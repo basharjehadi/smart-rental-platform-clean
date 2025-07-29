@@ -1,0 +1,214 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String?
+  role      UserRole @default(TENANT)
+  googleId  String?  @unique
+  
+  // Identity fields for contracts
+  firstName String?
+  lastName  String?
+  pesel     String?  // Polish national identification number
+  passportNumber String?
+  kartaPobytuNumber String? // Residence card number (renamed from kartaPobytu)
+  phoneNumber String? // Renamed from phone
+  
+  // Landlord-specific fields
+  dowodOsobistyNumber String? // Polish ID card number
+  address   String?
+  
+  // Profile and signature data
+  profileImage String? // Profile image URL
+  signatureBase64 String? // Base64 encoded signature image
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  rentalRequests RentalRequest[] @relation("TenantRequests")
+  offers         Offer[]         @relation("LandlordOffers")
+  payments       Payment[]       @relation("UserPayments")
+  rentPayments   RentPayment[]   @relation("TenantRentPayments")
+
+  @@map("users")
+}
+
+model RentalRequest {
+  id        Int      @id @default(autoincrement())
+  title     String
+  description String
+  location  String
+  moveInDate DateTime
+  budget    Float
+  bedrooms  Int?
+  bathrooms Int?
+  furnished Boolean  @default(false)
+  parking   Boolean  @default(false)
+  petsAllowed Boolean @default(false)
+  status    RentalRequestStatus @default(ACTIVE)
+  isLocked  Boolean  @default(false)
+  
+  // Enhanced fields for better landlord attraction
+  additionalRequirements String?
+  preferredNeighborhood String?
+  maxCommuteTime String?
+  mustHaveFeatures String?
+  flexibleOnMoveInDate Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  tenantId String
+  tenant   User     @relation("TenantRequests", fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  offer    Offer?   @relation("RequestOffer")
+  contractSignature ContractSignature? @relation("ContractSignature")
+  payments Payment[] @relation("RequestPayments")
+  
+  @@map("rental_requests")
+}
+
+model Offer {
+  id              String   @id @default(cuid())
+  rentAmount      Float
+  depositAmount   Float?
+  leaseDuration   Int      // in months
+  description     String?
+  utilitiesIncluded Boolean @default(false)
+  availableFrom   DateTime
+  status          OfferStatus @default(PENDING)
+  paymentIntentId String?
+  leaseStartDate  DateTime? // When the lease actually starts
+  leaseEndDate    DateTime? // When the lease ends
+  
+  // Property Information
+  propertyAddress String?
+  propertyImages  String? // JSON array of image URLs
+  propertyVideo   String? // Video URL
+  propertyType    String? // Apartment, House, Studio, etc.
+  propertySize    String? // Size in m²
+  propertyAmenities String? // JSON array of amenities
+  propertyDescription String? // Detailed property description
+  
+  // Contract Status
+  contractGenerated Boolean @default(false)
+  contractGeneratedAt DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  landlordId      String
+  landlord        User     @relation("LandlordOffers", fields: [landlordId], references: [id], onDelete: Cascade)
+  rentalRequestId Int      @unique
+  rentalRequest   RentalRequest @relation("RequestOffer", fields: [rentalRequestId], references: [id], onDelete: Cascade)
+  rentPayments    RentPayment[] @relation("OfferRentPayments")
+
+  @@map("offers")
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  amount          Float
+  status          PaymentStatus @default(PENDING)
+  purpose         PaymentPurpose
+  stripePaymentIntentId String? @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  userId          String
+  user            User     @relation("UserPayments", fields: [userId], references: [id], onDelete: Cascade)
+  rentalRequestId Int?
+  rentalRequest   RentalRequest? @relation("RequestPayments", fields: [rentalRequestId], references: [id], onDelete: SetNull)
+
+  @@map("payments")
+}
+
+model RentPayment {
+  id              String   @id @default(cuid())
+  amount          Float
+  status          PaymentStatus @default(PENDING)
+  dueDate         DateTime
+  paidDate        DateTime?
+  month           Int      // 1-12
+  year            Int      // e.g., 2024
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  offerId         String
+  offer           Offer    @relation("OfferRentPayments", fields: [offerId], references: [id], onDelete: Cascade)
+  tenantId        String
+  tenant          User     @relation("TenantRentPayments", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("rent_payments")
+}
+
+model ContractSignature {
+  id          String   @id @default(cuid())
+  rentalRequestId Int   @unique
+  tenantSignatureBase64 String?
+  landlordSignatureBase64 String?
+  signedAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  rentalRequest RentalRequest @relation("ContractSignature", fields: [rentalRequestId], references: [id], onDelete: Cascade)
+
+  @@map("contract_signatures")
+}
+
+enum UserRole {
+  TENANT
+  LANDLORD
+  ADMIN
+}
+
+enum RentalRequestStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+}
+
+enum RequestStatus {
+  ACTIVE
+  INACTIVE
+  FULFILLED
+  CANCELLED
+  LOCKED
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  PAID
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum PaymentPurpose {
+  DEPOSIT
+  RENT
+} 
