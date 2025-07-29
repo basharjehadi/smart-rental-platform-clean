@@ -80,6 +80,14 @@ function App() {
               } 
             />
             <Route 
+              path="/payment/:offerId" 
+              element={
+                <ProtectedRoute>
+                  <PaymentPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/my-rents" 
               element={
                 <ProtectedRoute>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ContractViewer from '../components/ContractViewer';
+import PropertyMediaViewer from '../components/PropertyMediaViewer';
 
 const MyOffers = () => {
   const [offers, setOffers] = useState([]);
@@ -9,6 +10,7 @@ const MyOffers = () => {
   const [error, setError] = useState('');
   const [updatingOffer, setUpdatingOffer] = useState(null);
   const [contractEligibility, setContractEligibility] = useState({});
+  const [expandedOffers, setExpandedOffers] = useState(new Set());
 
   const { api } = useAuth();
   const navigate = useNavigate();
@@ -140,122 +142,54 @@ const MyOffers = () => {
   };
 
   const renderPropertyInfo = (offer) => {
-    if (!offer.propertyAddress) return null;
+    const hasPropertyInfo = offer.propertyAddress || offer.propertyImages || offer.propertyVideo || offer.propertyType || offer.propertySize || offer.propertyAmenities || offer.propertyDescription;
+    
+    if (!hasPropertyInfo) {
+      return null;
+    }
 
-    const propertyImages = offer.propertyImages ? JSON.parse(offer.propertyImages) : [];
-    const propertyAmenities = offer.propertyAmenities ? JSON.parse(offer.propertyAmenities) : [];
+    const isExpanded = expandedOffers.has(offer.id);
 
     return (
-      <div className="mb-6 border-t pt-4">
-        <h4 className="text-sm font-medium text-gray-900 mb-3">Property Information</h4>
+      <div className="mb-4">
+        <button
+          onClick={() => {
+            const newExpanded = new Set(expandedOffers);
+            if (isExpanded) {
+              newExpanded.delete(offer.id);
+            } else {
+              newExpanded.add(offer.id);
+            }
+            setExpandedOffers(newExpanded);
+          }}
+          className="w-full flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+        >
+          <span className="text-sm font-medium text-blue-900">
+            📷 View Property Details
+          </span>
+          <svg 
+            className={`w-4 h-4 text-blue-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
         
-        <div className="space-y-3">
-          <div>
-            <span className="text-sm font-medium text-gray-700">Address:</span>
-            <p className="text-sm text-gray-600">{offer.propertyAddress}</p>
+        {isExpanded && (
+          <div className="mt-3">
+            <PropertyMediaViewer
+              propertyImages={offer.propertyImages}
+              propertyVideo={offer.propertyVideo}
+              propertyAddress={offer.propertyAddress}
+              propertyType={offer.propertyType}
+              propertySize={offer.propertySize}
+              propertyAmenities={offer.propertyAmenities}
+              propertyDescription={offer.propertyDescription}
+            />
           </div>
-          
-          {offer.propertyType && (
-            <div>
-              <span className="text-sm font-medium text-gray-700">Type:</span>
-              <span className="text-sm text-gray-600 ml-2">{offer.propertyType}</span>
-            </div>
-          )}
-          
-          {offer.propertySize && (
-            <div>
-              <span className="text-sm font-medium text-gray-700">Size:</span>
-              <span className="text-sm text-gray-600 ml-2">{offer.propertySize}</span>
-            </div>
-          )}
-          
-          {propertyAmenities.length > 0 && (
-            <div>
-              <span className="text-sm font-medium text-gray-700">Amenities:</span>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {propertyAmenities.map((amenity, index) => (
-                  <span key={index} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                    {amenity}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {propertyImages.length > 0 && (
-            <div>
-              <span className="text-sm font-medium text-gray-700">Images:</span>
-              <div className="grid grid-cols-3 gap-2 mt-2">
-                {propertyImages.slice(0, 6).map((imageUrl, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={imageUrl}
-                      alt={`Property ${index + 1}`}
-                      className="w-full h-20 object-cover rounded border cursor-pointer"
-                      onClick={() => window.open(imageUrl, '_blank')}
-                      onError={(e) => e.target.style.display = 'none'}
-                    />
-                    {index === 5 && propertyImages.length > 6 && (
-                      <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-white text-xs font-medium rounded">
-                        +{propertyImages.length - 6}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {propertyImages.length > 6 && (
-                <button
-                  onClick={() => {
-                    const imageUrls = propertyImages.join('\n');
-                    const newWindow = window.open();
-                    newWindow.document.write(`
-                      <html>
-                        <head><title>Property Images</title></head>
-                        <body style="margin: 0; padding: 20px; background: #f5f5f5;">
-                          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                            ${propertyImages.map(url => `
-                              <img src="${url}" style="width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
-                            `).join('')}
-                          </div>
-                        </body>
-                      </html>
-                    `);
-                  }}
-                  className="text-xs text-blue-600 hover:text-blue-800 mt-2"
-                >
-                  View all {propertyImages.length} images →
-                </button>
-              )}
-            </div>
-          )}
-          
-          {offer.propertyVideo && (
-            <div>
-              <span className="text-sm font-medium text-gray-700">Video:</span>
-              <div className="mt-2">
-                <video
-                  src={offer.propertyVideo}
-                  controls
-                  className="w-full h-48 object-cover rounded border"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'block';
-                  }}
-                />
-                <div style={{ display: 'none' }} className="text-sm text-gray-500 mt-1">
-                  Video not available. <a href={offer.propertyVideo} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">Try direct link →</a>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {offer.propertyDescription && (
-            <div>
-              <span className="text-sm font-medium text-gray-700">Description:</span>
-              <p className="text-sm text-gray-600 mt-1">{offer.propertyDescription}</p>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     );
   };
@@ -347,21 +281,36 @@ const MyOffers = () => {
                 {renderPropertyInfo(offer)}
 
                 {offer.status === 'PENDING' && (
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleOfferAction(offer.id, 'ACCEPTED')}
-                      disabled={updatingOffer === offer.id}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
-                    >
-                      {updatingOffer === offer.id ? 'Accepting...' : 'Accept'}
-                    </button>
-                    <button
-                      onClick={() => handleOfferAction(offer.id, 'REJECTED')}
-                      disabled={updatingOffer === offer.id}
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
-                    >
-                      {updatingOffer === offer.id ? 'Rejecting...' : 'Reject'}
-                    </button>
+                  <div className="space-y-3">
+                    {/* Helpful message for pending offers */}
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <div className="flex items-start">
+                        <svg className="w-5 h-5 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <div className="text-sm text-yellow-800">
+                          <p className="font-medium">Review property details before accepting</p>
+                          <p className="mt-1">Click "View Property Details" above to see photos, videos, and property information.</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleOfferAction(offer.id, 'ACCEPTED')}
+                        disabled={updatingOffer === offer.id}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                      >
+                        {updatingOffer === offer.id ? 'Accepting...' : 'Accept'}
+                      </button>
+                      <button
+                        onClick={() => handleOfferAction(offer.id, 'REJECTED')}
+                        disabled={updatingOffer === offer.id}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                      >
+                        {updatingOffer === offer.id ? 'Rejecting...' : 'Reject'}
+                      </button>
+                    </div>
                   </div>
                 )}
 

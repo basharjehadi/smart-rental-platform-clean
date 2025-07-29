@@ -73,6 +73,22 @@ app.use('/uploads/profile_images', (req, res, next) => {
   next();
 }, express.static('uploads/profile_images'));
 
+// Serve property images specifically
+app.use('/uploads/property_images', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+}, express.static('uploads/property_images'));
+
+// Serve property videos specifically
+app.use('/uploads/property_videos', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+}, express.static('uploads/property_videos'));
+
 // Special handling for Stripe webhooks (raw body)
 app.use('/api/stripe-webhook', express.raw({ type: 'application/json' }));
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
@@ -276,34 +276,38 @@ const PaymentPage = () => {
   
   const { api } = useAuth();
   const navigate = useNavigate();
+  const { offerId } = useParams(); // Get offer ID from URL
 
-  // Fetch accepted offer on component mount
+  // Fetch specific offer on component mount
   useEffect(() => {
-    fetchAcceptedOffer();
-  }, []);
+    if (offerId) {
+      fetchOfferById(offerId);
+    } else {
+      fetchAcceptedOffer();
+    }
+  }, [offerId]);
 
-  const fetchAcceptedOffer = async () => {
+  const fetchOfferById = async (id) => {
     try {
       setLoading(true);
       setError('');
       
-      console.log('Fetching accepted offer...');
-      const response = await api.get('/offers/my?status=ACCEPTED');
-      console.log('Accepted offers response:', response.data);
+      console.log('Fetching offer by ID:', id);
+      const response = await api.get(`/offers/id/${id}`);
+      console.log('Offer response:', response.data);
       
-      const offers = response.data.offers || response.data || [];
-      const acceptedOffer = offers.find(o => o.status === 'ACCEPTED');
+      const offerData = response.data.offer || response.data;
       
-      if (acceptedOffer) {
-        console.log('Found accepted offer:', acceptedOffer);
-        setOffer(acceptedOffer);
+      if (offerData && offerData.status === 'ACCEPTED') {
+        console.log('Found accepted offer:', offerData);
+        setOffer(offerData);
       } else {
-        console.log('No accepted offer found');
-        setError('No accepted offer found. Please accept an offer first.');
+        console.log('Offer not found or not accepted');
+        setError('Offer not found or not accepted. Please accept an offer first.');
       }
     } catch (error) {
-      console.error('Error fetching accepted offer:', error);
-      setError(error.response?.data?.error || 'Failed to fetch accepted offer');
+      console.error('Error fetching offer:', error);
+      setError(error.response?.data?.error || 'Failed to fetch offer');
     } finally {
       setLoading(false);
     }

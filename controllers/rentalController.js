@@ -126,15 +126,10 @@ const getMyRequests = async (req, res) => {
 // Get all active rental requests (landlord only)
 const getAllActiveRequests = async (req, res) => {
   try {
+    // Get all active rental requests
     const rentalRequests = await prisma.rentalRequest.findMany({
       where: {
-        status: 'ACTIVE',
-        // Exclude requests where the current landlord has already made an offer
-        NOT: {
-          offer: {
-            landlordId: req.user.id
-          }
-        }
+        status: 'ACTIVE'
       },
       include: {
         tenant: {
@@ -161,8 +156,25 @@ const getAllActiveRequests = async (req, res) => {
       }
     });
 
+    // Process the requests to add offer status for the current landlord
+    const processedRequests = rentalRequests.map(request => {
+      const myOffer = request.offer && request.offer.landlordId === req.user.id ? request.offer : null;
+      
+      return {
+        ...request,
+        myOffer: myOffer ? {
+          id: myOffer.id,
+          status: myOffer.status,
+          rentAmount: myOffer.rentAmount,
+          createdAt: myOffer.createdAt,
+          updatedAt: myOffer.updatedAt
+        } : null,
+        hasMyOffer: !!myOffer
+      };
+    });
+
     res.json({
-      rentalRequests
+      rentalRequests: processedRequests
     });
   } catch (error) {
     console.error('Get all active requests error:', error);
@@ -357,6 +369,67 @@ const getOfferForRequest = async (req, res) => {
   }
 };
 
+// Get offer by ID (tenant only)
+const getOfferById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('getOfferById called with ID:', id);
+    console.log('User ID:', req.user.id);
+
+    // Find the offer with rental request details
+    const offer = await prisma.offer.findUnique({
+      where: { id: id }, // Remove parseInt since ID is a string
+      include: {
+        rentalRequest: {
+          include: {
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        },
+        landlord: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    console.log('Found offer:', offer);
+
+    if (!offer) {
+      console.log('Offer not found');
+      return res.status(404).json({
+        error: 'Offer not found.'
+      });
+    }
+
+    // Check if the offer belongs to the logged-in tenant
+    if (offer.rentalRequest.tenantId !== req.user.id) {
+      console.log('Access denied - offer belongs to tenant:', offer.rentalRequest.tenantId, 'but user is:', req.user.id);
+      return res.status(403).json({
+        error: 'Access denied. This offer does not belong to you.'
+      });
+    }
+
+    console.log('Returning offer successfully');
+    res.json({
+      offer: offer
+    });
+  } catch (error) {
+    console.error('Get offer by ID error:', error);
+    res.status(500).json({
+      error: 'Internal server error.'
+    });
+  }
+};
+
 // Get all offers for the logged-in tenant
 const getMyOffers = async (req, res) => {
   try {
@@ -388,8 +461,21 @@ const getMyOffers = async (req, res) => {
       }
     });
 
+    // Process offers to include property information
+    const processedOffers = offers.map(offer => ({
+      ...offer,
+      // Include all property information fields
+      propertyAddress: offer.propertyAddress,
+      propertyImages: offer.propertyImages,
+      propertyVideo: offer.propertyVideo,
+      propertyType: offer.propertyType,
+      propertySize: offer.propertySize,
+      propertyAmenities: offer.propertyAmenities,
+      propertyDescription: offer.propertyDescription
+    }));
+
     res.json({
-      offers
+      offers: processedOffers
     });
   } catch (error) {
     console.error('Get my offers error:', error);
@@ -1046,6 +1132,7 @@ export {
   getAllActiveRequests,
   createOffer,
   getOfferForRequest,
+  getOfferById,
   getMyOffers,
   updateOfferStatus,
   updateOfferPaymentStatus,

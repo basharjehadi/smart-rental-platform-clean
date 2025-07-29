@@ -5,6 +5,7 @@ import {
   getAllActiveRequests,
   createOffer,
   getOfferForRequest,
+  getOfferById,
   getMyOffers,
   updateOfferStatus,
   updateOfferPaymentStatus,
@@ -33,6 +34,7 @@ router.delete('/rental-request/:id', requireTenant, deleteRentalRequest);
 router.get('/current-rental-status', requireTenant, getCurrentRentalStatus);
 router.get('/my-rents', requireTenant, getMyRentPayments);
 router.get('/offers/my', requireTenant, getMyOffers);
+router.get('/offers/id/:id', requireTenant, getOfferById);
 router.get('/offers/:requestId', requireTenant, getOfferForRequest);
 router.put('/offers/:id/status', requireTenant, requireCompleteProfile, updateOfferStatus);
 router.put('/offers/:id/payment-status', requireTenant, updateOfferPaymentStatus);

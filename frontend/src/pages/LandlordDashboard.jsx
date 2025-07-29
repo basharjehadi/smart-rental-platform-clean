@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+import FileUpload from '../components/FileUpload';
 
 const LandlordDashboard = () => {
   const [rentalRequests, setRentalRequests] = useState([]);
@@ -17,13 +18,15 @@ const LandlordDashboard = () => {
     availableFrom: '',
     description: '',
     propertyAddress: '',
-    propertyImages: '',
+    propertyImages: [],
     propertyVideo: '',
     propertyType: '',
     propertySize: '',
     propertyAmenities: '',
     propertyDescription: ''
   });
+  const [uploadedImages, setUploadedImages] = useState([]);
+  const [uploadedVideo, setUploadedVideo] = useState('');
   const [submittingOffer, setSubmittingOffer] = useState(false);
   const [offerError, setOfferError] = useState('');
   const [offerSuccess, setOfferSuccess] = useState('');
@@ -62,13 +65,10 @@ const LandlordDashboard = () => {
       
       const response = await api.get('/rental-requests');
       
-      // The backend returns { rentalRequests: [...] }
+      // The backend now returns all active requests with offer status
       const requests = response.data.rentalRequests || [];
       
-      // Backend already filters for ACTIVE requests, but let's double-check
-      const activeRequests = requests.filter(request => request.status === 'ACTIVE');
-      
-      setRentalRequests(activeRequests);
+      setRentalRequests(requests);
     } catch (error) {
       console.error('Error fetching rental requests:', error);
       
@@ -124,16 +124,37 @@ const LandlordDashboard = () => {
       availableFrom: '',
       description: '',
       propertyAddress: '',
-      propertyImages: '',
+      propertyImages: [],
       propertyVideo: '',
       propertyType: '',
       propertySize: '',
       propertyAmenities: '',
       propertyDescription: ''
     });
+    setUploadedImages([]);
+    setUploadedVideo('');
     setOfferError('');
     setOfferSuccess('');
     setShowModal(true);
+  };
+
+  const handleViewOfferDetails = (request) => {
+    // For now, we'll show the offer details in an alert
+    // In the future, this could open a modal with detailed offer information
+    const offer = request.myOffer;
+    const statusMessages = {
+      'PENDING': 'Your offer is pending tenant review',
+      'ACCEPTED': 'Your offer has been accepted by the tenant',
+      'REJECTED': 'Your offer was rejected by the tenant'
+    };
+    
+    alert(`Offer Details:
+Status: ${offer.status}
+Rent Amount: ${formatCurrency(offer.rentAmount)}
+Sent: ${formatDate(offer.createdAt)}
+Last Updated: ${formatDate(offer.updatedAt)}
+
+${statusMessages[offer.status] || 'Unknown status'}`);
   };
 
   const handleOfferChange = (e) => {
@@ -142,6 +163,40 @@ const LandlordDashboard = () => {
       ...prev,
       [name]: value
     }));
+  };
+
+  // File upload handlers
+  const handleImagesUploaded = (imageUrls) => {
+    setUploadedImages(imageUrls);
+    setOfferData(prev => ({
+      ...prev,
+      propertyImages: imageUrls
+    }));
+  };
+
+  const handleVideoUploaded = (videoUrl) => {
+    setUploadedVideo(videoUrl);
+    setOfferData(prev => ({
+      ...prev,
+      propertyVideo: videoUrl
+    }));
+  };
+
+  const handleFileDeleted = (fileUrl, isVideo = false) => {
+    if (isVideo) {
+      setUploadedVideo('');
+      setOfferData(prev => ({
+        ...prev,
+        propertyVideo: ''
+      }));
+    } else {
+      const updatedImages = uploadedImages.filter(url => url !== fileUrl);
+      setUploadedImages(updatedImages);
+      setOfferData(prev => ({
+        ...prev,
+        propertyImages: updatedImages
+      }));
+    }
   };
 
   const validateOffer = () => {
@@ -167,11 +222,13 @@ const LandlordDashboard = () => {
     setOfferSuccess('');
 
     try {
-      // Convert string inputs to arrays for backend
-      const propertyImagesArray = offerData.propertyImages
-        .split('\n')
-        .map(url => url.trim())
-        .filter(url => url.length > 0);
+      // Handle property images (now an array)
+      const propertyImagesArray = Array.isArray(offerData.propertyImages) 
+        ? offerData.propertyImages 
+        : offerData.propertyImages
+            .split('\n')
+            .map(url => url.trim())
+            .filter(url => url.length > 0);
       
       const propertyAmenitiesArray = offerData.propertyAmenities
         .split('\n')
@@ -196,13 +253,15 @@ const LandlordDashboard = () => {
         availableFrom: '',
         description: '',
         propertyAddress: '',
-        propertyImages: '',
+        propertyImages: [],
         propertyVideo: '',
         propertyType: '',
         propertySize: '',
         propertyAmenities: '',
         propertyDescription: ''
       });
+      setUploadedImages([]);
+      setUploadedVideo('');
       
       // Refresh the rental requests list
       fetchRentalRequests();
@@ -224,13 +283,15 @@ const LandlordDashboard = () => {
       availableFrom: '',
       description: '',
       propertyAddress: '',
-      propertyImages: '',
+      propertyImages: [],
       propertyVideo: '',
       propertyType: '',
       propertySize: '',
       propertyAmenities: '',
       propertyDescription: ''
     });
+    setUploadedImages([]);
+    setUploadedVideo('');
     setOfferError('');
     setOfferSuccess('');
   };
@@ -334,6 +395,73 @@ const LandlordDashboard = () => {
           </div>
         )}
 
+        {/* Request Summary */}
+        {rentalRequests.length > 0 && (
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded-lg shadow-sm border">
+              <div className="flex items-center">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">Total Requests</p>
+                  <p className="text-2xl font-semibold text-gray-900">{rentalRequests.length}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white p-4 rounded-lg shadow-sm border">
+              <div className="flex items-center">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">New Requests</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {rentalRequests.filter(r => !r.hasMyOffer).length}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white p-4 rounded-lg shadow-sm border">
+              <div className="flex items-center">
+                <div className="p-2 bg-yellow-100 rounded-lg">
+                  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">Pending Offers</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {rentalRequests.filter(r => r.hasMyOffer && r.myOffer.status === 'PENDING').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white p-4 rounded-lg shadow-sm border">
+              <div className="flex items-center">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">Accepted Offers</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {rentalRequests.filter(r => r.hasMyOffer && r.myOffer.status === 'ACCEPTED').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Rental Requests Grid */}
         {rentalRequests.length === 0 ? (
           <div className="text-center py-12">
@@ -416,14 +544,64 @@ const LandlordDashboard = () => {
                     <p className="text-sm text-gray-600">{request.tenant.name}</p>
                   </div>
 
-                  {/* Send Offer Button */}
+                  {/* Send Offer Button or Offer Status */}
                   <div className="mt-6">
-                    <button
-                      onClick={() => handleSendOffer(request)}
-                      className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                    >
-                      Send Offer
-                    </button>
+                    {request.hasMyOffer ? (
+                      <div className="space-y-3">
+                        {/* Offer Status Badge */}
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm font-medium text-gray-900">Your Offer:</span>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              request.myOffer.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                              request.myOffer.status === 'ACCEPTED' ? 'bg-green-100 text-green-800' :
+                              request.myOffer.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {request.myOffer.status}
+                            </span>
+                          </div>
+                          <span className="text-sm font-semibold text-green-600">
+                            {formatCurrency(request.myOffer.rentAmount)}
+                          </span>
+                        </div>
+                        
+                        {/* Offer Details */}
+                        <div className="text-xs text-gray-500 space-y-1">
+                          <div>Sent: {formatDate(request.myOffer.createdAt)}</div>
+                          {request.myOffer.status === 'PENDING' && (
+                            <div className="text-yellow-600">
+                              Waiting for tenant response...
+                            </div>
+                          )}
+                          {request.myOffer.status === 'ACCEPTED' && (
+                            <div className="text-green-600">
+                              ✅ Offer accepted by tenant
+                            </div>
+                          )}
+                          {request.myOffer.status === 'REJECTED' && (
+                            <div className="text-red-600">
+                              ❌ Offer rejected by tenant
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* View Offer Details Button */}
+                        <button
+                          onClick={() => handleViewOfferDetails(request)}
+                          className="w-full bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors text-sm"
+                        >
+                          View Offer Details
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleSendOffer(request)}
+                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                      >
+                        Send Offer
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -616,32 +794,14 @@ const LandlordDashboard = () => {
                     
                     {/* File Upload Section */}
                     <div className="mt-6">
-                      <label htmlFor="propertyImages" className="block text-sm font-medium text-gray-700 mb-1">
-                        Property Images (URLs, one per line)
-                      </label>
-                      <textarea
-                        id="propertyImages"
-                        name="propertyImages"
-                        value={offerData.propertyImages}
-                        onChange={handleOfferChange}
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"
-                      />
-                    </div>
-
-                    <div className="mt-6">
-                      <label htmlFor="propertyVideo" className="block text-sm font-medium text-gray-700 mb-1">
-                        Property Video (URL)
-                      </label>
-                      <input
-                        type="url"
-                        id="propertyVideo"
-                        name="propertyVideo"
-                        value={offerData.propertyVideo}
-                        onChange={handleOfferChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="https://example.com/video.mp4"
+                      <h4 className="text-md font-medium text-gray-900 mb-4">Property Media</h4>
+                      <FileUpload
+                        onImagesUploaded={handleImagesUploaded}
+                        onVideoUploaded={handleVideoUploaded}
+                        onFileDeleted={handleFileDeleted}
+                        maxImages={10}
+                        maxVideoSize={50 * 1024 * 1024} // 50MB
+                        maxImageSize={10 * 1024 * 1024} // 10MB
                       />
                     </div>
                     
