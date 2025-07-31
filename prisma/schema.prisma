@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "sqlite" // Using SQLite for development
   url      = "file:./dev.db"
 }
 
@@ -23,8 +23,8 @@ model User {
   lastName  String?
   pesel     String?  // Polish national identification number
   passportNumber String?
-  kartaPobytuNumber String? // Residence card number (renamed from kartaPobytu)
-  phoneNumber String? // Renamed from phone
+  kartaPobytuNumber String? // Residence card number
+  phoneNumber String?
   
   // Landlord-specific fields
   dowodOsobistyNumber String? // Polish ID card number
@@ -33,6 +33,18 @@ model User {
   // Profile and signature data
   profileImage String? // Profile image URL
   signatureBase64 String? // Base64 encoded signature image
+  identityDocument String? // Identity document filename
+  isVerified Boolean @default(false) // KYC verification status
+  
+  // 🚀 SCALABILITY: Landlord capacity management
+  availability Boolean @default(true) // Whether landlord is accepting new requests
+  totalCapacity Int @default(10) // Maximum number of properties landlord can manage
+  activeContracts Int @default(0) // Current number of active contracts
+  
+  // 🚀 SCALABILITY: Performance tracking
+  lastActiveAt DateTime @default(now())
+  requestCount Int @default(0) // Number of requests processed
+  responseTime Int? // Average response time in ms
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -42,8 +54,46 @@ model User {
   offers         Offer[]         @relation("LandlordOffers")
   payments       Payment[]       @relation("UserPayments")
   rentPayments   RentPayment[]   @relation("TenantRentPayments")
+  landlordProfile LandlordProfile? @relation("LandlordProfile")
+  landlordRequestMatches LandlordRequestMatch[] @relation("LandlordMatches")
 
   @@map("users")
+  @@index([role, availability, activeContracts]) // 🚀 SCALABILITY: Composite index for landlord queries
+  @@index([email]) // 🚀 SCALABILITY: Email lookup optimization
+  @@index([lastActiveAt]) // 🚀 SCALABILITY: Activity tracking
+}
+
+// 🚀 SCALABILITY: New model for landlord-specific data
+model LandlordProfile {
+  id String @id @default(cuid())
+  
+  // Location preferences for efficient matching
+  preferredLocations String? // JSON string of preferred cities/areas
+  maxBudget Float? // Maximum budget landlord typically works with
+  minBudget Float? // Minimum budget landlord typically works with
+  
+  // Property types and preferences
+  propertyTypes String? // JSON string of property types ["apartment", "house", "studio"]
+  amenities String? // JSON string of amenities ["parking", "furnished", "pets_allowed"]
+  
+  // Response preferences
+  autoResponse Boolean @default(false) // Auto-generate offers
+  responseTemplate String? // Template for auto-responses
+  
+  // Performance metrics
+  averageResponseTime Int? // Average time to respond to requests
+  acceptanceRate Float? // Percentage of offers accepted
+  
+  // Relations
+  userId String @unique
+  user User @relation("LandlordProfile", fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("landlord_profiles")
+  @@index([preferredLocations]) // 🚀 SCALABILITY: Location-based queries
+  @@index([maxBudget, minBudget]) // 🚀 SCALABILITY: Budget range queries
 }
 
 model RentalRequest {
@@ -68,8 +118,16 @@ model RentalRequest {
   mustHaveFeatures String?
   flexibleOnMoveInDate Boolean @default(false)
   
+  // 🚀 SCALABILITY: Request pool management
+  poolStatus RequestPoolStatus @default(ACTIVE) // ACTIVE, MATCHED, EXPIRED, CANCELLED
+  matchScore Float? // Algorithm-generated match score
+  viewCount Int @default(0) // Number of landlords who viewed this request
+  responseCount Int @default(0) // Number of offers received
+  
+  // 🚀 SCALABILITY: Performance tracking
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  expiresAt DateTime? // When request expires from pool
   
   // Relations
   tenantId String
@@ -77,9 +135,15 @@ model RentalRequest {
   
   offer    Offer?   @relation("RequestOffer")
   contractSignature ContractSignature? @relation("ContractSignature")
+  contract Contract? @relation("Contract")
   payments Payment[] @relation("RequestPayments")
+  landlordRequestMatches LandlordRequestMatch[] @relation("RequestMatches")
   
   @@map("rental_requests")
+  @@index([location, status, poolStatus]) // 🚀 SCALABILITY: Location-based request queries
+  @@index([budget, status]) // 🚀 SCALABILITY: Budget-based filtering
+  @@index([createdAt, poolStatus]) // 🚀 SCALABILITY: Time-based queries
+  @@index([tenantId, status]) // 🚀 SCALABILITY: User's requests
 }
 
 model Offer {
@@ -97,83 +161,199 @@ model Offer {
   
   // Property Information
   propertyAddress String?
-  propertyImages  String? // JSON array of image URLs
-  propertyVideo   String? // Video URL
-  propertyType    String? // Apartment, House, Studio, etc.
-  propertySize    String? // Size in m²
-  propertyAmenities String? // JSON array of amenities
-  propertyDescription String? // Detailed property description
+  propertyImages  String? // JSON string of image URLs
+  propertyVideo   String?
+  propertyType    String?
+  propertySize    String?
+  propertyAmenities String?
+  propertyDescription String?
   
-  // Contract Status
-  contractGenerated Boolean @default(false)
-  contractGeneratedAt DateTime?
+  // 🚀 SCALABILITY: House rules support
+  rulesText String?
+  rulesPdf  String?
   
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relationships
-  landlordId      String
-  landlord        User     @relation("LandlordOffers", fields: [landlordId], references: [id], onDelete: Cascade)
-  rentalRequestId Int      @unique
+  // 🚀 SCALABILITY: Payment gateway selection
+  preferredPaymentGateway PaymentGateway?
+  
+  // 🚀 SCALABILITY: Performance tracking
+  responseTime Int? // Time from request to offer in ms
+  matchScore Float? // How well this offer matches the request
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  rentalRequestId Int @unique
   rentalRequest   RentalRequest @relation("RequestOffer", fields: [rentalRequestId], references: [id], onDelete: Cascade)
-  rentPayments    RentPayment[] @relation("OfferRentPayments")
-
+  
+  landlordId String
+  landlord   User     @relation("LandlordOffers", fields: [landlordId], references: [id], onDelete: Cascade)
+  
+  payments Payment[] @relation("OfferPayments")
+  
   @@map("offers")
+  @@index([landlordId, status]) // 🚀 SCALABILITY: Landlord's offers
+  @@index([rentalRequestId, status]) // 🚀 SCALABILITY: Request's offers
+  @@index([status, createdAt]) // 🚀 SCALABILITY: Status-based queries
 }
 
 model Payment {
   id              String   @id @default(cuid())
   amount          Float
+  currency        String   @default("PLN")
   status          PaymentStatus @default(PENDING)
+  paymentIntentId String?  @unique
   purpose         PaymentPurpose
-  stripePaymentIntentId String? @unique
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relationships
-  userId          String
-  user            User     @relation("UserPayments", fields: [userId], references: [id], onDelete: Cascade)
+  gateway         PaymentGateway
+  
+  // 🚀 SCALABILITY: Enhanced payment tracking
+  processingTime Int? // Time from creation to completion in ms
+  retryCount Int @default(0) // Number of retry attempts
+  errorMessage String? // Last error message if failed
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  paidAt    DateTime?
+  
+  // Relations
+  userId String
+  user   User   @relation("UserPayments", fields: [userId], references: [id], onDelete: Cascade)
+  
   rentalRequestId Int?
   rentalRequest   RentalRequest? @relation("RequestPayments", fields: [rentalRequestId], references: [id], onDelete: SetNull)
-
+  
+  offerId String?
+  offer   Offer? @relation("OfferPayments", fields: [offerId], references: [id], onDelete: SetNull)
+  
+  rentPayments RentPayment[] @relation("PaymentRentPayments")
+  
   @@map("payments")
+  @@index([userId, status]) // 🚀 SCALABILITY: User's payments
+  @@index([status, createdAt]) // 🚀 SCALABILITY: Payment status queries
+  @@index([paymentIntentId]) // 🚀 SCALABILITY: Payment intent lookup
 }
 
 model RentPayment {
-  id              String   @id @default(cuid())
-  amount          Float
-  status          PaymentStatus @default(PENDING)
-  dueDate         DateTime
-  paidDate        DateTime?
-  month           Int      // 1-12
-  year            Int      // e.g., 2024
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relationships
-  offerId         String
-  offer           Offer    @relation("OfferRentPayments", fields: [offerId], references: [id], onDelete: Cascade)
-  tenantId        String
-  tenant          User     @relation("TenantRentPayments", fields: [tenantId], references: [id], onDelete: Cascade)
-
+  id        String   @id @default(cuid())
+  amount    Float
+  status    PaymentStatus @default(PENDING)
+  dueDate   DateTime
+  paidDate  DateTime?
+  month     Int
+  year      Int
+  
+  // 🚀 SCALABILITY: Enhanced rent tracking
+  lateFee Float @default(0) // Late payment fees
+  gracePeriod Int @default(5) // Days of grace period
+  isOverdue Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  userId String
+  user   User   @relation("TenantRentPayments", fields: [userId], references: [id], onDelete: Cascade)
+  
+  paymentId String?
+  payment   Payment? @relation("PaymentRentPayments", fields: [paymentId], references: [id], onDelete: SetNull)
+  
   @@map("rent_payments")
+  @@index([userId, month, year]) // 🚀 SCALABILITY: User's rent history
+  @@index([status, dueDate]) // 🚀 SCALABILITY: Overdue payments
+  @@index([isOverdue, dueDate]) // 🚀 SCALABILITY: Overdue tracking
 }
 
 model ContractSignature {
-  id          String   @id @default(cuid())
-  rentalRequestId Int   @unique
-  tenantSignatureBase64 String?
-  landlordSignatureBase64 String?
-  signedAt    DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relationships
-  rentalRequest RentalRequest @relation("ContractSignature", fields: [rentalRequestId], references: [id], onDelete: Cascade)
-
+  id        String   @id @default(cuid())
+  signature String   // Base64 encoded signature
+  signedAt  DateTime @default(now())
+  
+  // Relations
+  rentalRequestId Int @unique
+  rentalRequest   RentalRequest @relation("ContractSignature", fields: [rentalRequestId], references: [id], onDelete: Cascade)
+  
   @@map("contract_signatures")
 }
 
+model Contract {
+  id              String   @id @default(cuid())
+  contractNumber  String   @unique
+  status          ContractStatus @default(GENERATED)
+  pdfUrl          String?
+  signedAt        DateTime?
+  
+  // 🚀 SCALABILITY: Contract metadata
+  generationTime Int? // Time to generate contract in ms
+  fileSize Int? // PDF file size in bytes
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  rentalRequestId Int @unique
+  rentalRequest   RentalRequest @relation("Contract", fields: [rentalRequestId], references: [id], onDelete: Cascade)
+  
+  @@map("contracts")
+  @@index([status, signedAt]) // 🚀 SCALABILITY: Contract status queries
+  @@index([contractNumber]) // 🚀 SCALABILITY: Contract number lookup
+}
+
+// 🚀 SCALABILITY: New model for request pool analytics
+model RequestPoolAnalytics {
+  id String @id @default(cuid())
+  
+  // Pool metrics
+  totalRequests Int @default(0)
+  activeRequests Int @default(0)
+  matchedRequests Int @default(0)
+  expiredRequests Int @default(0)
+  
+  // Performance metrics
+  averageResponseTime Int? // Average time for landlords to respond
+  averageMatchScore Float? // Average match score
+  conversionRate Float? // Requests to offers conversion rate
+  
+  // Location-based metrics
+  location String
+  requestCount Int @default(0)
+  landlordCount Int @default(0) // Number of active landlords in this location
+  
+  // Time-based tracking
+  date DateTime @default(now())
+  
+  @@map("request_pool_analytics")
+  @@index([location, date]) // 🚀 SCALABILITY: Location-based analytics
+  @@index([date]) // 🚀 SCALABILITY: Time-based analytics
+}
+
+// 🚀 SCALABILITY: New model for landlord-request matching
+model LandlordRequestMatch {
+  id String @id @default(cuid())
+  
+  // Match details
+  matchScore Float // 0-100 score
+  matchReason String? // Why this match was made
+  isViewed Boolean @default(false)
+  isResponded Boolean @default(false)
+  
+  // Relations
+  landlordId String
+  landlord User @relation("LandlordMatches", fields: [landlordId], references: [id], onDelete: Cascade)
+  
+  rentalRequestId Int
+  rentalRequest RentalRequest @relation("RequestMatches", fields: [rentalRequestId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([landlordId, rentalRequestId]) // Prevent duplicate matches
+  @@map("landlord_request_matches")
+  @@index([landlordId, matchScore]) // 🚀 SCALABILITY: Landlord's best matches
+  @@index([rentalRequestId, matchScore]) // 🚀 SCALABILITY: Request's best matches
+  @@index([isViewed, isResponded]) // 🚀 SCALABILITY: Response tracking
+}
+
+// Enums
 enum UserRole {
   TENANT
   LANDLORD
@@ -182,16 +362,22 @@ enum UserRole {
 
 enum RentalRequestStatus {
   ACTIVE
-  INACTIVE
+  LOCKED
+  COMPLETED
+  CANCELLED
+}
+
+enum RequestPoolStatus {
+  ACTIVE
+  MATCHED
   EXPIRED
+  CANCELLED
 }
 
 enum RequestStatus {
-  ACTIVE
-  INACTIVE
-  FULFILLED
-  CANCELLED
-  LOCKED
+  PENDING
+  ACCEPTED
+  REJECTED
 }
 
 enum OfferStatus {
@@ -199,16 +385,32 @@ enum OfferStatus {
   ACCEPTED
   REJECTED
   PAID
-  EXPIRED
 }
 
 enum PaymentStatus {
   PENDING
   SUCCEEDED
   FAILED
+  CANCELLED
 }
 
 enum PaymentPurpose {
   DEPOSIT
   RENT
+  DEPOSIT_AND_FIRST_MONTH
+}
+
+enum ContractStatus {
+  GENERATED
+  TENANT_SIGNED
+  LANDLORD_SIGNED
+  COMPLETED
+  EXPIRED
+}
+
+enum PaymentGateway {
+  STRIPE
+  PAYU
+  P24
+  TPAY
 } 

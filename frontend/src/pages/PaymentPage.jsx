@@ -33,13 +33,22 @@ const PaymentForm = ({ offer, onPaymentSuccess }) => {
       setLoading(true);
       setError('');
       
+      // Calculate total payment: deposit + first month's rent
+      const depositAmount = offer.depositAmount || 0;
+      const firstMonthRent = offer.rentAmount || 0;
+      const totalAmount = depositAmount + firstMonthRent;
+      
       console.log('Creating payment intent for offer:', offer.id);
-      console.log('Offer details:', { id: offer.id, depositAmount: offer.depositAmount });
+      console.log('Payment breakdown:', {
+        depositAmount,
+        firstMonthRent,
+        totalAmount
+      });
       
       const response = await api.post('/create-payment-intent', {
         offerId: offer.id,
-        amount: offer.depositAmount,
-        purpose: 'DEPOSIT'
+        amount: totalAmount,
+        purpose: 'DEPOSIT_AND_FIRST_MONTH'
       });
       
       console.log('Payment intent response:', response.data);
@@ -92,7 +101,7 @@ const PaymentForm = ({ offer, onPaymentSuccess }) => {
           payment_method: {
             card: cardElement,
             billing_details: {
-              name: offer.rentalRequest?.title || 'Rental Deposit',
+              name: offer.rentalRequest?.title || 'Rental Payment (Deposit + First Month)',
             },
           },
         }
@@ -107,13 +116,16 @@ const PaymentForm = ({ offer, onPaymentSuccess }) => {
         console.log('Payment successful:', confirmedPayment);
         setError('');
         
-        // Update offer status to PAID (simplified approach)
+        // Update offer status to PAID
         try {
-          console.log('Payment completed successfully');
-          // For now, we'll just log the success
-          // The offer will remain as ACCEPTED but payment is complete
+          console.log('Updating offer status to PAID...');
+          await api.put(`/offers/${offer.id}/payment-status`, {
+            status: 'PAID',
+            paymentIntentId: confirmedPayment.id
+          });
+          console.log('✅ Offer status updated to PAID');
         } catch (updateError) {
-          console.error('Error logging payment completion:', updateError);
+          console.error('Error updating offer status:', updateError);
         }
         
         // Call success callback
@@ -121,9 +133,9 @@ const PaymentForm = ({ offer, onPaymentSuccess }) => {
           onPaymentSuccess(confirmedPayment);
         }
         
-        // Show success message and redirect
-        alert('Payment successful! Redirecting to dashboard...');
-        navigate('/dashboard');
+        // Show success message and redirect to my-offers
+        alert('Payment successful! Redirecting to My Offers...');
+        navigate('/my-offers');
       } else {
         console.log('Payment not succeeded, status:', confirmedPayment.status);
         setError('Payment was not completed. Please try again.');
@@ -256,7 +268,7 @@ const PaymentForm = ({ offer, onPaymentSuccess }) => {
             className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             onClick={() => console.log('Button clicked')}
           >
-            {loading ? 'Processing Payment...' : `Pay Deposit (${formatCurrency(offer.depositAmount)})`}
+            {loading ? 'Processing Payment...' : `Pay ${formatCurrency((offer.rentAmount || 0) + (offer.depositAmount || 0))} (Deposit + First Month Rent)`}
           </button>
         </form>
 
@@ -374,6 +386,13 @@ const PaymentPage = () => {
     );
   }
 
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('pl-PL', {
+      style: 'currency',
+      currency: 'PLN'
+    }).format(amount);
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -383,8 +402,35 @@ const PaymentPage = () => {
             Payment
           </h1>
           <p className="text-gray-600">
-            Complete your deposit payment for the accepted rental offer.
+            Complete your payment for the accepted rental offer (Deposit + First Month's Rent).
           </p>
+        </div>
+
+        {/* Payment Breakdown */}
+        <div className="mb-8 bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment Breakdown</h2>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Monthly Rent:</span>
+              <span className="font-medium">{formatCurrency(offer.rentAmount || 0)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Deposit:</span>
+              <span className="font-medium">{formatCurrency(offer.depositAmount || 0)}</span>
+            </div>
+            <div className="border-t pt-3 flex justify-between">
+              <span className="text-lg font-semibold text-gray-900">Total Payment:</span>
+              <span className="text-lg font-bold text-blue-600">
+                {formatCurrency((offer.rentAmount || 0) + (offer.depositAmount || 0))}
+              </span>
+            </div>
+          </div>
+          <div className="mt-4 p-3 bg-blue-50 rounded-md">
+            <p className="text-sm text-blue-800">
+              <strong>Note:</strong> This payment includes both the security deposit and the first month's rent. 
+              The deposit will be returned at the end of your lease term, subject to property condition.
+            </p>
+          </div>
         </div>
 
         {/* Payment Form */}

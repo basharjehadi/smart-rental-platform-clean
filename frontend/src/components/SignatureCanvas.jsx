@@ -1,99 +1,76 @@
-import { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
-import { useTranslation } from 'react-i18next';
 
-const SignatureCanvasComponent = ({ 
-  onSave, 
-  onClear, 
-  initialSignature = null,
-  className = '',
-  width = 400,
-  height = 200 
-}) => {
+const SignatureCanvasComponent = ({ onSave, onClear, initialSignature = null }) => {
   const sigPadRef = useRef(null);
-  const { t } = useTranslation();
+  const [isDrawing, setIsDrawing] = useState(false);
 
   useEffect(() => {
-    // Load initial signature if provided
     if (initialSignature && sigPadRef.current) {
       sigPadRef.current.fromDataURL(initialSignature);
     }
   }, [initialSignature]);
 
+  const handleSave = () => {
+    if (sigPadRef.current && !sigPadRef.current.isEmpty()) {
+      const signatureData = sigPadRef.current.toDataURL('image/png');
+      onSave(signatureData);
+    }
+  };
+
   const handleClear = () => {
     if (sigPadRef.current) {
       sigPadRef.current.clear();
-    }
-    if (onClear) {
-      onClear();
+      setIsDrawing(false);
     }
   };
 
-  const handleSave = () => {
-    if (sigPadRef.current && !sigPadRef.current.isEmpty()) {
-      const signatureData = sigPadRef.current.toDataURL();
-      if (onSave) {
-        onSave(signatureData);
-      }
-    }
+  const handleBegin = () => {
+    setIsDrawing(true);
   };
 
-  const handleSaveSignature = async () => {
-    if (sigPadRef.current && !sigPadRef.current.isEmpty()) {
-      const signatureData = sigPadRef.current.toDataURL();
-      
-      try {
-        // Extract base64 data (remove data:image/png;base64, prefix)
-        const base64Data = signatureData.split(',')[1];
-        
-        if (onSave) {
-          onSave(base64Data);
-        }
-      } catch (error) {
-        console.error('Error saving signature:', error);
-      }
-    }
+  const handleEnd = () => {
+    setIsDrawing(false);
   };
 
   return (
-    <div className={`signature-canvas-container ${className}`}>
-      <div className="border border-gray-300 rounded-lg p-4 bg-white">
-        <div className="mb-4">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {t('contract.signature')}
-          </h3>
-          <p className="text-sm text-gray-600">
-            {t('contract.signatureInstructions')}
-          </p>
-        </div>
-        
-        <div className="border border-gray-300 rounded bg-gray-50 mb-4">
+    <div className="signature-container">
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Draw your signature below:
+        </label>
+        <div className="border-2 border-gray-300 rounded-lg overflow-hidden">
           <SignatureCanvas
             ref={sigPadRef}
             canvasProps={{
-              width: width,
-              height: height,
-              className: 'signature-canvas w-full h-full'
+              className: 'w-full h-48 bg-white',
+              style: { border: 'none' }
             }}
-            backgroundColor="rgb(248, 250, 252)"
-            penColor="rgb(0, 0, 0)"
+            onBegin={handleBegin}
+            onEnd={handleEnd}
           />
         </div>
-        
-        <div className="flex space-x-3">
-          <button
-            onClick={handleClear}
-            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-          >
-            {t('contract.clearSignature')}
-          </button>
-          <button
-            onClick={handleSaveSignature}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-          >
-            {t('contract.saveSignature')}
-          </button>
-        </div>
+        {isDrawing && (
+          <p className="text-xs text-gray-500 mt-1">Drawing...</p>
+        )}
+      </div>
+      
+      <div className="flex space-x-3">
+        <button
+          type="button"
+          onClick={handleClear}
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+        >
+          Clear
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!sigPadRef.current || sigPadRef.current.isEmpty()}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Save Signature
+        </button>
       </div>
     </div>
   );

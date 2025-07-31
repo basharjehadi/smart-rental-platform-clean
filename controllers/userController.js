@@ -59,6 +59,9 @@ export const getUserProfile = async (req, res) => {
         dowodOsobistyNumber: true,
         address: true,
         profileImage: true,
+        signatureBase64: true,
+        identityDocument: true,
+        isVerified: true,
         createdAt: true,
         updatedAt: true
       }
@@ -114,6 +117,7 @@ export const updateUserProfile = async (req, res) => {
       if (pesel !== undefined) updateData.pesel = pesel;
       if (passportNumber !== undefined) updateData.passportNumber = passportNumber;
       if (kartaPobytuNumber !== undefined) updateData.kartaPobytuNumber = kartaPobytuNumber;
+      if (address !== undefined) updateData.address = address; // Allow address for tenants too
     } else if (user.role === 'LANDLORD') {
       // Landlord-specific fields
       if (dowodOsobistyNumber !== undefined) updateData.dowodOsobistyNumber = dowodOsobistyNumber;
@@ -199,6 +203,7 @@ export const updateUserIdentity = async (req, res) => {
       updateData.passportNumber = passportNumber;
       updateData.kartaPobytuNumber = kartaPobytuNumber;
       updateData.phoneNumber = phoneNumber;
+      updateData.address = address; // Allow address for tenants too
     } else if (user.role === 'LANDLORD') {
       // Landlord-specific validation
       if (!firstName || !lastName) {
@@ -369,6 +374,141 @@ export const getContractSignatures = async (req, res) => {
     });
   } catch (error) {
     console.error('Get contract signatures error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Upload identity document
+export const uploadIdentityDocument = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({
+        error: 'No file uploaded',
+        message: 'Please select a file to upload'
+      });
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({
+        error: 'Invalid file type',
+        message: 'Only JPEG, PNG, and PDF files are allowed'
+      });
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (req.file.size > maxSize) {
+      return res.status(400).json({
+        error: 'File too large',
+        message: 'File size must be less than 10MB'
+      });
+    }
+
+    // Get the filename from the uploaded file
+    const filename = req.file.filename;
+    const filePath = `uploads/identity_documents/${filename}`;
+
+    // Update user record with identity document filename
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        identityDocument: filename
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        identityDocument: true,
+        updatedAt: true
+      }
+    });
+
+    console.log(`✅ Identity document uploaded for user ${userId}: ${filename}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Identity document uploaded successfully',
+      data: {
+        filename: filename,
+        filePath: filePath,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+        uploadedAt: updatedUser.updatedAt
+      }
+    });
+
+  } catch (error) {
+    console.error('Upload identity document error:', error);
+    res.status(500).json({
+      error: 'Failed to upload identity document',
+      message: 'An error occurred while processing your upload'
+    });
+  }
+};
+
+// Get profile completion status
+export const getProfileStatus = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+        pesel: true,
+        passportNumber: true,
+        kartaPobytuNumber: true,
+        phoneNumber: true,
+        dowodOsobistyNumber: true,
+        address: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Define required fields for different user roles
+    const REQUIRED_FIELDS = {
+      TENANT: [
+        'firstName', 'lastName', 'pesel', 'passportNumber', 
+        'kartaPobytuNumber', 'phoneNumber', 'address'
+      ],
+      LANDLORD: [
+        'firstName', 'lastName', 'dowodOsobistyNumber', 
+        'phoneNumber', 'address'
+      ],
+      ADMIN: [
+        'firstName', 'lastName', 'phoneNumber'
+      ]
+    };
+
+    const requiredFields = REQUIRED_FIELDS[user.role] || [];
+    const missingFields = requiredFields.filter(field => {
+      const value = user[field];
+      return !value || value.trim() === '';
+    });
+
+    const isComplete = missingFields.length === 0;
+    const completionPercentage = Math.round(((requiredFields.length - missingFields.length) / requiredFields.length) * 100);
+
+    res.json({
+      isComplete,
+      completionPercentage,
+      missingFields,
+      requiredFields,
+      userRole: user.role
+    });
+  } catch (error) {
+    console.error('Profile status check error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }; 

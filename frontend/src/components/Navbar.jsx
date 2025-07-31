@@ -50,6 +50,10 @@ const Navbar = () => {
                     </>
                   )}
                   
+                  <Link to="/profile-view" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
+                    My Profile
+                  </Link>
+                  
                   {user.role === 'LANDLORD' && (
                     <>
                       <Link to="/requests" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">

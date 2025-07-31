@@ -1,198 +1,177 @@
 import prisma from '../lib/prisma.js';
-import { 
-  sendRentReminder, 
-  sendPaymentSuccess, 
-  sendOverdueWarning, 
-  sendRentalLocked 
-} from '../utils/emailService.js';
+import requestPoolService from '../services/requestPoolService.js';
 
-// Daily cron job for rent management
-const dailyRentCheck = async () => {
+// 🚀 SCALABILITY: Enhanced daily rent check with capacity management
+export const dailyRentCheck = async () => {
   try {
-    console.log('🕐 Starting daily rent check...');
-    
-    const today = new Date();
-    const currentMonth = today.getMonth() + 1;
-    const currentYear = today.getFullYear();
-    
-    // Get all accepted offers with active leases
-    const activeOffers = await prisma.offer.findMany({
+    console.log('⏰ Starting daily rent check...');
+    const startTime = Date.now();
+
+    // Get all active rent payments
+    const activePayments = await prisma.rentPayment.findMany({
       where: {
-        status: {
-          in: ['ACCEPTED', 'PAID']
-        },
-        leaseStartDate: {
-          lte: today
-        },
-        leaseEndDate: {
-          gte: today
+        status: 'PENDING',
+        dueDate: {
+          lte: new Date()
         }
       },
       include: {
-        rentalRequest: {
-          include: {
-            tenant: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            }
-          }
-        },
-        landlord: {
+        user: {
           select: {
             id: true,
             name: true,
             email: true
           }
-        },
-        rentPayments: {
-          where: {
-            month: currentMonth,
-            year: currentYear
-          }
         }
       }
     });
 
-    console.log(`📊 Found ${activeOffers.length} active offers to process`);
+    console.log(`📊 Found ${activePayments.length} overdue payments`);
 
-    for (const offer of activeOffers) {
-      await processRentPayment(offer, currentMonth, currentYear, today);
+    // Process payments in batches for scalability
+    const batchSize = 50;
+    for (let i = 0; i < activePayments.length; i += batchSize) {
+      const batch = activePayments.slice(i, i + batchSize);
+      
+      await Promise.all(batch.map(async (payment) => {
+        try {
+          // Calculate late fees
+          const daysLate = Math.floor((Date.now() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24));
+          const lateFee = daysLate * (payment.amount * 0.05); // 5% per day
+
+          // Update payment status
+          await prisma.rentPayment.update({
+            where: { id: payment.id },
+            data: {
+              isOverdue: true,
+              lateFee: lateFee,
+              status: 'PENDING' // Keep as pending for manual review
+            }
+          });
+
+          console.log(`💰 Updated payment ${payment.id} with late fee: ${lateFee}`);
+        } catch (error) {
+          console.error(`❌ Error processing payment ${payment.id}:`, error);
+        }
+      }));
     }
 
-    console.log('✅ Daily rent check completed successfully');
+    // 🚀 SCALABILITY: Cleanup expired requests from pool
+    await requestPoolService.cleanupExpiredRequests();
+
+    // 🚀 SCALABILITY: Update landlord availability based on capacity
+    await updateLandlordAvailability();
+
+    const endTime = Date.now();
+    console.log(`✅ Daily rent check completed in ${endTime - startTime}ms`);
   } catch (error) {
-    console.error('❌ Daily rent check failed:', error);
+    console.error('❌ Error in daily rent check:', error);
   }
 };
 
-// Process rent payment for a single offer
-const processRentPayment = async (offer, currentMonth, currentYear, today) => {
+// 🚀 SCALABILITY: Update landlord availability based on capacity
+const updateLandlordAvailability = async () => {
   try {
-    const { rentalRequest, landlord, rentPayments } = offer;
-    const tenant = rentalRequest.tenant;
-    
-    // Check if payment already exists for current month
-    const existingPayment = rentPayments[0];
-    
-    if (!existingPayment) {
-      // Create new pending payment
-      const dueDate = new Date(today.getFullYear(), today.getMonth(), 5); // Due on 5th of month
-      
-      const newPayment = await prisma.rentPayment.create({
+    console.log('🔄 Updating landlord availability...');
+
+    // Find landlords who should be marked as unavailable
+    const overCapacityLandlords = await prisma.user.findMany({
+      where: {
+        role: 'LANDLORD',
+        availability: true,
+        activeContracts: {
+          gte: prisma.user.fields.totalCapacity
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        activeContracts: true,
+        totalCapacity: true
+      }
+    });
+
+    // Mark over-capacity landlords as unavailable
+    if (overCapacityLandlords.length > 0) {
+      await prisma.user.updateMany({
+        where: {
+          id: {
+            in: overCapacityLandlords.map(l => l.id)
+          }
+        },
         data: {
-          amount: offer.rentAmount,
-          status: 'PENDING',
-          dueDate: dueDate,
-          month: currentMonth,
-          year: currentYear,
-          offerId: offer.id,
-          tenantId: tenant.id
+          availability: false
         }
       });
 
-      console.log(`💰 Created pending payment for ${tenant.name}: ${offer.rentAmount} PLN`);
-
-      // Send reminder email 3 days before due date
-      const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-      
-      if (daysUntilDue <= 3 && daysUntilDue > 0) {
-        console.log(`📧 Sending rent reminder to ${tenant.name} (${daysUntilDue} days until due)`);
-        await sendRentReminder(
-          tenant.email,
-          tenant.name,
-          rentalRequest.title,
-          dueDate.toLocaleDateString(),
-          offer.rentAmount
-        );
-      }
-    } else {
-      // Check for overdue payments
-      const daysOverdue = Math.ceil((today - new Date(existingPayment.dueDate)) / (1000 * 60 * 60 * 24));
-      
-      if (existingPayment.status === 'PENDING' && daysOverdue > 0) {
-        console.log(`⚠️ Payment overdue for ${tenant.name}: ${daysOverdue} days`);
-        
-        // Send overdue warning after 5 days
-        if (daysOverdue >= 5 && daysOverdue <= 7) {
-          console.log(`📧 Sending overdue warning to ${tenant.name}`);
-          await sendOverdueWarning(
-            tenant.email,
-            tenant.name,
-            rentalRequest.title,
-            daysOverdue,
-            existingPayment.amount
-          );
-        }
-        
-        // Lock rental after 5 days overdue
-        if (daysOverdue >= 5) {
-          console.log(`🔒 Locking rental for ${tenant.name} (${daysOverdue} days overdue)`);
-          await lockRentalRequest(rentalRequest.id);
-          
-          // Send locked notification
-          if (daysOverdue === 5) {
-            console.log(`📧 Sending rental locked notification to ${tenant.name}`);
-            await sendRentalLocked(
-              tenant.email,
-              tenant.name,
-              rentalRequest.title,
-              daysOverdue,
-              existingPayment.amount
-            );
-          }
-        }
-      }
+      console.log(`🚫 Marked ${overCapacityLandlords.length} landlords as unavailable due to capacity limits`);
     }
-  } catch (error) {
-    console.error('❌ Error processing rent payment:', error);
-  }
-};
 
-// Lock rental request
-const lockRentalRequest = async (rentalRequestId) => {
-  try {
-    await prisma.rentalRequest.update({
-      where: { id: rentalRequestId },
-      data: {
-        status: 'LOCKED',
-        isLocked: true
+    // Find landlords who can be marked as available again
+    const underCapacityLandlords = await prisma.user.findMany({
+      where: {
+        role: 'LANDLORD',
+        availability: false,
+        activeContracts: {
+          lt: prisma.user.fields.totalCapacity
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        activeContracts: true,
+        totalCapacity: true
       }
     });
-    
-    console.log(`🔒 Locked rental request: ${rentalRequestId}`);
+
+    // Mark under-capacity landlords as available
+    if (underCapacityLandlords.length > 0) {
+      await prisma.user.updateMany({
+        where: {
+          id: {
+            in: underCapacityLandlords.map(l => l.id)
+          }
+        },
+        data: {
+          availability: true
+        }
+      });
+
+      console.log(`✅ Marked ${underCapacityLandlords.length} landlords as available again`);
+    }
+
   } catch (error) {
-    console.error('❌ Error locking rental request:', error);
+    console.error('❌ Error updating landlord availability:', error);
   }
 };
 
-// Initialize lease dates when offer is accepted
-const initializeLeaseDates = async (offerId) => {
+// 🚀 SCALABILITY: Initialize lease dates for accepted offers
+export const initializeLeaseDates = async (offerId) => {
   try {
+    console.log(`📅 Initializing lease dates for offer ${offerId}`);
+
     const offer = await prisma.offer.findUnique({
       where: { id: offerId },
       include: {
-        rentalRequest: true
+        rentalRequest: {
+          select: {
+            id: true,
+            title: true
+          }
+        }
       }
     });
 
     if (!offer) {
-      console.error('❌ Offer not found for lease initialization');
-      return;
+      throw new Error('Offer not found');
     }
 
-    // Set lease start date to 1 month from now
-    const leaseStartDate = new Date();
-    leaseStartDate.setMonth(leaseStartDate.getMonth() + 1);
-    leaseStartDate.setDate(1); // Start on 1st of month
-
-    // Set lease end date to 12 months from start
+    // Calculate lease start and end dates
+    const leaseStartDate = new Date(offer.availableFrom);
     const leaseEndDate = new Date(leaseStartDate);
-    leaseEndDate.setFullYear(leaseEndDate.getFullYear() + 1);
-    leaseEndDate.setDate(leaseEndDate.getDate() - 1); // End on last day of previous month
+    leaseEndDate.setMonth(leaseEndDate.getMonth() + offer.leaseDuration);
 
+    // Update offer with lease dates
     await prisma.offer.update({
       where: { id: offerId },
       data: {
@@ -201,101 +180,166 @@ const initializeLeaseDates = async (offerId) => {
       }
     });
 
-    console.log(`📅 Initialized lease dates for offer: ${offerId}`);
+    // 🚀 SCALABILITY: Create rent payment records for the lease duration
+    await createRentPayments(offerId, leaseStartDate, leaseEndDate, offer.rentAmount);
+
+    console.log(`✅ Lease dates initialized for offer ${offerId}`);
   } catch (error) {
     console.error('❌ Error initializing lease dates:', error);
+    throw error;
   }
 };
 
-// Get rent payment status for an offer
-const getRentPaymentStatus = async (offerId) => {
+// 🚀 SCALABILITY: Create rent payment records for lease duration
+const createRentPayments = async (offerId, leaseStartDate, leaseEndDate, rentAmount) => {
   try {
-    const payments = await prisma.rentPayment.findMany({
-      where: { offerId },
-      orderBy: [
-        { year: 'desc' },
-        { month: 'desc' }
-      ]
-    });
+    const payments = [];
+    const currentDate = new Date(leaseStartDate);
     
-    return payments;
+    while (currentDate < leaseEndDate) {
+      const month = currentDate.getMonth() + 1;
+      const year = currentDate.getFullYear();
+      const dueDate = new Date(currentDate);
+      dueDate.setDate(dueDate.getDate() + 1); // Due on 1st of each month
+
+      payments.push({
+        amount: rentAmount,
+        status: 'PENDING',
+        dueDate: dueDate,
+        month: month,
+        year: year,
+        isOverdue: false,
+        lateFee: 0,
+        gracePeriod: 5
+      });
+
+      currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+
+    // 🚀 SCALABILITY: Batch insert payments for performance
+    if (payments.length > 0) {
+      await prisma.rentPayment.createMany({
+        data: payments.map(payment => ({
+          ...payment,
+          offerId: offerId
+        }))
+      });
+
+      console.log(`💰 Created ${payments.length} rent payment records for offer ${offerId}`);
+    }
   } catch (error) {
-    console.error('❌ Error getting rent payment status:', error);
-    return [];
+    console.error('❌ Error creating rent payments:', error);
+    throw error;
   }
 };
 
-// Mark rent payment as paid and send notification
-const markRentPaymentAsPaid = async (rentPaymentId) => {
+// 🚀 SCALABILITY: Weekly analytics update
+export const weeklyAnalyticsUpdate = async () => {
   try {
-    const payment = await prisma.rentPayment.update({
-      where: { id: rentPaymentId },
-      data: {
-        status: 'SUCCEEDED',
-        paidDate: new Date()
+    console.log('📊 Starting weekly analytics update...');
+
+    // Update request pool analytics for all locations
+    const locations = await prisma.rentalRequest.groupBy({
+      by: ['location'],
+      _count: {
+        location: true
+      }
+    });
+
+    for (const location of locations) {
+      await requestPoolService.updatePoolAnalytics(location.location);
+    }
+
+    // Update landlord performance metrics
+    await updateLandlordPerformanceMetrics();
+
+    console.log('✅ Weekly analytics update completed');
+  } catch (error) {
+    console.error('❌ Error in weekly analytics update:', error);
+  }
+};
+
+// 🚀 SCALABILITY: Update landlord performance metrics
+const updateLandlordPerformanceMetrics = async () => {
+  try {
+    const landlords = await prisma.user.findMany({
+      where: {
+        role: 'LANDLORD'
       },
       include: {
-        offer: {
-          include: {
-            rentalRequest: {
-              include: {
-                tenant: {
-                  select: {
-                    name: true,
-                    email: true
-                  }
-                }
-              }
-            },
-            landlord: {
-              select: {
-                name: true,
-                email: true
-              }
+        offers: {
+          where: {
+            createdAt: {
+              gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
             }
+          },
+          select: {
+            id: true,
+            status: true,
+            responseTime: true,
+            createdAt: true
           }
         }
       }
     });
 
-    console.log(`✅ Marked payment as paid: ${rentPaymentId}`);
+    for (const landlord of landlords) {
+      const acceptedOffers = landlord.offers.filter(o => o.status === 'ACCEPTED');
+      const totalOffers = landlord.offers.length;
+      
+      const acceptanceRate = totalOffers > 0 ? acceptedOffers.length / totalOffers : 0;
+      const averageResponseTime = landlord.offers.length > 0 
+        ? landlord.offers.reduce((sum, o) => sum + (o.responseTime || 0), 0) / landlord.offers.length 
+        : null;
 
-    // Send payment success notification to landlord
-    if (payment.offer.landlord?.email) {
-      console.log(`📧 Sending payment success notification to landlord: ${payment.offer.landlord.name}`);
-      await sendPaymentSuccess(
-        payment.offer.landlord.email,
-        payment.offer.landlord.name,
-        payment.offer.rentalRequest.tenant.name,
-        payment.offer.rentalRequest.title,
-        payment.amount,
-        new Date().toLocaleDateString()
-      );
-    }
-
-    // Unlock rental if it was locked
-    if (payment.offer.rentalRequest.isLocked) {
-      await prisma.rentalRequest.update({
-        where: { id: payment.offer.rentalRequest.id },
+      await prisma.landlordProfile.update({
+        where: { userId: landlord.id },
         data: {
-          status: 'ACTIVE',
-          isLocked: false
+          acceptanceRate: acceptanceRate,
+          averageResponseTime: averageResponseTime
         }
       });
-      
-      console.log(`🔓 Unlocked rental request: ${payment.offer.rentalRequest.id}`);
     }
 
-    return payment;
+    console.log(`📈 Updated performance metrics for ${landlords.length} landlords`);
   } catch (error) {
-    console.error('❌ Error marking payment as paid:', error);
-    throw error;
+    console.error('❌ Error updating landlord performance metrics:', error);
   }
 };
 
-export {
-  dailyRentCheck,
-  initializeLeaseDates,
-  getRentPaymentStatus,
-  markRentPaymentAsPaid
+// 🚀 SCALABILITY: Monthly cleanup and maintenance
+export const monthlyCleanup = async () => {
+  try {
+    console.log('🧹 Starting monthly cleanup...');
+
+    // Archive old analytics data (keep last 12 months)
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+    await prisma.requestPoolAnalytics.deleteMany({
+      where: {
+        date: {
+          lt: twelveMonthsAgo
+        }
+      }
+    });
+
+    // Clean up old matches (keep last 6 months)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    await prisma.landlordRequestMatch.deleteMany({
+      where: {
+        createdAt: {
+          lt: sixMonthsAgo
+        },
+        isViewed: true,
+        isResponded: true
+      }
+    });
+
+    console.log('✅ Monthly cleanup completed');
+  } catch (error) {
+    console.error('❌ Error in monthly cleanup:', error);
+  }
 }; 

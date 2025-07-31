@@ -23,10 +23,13 @@ const LandlordDashboard = () => {
     propertyType: '',
     propertySize: '',
     propertyAmenities: '',
-    propertyDescription: ''
+    propertyDescription: '',
+    rulesText: ''
   });
   const [uploadedImages, setUploadedImages] = useState([]);
   const [uploadedVideo, setUploadedVideo] = useState('');
+  const [rulesPdfFile, setRulesPdfFile] = useState(null);
+  const [rulesPdfPreview, setRulesPdfPreview] = useState('');
   const [submittingOffer, setSubmittingOffer] = useState(false);
   const [offerError, setOfferError] = useState('');
   const [offerSuccess, setOfferSuccess] = useState('');
@@ -110,7 +113,7 @@ const LandlordDashboard = () => {
   // Get profile image or fallback to initials
   const getProfileImage = () => {
     if (profileData?.profileImage) {
-      return profileData.profileImage;
+      return `http://localhost:3001/uploads/profile_images/${profileData.profileImage}`;
     }
     return null;
   };
@@ -129,10 +132,13 @@ const LandlordDashboard = () => {
       propertyType: '',
       propertySize: '',
       propertyAmenities: '',
-      propertyDescription: ''
+      propertyDescription: '',
+      rulesText: ''
     });
     setUploadedImages([]);
     setUploadedVideo('');
+    setRulesPdfFile(null);
+    setRulesPdfPreview('');
     setOfferError('');
     setOfferSuccess('');
     setShowModal(true);
@@ -185,17 +191,52 @@ ${statusMessages[offer.status] || 'Unknown status'}`);
   const handleFileDeleted = (fileUrl, isVideo = false) => {
     if (isVideo) {
       setUploadedVideo('');
-      setOfferData(prev => ({
-        ...prev,
-        propertyVideo: ''
-      }));
+      setOfferData(prev => ({ ...prev, propertyVideo: '' }));
     } else {
-      const updatedImages = uploadedImages.filter(url => url !== fileUrl);
-      setUploadedImages(updatedImages);
-      setOfferData(prev => ({
-        ...prev,
-        propertyImages: updatedImages
+      setUploadedImages(prev => prev.filter(img => img !== fileUrl));
+      setOfferData(prev => ({ 
+        ...prev, 
+        propertyImages: prev.propertyImages.filter(img => img !== fileUrl) 
       }));
+    }
+  };
+
+  const handleRulesPdfChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) {
+      setRulesPdfFile(null);
+      setRulesPdfPreview('');
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      setOfferError('Rules file must be PDF, JPG, or PNG format.');
+      e.target.value = '';
+      return;
+    }
+
+    // Validate file size (10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    if (file.size > maxSize) {
+      setOfferError('Rules file size must be less than 10MB.');
+      e.target.value = '';
+      return;
+    }
+
+    setRulesPdfFile(file);
+    setRulesPdfPreview(file.name);
+    setOfferError(''); // Clear any previous errors
+  };
+
+  const handleClearRulesPdf = () => {
+    setRulesPdfFile(null);
+    setRulesPdfPreview('');
+    // Reset the file input
+    const fileInput = document.getElementById('rulesPdf');
+    if (fileInput) {
+      fileInput.value = '';
     }
   };
 
@@ -235,13 +276,40 @@ ${statusMessages[offer.status] || 'Unknown status'}`);
         .map(amenity => amenity.trim())
         .filter(amenity => amenity.length > 0);
 
-      const offerPayload = {
-        ...offerData,
-        propertyImages: propertyImagesArray,
-        propertyAmenities: propertyAmenitiesArray
-      };
+      // Create FormData for file upload
+      const formData = new FormData();
+      
+      // Add all text fields
+      formData.append('rentAmount', offerData.rentAmount);
+      formData.append('depositAmount', offerData.depositAmount || '');
+      formData.append('leaseDuration', offerData.leaseDuration);
+      formData.append('availableFrom', offerData.availableFrom);
+      formData.append('description', offerData.description || '');
+      formData.append('propertyAddress', offerData.propertyAddress);
+      formData.append('propertyType', offerData.propertyType || '');
+      formData.append('propertySize', offerData.propertySize || '');
+      formData.append('propertyDescription', offerData.propertyDescription || '');
+      formData.append('rulesText', offerData.rulesText || '');
+      
+      // Add arrays as JSON strings
+      formData.append('propertyImages', JSON.stringify(propertyImagesArray));
+      formData.append('propertyAmenities', JSON.stringify(propertyAmenitiesArray));
+      
+      // Add video if exists
+      if (offerData.propertyVideo) {
+        formData.append('propertyVideo', offerData.propertyVideo);
+      }
+      
+      // Add rules PDF file if exists
+      if (rulesPdfFile) {
+        formData.append('rulesPdf', rulesPdfFile);
+      }
 
-      const response = await api.post(`/rental-request/${selectedRequest.id}/offer`, offerPayload);
+      const response = await api.post(`/rental-request/${selectedRequest.id}/offer`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       
       setOfferSuccess('Offer sent successfully!');
       setShowModal(false);
@@ -258,10 +326,13 @@ ${statusMessages[offer.status] || 'Unknown status'}`);
         propertyType: '',
         propertySize: '',
         propertyAmenities: '',
-        propertyDescription: ''
+        propertyDescription: '',
+        rulesText: ''
       });
       setUploadedImages([]);
       setUploadedVideo('');
+      setRulesPdfFile(null);
+      setRulesPdfPreview('');
       
       // Refresh the rental requests list
       fetchRentalRequests();
@@ -288,10 +359,13 @@ ${statusMessages[offer.status] || 'Unknown status'}`);
       propertyType: '',
       propertySize: '',
       propertyAmenities: '',
-      propertyDescription: ''
+      propertyDescription: '',
+      rulesText: ''
     });
     setUploadedImages([]);
     setUploadedVideo('');
+    setRulesPdfFile(null);
+    setRulesPdfPreview('');
     setOfferError('');
     setOfferSuccess('');
   };
@@ -640,6 +714,34 @@ ${statusMessages[offer.status] || 'Unknown status'}`);
                     <span>{offer.rentalRequest.tenant.name}</span>
                   </div>
                 </div>
+                
+                {/* Contract Download Section */}
+                {offer.rentalRequest.contract && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    {offer.rentalRequest.contract.signedAt ? (
+                      <div className="space-y-2">
+                        <div className="text-center text-sm text-green-600 font-medium">
+                          ✅ Contract signed on {formatDate(offer.rentalRequest.contract.signedAt)}
+                        </div>
+                        <a
+                          href={`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/contracts/download/${offer.rentalRequest.contract.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          📄 Download Tenant-Signed Contract
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="text-center text-sm text-gray-500">
+                        Waiting for tenant to sign contract...
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -849,6 +951,64 @@ ${statusMessages[offer.status] || 'Unknown status'}`);
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                       placeholder="Additional details about the offer, terms, and conditions..."
                     />
+                  </div>
+
+                  {/* House Rules Section */}
+                  <div className="border-t pt-6">
+                    <h4 className="text-md font-medium text-gray-900 mb-4">House Rules (Optional)</h4>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label htmlFor="rulesText" className="block text-sm font-medium text-gray-700 mb-1">
+                          House Rules (Text)
+                        </label>
+                        <textarea
+                          id="rulesText"
+                          name="rulesText"
+                          value={offerData.rulesText}
+                          onChange={handleOfferChange}
+                          rows={4}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="e.g., No smoking, no loud music after 10 PM, keep common areas clean, report maintenance issues promptly..."
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Enter house rules as text. This will be visible to tenants when they view your offer.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label htmlFor="rulesPdf" className="block text-sm font-medium text-gray-700 mb-1">
+                          Attach Rules Document
+                        </label>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="file"
+                            id="rulesPdf"
+                            name="rulesPdf"
+                            onChange={handleRulesPdfChange}
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                          />
+                          {rulesPdfPreview && (
+                            <button
+                              type="button"
+                              onClick={handleClearRulesPdf}
+                              className="px-3 py-2 text-sm text-red-600 hover:text-red-800 focus:outline-none"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                        {rulesPdfPreview && (
+                          <p className="text-sm text-green-600 mt-1">
+                            ✓ Selected: {rulesPdfPreview}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          Upload a PDF, JPG, or PNG file (max 10MB) with detailed house rules or terms.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                   
                   <div className="flex justify-end space-x-3 pt-4 border-t">

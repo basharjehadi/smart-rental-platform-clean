@@ -69,7 +69,7 @@ const DashboardPage = () => {
   // Get profile image or fallback to initials
   const getProfileImage = () => {
     if (profileData?.profileImage) {
-      return profileData.profileImage;
+      return `http://localhost:3001/uploads/profile_images/${profileData.profileImage}`;
     }
     return null;
   };
@@ -370,14 +370,14 @@ const DashboardPage = () => {
                           <dd className="text-sm text-yellow-900 mt-2">
                             <ul className="space-y-2">
                               <li>
-                                <Link 
-                                  to="/profile" 
+                                                                <Link
+                                  to="/profile-view"
                                   className="inline-flex items-center text-yellow-700 hover:text-yellow-900 hover:underline"
                                 >
                                   <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                   </svg>
-                                  Update profile
+                                  View profile
                                 </Link>
                               </li>
                               

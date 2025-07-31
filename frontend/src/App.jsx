@@ -18,6 +18,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AuthCallback from './pages/AuthCallback';
 import TestPage from './pages/TestPage';
 import ProfilePage from './pages/ProfilePage';
+import ProfileViewPage from './pages/ProfileViewPage';
 // import PaymentDemo from './pages/PaymentDemo';
 // import PaymentExample from './pages/PaymentExample';
 
@@ -108,6 +109,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AdminDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/profile-view" 
+              element={
+                <ProtectedRoute>
+                  <ProfileViewPage />
                 </ProtectedRoute>
               } 
             />

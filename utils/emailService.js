@@ -247,6 +247,66 @@ const emailTemplates = {
       </div>
     </body>
     </html>
+  `,
+
+  offerNotification: (tenantName, landlordName, propertyTitle, rentAmount, offerId) => `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>New Rental Offer Received</title>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #4F46E5; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background-color: #f9f9f9; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+        .button { display: inline-block; padding: 12px 24px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 5px; }
+        .offer { background-color: #E0F2FE; border: 1px solid #4F46E5; padding: 15px; border-radius: 5px; margin: 15px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>🏠 Smart Rental System</h1>
+          <p>New Rental Offer Received</p>
+        </div>
+        <div class="content">
+          <h2>Hello ${tenantName},</h2>
+          <p>You have received a new rental offer for the property "${propertyTitle}".</p>
+          
+          <div class="offer">
+            <strong>🎉 New Offer Received!</strong>
+          </div>
+          
+          <h3>Offer Details:</h3>
+          <ul>
+            <li><strong>Landlord:</strong> ${landlordName}</li>
+            <li><strong>Property:</strong> ${propertyTitle}</li>
+            <li><strong>Rent Amount:</strong> ${rentAmount} PLN</li>
+            <li><strong>Offer ID:</strong> ${offerId}</li>
+          </ul>
+          
+          <p>Please review the offer and take appropriate action. You can view the offer details in your tenant dashboard.</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/my-offers" class="button">
+              View Offer Details
+            </a>
+          </div>
+          
+          <p>If you have any questions or need assistance, please contact your landlord.</p>
+          
+          <p>Best regards,<br>Smart Rental System Team</p>
+        </div>
+        <div class="footer">
+          <p>This is an automated message. Please do not reply to this email.</p>
+          <p>© 2024 Smart Rental System. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
   `
 };
 
@@ -316,11 +376,18 @@ const sendRentalLocked = async (tenantEmail, tenantName, propertyTitle, overdueD
   return await sendEmail(tenantEmail, subject, htmlContent);
 };
 
+const sendOfferNotification = async (tenantEmail, tenantName, landlordName, propertyTitle, rentAmount, offerId) => {
+  const subject = 'New Rental Offer Received - Action Required';
+  const htmlContent = emailTemplates.offerNotification(tenantName, landlordName, propertyTitle, rentAmount, offerId);
+  return await sendEmail(tenantEmail, subject, htmlContent);
+};
+
 export {
   sendEmail,
   sendRentReminder,
   sendPaymentSuccess,
   sendOverdueWarning,
   sendRentalLocked,
+  sendOfferNotification,
   emailTemplates
 }; 

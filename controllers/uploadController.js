@@ -8,19 +8,24 @@ const prisma = new PrismaClient();
 export const uploadProfileImage = async (req, res) => {
   try {
     const userId = req.user.id;
+    console.log('📤 Profile image upload request from user:', userId);
 
     if (!req.file) {
+      console.log('❌ No file provided in request');
       return res.status(400).json({ error: 'No image file provided' });
     }
 
-    // Generate the file URL
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
+    console.log('📁 File received:', {
+      originalname: req.file.originalname,
+      filename: req.file.filename,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    });
 
-    // Update user profile with new image URL
+    // Store just the filename in the database
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: { profileImage: fileUrl },
+      data: { profileImage: req.file.filename },
       select: {
         id: true,
         profileImage: true,
@@ -28,13 +33,15 @@ export const uploadProfileImage = async (req, res) => {
       }
     });
 
+    console.log('✅ Profile image saved to database:', updatedUser.profileImage);
+
     res.json({
       message: 'Profile image uploaded successfully',
       profileImage: updatedUser.profileImage
     });
 
   } catch (error) {
-    console.error('Upload profile image error:', error);
+    console.error('❌ Upload profile image error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -51,9 +58,8 @@ export const deleteProfileImage = async (req, res) => {
     });
 
     if (user && user.profileImage) {
-      // Extract filename from URL
-      const filename = user.profileImage.split('/').pop();
-      const filePath = path.join('./uploads', filename);
+      // user.profileImage is now just the filename
+      const filePath = path.join('./uploads/profile_images', user.profileImage);
 
       // Delete file from filesystem if it exists
       if (fs.existsSync(filePath)) {

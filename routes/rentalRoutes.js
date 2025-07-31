@@ -1,51 +1,33 @@
 import express from 'express';
 import {
   createRentalRequest,
-  getMyRequests,
   getAllActiveRequests,
+  markRequestAsViewed,
   createOffer,
-  getOfferForRequest,
-  getOfferById,
-  getMyOffers,
   updateOfferStatus,
-  updateOfferPaymentStatus,
-  getLockStatus,
-  getMyRentPayments,
-  getLandlordRentOverview,
-  getCurrentRentalStatus,
-  getAcceptedOffersForLandlord,
-  updateRentalRequest,
-  deleteRentalRequest
+  updateLandlordCapacity,
+  getPoolStats,
+  cleanupExpiredRequests
 } from '../controllers/rentalController.js';
+import { uploadRulesPdf } from '../middlewares/uploadMiddleware.js';
 import verifyToken from '../middlewares/verifyToken.js';
-import { requireTenant, requireLandlord } from '../middlewares/roleMiddleware.js';
-import { requireCompleteProfile } from '../middlewares/profileValidationMiddleware.js';
+import { requireLandlord, requireTenant, requireAdmin } from '../middlewares/roleMiddleware.js';
 
 const router = express.Router();
 
-// All routes require authentication
-router.use(verifyToken);
+// 🚀 SCALABILITY: Tenant routes
+router.post('/rental-request', verifyToken, requireTenant, createRentalRequest);
 
-// Tenant routes (require complete profile)
-router.post('/rental-request', requireTenant, requireCompleteProfile, createRentalRequest);
-router.get('/my-requests', requireTenant, getMyRequests);
-router.put('/rental-request/:id', requireTenant, requireCompleteProfile, updateRentalRequest);
-router.delete('/rental-request/:id', requireTenant, deleteRentalRequest);
-router.get('/current-rental-status', requireTenant, getCurrentRentalStatus);
-router.get('/my-rents', requireTenant, getMyRentPayments);
-router.get('/offers/my', requireTenant, getMyOffers);
-router.get('/offers/id/:id', requireTenant, getOfferById);
-router.get('/offers/:requestId', requireTenant, getOfferForRequest);
-router.put('/offers/:id/status', requireTenant, requireCompleteProfile, updateOfferStatus);
-router.put('/offers/:id/payment-status', requireTenant, updateOfferPaymentStatus);
+// 🚀 SCALABILITY: Landlord routes with pool integration
+router.get('/rental-requests', verifyToken, requireLandlord, getAllActiveRequests);
+router.post('/rental-request/:requestId/view', verifyToken, requireLandlord, markRequestAsViewed);
+router.post('/rental-request/:requestId/offer', verifyToken, requireLandlord, uploadRulesPdf, createOffer);
 
-// Landlord routes (require complete profile)
-router.get('/rental-requests', requireLandlord, getAllActiveRequests);
-router.get('/landlord-rents', requireLandlord, getLandlordRentOverview);
-router.get('/offers/landlord/accepted', requireLandlord, getAcceptedOffersForLandlord);
-router.post('/rental-request/:requestId/offer', requireLandlord, requireCompleteProfile, createOffer);
+// 🚀 SCALABILITY: Offer management
+router.put('/offers/:id/status', verifyToken, requireTenant, updateOfferStatus);
 
-// Lock status route (accessible by tenant, landlord, and admin)
-router.get('/rental-request/:id/lock-status', getLockStatus);
+// 🚀 SCALABILITY: Pool management routes
+router.get('/pool/stats', verifyToken, getPoolStats);
+router.post('/pool/cleanup', verifyToken, requireAdmin, cleanupExpiredRequests);
 
 export default router; 

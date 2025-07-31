@@ -16,6 +16,7 @@ import contractRoutes from './routes/contractRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import prisma from './lib/prisma.js';
 import { dailyRentCheck } from './controllers/cronController.js';
+import { startContractMonitoring, stopContractMonitoring } from './controllers/contractController.js';
 
 // Load environment variables
 dotenv.config();
@@ -88,6 +89,30 @@ app.use('/uploads/property_videos', (req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   next();
 }, express.static('uploads/property_videos'));
+
+// Serve identity documents specifically
+app.use('/uploads/identity_documents', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+}, express.static('uploads/identity_documents'));
+
+// Serve rules files specifically
+app.use('/uploads/rules', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+}, express.static('uploads/rules'));
+
+// Serve contract PDFs specifically
+app.use('/uploads/contracts', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+}, express.static('uploads/contracts'));
 
 // Special handling for Stripe webhooks (raw body)
 app.use('/api/stripe-webhook', express.raw({ type: 'application/json' }));
@@ -169,6 +194,9 @@ const startServer = async () => {
     // Initialize cron jobs
     initializeCronJobs();
 
+    // Start contract generation scheduler
+    startContractMonitoring();
+
     // Start server
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
@@ -186,12 +214,14 @@ const startServer = async () => {
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\n🛑 Shutting down server...');
+  stopContractMonitoring();
   await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   console.log('\n🛑 Shutting down server...');
+  stopContractMonitoring();
   await prisma.$disconnect();
   process.exit(0);
 });
