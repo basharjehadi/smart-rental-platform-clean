@@ -76,7 +76,9 @@ const ProfileViewPage = () => {
           </p>
         </div>
 
-        {/* Error Message */}
+        {/* Success/Error Messages */}
+        {/* Removed landlord-specific success/error messages */}
+
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex">
@@ -120,6 +122,22 @@ const ProfileViewPage = () => {
                  >
                    Update Profile
                  </button>
+                 {profileData?.role === 'LANDLORD' && (
+                   <button
+                     onClick={() => navigate('/landlord-settings')}
+                     className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors mt-3"
+                   >
+                     🏠 Landlord Settings
+                   </button>
+                 )}
+                 {profileData?.role === 'LANDLORD' && (
+                   <button
+                     onClick={() => navigate('/property-media')}
+                     className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors mt-3"
+                   >
+                     🖼️ Manage Property Media
+                   </button>
+                 )}
                </div>
              </div>
 
@@ -282,6 +300,8 @@ const ProfileViewPage = () => {
             </div>
           </div>
         </div>
+
+        {/* Removed Landlord Profile Management Section */}
       </div>
     </div>
   );

@@ -158,7 +158,7 @@ const markRequestAsViewed = async (req, res) => {
   }
 };
 
-// 🚀 SCALABILITY: Create offer with capacity management
+// 🚀 SCALABILITY: Create offer with capacity management and profile templates
 const createOffer = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -190,7 +190,12 @@ const createOffer = async (req, res) => {
     // 🚀 SCALABILITY: Check landlord capacity before creating offer
     const landlord = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: { activeContracts: true, totalCapacity: true, availability: true }
+      select: { 
+        currentTenants: true, 
+        maxTenants: true, 
+        availability: true,
+        autoAvailability: true
+      }
     });
 
     if (!landlord.availability) {
@@ -199,10 +204,54 @@ const createOffer = async (req, res) => {
       });
     }
 
-    if (landlord.activeContracts >= landlord.totalCapacity) {
+    if (landlord.currentTenants >= landlord.maxTenants && landlord.autoAvailability) {
       return res.status(400).json({
         error: 'You have reached your maximum capacity for managing properties.'
       });
+    }
+
+    // 🏠 Get landlord profile for auto-fill templates
+    const landlordProfile = await prisma.landlordProfile.findUnique({
+      where: { userId: req.user.id }
+    });
+
+    // 🚀 SCALABILITY: Auto-fill from profile templates
+    let finalPropertyImages = propertyImages || [];
+    let finalPropertyVideo = propertyVideo || null;
+    let finalPropertyDescription = propertyDescription || '';
+    let finalRulesText = rulesText || '';
+
+    if (landlordProfile) {
+      // Auto-fill media if enabled
+      if (landlordProfile.autoFillMedia) {
+        if (landlordProfile.propertyImages && (!propertyImages || propertyImages.length === 0)) {
+          try {
+            const profileImages = JSON.parse(landlordProfile.propertyImages);
+            finalPropertyImages = profileImages.slice(0, 5); // Limit to 5 images
+          } catch (error) {
+            console.error('Error parsing property images from profile:', error);
+          }
+        }
+        
+        if (landlordProfile.propertyVideos && !propertyVideo) {
+          try {
+            const profileVideos = JSON.parse(landlordProfile.propertyVideos);
+            finalPropertyVideo = profileVideos[0]; // Use first video
+          } catch (error) {
+            console.error('Error parsing property videos from profile:', error);
+          }
+        }
+      }
+
+      // Auto-fill description if enabled
+      if (landlordProfile.autoFillDescription && landlordProfile.propertyDescription && !propertyDescription) {
+        finalPropertyDescription = landlordProfile.propertyDescription;
+      }
+
+      // Auto-fill rules if enabled
+      if (landlordProfile.autoFillRules && landlordProfile.propertyRules && !rulesText) {
+        finalRulesText = landlordProfile.propertyRules;
+      }
     }
 
     // Validate rental request exists and is active
@@ -243,13 +292,13 @@ const createOffer = async (req, res) => {
           utilitiesIncluded: utilitiesIncluded || false,
           availableFrom: new Date(availableFrom),
           propertyAddress: propertyAddress || null,
-          propertyImages: propertyImages || [],
-          propertyVideo: propertyVideo || null,
+          propertyImages: JSON.stringify(finalPropertyImages),
+          propertyVideo: finalPropertyVideo || null,
           propertyType: propertyType || null,
           propertySize: propertySize || null,
           propertyAmenities: propertyAmenities || null,
-          propertyDescription: propertyDescription || null,
-          rulesText: rulesText || null,
+          propertyDescription: finalPropertyDescription || null,
+          rulesText: finalRulesText || null,
           rulesPdf: rulesPdf || null,
           rentalRequestId: parseInt(requestId),
           landlordId: req.user.id,
@@ -265,13 +314,6 @@ const createOffer = async (req, res) => {
                   email: true
                 }
               }
-            }
-          },
-          landlord: {
-            select: {
-              id: true,
-              name: true,
-              email: true
             }
           }
         }
@@ -466,6 +508,165 @@ const cleanupExpiredRequests = async (req, res) => {
   }
 };
 
+// 🚀 SCALABILITY: Get tenant's rental requests
+const getMyRequests = async (req, res) => {
+  try {
+    const { id: tenantId } = req.user;
+
+    const rentalRequests = await prisma.rentalRequest.findMany({
+      where: {
+        tenantId: tenantId
+      },
+      include: {
+        offer: {
+          include: {
+            landlord: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json({
+      message: 'Rental requests retrieved successfully.',
+      rentalRequests: rentalRequests
+    });
+  } catch (error) {
+    console.error('Get my requests error:', error);
+    res.status(500).json({
+      error: 'Internal server error.'
+    });
+  }
+};
+
+// 🚀 SCALABILITY: Update rental request
+const updateRentalRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { id: tenantId } = req.user;
+    const updateData = req.body;
+
+    // Validate that the request belongs to the tenant
+    const existingRequest = await prisma.rentalRequest.findFirst({
+      where: {
+        id: parseInt(id),
+        tenantId: tenantId
+      }
+    });
+
+    if (!existingRequest) {
+      return res.status(404).json({
+        error: 'Rental request not found or you do not have permission to edit it.'
+      });
+    }
+
+    // Validate moveInDate is in the future if provided
+    if (updateData.moveInDate) {
+      const moveInDateObj = new Date(updateData.moveInDate);
+      if (moveInDateObj <= new Date()) {
+        return res.status(400).json({
+          error: 'Move-in date must be in the future.'
+        });
+      }
+      updateData.moveInDate = moveInDateObj;
+    }
+
+    // Validate budget is positive if provided
+    if (updateData.budget && updateData.budget <= 0) {
+      return res.status(400).json({
+        error: 'Budget must be a positive number.'
+      });
+    }
+
+    const updatedRequest = await prisma.rentalRequest.update({
+      where: {
+        id: parseInt(id)
+      },
+      data: updateData,
+      include: {
+        offer: {
+          include: {
+            landlord: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    res.json({
+      message: 'Rental request updated successfully.',
+      rentalRequest: updatedRequest
+    });
+  } catch (error) {
+    console.error('Update rental request error:', error);
+    res.status(500).json({
+      error: 'Internal server error.'
+    });
+  }
+};
+
+// 🚀 SCALABILITY: Delete rental request
+const deleteRentalRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { id: tenantId } = req.user;
+
+    // Validate that the request belongs to the tenant
+    const existingRequest = await prisma.rentalRequest.findFirst({
+      where: {
+        id: parseInt(id),
+        tenantId: tenantId
+      }
+    });
+
+    if (!existingRequest) {
+      return res.status(404).json({
+        error: 'Rental request not found or you do not have permission to delete it.'
+      });
+    }
+
+    // Check if request has an accepted offer
+    if (existingRequest.offer && existingRequest.offer.status === 'ACCEPTED') {
+      return res.status(400).json({
+        error: 'Cannot delete a request that has an accepted offer.'
+      });
+    }
+
+    // Remove from request pool if active
+    if (existingRequest.poolStatus === 'ACTIVE') {
+      await requestPoolService.removeFromPool(parseInt(id), 'CANCELLED');
+    }
+
+    await prisma.rentalRequest.delete({
+      where: {
+        id: parseInt(id)
+      }
+    });
+
+    res.json({
+      message: 'Rental request deleted successfully.'
+    });
+  } catch (error) {
+    console.error('Delete rental request error:', error);
+    res.status(500).json({
+      error: 'Internal server error.'
+    });
+  }
+};
+
 // Export all functions
 export {
   createRentalRequest,
@@ -475,5 +676,8 @@ export {
   updateOfferStatus,
   updateLandlordCapacity,
   getPoolStats,
-  cleanupExpiredRequests
+  cleanupExpiredRequests,
+  getMyRequests,
+  updateRentalRequest,
+  deleteRentalRequest
 }; 

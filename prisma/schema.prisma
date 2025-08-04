@@ -37,9 +37,10 @@ model User {
   isVerified Boolean @default(false) // KYC verification status
   
   // 🚀 SCALABILITY: Landlord capacity management
-  availability Boolean @default(true) // Whether landlord is accepting new requests
-  totalCapacity Int @default(10) // Maximum number of properties landlord can manage
-  activeContracts Int @default(0) // Current number of active contracts
+  availability Boolean @default(true) // Whether landlord is accepting new requests (manual override)
+  autoAvailability Boolean @default(true) // Auto-manage availability based on capacity
+  maxTenants Int @default(5) // Maximum number of tenants landlord can handle
+  currentTenants Int @default(0) // Current number of active tenants
   
   // 🚀 SCALABILITY: Performance tracking
   lastActiveAt DateTime @default(now())
@@ -56,9 +57,10 @@ model User {
   rentPayments   RentPayment[]   @relation("TenantRentPayments")
   landlordProfile LandlordProfile? @relation("LandlordProfile")
   landlordRequestMatches LandlordRequestMatch[] @relation("LandlordMatches")
+  properties     Property[]      @relation("LandlordProperties")
 
   @@map("users")
-  @@index([role, availability, activeContracts]) // 🚀 SCALABILITY: Composite index for landlord queries
+  @@index([role, availability, autoAvailability, currentTenants]) // 🚀 SCALABILITY: Composite index for landlord queries
   @@index([email]) // 🚀 SCALABILITY: Email lookup optimization
   @@index([lastActiveAt]) // 🚀 SCALABILITY: Activity tracking
 }
@@ -72,9 +74,30 @@ model LandlordProfile {
   maxBudget Float? // Maximum budget landlord typically works with
   minBudget Float? // Minimum budget landlord typically works with
   
+  // 🏠 NEW: Capacity management
+  maxTenants Int @default(5) // Maximum number of tenants landlord can handle
+  currentTenants Int @default(0) // Current number of active tenants
+  
+  // 🎛️ NEW: Availability control
+  manualAvailability Boolean @default(true) // Manual override for availability
+  autoAvailability Boolean @default(true) // Auto-manage based on capacity
+  
   // Property types and preferences
   propertyTypes String? // JSON string of property types ["apartment", "house", "studio"]
   amenities String? // JSON string of amenities ["parking", "furnished", "pets_allowed"]
+  
+  // 🏠 NEW: Property templates for offers
+  propertyRules String? // Standard house rules template
+  propertyDescription String? // Standard property description template
+  
+  // 🖼️ NEW: Property media library
+  propertyImages String? // JSON string of image URLs for reuse
+  propertyVideos String? // JSON string of video URLs for reuse
+  
+  // 🚀 NEW: Auto-fill preferences
+  autoFillMedia Boolean @default(true) // Auto-fill media in offers
+  autoFillRules Boolean @default(true) // Auto-fill rules in offers
+  autoFillDescription Boolean @default(true) // Auto-fill description in offers
   
   // Response preferences
   autoResponse Boolean @default(false) // Auto-generate offers
@@ -94,6 +117,72 @@ model LandlordProfile {
   @@map("landlord_profiles")
   @@index([preferredLocations]) // 🚀 SCALABILITY: Location-based queries
   @@index([maxBudget, minBudget]) // 🚀 SCALABILITY: Budget range queries
+  @@index([maxTenants, currentTenants]) // 🚀 SCALABILITY: Capacity-based queries
+  @@index([manualAvailability, autoAvailability]) // 🚀 SCALABILITY: Availability queries
+}
+
+// 🏠 NEW: Property model for landlord property management
+model Property {
+  id String @id @default(cuid())
+  
+  // Basic property information
+  name String
+  address String
+  city String
+  zipCode String
+  country String @default("Poland")
+  
+  // Property details
+  propertyType String // "apartment", "house", "studio", "room"
+  bedrooms Int?
+  bathrooms Int?
+  size Float? // in square meters
+  floor Int?
+  totalFloors Int?
+  
+  // Rental information
+  monthlyRent Float
+  depositAmount Float?
+  utilitiesIncluded Boolean @default(false)
+  availableFrom DateTime?
+  availableUntil DateTime?
+  
+  // Property features
+  furnished Boolean @default(false)
+  parking Boolean @default(false)
+  petsAllowed Boolean @default(false)
+  smokingAllowed Boolean @default(false)
+  
+  // Property status
+  status PropertyStatus @default(AVAILABLE)
+  maxTenants Int @default(1)
+  currentTenants Int @default(0)
+  
+  // Property description and rules
+  description String?
+  houseRules String?
+  
+  // Media
+  images String? // JSON string of image URLs
+  videos String? // JSON string of video URLs
+  
+  // Location coordinates (optional)
+  latitude Float?
+  longitude Float?
+  
+  // Relations
+  landlordId String
+  landlord User @relation("LandlordProperties", fields: [landlordId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("properties")
+  @@index([landlordId, status]) // 🚀 SCALABILITY: Landlord's properties
+  @@index([city, status]) // 🚀 SCALABILITY: Location-based queries
+  @@index([propertyType, status]) // 🚀 SCALABILITY: Type-based queries
+  @@index([monthlyRent, status]) // 🚀 SCALABILITY: Price-based queries
 }
 
 model RentalRequest {
@@ -103,6 +192,8 @@ model RentalRequest {
   location  String
   moveInDate DateTime
   budget    Float
+  budgetFrom Float? // Minimum budget range
+  budgetTo   Float? // Maximum budget range
   bedrooms  Int?
   bathrooms Int?
   furnished Boolean  @default(false)
@@ -413,4 +504,16 @@ enum PaymentGateway {
   PAYU
   P24
   TPAY
+}
+
+enum PropertyStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+  RENTED
+  UNAVAILABLE
+} 
+  UNAVAILABLE
+} 
+  UNAVAILABLE
 } 

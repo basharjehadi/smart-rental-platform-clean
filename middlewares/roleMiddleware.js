@@ -7,9 +7,12 @@ const requireRole = (roles) => {
       });
     }
 
-    if (!roles.includes(req.user.role)) {
+    // Ensure roles is an array
+    const rolesArray = Array.isArray(roles) ? roles : [roles];
+
+    if (!rolesArray.includes(req.user.role)) {
       return res.status(403).json({ 
-        error: 'Insufficient permissions. Required roles: ' + roles.join(', ')
+        error: 'Insufficient permissions. Required roles: ' + rolesArray.join(', ')
       });
     }
 
@@ -25,6 +28,12 @@ const requireAdmin = requireRole(['ADMIN']);
 export {
   requireRole,
   requireTenant,
+  requireLandlord,
+  requireAdmin
+}; 
+  requireLandlord,
+  requireAdmin
+}; 
   requireLandlord,
   requireAdmin
 }; 
