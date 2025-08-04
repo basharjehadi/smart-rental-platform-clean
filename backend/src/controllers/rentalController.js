@@ -339,7 +339,14 @@ const createOffer = async (req, res) => {
     // 🚀 SCALABILITY: Send notification asynchronously
     setImmediate(async () => {
       try {
-        await sendOfferNotification(result);
+        await sendOfferNotification(
+          result.rentalRequest.tenant.email,
+          result.rentalRequest.tenant.name,
+          req.user.name,
+          result.propertyAddress || 'Property',
+          result.rentAmount,
+          result.id
+        );
       } catch (error) {
         console.error('❌ Error sending offer notification:', error);
       }

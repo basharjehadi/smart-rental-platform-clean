@@ -180,7 +180,7 @@ const testCompleteFlow = async () => {
       };
       
       const offerResponse = await axios.post(
-        `${API_BASE_URL}/rental-requests/${rentalRequest.id}/offer`,
+        `${API_BASE_URL}/rental-request/${rentalRequest.id}/offer`,
         offerData,
         {
           headers: { Authorization: `Bearer ${landlordToken}` }
