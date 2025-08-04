@@ -170,17 +170,23 @@ class RequestPoolService {
     let score = 50; // Base score
 
     if (!landlord.properties || landlord.properties.length === 0) {
+      console.log(`   ❌ Landlord ${landlord.id} has no properties`);
       return 0;
     }
 
     // Get the best matching property
     const bestProperty = landlord.properties[0]; // Already sorted by match criteria
 
+    console.log(`   🧮 Scoring landlord ${landlord.id} with property ${bestProperty.name}:`);
+
     // 📍 Location match (40 points)
     const locationMatch = bestProperty.city.includes(rentalRequest.location.split(',')[0].trim()) ||
                          bestProperty.address.includes(rentalRequest.location.split(',')[0].trim());
     if (locationMatch) {
       score += 40;
+      console.log(`      ✅ Location match: +40 points (${bestProperty.city} contains ${rentalRequest.location.split(',')[0].trim()})`);
+    } else {
+      console.log(`      ❌ Location mismatch: ${bestProperty.city} vs ${rentalRequest.location.split(',')[0].trim()}`);
     }
 
     // 💰 Budget match (30 points)
@@ -190,18 +196,27 @@ class RequestPoolService {
     if (bestProperty.monthlyRent >= (rentalRequest.budgetFrom - budgetTolerance) && 
         bestProperty.monthlyRent <= (rentalRequest.budgetTo + budgetTolerance)) {
       score += 30;
+      console.log(`      ✅ Budget match with tolerance: +30 points (${bestProperty.monthlyRent} PLN in range ${rentalRequest.budgetFrom - budgetTolerance}-${rentalRequest.budgetTo + budgetTolerance})`);
     } else if (bestProperty.monthlyRent >= rentalRequest.budgetFrom && 
                bestProperty.monthlyRent <= rentalRequest.budgetTo) {
       score += 25; // Within exact range
+      console.log(`      ✅ Budget exact match: +25 points (${bestProperty.monthlyRent} PLN in exact range ${rentalRequest.budgetFrom}-${rentalRequest.budgetTo})`);
     } else if (bestProperty.monthlyRent <= rentalRequest.budgetTo) {
       score += 15; // Within max budget
+      console.log(`      ✅ Budget within max: +15 points (${bestProperty.monthlyRent} PLN <= ${rentalRequest.budgetTo})`);
+    } else {
+      console.log(`      ❌ Budget mismatch: ${bestProperty.monthlyRent} PLN vs range ${rentalRequest.budgetFrom}-${rentalRequest.budgetTo}`);
     }
 
     // 🏠 Bedrooms match (20 points)
     if (rentalRequest.bedrooms && bestProperty.bedrooms === rentalRequest.bedrooms) {
       score += 20;
+      console.log(`      ✅ Bedrooms exact match: +20 points (${bestProperty.bedrooms} = ${rentalRequest.bedrooms})`);
     } else if (rentalRequest.bedrooms && Math.abs(bestProperty.bedrooms - rentalRequest.bedrooms) <= 1) {
       score += 10; // Close match
+      console.log(`      ✅ Bedrooms close match: +10 points (${bestProperty.bedrooms} ≈ ${rentalRequest.bedrooms})`);
+    } else if (rentalRequest.bedrooms) {
+      console.log(`      ❌ Bedrooms mismatch: ${bestProperty.bedrooms} vs ${rentalRequest.bedrooms}`);
     }
 
     // 📅 Availability match (10 points)
@@ -211,11 +226,18 @@ class RequestPoolService {
     
     if (daysDiff <= 7) {
       score += 10; // Available within a week
+      console.log(`      ✅ Availability within week: +10 points (${daysDiff.toFixed(1)} days diff)`);
     } else if (daysDiff <= 30) {
       score += 5; // Available within a month
+      console.log(`      ✅ Availability within month: +5 points (${daysDiff.toFixed(1)} days diff)`);
+    } else {
+      console.log(`      ❌ Availability mismatch: ${daysDiff.toFixed(1)} days diff`);
     }
 
-    return Math.min(100, Math.max(0, score));
+    const finalScore = Math.min(100, Math.max(0, score));
+    console.log(`      🎯 Final score: ${finalScore}/100`);
+    
+    return finalScore;
   }
 
   /**
@@ -273,8 +295,7 @@ class RequestPoolService {
 
       // 🚀 SCALABILITY: Batch insert for performance
       await prisma.landlordRequestMatch.createMany({
-        data: matches,
-        skipDuplicates: true
+        data: matches
       });
 
       console.log(`✅ Created ${matches.length} matches for request ${rentalRequestId}`);
