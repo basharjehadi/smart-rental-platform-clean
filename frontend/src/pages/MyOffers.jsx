@@ -88,7 +88,7 @@ const MyOffers = () => {
         <nav className="flex-1 p-4">
           <div className="space-y-2">
             <Link
-              to="/tenant-dashboard"
+              to="/tenant-request-for-landlord"
               className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg"
             >
               <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -132,7 +132,7 @@ const MyOffers = () => {
             
             <div className="flex items-center space-x-4">
               <Link
-                to="/tenant-dashboard"
+                to="/tenant-request-for-landlord"
                 className="inline-flex items-center px-4 py-2 bg-black text-white font-medium rounded-lg hover:bg-gray-800 transition-colors"
               >
                 My Requests

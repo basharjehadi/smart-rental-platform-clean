@@ -18,8 +18,9 @@ const ProfileCompletionGuard = ({ children, required = true }) => {
         
         // If profile is incomplete and this route requires complete profile
         if (required && !response.data.isComplete) {
-          // Redirect to profile page with message
-          navigate('/profile', { 
+          // Redirect to appropriate profile page based on user role
+          const profileRoute = response.data.user?.role === 'LANDLORD' ? '/landlord-profile' : '/profile';
+          navigate(profileRoute, { 
             state: { 
               message: 'Please complete your profile information before proceeding',
               missingFields: response.data.missingFields 

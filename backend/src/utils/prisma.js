@@ -1,8 +1,18 @@
 import { PrismaClient } from '@prisma/client';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Create a single PrismaClient instance that can be shared throughout your app
 const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  datasources: {
+    db: {
+      url: `file:${join(__dirname, '../../prisma/dev.db')}`
+    }
+  }
 });
 
 // Handle connection events

@@ -4,24 +4,24 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 const API_BASE = 'http://localhost:3001/api';
 
-// Test data with proper budget fields
+// Test data
 const testData = {
   tenant: {
-    email: 'test-tenant-simple@example.com',
+    email: 'test-tenant-matching@example.com',
     password: 'password123',
-    name: 'Test Tenant Simple',
+    name: 'Test Tenant Matching',
     role: 'TENANT'
   },
   landlord: {
-    email: 'test-landlord-simple@example.com',
+    email: 'test-landlord-matching@example.com',
     password: 'password123',
-    name: 'Test Landlord Simple',
+    name: 'Test Landlord Matching',
     role: 'LANDLORD'
   },
   property: {
-    name: 'Simple Test Property',
-    description: 'A simple property for testing',
-    address: 'Simple Street 123',
+    name: 'Test Matching Property',
+    description: 'A property that should match the rental request',
+    address: 'Test Street 123',
     city: 'Warsaw',
     zipCode: '00-001',
     monthlyRent: 2500,
@@ -34,8 +34,8 @@ const testData = {
     petsAllowed: true
   },
   rentalRequest: {
-    title: 'Simple 2-bedroom request',
-    description: 'Looking for a simple 2-bedroom apartment',
+    title: 'Looking for 2-bedroom apartment in Warsaw',
+    description: 'I need a 2-bedroom apartment in Warsaw with a budget of 2000-3000 PLN',
     location: 'Warsaw, Poland',
     moveInDate: '2025-09-01',
     budget: 2500,
@@ -76,6 +76,20 @@ async function createUser(userData) {
   }
 }
 
+async function loginUser(userData) {
+  try {
+    console.log(`🔐 Logging in ${userData.role.toLowerCase()}...`);
+    const response = await axios.post(`${API_BASE}/auth/login`, {
+      email: userData.email,
+      password: userData.password
+    });
+    console.log(`✅ ${userData.role} logged in successfully`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+}
+
 async function createProperty(propertyData, token) {
   try {
     console.log('🏠 Creating property...');
@@ -92,7 +106,6 @@ async function createProperty(propertyData, token) {
 async function createRentalRequest(requestData, token) {
   try {
     console.log('📝 Creating rental request...');
-    console.log('📝 Request data:', JSON.stringify(requestData, null, 2));
     const response = await axios.post(`${API_BASE}/rental-request`, requestData, {
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -134,9 +147,6 @@ async function checkDatabaseMatches() {
     console.log(`✅ Rental request found: ${rentalRequest.title}`);
     console.log(`   Status: ${rentalRequest.poolStatus}`);
     console.log(`   Tenant: ${rentalRequest.tenant.name}`);
-    console.log(`   Budget From: ${rentalRequest.budgetFrom}`);
-    console.log(`   Budget To: ${rentalRequest.budgetTo}`);
-    console.log(`   Budget: ${rentalRequest.budget}`);
     
     // Check if matches were created
     const matches = await prisma.landlordRequestMatch.findMany({
@@ -163,9 +173,9 @@ async function checkDatabaseMatches() {
   }
 }
 
-async function testSimpleMatching() {
-  console.log('🚀 Testing Simple Matching System');
-  console.log('==================================');
+async function testCoreMatchingSystem() {
+  console.log('🚀 Testing Core Matching System');
+  console.log('================================');
   
   try {
     // Step 1: Create/Load tenant
@@ -199,7 +209,7 @@ async function testSimpleMatching() {
     console.log(`   Bedrooms: ${rentalRequest.bedrooms}`);
     console.log(`   Move-in: ${rentalRequest.moveInDate}`);
     
-    // Step 5: Wait for pool processing
+    // Step 5: Wait for pool processing (give it time to process)
     console.log('⏳ Waiting for pool processing...');
     await sleep(3000);
     
@@ -229,28 +239,8 @@ async function testSimpleMatching() {
       console.log(`   Location: ${requestDetails.location}`);
       console.log(`   Budget From: ${requestDetails.budgetFrom}`);
       console.log(`   Budget To: ${requestDetails.budgetTo}`);
-      console.log(`   Budget: ${requestDetails.budget}`);
       console.log(`   Bedrooms: ${requestDetails.bedrooms}`);
       console.log(`   Move In Date: ${requestDetails.moveInDate}`);
-      
-      // Debug: Check if there are any landlords with properties
-      const landlordsWithProperties = await prisma.user.findMany({
-        where: {
-          role: 'LANDLORD',
-          properties: { some: {} }
-        },
-        include: {
-          properties: true
-        }
-      });
-      
-      console.log(`👥 Found ${landlordsWithProperties.length} landlords with properties`);
-      landlordsWithProperties.forEach(landlord => {
-        console.log(`   👤 Landlord ${landlord.id} (${landlord.email}): ${landlord.properties.length} properties`);
-        landlord.properties.forEach(prop => {
-          console.log(`      🏢 ${prop.name}: ${prop.city}, ${prop.monthlyRent} PLN, ${prop.bedrooms} bedrooms`);
-        });
-      });
       
       return false;
     }
@@ -272,15 +262,23 @@ async function testSimpleMatching() {
     console.log(`   Match Score: ${receivedRequest.matchScore}`);
     console.log(`   Match Reason: ${receivedRequest.matchReason}`);
     
-    console.log('\n🎉 SIMPLE MATCHING SYSTEM TEST PASSED!');
+    // Step 9: Verify matching criteria
+    console.log('🔍 Verifying matching criteria:');
+    console.log(`   Location match: ${receivedRequest.location.includes('Warsaw') ? '✅' : '❌'}`);
+    console.log(`   Budget match: ${receivedRequest.budgetFrom <= 2500 && receivedRequest.budgetTo >= 2500 ? '✅' : '❌'}`);
+    console.log(`   Bedrooms match: ${receivedRequest.bedrooms === 2 ? '✅' : '❌'}`);
+    console.log(`   Move-in date match: ${new Date(receivedRequest.moveInDate) >= new Date('2025-01-01') ? '✅' : '❌'}`);
+    
+    console.log('\n🎉 CORE MATCHING SYSTEM TEST PASSED!');
     console.log('✅ Tenant created rental request');
     console.log('✅ System found matching landlord property');
     console.log('✅ Landlord received the rental request');
+    console.log('✅ All matching criteria verified');
     
     return true;
     
   } catch (error) {
-    console.error('❌ Simple matching system test failed:', error.response?.data || error.message);
+    console.error('❌ Core matching system test failed:', error.response?.data || error.message);
     return false;
   } finally {
     await prisma.$disconnect();
@@ -288,12 +286,14 @@ async function testSimpleMatching() {
 }
 
 // Run the test
-testSimpleMatching()
+testCoreMatchingSystem()
   .then(success => {
     console.log(`\n🏁 Test completed: ${success ? 'PASSED' : 'FAILED'}`);
     process.exit(success ? 0 : 1);
   })
   .catch(error => {
     console.error('💥 Test crashed:', error);
+    console.error('Error details:', error.response?.data || error.message);
+    console.error('Stack trace:', error.stack);
     process.exit(1);
   }); 

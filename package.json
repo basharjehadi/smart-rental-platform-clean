@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A comprehensive rental management platform with landlord and tenant portals",
   "private": true,
+  "type": "module",
   "workspaces": [
     "backend",
     "frontend"

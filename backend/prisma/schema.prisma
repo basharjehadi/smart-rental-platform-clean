@@ -224,7 +224,7 @@ model RentalRequest {
   tenantId String
   tenant   User     @relation("TenantRequests", fields: [tenantId], references: [id], onDelete: Cascade)
   
-  offer    Offer?   @relation("RequestOffer")
+  offers   Offer[]  @relation("RequestOffer")
   contractSignature ContractSignature? @relation("ContractSignature")
   contract Contract? @relation("Contract")
   payments Payment[] @relation("RequestPayments")

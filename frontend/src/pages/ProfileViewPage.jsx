@@ -30,7 +30,8 @@ const ProfileViewPage = () => {
   };
 
   const handleUpdateProfile = () => {
-    navigate('/profile');
+    const profileRoute = profileData?.role === 'LANDLORD' ? '/landlord-profile' : '/profile';
+    navigate(profileRoute);
   };
 
   const formatDate = (dateString) => {
@@ -307,4 +308,5 @@ const ProfileViewPage = () => {
   );
 };
 
+export default ProfileViewPage; 
 export default ProfileViewPage; 

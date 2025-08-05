@@ -17,7 +17,7 @@ import LandlordMyProperty from './pages/LandlordMyProperty';
 import LandlordAddProperty from './pages/LandlordAddProperty';
 import LandlordEditProperty from './pages/LandlordEditProperty';
 import LandlordPropertyDetails from './pages/LandlordPropertyDetails';
-import LandlordRequests from './pages/LandlordRequests';
+
 import MyOffers from './pages/MyOffers';
 import PaymentPage from './pages/PaymentPage';
 import TenantDashboardRent from './pages/TenantDashboardRent';
@@ -28,7 +28,7 @@ import AuthCallback from './pages/AuthCallback';
 import TestPage from './pages/TestPage';
 import ProfilePage from './pages/ProfilePage';
 
-import LandlordSettingsPage from './pages/LandlordSettingsPage';
+
 import PropertyMediaUpload from './components/PropertyMediaUpload';
 import ContractManagementPage from './pages/ContractManagementPage';
 import PaymentManagementPage from './pages/PaymentManagementPage';
@@ -39,7 +39,7 @@ import TenantDashboardRedirect from './components/TenantDashboardRedirect';
 // Component to conditionally render Navbar
 const AppContent = () => {
   const location = useLocation();
-  const hideNavbarRoutes = ['/dashboard', '/tenant-dashboard', '/tenant-profile', '/post-request', '/my-offers', '/contracts', '/payments', '/my-rents', '/my-requests', '/landlord-dashboard', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details'];
+  const hideNavbarRoutes = ['/dashboard', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/contracts', '/payments', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details'];
   const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
 
   return (
@@ -60,7 +60,7 @@ const AppContent = () => {
           } 
         />
         <Route 
-          path="/tenant-dashboard" 
+          path="/tenant-request-for-landlord" 
           element={
             <ProtectedRoute>
               <TenantDashboard />
@@ -95,23 +95,20 @@ const AppContent = () => {
             </ProtectedRoute>
           } 
         />
-        <Route 
-          path="/requests" 
-          element={
-            <ProtectedRoute>
-              <ProfileCompletionGuard required={true}>
-                <LandlordRequests />
-              </ProfileCompletionGuard>
-            </ProtectedRoute>
-          } 
-        />
+
         <Route 
           path="/landlord-dashboard" 
           element={
             <ProtectedRoute>
-              <ProfileCompletionGuard required={true}>
-                <LandlordDashboard />
-              </ProfileCompletionGuard>
+              <LandlordDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/tenant-rental-requests" 
+          element={
+            <ProtectedRoute>
+              <LandlordDashboard />
             </ProtectedRoute>
           } 
         />
@@ -205,14 +202,7 @@ const AppContent = () => {
             </ProtectedRoute>
           } 
         />
-        <Route 
-          path="/landlord-settings" 
-          element={
-            <ProtectedRoute>
-              <LandlordSettingsPage />
-            </ProtectedRoute>
-          } 
-        />
+
         <Route 
           path="/property-media" 
           element={

@@ -56,11 +56,11 @@ const Navbar = () => {
                   
                   {user.role === 'LANDLORD' && (
                     <>
-                      <Link to="/requests" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
-                        Requests
+                      <Link to="/landlord-dashboard" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
+                        Dashboard
                       </Link>
-                      <Link to="/landlord-rents" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
-                        {t('navigation.rentOverview')}
+                      <Link to="/landlord-my-property" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
+                        My Properties
                       </Link>
                     </>
                   )}
