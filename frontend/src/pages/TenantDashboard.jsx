@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import CreateRentalRequestModal from '../components/CreateRentalRequestModal';
+import TenantSidebar from '../components/TenantSidebar';
+import { LogOut } from 'lucide-react';
 
 const TenantDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   
   const [requests, setRequests] = useState([]);
+  const [profileData, setProfileData] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -106,6 +110,19 @@ const TenantDashboard = () => {
     }).format(amount);
   };
 
+  const getProfilePhotoUrl = (photoPath) => {
+    if (!photoPath) return null;
+    
+    // If it's already a full URL, return as is
+    if (photoPath.startsWith('http://') || photoPath.startsWith('https://')) {
+      return photoPath;
+    }
+    
+    // If it's a relative path, construct full URL
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    return `${baseUrl}${photoPath}`;
+  };
+
   const getStatusBadge = (status) => {
     const statusConfig = {
       ACTIVE: { text: 'Active', color: 'bg-green-100 text-green-800' },
@@ -154,78 +171,87 @@ const TenantDashboard = () => {
     fetchRequests();
   }, []);
 
+  // Separate useEffect for profile data fetching (like other working pages)
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        console.log('Fetching profile data from /users/profile...');
+        const response = await api.get('/users/profile');
+        console.log('Profile response on dashboard:', response.data);
+        console.log('Profile user data:', response.data.user);
+        console.log('Profile image field:', response.data.user?.profileImage);
+        console.log('Profile image type:', typeof response.data.user?.profileImage);
+        console.log('Profile image length:', response.data.user?.profileImage?.length);
+        console.log('Full profile user object:', JSON.stringify(response.data.user, null, 2));
+        setProfileData(response.data.user);
+      } catch (error) {
+        console.error('Error fetching profile data:', error);
+        console.error('Profile error response:', error.response?.data);
+        setProfileData(null);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+    
+    fetchProfileData();
+  }, []);
+
+  useEffect(() => {
+    console.log('Profile data changed on dashboard:', profileData);
+  }, [profileData]);
+
+  useEffect(() => {
+    console.log('Profile loading state changed on dashboard:', profileLoading);
+  }, [profileLoading]);
+
   return (
     <div className="min-h-screen bg-white flex">
       {/* Left Sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        {/* Logo */}
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center mr-3">
-              <span className="text-white font-bold text-sm">R</span>
-            </div>
-            <span className="text-lg font-semibold text-gray-900">RentPlatform Poland</span>
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 p-4">
-          <div className="space-y-2">
-            <Link
-                              to="/tenant-request-for-landlord"
-              className="flex items-center px-4 py-3 text-sm font-medium text-white bg-black rounded-lg"
-            >
-              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              My requests
-            </Link>
-            
-            <Link
-              to="/my-offers"
-              className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg"
-            >
-              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM4 19h6v-2H4v2zM4 15h6v-2H4v2zM4 11h6V9H4v2zM4 7h6V5H4v2z" />
-              </svg>
-              View offers
-            </Link>
-            
-            <Link
-              to="/tenant-profile"
-              className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg"
-            >
-              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              Profile
-            </Link>
-          </div>
-        </nav>
-      </div>
+      <TenantSidebar />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Top Header */}
         <header className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">Tenant Dashboard</h1>
+            <h1 className="text-2xl font-bold text-gray-900">My Requests</h1>
             
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
-                <span className="text-sm font-medium text-gray-900">{user?.name || 'Test Tenant'}</span>
-                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-gray-700">
-                    {user?.name?.charAt(0) || 'T'}
-                  </span>
+                <span className="text-sm font-medium text-gray-900">{user?.name || 'Tenant'}</span>
+                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-md overflow-hidden">
+                  {profileLoading ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : profileData && profileData.profileImage ? (
+                    <img
+                      src={getProfilePhotoUrl(profileData.profileImage)}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.error('Profile image failed to load on dashboard:', e.target.src);
+                        console.log('Profile data:', profileData);
+                        console.log('Profile image path:', profileData.profileImage);
+                        console.log('Constructed URL:', e.target.src);
+                      }}
+                      onLoad={() => {
+                        console.log('Profile image loaded successfully on dashboard');
+                        console.log('Loaded image URL:', getProfilePhotoUrl(profileData.profileImage));
+                      }}
+                    />
+                  ) : (
+                    <span className="text-base font-bold text-white">
+                      {user?.name?.charAt(0) || 'T'}
+                    </span>
+                  )}
                 </div>
               </div>
               
               <button
                 onClick={handleLogout}
-                className="text-sm text-gray-600 hover:text-gray-900"
+                className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"
               >
-                Logout
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
               </button>
             </div>
           </div>

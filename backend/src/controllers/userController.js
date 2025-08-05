@@ -56,6 +56,13 @@ export const getUserProfile = async (req, res) => {
         passportNumber: true,
         kartaPobytuNumber: true,
         phoneNumber: true,
+        citizenship: true,
+        dateOfBirth: true,
+        street: true,
+        city: true,
+        zipCode: true,
+        country: true,
+        profession: true,
         dowodOsobistyNumber: true,
         address: true,
         profileImage: true,
@@ -89,6 +96,13 @@ export const updateUserProfile = async (req, res) => {
       passportNumber,
       kartaPobytuNumber,
       phoneNumber,
+      citizenship,
+      dateOfBirth,
+      street,
+      city,
+      zipCode,
+      country,
+      profession,
       dowodOsobistyNumber,
       address,
       profileImage
@@ -110,6 +124,13 @@ export const updateUserProfile = async (req, res) => {
     if (firstName !== undefined) updateData.firstName = firstName;
     if (lastName !== undefined) updateData.lastName = lastName;
     if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
+    if (citizenship !== undefined) updateData.citizenship = citizenship;
+    if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+    if (street !== undefined) updateData.street = street;
+    if (city !== undefined) updateData.city = city;
+    if (zipCode !== undefined) updateData.zipCode = zipCode;
+    if (country !== undefined) updateData.country = country;
+    if (profession !== undefined) updateData.profession = profession;
     if (profileImage !== undefined) updateData.profileImage = profileImage;
 
     if (user.role === 'TENANT') {
@@ -148,6 +169,13 @@ export const updateUserProfile = async (req, res) => {
         passportNumber: true,
         kartaPobytuNumber: true,
         phoneNumber: true,
+        citizenship: true,
+        dateOfBirth: true,
+        street: true,
+        city: true,
+        zipCode: true,
+        country: true,
+        profession: true,
         dowodOsobistyNumber: true,
         address: true,
         profileImage: true,
@@ -413,17 +441,37 @@ export const uploadIdentityDocument = async (req, res) => {
     const filename = req.file.filename;
     const filePath = `uploads/identity_documents/${filename}`;
 
-    // Update user record with identity document filename
+    // Get GDPR consent data from request body
+    const { gdprConsent, gdprConsentDate } = req.body;
+    
+    // Prepare update data
+    const updateData = {
+      identityDocument: filename
+    };
+    
+    // Add GDPR consent data if provided
+    if (gdprConsent === 'true' && gdprConsentDate) {
+      updateData.gdprConsent = true;
+      updateData.gdprConsentDate = new Date(gdprConsentDate);
+    }
+    
+    // Set KYC status to PENDING when documents are uploaded
+    updateData.kycStatus = 'PENDING';
+    updateData.kycSubmittedAt = new Date();
+
+    // Update user record with identity document filename and GDPR consent
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: {
-        identityDocument: filename
-      },
+      data: updateData,
       select: {
         id: true,
         firstName: true,
         lastName: true,
         identityDocument: true,
+        gdprConsent: true,
+        gdprConsentDate: true,
+        kycStatus: true,
+        kycSubmittedAt: true,
         updatedAt: true
       }
     });
@@ -468,7 +516,15 @@ export const getProfileStatus = async (req, res) => {
         kartaPobytuNumber: true,
         phoneNumber: true,
         dowodOsobistyNumber: true,
-        address: true
+        address: true,
+        email: true,
+        kycStatus: true,
+        isVerified: true,
+        gdprConsent: true,
+        signatureBase64: true,
+        profileImage: true,
+        phoneVerified: true,
+        emailVerified: true
       }
     });
 
@@ -497,18 +553,302 @@ export const getProfileStatus = async (req, res) => {
       return !value || value.trim() === '';
     });
 
-    const isComplete = missingFields.length === 0;
-    const completionPercentage = Math.round(((requiredFields.length - missingFields.length) / requiredFields.length) * 100);
+    // Additional verification requirements
+    const verificationRequirements = [];
+    const missingVerifications = [];
+
+    // Email verification (always required)
+    verificationRequirements.push('emailVerified');
+    if (!user.emailVerified) {
+      missingVerifications.push('emailVerified');
+    }
+
+    // Phone verification (always required)
+    verificationRequirements.push('phoneVerified');
+    if (!user.phoneVerified) {
+      missingVerifications.push('phoneVerified');
+    }
+
+    // KYC verification (required for all users)
+    verificationRequirements.push('kycVerified');
+    if (user.kycStatus !== 'APPROVED') {
+      missingVerifications.push('kycVerified');
+    }
+
+    // GDPR consent (required for all users)
+    verificationRequirements.push('gdprConsent');
+    if (!user.gdprConsent) {
+      missingVerifications.push('gdprConsent');
+    }
+
+    // Signature (optional but recommended)
+    if (!user.signatureBase64) {
+      missingVerifications.push('signature');
+    }
+
+    // Profile photo (optional but recommended)
+    if (!user.profileImage) {
+      missingVerifications.push('profilePhoto');
+    }
+
+    // Calculate completion percentage
+    const totalRequirements = requiredFields.length + verificationRequirements.length;
+    const completedRequirements = (requiredFields.length - missingFields.length) + 
+                                 (verificationRequirements.length - missingVerifications.length);
+    
+    const completionPercentage = Math.round((completedRequirements / totalRequirements) * 100);
+
+    // Profile is complete if all required fields and verifications are done
+    const isComplete = missingFields.length === 0 && 
+                      !missingVerifications.includes('emailVerified') &&
+                      !missingVerifications.includes('phoneVerified') &&
+                      !missingVerifications.includes('kycVerified') &&
+                      !missingVerifications.includes('gdprConsent');
 
     res.json({
       isComplete,
       completionPercentage,
       missingFields,
+      missingVerifications,
       requiredFields,
-      userRole: user.role
+      verificationRequirements,
+      userRole: user.role,
+      kycStatus: user.kycStatus,
+      gdprConsent: user.gdprConsent,
+      hasSignature: !!user.signatureBase64,
+      hasProfilePhoto: !!user.profileImage,
+      phoneVerified: user.phoneVerified,
+      emailVerified: user.emailVerified
     });
   } catch (error) {
     console.error('Profile status check error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Upload profile photo
+export const uploadProfilePhoto = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        error: 'No photo file provided.'
+      });
+    }
+
+    const userId = req.user.id;
+    const file = req.file;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!validTypes.includes(file.mimetype)) {
+      return res.status(400).json({
+        error: 'Invalid file type. Only JPG, JPEG, and PNG files are allowed.'
+      });
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      return res.status(400).json({
+        error: 'File size must be less than 5MB.'
+      });
+    }
+
+    // File is already saved by multer middleware
+    // Generate URL for the saved file
+    const photoUrl = `/${file.path.replace(/\\/g, '/')}`;
+
+    // Update user profile with photo URL
+    await prisma.user.update({
+      where: { id: userId },
+      data: { profileImage: photoUrl }
+    });
+
+    res.json({
+      message: 'Profile photo uploaded successfully.',
+      photoUrl: photoUrl
+    });
+  } catch (error) {
+    console.error('Upload profile photo error:', error);
+    res.status(500).json({
+      error: 'Internal server error.'
+    });
+  }
+};
+
+// Delete profile photo
+export const deleteProfilePhoto = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get current user to find existing photo
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { profileImage: true }
+    });
+
+    if (user?.profileImage) {
+      // Delete file from filesystem
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      // Remove leading slash and convert to absolute path
+      const photoPath = path.join(process.cwd(), user.profileImage.substring(1));
+      if (fs.existsSync(photoPath)) {
+        fs.unlinkSync(photoPath);
+      }
+    }
+
+    // Update user to remove photo reference
+    await prisma.user.update({
+      where: { id: userId },
+      data: { profileImage: null }
+    });
+
+    res.json({
+      message: 'Profile photo deleted successfully.'
+    });
+  } catch (error) {
+    console.error('Delete profile photo error:', error);
+    res.status(500).json({
+      error: 'Internal server error.'
+    });
+  }
+};
+
+// Admin function to get all pending KYC submissions
+export const getPendingKYC = async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'Only admins can access this endpoint'
+      });
+    }
+
+    const pendingKYC = await prisma.user.findMany({
+      where: {
+        kycStatus: 'PENDING',
+        identityDocument: { not: null }
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        identityDocument: true,
+        kycStatus: true,
+        kycSubmittedAt: true,
+        gdprConsent: true,
+        gdprConsentDate: true,
+        createdAt: true
+      },
+      orderBy: {
+        kycSubmittedAt: 'asc'
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: pendingKYC
+    });
+
+  } catch (error) {
+    console.error('Get pending KYC error:', error);
+    res.status(500).json({
+      error: 'Failed to get pending KYC',
+      message: 'An error occurred while fetching pending KYC submissions'
+    });
+  }
+};
+
+// Admin function to approve/reject KYC
+export const reviewKYC = async (req, res) => {
+  try {
+    const { userId, action, rejectionReason } = req.body;
+
+    // Check if user is admin
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'Only admins can access this endpoint'
+      });
+    }
+
+    // Validate action
+    if (!['APPROVED', 'REJECTED'].includes(action)) {
+      return res.status(400).json({
+        error: 'Invalid action',
+        message: 'Action must be either APPROVED or REJECTED'
+      });
+    }
+
+    // Check if user exists and has pending KYC
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        kycStatus: true,
+        identityDocument: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+        message: 'The specified user does not exist'
+      });
+    }
+
+    if (user.kycStatus !== 'PENDING') {
+      return res.status(400).json({
+        error: 'Invalid KYC status',
+        message: 'KYC is not in pending status'
+      });
+    }
+
+    // Prepare update data
+    const updateData = {
+      kycStatus: action,
+      kycReviewedAt: new Date(),
+      kycReviewedBy: req.user.id
+    };
+
+    if (action === 'APPROVED') {
+      updateData.isVerified = true;
+    } else if (action === 'REJECTED') {
+      updateData.kycRejectionReason = rejectionReason || 'No reason provided';
+    }
+
+    // Update user KYC status
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        kycStatus: true,
+        kycReviewedAt: true,
+        kycRejectionReason: true,
+        isVerified: true
+      }
+    });
+
+    console.log(`✅ KYC ${action.toLowerCase()} for user ${userId} by admin ${req.user.id}`);
+
+    res.status(200).json({
+      success: true,
+      message: `KYC ${action.toLowerCase()} successfully`,
+      data: updatedUser
+    });
+
+  } catch (error) {
+    console.error('Review KYC error:', error);
+    res.status(500).json({
+      error: 'Failed to review KYC',
+      message: 'An error occurred while reviewing KYC'
+    });
   }
 }; 

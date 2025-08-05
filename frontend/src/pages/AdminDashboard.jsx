@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import api from '../utils/api';
 
 const AdminDashboard = () => {
-  const { user, api } = useAuth();
+  const { user, logout } = useAuth();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -65,106 +68,110 @@ const AdminDashboard = () => {
   };
 
   const fetchAnalytics = async () => {
-    const response = await api.get('/admin/analytics?period=30d');
-    setAnalytics(response.data);
+    try {
+      const response = await api.get('/admin/analytics?period=30d');
+      setAnalytics(response.data);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+    }
   };
 
   const fetchHealthMetrics = async () => {
-    const response = await api.get('/admin/health');
-    setHealthMetrics(response.data.healthMetrics);
+    try {
+      const response = await api.get('/admin/health');
+      setHealthMetrics(response.data.healthMetrics);
+    } catch (error) {
+      console.error('Error fetching health metrics:', error);
+    }
   };
 
   const fetchUsers = async () => {
-    const params = new URLSearchParams({
-      page: currentPage,
-      limit: 20,
-      ...userFilter
-    });
-    const response = await api.get(`/admin/users?${params}`);
-    setUsers(response.data.users);
-    setTotalPages(response.data.pagination.pages);
+    try {
+      const params = new URLSearchParams({
+        page: currentPage,
+        limit: 20,
+        ...userFilter
+      });
+      const response = await api.get(`/admin/users?${params}`);
+      setUsers(response.data.users);
+      setTotalPages(response.data.pagination.pages);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
   };
 
   const fetchPendingKYC = async () => {
-    const response = await api.get('/admin/users/pending-kyc');
-    setPendingKYC(response.data.users);
+    try {
+      const response = await api.get('/admin/users/pending-kyc');
+      setPendingKYC(response.data.users);
+    } catch (error) {
+      console.error('Error fetching pending KYC:', error);
+    }
   };
 
   const fetchRentalRequests = async () => {
-    const params = new URLSearchParams({
-      page: currentPage,
-      limit: 20,
-      ...requestFilter
-    });
-    const response = await api.get(`/admin/rental-requests?${params}`);
-    setRentalRequests(response.data.rentalRequests);
-    setTotalPages(response.data.pagination.pages);
+    try {
+      const params = new URLSearchParams({
+        page: currentPage,
+        limit: 20,
+        ...requestFilter
+      });
+      const response = await api.get(`/admin/rental-requests?${params}`);
+      setRentalRequests(response.data.rentalRequests);
+    } catch (error) {
+      console.error('Error fetching rental requests:', error);
+    }
   };
 
   const fetchPayments = async () => {
-    const params = new URLSearchParams({
-      page: currentPage,
-      limit: 20,
-      ...paymentFilter
-    });
-    const response = await api.get(`/admin/payments?${params}`);
-    setPayments(response.data.payments);
-    setTotalPages(response.data.pagination.pages);
+    try {
+      const params = new URLSearchParams({
+        page: currentPage,
+        limit: 20,
+        ...paymentFilter
+      });
+      const response = await api.get(`/admin/payments?${params}`);
+      setPayments(response.data.payments);
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+    }
   };
 
   const handleKYCVerification = async (userId, isApproved, rejectionReason = '') => {
     try {
-      setLoading(true);
       await api.put(`/admin/users/${userId}/kyc`, {
         isApproved,
         rejectionReason
       });
-
       setSuccess(`KYC ${isApproved ? 'approved' : 'rejected'} successfully`);
-      setTimeout(() => setSuccess(''), 3000);
-
-      // Refresh KYC data
-      await fetchPendingKYC();
+      fetchPendingKYC();
     } catch (error) {
-      console.error('Error verifying KYC:', error);
-      setError('Failed to verify KYC');
-    } finally {
-      setLoading(false);
+      console.error('Error updating KYC status:', error);
+      setError('Failed to update KYC status');
     }
   };
 
   const handleUserSuspension = async (userId, isSuspended, reason = '') => {
     try {
-      setLoading(true);
       await api.put(`/admin/users/${userId}/suspension`, {
         isSuspended,
         reason
       });
-
       setSuccess(`User ${isSuspended ? 'suspended' : 'unsuspended'} successfully`);
-      setTimeout(() => setSuccess(''), 3000);
-
-      // Refresh users data
-      await fetchUsers();
+      fetchUsers();
     } catch (error) {
-      console.error('Error toggling user suspension:', error);
-      setError('Failed to update user status');
-    } finally {
-      setLoading(false);
+      console.error('Error updating user suspension:', error);
+      setError('Failed to update user suspension');
     }
   };
 
   const handleSystemMaintenance = async (action) => {
     try {
-      setLoading(true);
-      const response = await api.post('/admin/maintenance', { action });
-      setSuccess(response.data.message);
-      setTimeout(() => setSuccess(''), 3000);
+      await api.post('/admin/system/maintenance', { action });
+      setSuccess(`System maintenance ${action} initiated successfully`);
     } catch (error) {
-      console.error('Error triggering maintenance:', error);
-      setError('Failed to trigger maintenance');
-    } finally {
-      setLoading(false);
+      console.error('Error initiating system maintenance:', error);
+      setError('Failed to initiate system maintenance');
     }
   };
 
@@ -172,191 +179,176 @@ const AdminDashboard = () => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: 'numeric'
     });
   };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('pl-PL', {
       style: 'currency',
-      currency: 'PLN'
+      currency: 'PLN',
+      minimumFractionDigits: 0
     }).format(amount);
   };
 
   const getStatusBadge = (status, type = 'default') => {
     const configs = {
-      user: {
-        'verified': { color: 'bg-green-100 text-green-800', text: 'Verified' },
-        'unverified': { color: 'bg-yellow-100 text-yellow-800', text: 'Unverified' },
-        'suspended': { color: 'bg-red-100 text-red-800', text: 'Suspended' }
-      },
-      request: {
-        'ACTIVE': { color: 'bg-green-100 text-green-800', text: 'Active' },
-        'LOCKED': { color: 'bg-red-100 text-red-800', text: 'Locked' },
-        'EXPIRED': { color: 'bg-gray-100 text-gray-800', text: 'Expired' }
-      },
-      payment: {
-        'SUCCEEDED': { color: 'bg-green-100 text-green-800', text: 'Succeeded' },
-        'PENDING': { color: 'bg-yellow-100 text-yellow-800', text: 'Pending' },
-        'FAILED': { color: 'bg-red-100 text-red-800', text: 'Failed' }
-      },
       default: {
-        'active': { color: 'bg-green-100 text-green-800', text: 'Active' },
-        'inactive': { color: 'bg-gray-100 text-gray-800', text: 'Inactive' }
+        ACTIVE: { bg: 'bg-green-100', textColor: 'text-green-800', label: 'Active' },
+        SUSPENDED: { bg: 'bg-red-100', textColor: 'text-red-800', label: 'Suspended' },
+        PENDING: { bg: 'bg-yellow-100', textColor: 'text-yellow-800', label: 'Pending' },
+        APPROVED: { bg: 'bg-green-100', textColor: 'text-green-800', label: 'Approved' },
+        REJECTED: { bg: 'bg-red-100', textColor: 'text-red-800', label: 'Rejected' },
+        COMPLETED: { bg: 'bg-blue-100', textColor: 'text-blue-800', label: 'Completed' },
+        CANCELLED: { bg: 'bg-gray-100', textColor: 'text-gray-800', label: 'Cancelled' }
       }
     };
 
-    const config = configs[type]?.[status] || configs.default[status] || { color: 'bg-gray-100 text-gray-800', text: status };
-    
+    const config = configs[type]?.[status] || configs.default[status] || { bg: 'bg-gray-100', textColor: 'text-gray-800', label: status };
+
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-        {config.text}
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.textColor}`}>
+        {config.label}
       </span>
     );
   };
 
+  // Calculate counts for overview
+  const getOverviewCounts = () => {
+    return {
+      totalUsers: analytics?.totalUsers || 0,
+      totalRequests: analytics?.totalRequests || 0,
+      totalPayments: analytics?.totalPayments || 0,
+      pendingKYC: pendingKYC.length
+    };
+  };
+
   const renderOverview = () => (
     <div className="space-y-6">
-      {/* Analytics Cards */}
-      {analytics && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <span className="text-2xl">👥</span>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Users</p>
-                <p className="text-2xl font-bold text-gray-900">{analytics.analytics.totalUsers}</p>
-                <p className="text-sm text-green-600">+{analytics.analytics.newUsers} new</p>
+      {/* Status Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                </svg>
               </div>
             </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <span className="text-2xl">🏠</span>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Rental Requests</p>
-                <p className="text-2xl font-bold text-gray-900">{analytics.analytics.totalRentalRequests}</p>
-                <p className="text-sm text-green-600">+{analytics.analytics.newRentalRequests} new</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <span className="text-2xl">💳</span>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(analytics.analytics.totalRevenue)}</p>
-                <p className="text-sm text-green-600">{analytics.analytics.totalPayments} payments</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <span className="text-2xl">📋</span>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Pending KYC</p>
-                <p className="text-2xl font-bold text-gray-900">{analytics.analytics.pendingKYC}</p>
-                <p className="text-sm text-yellow-600">Needs review</p>
-              </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Users</p>
+              <p className="text-2xl font-semibold text-gray-900">{getOverviewCounts().totalUsers}</p>
             </div>
           </div>
         </div>
-      )}
+
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Requests</p>
+              <p className="text-2xl font-semibold text-gray-900">{getOverviewCounts().totalRequests}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+              </div>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Payments</p>
+              <p className="text-2xl font-semibold text-gray-900">{getOverviewCounts().totalPayments}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Pending KYC</p>
+              <p className="text-2xl font-semibold text-gray-900">{getOverviewCounts().pendingKYC}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* System Health */}
       {healthMetrics && (
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">System Health</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">User Activity</p>
-              <p className="text-lg font-semibold">{healthMetrics.users.activePercentage}% active</p>
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">System Health</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Active Users</p>
+              <p className="text-lg font-semibold text-green-600">{healthMetrics.users?.active || 0}</p>
+              <p className="text-xs text-gray-500">{healthMetrics.users?.activePercentage || 0}% of total</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Payment Success Rate</p>
-              <p className="text-lg font-semibold">{healthMetrics.payments.successRate}%</p>
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Active Requests</p>
+              <p className="text-lg font-semibold text-blue-600">{healthMetrics.requests?.active || 0}</p>
+              <p className="text-xs text-gray-500">{healthMetrics.requests?.activePercentage || 0}% of total</p>
             </div>
-            <div>
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Payment Success</p>
+              <p className="text-lg font-semibold text-purple-600">{healthMetrics.payments?.successRate || 0}%</p>
+              <p className="text-xs text-gray-500">{healthMetrics.payments?.successful || 0} successful</p>
+            </div>
+            <div className="text-center">
               <p className="text-sm text-gray-600">System Uptime</p>
-              <p className="text-lg font-semibold">{healthMetrics.system.uptime}h</p>
+              <p className="text-lg font-semibold text-gray-900">{healthMetrics.system?.uptime || 0}h</p>
+              <p className="text-xs text-green-600">{healthMetrics.system?.status || 'unknown'}</p>
             </div>
           </div>
         </div>
       )}
-
-      {/* Quick Actions */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-        <div className="flex space-x-4">
-          <button
-            onClick={() => handleSystemMaintenance('cleanup_expired_requests')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Cleanup Expired Requests
-          </button>
-          <button
-            onClick={() => handleSystemMaintenance('generate_missing_contracts')}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            Generate Missing Contracts
-          </button>
-        </div>
-      </div>
     </div>
   );
 
   const renderUsers = () => (
     <div className="space-y-6">
-      {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-gray-900">User Management</h2>
+        <div className="flex space-x-3">
+          <input
+            type="text"
+            placeholder="Search users..."
+            value={userFilter.search}
+            onChange={(e) => setUserFilter({ ...userFilter, search: e.target.value })}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          />
           <select
             value={userFilter.role}
             onChange={(e) => setUserFilter({ ...userFilter, role: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="">All Roles</option>
             <option value="TENANT">Tenant</option>
             <option value="LANDLORD">Landlord</option>
             <option value="ADMIN">Admin</option>
           </select>
-          <select
-            value={userFilter.status}
-            onChange={(e) => setUserFilter({ ...userFilter, status: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Status</option>
-            <option value="verified">Verified</option>
-            <option value="unverified">Unverified</option>
-          </select>
-          <input
-            type="text"
-            placeholder="Search users..."
-            value={userFilter.search}
-            onChange={(e) => setUserFilter({ ...userFilter, search: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          />
         </div>
       </div>
 
-      {/* Users List */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Users</h3>
-        </div>
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -364,7 +356,7 @@ const AdminDashboard = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -372,24 +364,31 @@ const AdminDashboard = () => {
               {users.map((user) => (
                 <tr key={user.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-medium text-gray-700">
+                          {user.name?.charAt(0) || 'U'}
+                        </span>
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                        <div className="text-sm text-gray-500">{user.email}</div>
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm text-gray-900">{user.role}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(user.isVerified ? 'verified' : 'unverified', 'user')}
+                    {getStatusBadge(user.isSuspended ? 'SUSPENDED' : 'ACTIVE')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user._count.rentalRequests} requests, {user._count.offers} offers
+                    {formatDate(user.createdAt)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button
-                      onClick={() => handleUserSuspension(user.id, !user.isSuspended, 'Admin action')}
-                      className="text-indigo-600 hover:text-indigo-900 mr-3"
+                      onClick={() => handleUserSuspension(user.id, !user.isSuspended)}
+                      className={`text-${user.isSuspended ? 'green' : 'red'}-600 hover:text-${user.isSuspended ? 'green' : 'red'}-900`}
                     >
                       {user.isSuspended ? 'Unsuspend' : 'Suspend'}
                     </button>
@@ -405,17 +404,17 @@ const AdminDashboard = () => {
 
   const renderKYC = () => (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Pending KYC Verification</h3>
-        </div>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-gray-900">Pending KYC Verifications</h2>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Document</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documents</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
@@ -424,39 +423,35 @@ const AdminDashboard = () => {
               {pendingKYC.map((user) => (
                 <tr key={user.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-medium text-gray-700">
+                          {user.name?.charAt(0) || 'U'}
+                        </span>
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                        <div className="text-sm text-gray-500">{user.email}</div>
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900">{user.role}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <a
-                      href={`http://localhost:3001/${user.identityDocument}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-600 hover:text-indigo-900"
-                    >
-                      View Document
-                    </a>
+                    <span className="text-sm text-gray-900">
+                      {user.identityDocument ? 'ID Document' : 'No documents'}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatDate(user.createdAt)}
+                    {formatDate(user.updatedAt)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                     <button
                       onClick={() => handleKYCVerification(user.id, true)}
-                      className="text-green-600 hover:text-green-900 mr-3"
+                      className="text-green-600 hover:text-green-900"
                     >
                       Approve
                     </button>
                     <button
-                      onClick={() => {
-                        const reason = prompt('Enter rejection reason:');
-                        if (reason) handleKYCVerification(user.id, false, reason);
-                      }}
+                      onClick={() => handleKYCVerification(user.id, false, 'Documents not sufficient')}
                       className="text-red-600 hover:text-red-900"
                     >
                       Reject
@@ -473,42 +468,39 @@ const AdminDashboard = () => {
 
   const renderRentals = () => (
     <div className="space-y-6">
-      {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <select
-            value={requestFilter.status}
-            onChange={(e) => setRequestFilter({ ...requestFilter, status: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Status</option>
-            <option value="ACTIVE">Active</option>
-            <option value="LOCKED">Locked</option>
-            <option value="EXPIRED">Expired</option>
-          </select>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-gray-900">Rental Requests</h2>
+        <div className="flex space-x-3">
           <input
             type="text"
             placeholder="Search requests..."
             value={requestFilter.search}
             onChange={(e) => setRequestFilter({ ...requestFilter, search: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
           />
+          <select
+            value={requestFilter.status}
+            onChange={(e) => setRequestFilter({ ...requestFilter, status: e.target.value })}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">All Statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="LOCKED">Locked</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
         </div>
       </div>
 
-      {/* Rental Requests List */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Rental Requests</h3>
-        </div>
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Request</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Budget</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Offer</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
               </tr>
             </thead>
@@ -518,27 +510,19 @@ const AdminDashboard = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">{request.title}</div>
-                      <div className="text-sm text-gray-500">{request.budget} PLN</div>
+                      <div className="text-sm text-gray-500">{request.location}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{request.tenant.name}</div>
-                      <div className="text-sm text-gray-500">{request.tenant.email}</div>
-                    </div>
+                    <span className="text-sm text-gray-900">{request.tenant?.name}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(request.poolStatus, 'request')}
+                    <span className="text-sm text-gray-900">
+                      {formatCurrency(request.budgetFrom)} - {formatCurrency(request.budgetTo)}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {request.offer ? (
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{request.offer.landlord.name}</div>
-                        <div className="text-sm text-gray-500">{request.offer.status}</div>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-gray-500">No offer</span>
-                    )}
+                    {getStatusBadge(request.status)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(request.createdAt)}
@@ -554,45 +538,42 @@ const AdminDashboard = () => {
 
   const renderPayments = () => (
     <div className="space-y-6">
-      {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-gray-900">Payment History</h2>
+        <div className="flex space-x-3">
           <select
             value={paymentFilter.status}
             onChange={(e) => setPaymentFilter({ ...paymentFilter, status: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value="">All Status</option>
-            <option value="SUCCEEDED">Succeeded</option>
+            <option value="">All Statuses</option>
             <option value="PENDING">Pending</option>
+            <option value="COMPLETED">Completed</option>
             <option value="FAILED">Failed</option>
           </select>
           <select
             value={paymentFilter.purpose}
             onChange={(e) => setPaymentFilter({ ...paymentFilter, purpose: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="">All Purposes</option>
-            <option value="DEPOSIT">Deposit</option>
             <option value="RENT">Rent</option>
-            <option value="DEPOSIT_AND_FIRST_MONTH">Deposit + First Month</option>
+            <option value="DEPOSIT">Deposit</option>
+            <option value="SERVICE_FEE">Service Fee</option>
           </select>
         </div>
       </div>
 
-      {/* Payments List */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Payments</h3>
-        </div>
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Purpose</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tenant</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
               </tr>
             </thead>
@@ -600,19 +581,19 @@ const AdminDashboard = () => {
               {payments.map((payment) => (
                 <tr key={payment.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{formatCurrency(payment.amount)}</div>
+                    <div className="text-sm font-medium text-gray-900">#{payment.paymentIntentId}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm text-gray-900">{payment.user?.name}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm font-medium text-gray-900">{formatCurrency(payment.amount)}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm text-gray-900">{payment.purpose}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(payment.status, 'payment')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{payment.rentalRequest.tenant.name}</div>
-                      <div className="text-sm text-gray-500">{payment.rentalRequest.tenant.email}</div>
-                    </div>
+                    {getStatusBadge(payment.status)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(payment.createdAt)}
@@ -626,119 +607,165 @@ const AdminDashboard = () => {
     </div>
   );
 
-  if (user?.role !== 'ADMIN') {
-    return (
-      <div className="min-h-screen bg-gray-100 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900">Access Denied</h1>
-            <p className="mt-2 text-gray-600">You don't have permission to access the admin dashboard.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return renderOverview();
+      case 'users':
+        return renderUsers();
+      case 'kyc':
+        return renderKYC();
+      case 'rentals':
+        return renderRentals();
+      case 'payments':
+        return renderPayments();
+      default:
+        return renderOverview();
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">🔧 Admin Dashboard</h1>
-          <p className="mt-2 text-gray-600">Manage users, verify KYC, and monitor system health</p>
+    <div className="min-h-screen bg-white flex">
+      {/* Left Sidebar */}
+      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+        {/* Logo */}
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center mr-3">
+              <span className="text-white font-bold text-sm">R</span>
+            </div>
+            <span className="text-lg font-semibold text-gray-900">RentPlatform Poland</span>
+          </div>
         </div>
 
-        {/* Success/Error Messages */}
-        {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex">
-              <svg className="w-5 h-5 text-green-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+        {/* Navigation */}
+        <nav className="flex-1 p-4">
+          <div className="space-y-2">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'overview'
+                  ? 'text-white bg-black'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
               </svg>
-              <span className="text-green-800">{success}</span>
+              Overview
+            </button>
+            
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'users'
+                  ? 'text-white bg-black'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+              </svg>
+              Users
+            </button>
+            
+            <button
+              onClick={() => setActiveTab('kyc')}
+              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'kyc'
+                  ? 'text-white bg-black'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              KYC Verification
+            </button>
+            
+            <button
+              onClick={() => setActiveTab('rentals')}
+              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'rentals'
+                  ? 'text-white bg-black'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Rental Requests
+            </button>
+            
+            <button
+              onClick={() => setActiveTab('payments')}
+              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'payments'
+                  ? 'text-white bg-black'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+              </svg>
+              Payments
+            </button>
+          </div>
+        </nav>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Top Header */}
+        <header className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+            
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <span className="text-sm font-medium text-gray-900">{user?.name || 'Admin'}</span>
+                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                  <span className="text-sm font-medium text-gray-700">
+                    {user?.name?.charAt(0) || 'A'}
+                  </span>
+                </div>
+              </div>
+              
+              <button
+                onClick={logout}
+                className="text-sm text-gray-600 hover:text-gray-900"
+              >
+                Logout
+              </button>
             </div>
           </div>
-        )}
+        </header>
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex">
-              <svg className="w-5 h-5 text-red-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 00-1.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              <span className="text-red-800">{error}</span>
-            </div>
+        {/* Main Content Area */}
+        <main className="flex-1 p-6">
+          <div className="max-w-7xl mx-auto">
+            {error && (
+              <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                {error}
+              </div>
+            )}
+            
+            {success && (
+              <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+                {success}
+              </div>
+            )}
+            
+            {loading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              </div>
+            ) : (
+              renderContent()
+            )}
           </div>
-        )}
-
-        {/* Navigation Tabs */}
-        <div className="mb-6">
-          <nav className="flex space-x-8">
-            {[
-              { id: 'overview', name: 'Overview', icon: '📊' },
-              { id: 'users', name: 'Users', icon: '👥' },
-              { id: 'kyc', name: 'KYC Verification', icon: '📋' },
-              { id: 'rentals', name: 'Rental Requests', icon: '🏠' },
-              { id: 'payments', name: 'Payments', icon: '💳' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium ${
-                  activeTab === tab.id
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <span>{tab.icon}</span>
-                <span>{tab.name}</span>
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* Loading State */}
-        {loading && (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading...</p>
-          </div>
-        )}
-
-        {/* Content */}
-        {!loading && (
-          <>
-            {activeTab === 'overview' && renderOverview()}
-            {activeTab === 'users' && renderUsers()}
-            {activeTab === 'kyc' && renderKYC()}
-            {activeTab === 'rentals' && renderRentals()}
-            {activeTab === 'payments' && renderPayments()}
-          </>
-        )}
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="mt-6 flex justify-center">
-            <nav className="flex space-x-2">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <span className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-              >
-                Next
-              </button>
-            </nav>
-          </div>
-        )}
+        </main>
       </div>
     </div>
   );

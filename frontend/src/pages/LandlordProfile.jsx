@@ -125,7 +125,7 @@ const LandlordProfile = () => {
       formData.append('document', file);
       formData.append('type', type);
 
-      await api.post('/users/kyc-upload', formData);
+      await api.post('/users/upload-identity-document', formData);
       setKycFiles(prev => ({ ...prev, [type]: file }));
     } catch (error) {
       console.error('Error uploading KYC document:', error);

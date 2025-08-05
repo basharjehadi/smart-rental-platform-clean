@@ -2,9 +2,9 @@ import { prisma } from '../utils/prisma.js';
 
 // Required fields for each role
 const REQUIRED_FIELDS = {
-  TENANT: ['name', 'email', 'phoneNumber', 'pesel', 'passportNumber', 'kartaPobytuNumber', 'address'],
-  LANDLORD: ['name', 'email', 'phoneNumber', 'dowodOsobistyNumber', 'address'],
-  ADMIN: ['name', 'email']
+  TENANT: ['firstName', 'lastName', 'phoneNumber'],
+  LANDLORD: ['firstName', 'lastName', 'phoneNumber'],
+  ADMIN: ['firstName', 'lastName']
 };
 
 // Validation functions
@@ -130,13 +130,21 @@ export const getProfileStatus = async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
-        name: true,
+        firstName: true,
+        lastName: true,
         email: true,
         phoneNumber: true,
         role: true,
         pesel: true,
         passportNumber: true,
         kartaPobytuNumber: true,
+        citizenship: true,
+        dateOfBirth: true,
+        street: true,
+        city: true,
+        zipCode: true,
+        country: true,
+        profession: true,
         address: true,
         dowodOsobistyNumber: true,
         profileImage: true,

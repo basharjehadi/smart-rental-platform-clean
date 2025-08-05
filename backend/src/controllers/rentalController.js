@@ -532,7 +532,7 @@ const getMyRequests = async (req, res) => {
         tenantId: tenantId
       },
       include: {
-        offer: {
+        offers: {
           include: {
             landlord: {
               select: {
@@ -587,8 +587,10 @@ const autoUpdateRequestStatus = async (tenantId) => {
     await prisma.rentalRequest.updateMany({
       where: {
         tenantId: tenantId,
-        offer: {
-          status: 'ACCEPTED'
+        offers: {
+          some: {
+            status: 'ACCEPTED'
+          }
         },
         status: {
           not: 'CANCELLED'
@@ -674,7 +676,7 @@ const updateRentalRequest = async (req, res) => {
       },
       data: filteredUpdateData,
       include: {
-        offer: {
+        offers: {
           include: {
             landlord: {
               select: {
@@ -721,7 +723,14 @@ const deleteRentalRequest = async (req, res) => {
     }
 
     // Check if request has an accepted offer
-    if (existingRequest.offer && existingRequest.offer.status === 'ACCEPTED') {
+    const hasAcceptedOffer = await prisma.offer.findFirst({
+      where: {
+        rentalRequestId: parseInt(id),
+        status: 'ACCEPTED'
+      }
+    });
+    
+    if (hasAcceptedOffer) {
       return res.status(400).json({
         error: 'Cannot delete a request that has an accepted offer.'
       });

@@ -8,13 +8,13 @@ const TenantDashboardRedirect = () => {
 
   useEffect(() => {
     if (user?.role === 'TENANT') {
-      navigate('/tenant-request-for-landlord');
+      navigate('/tenant-dashboard');
     } else if (user?.role === 'LANDLORD') {
       navigate('/landlord-dashboard');
     } else if (user?.role === 'ADMIN') {
       navigate('/admin');
     } else {
-      navigate('/tenant-request-for-landlord');
+      navigate('/tenant-dashboard');
     }
   }, [user, navigate]);
 

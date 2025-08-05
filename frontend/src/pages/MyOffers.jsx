@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import OfferCard from '../components/OfferCard';
+import TenantSidebar from '../components/TenantSidebar';
+import { LogOut } from 'lucide-react';
 
 const MyOffers = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   
   const [offers, setOffers] = useState([]);
+  const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('ACTIVE');
@@ -18,6 +21,10 @@ const MyOffers = () => {
       setLoading(true);
       const response = await api.get('/tenant/offers');
       setOffers(response.data.offers || []);
+      
+      // Fetch user profile data for profile image
+      const profileResponse = await api.get('/users/profile');
+      setProfileData(profileResponse.data.user);
     } catch (error) {
       console.error('Error fetching offers:', error);
       setError('Failed to load offers');
@@ -73,52 +80,7 @@ const MyOffers = () => {
   return (
     <div className="min-h-screen bg-white flex">
       {/* Left Sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        {/* Logo */}
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center mr-3">
-              <span className="text-white font-bold text-sm">R</span>
-            </div>
-            <span className="text-lg font-semibold text-gray-900">RentPlatform Poland</span>
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 p-4">
-          <div className="space-y-2">
-            <Link
-              to="/tenant-request-for-landlord"
-              className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg"
-            >
-              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              My requests
-            </Link>
-            
-            <Link
-              to="/my-offers"
-              className="flex items-center px-4 py-3 text-sm font-medium text-white bg-black rounded-lg"
-            >
-              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM4 19h6v-2H4v2zM4 15h6v-2H4v2zM4 11h6V9H4v2zM4 7h6V5H4v2z" />
-              </svg>
-              View offers
-            </Link>
-            
-            <Link
-              to="/tenant-profile"
-              className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg"
-            >
-              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              Profile
-            </Link>
-          </div>
-        </nav>
-      </div>
+      <TenantSidebar />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
@@ -131,27 +93,32 @@ const MyOffers = () => {
             </div>
             
             <div className="flex items-center space-x-4">
-              <Link
-                to="/tenant-request-for-landlord"
-                className="inline-flex items-center px-4 py-2 bg-black text-white font-medium rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                My Requests
-              </Link>
-              
               <div className="flex items-center space-x-3">
-                <span className="text-sm font-medium text-gray-900">{user?.name || 'Test Tenant'}</span>
-                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-gray-700">
-                    {user?.name?.charAt(0) || 'T'}
-                  </span>
+                <span className="text-sm font-medium text-gray-900">{user?.name || 'Tenant'}</span>
+                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-md overflow-hidden">
+                  {profileData?.profileImage ? (
+                    <img
+                      src={profileData.profileImage.startsWith('/') 
+                        ? `http://localhost:3001${profileData.profileImage}`
+                        : `http://localhost:3001/uploads/profile_images/${profileData.profileImage}`
+                      }
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-base font-bold text-white">
+                      {user?.name?.charAt(0) || 'T'}
+                    </span>
+                  )}
                 </div>
               </div>
               
               <button
                 onClick={handleLogout}
-                className="text-sm text-gray-600 hover:text-gray-900"
+                className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"
               >
-                Logout
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
               </button>
             </div>
           </div>

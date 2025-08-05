@@ -8,6 +8,8 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 
 import TenantDashboard from './pages/TenantDashboard';
+import TenantDashboardNew from './pages/TenantDashboardNew';
+import TenantHelpCenter from './pages/TenantHelpCenter';
 import TenantProfile from './pages/TenantProfile';
 import RequestForm from './pages/RequestForm';
 import MyRequests from './pages/MyRequests';
@@ -39,7 +41,7 @@ import TenantDashboardRedirect from './components/TenantDashboardRedirect';
 // Component to conditionally render Navbar
 const AppContent = () => {
   const location = useLocation();
-  const hideNavbarRoutes = ['/dashboard', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/contracts', '/payments', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details'];
+  const hideNavbarRoutes = ['/', '/login', '/register', '/dashboard', '/tenant-dashboard', '/tenant-help-center', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/contracts', '/payments', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details', '/admin'];
   const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
 
   return (
@@ -56,6 +58,22 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <TenantDashboardRedirect />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/tenant-dashboard" 
+          element={
+            <ProtectedRoute>
+              <TenantDashboardNew />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/tenant-help-center" 
+          element={
+            <ProtectedRoute>
+              <TenantHelpCenter />
             </ProtectedRoute>
           } 
         />

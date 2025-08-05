@@ -4,18 +4,19 @@ import cors from 'cors';
 import cron from 'node-cron';
 import session from 'express-session';
 import passport from './src/config/passport.js';
-import pingRoutes from '../routes/ping.js';
-import authRoutes from '../routes/authRoutes.js';
-import socialAuthRoutes from '../routes/socialAuthRoutes.js';
-import userRoutes from '../routes/userRoutes.js';
-import uploadRoutes from '../routes/uploadRoutes.js';
-import propertyUploadRoutes from '../routes/propertyUploadRoutes.js';
-import rentalRoutes from '../routes/rentalRoutes.js';
-import paymentRoutes from '../routes/paymentRoutes.js';
-import contractRoutes from '../routes/contractRoutes.js';
-import adminRoutes from '../routes/adminRoutes.js';
-import landlordProfileRoutes from '../routes/landlordProfileRoutes.js';
-import propertyRoutes from '../routes/propertyRoutes.js';
+import pingRoutes from './src/routes/ping.js';
+import authRoutes from './src/routes/authRoutes.js';
+import socialAuthRoutes from './src/routes/socialAuthRoutes.js';
+import userRoutes from './src/routes/userRoutes.js';
+import uploadRoutes from './src/routes/uploadRoutes.js';
+import propertyUploadRoutes from './src/routes/propertyUploadRoutes.js';
+import rentalRoutes from './src/routes/rentalRoutes.js';
+import paymentRoutes from './src/routes/paymentRoutes.js';
+import contractRoutes from './src/routes/contractRoutes.js';
+import adminRoutes from './src/routes/adminRoutes.js';
+import landlordProfileRoutes from './src/routes/landlordProfileRoutes.js';
+import propertyRoutes from './src/routes/propertyRoutes.js';
+import tenantDashboardRoutes from './src/routes/tenantDashboardRoutes.js';
 import prisma from './src/lib/prisma.js';
 import { dailyRentCheck } from './src/controllers/cronController.js';
 import { startContractMonitoring, stopContractMonitoring } from './src/controllers/contractController.js';
@@ -133,6 +134,7 @@ app.use('/api/contracts', contractRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/landlord-profile', landlordProfileRoutes);
 app.use('/api', propertyRoutes);
+app.use('/api/tenant-dashboard', tenantDashboardRoutes);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -155,14 +157,6 @@ app.get('/health', async (req, res) => {
       error: error.message
     });
   }
-});
-
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ 
-    error: 'Route not found',
-    path: req.originalUrl 
-  });
 });
 
 // 404 handler

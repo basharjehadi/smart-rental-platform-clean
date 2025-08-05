@@ -25,6 +25,17 @@ model User {
   passportNumber String?
   kartaPobytuNumber String? // Residence card number
   phoneNumber String?
+  citizenship String? // Polish or Non-Polish
+  dateOfBirth DateTime? // Date of birth for non-Polish citizens
+  
+  // Address fields
+  street    String?
+  city      String?
+  zipCode   String?
+  country   String?
+  
+  // Professional information
+  profession String? // User's profession/occupation
   
   // Landlord-specific fields
   dowodOsobistyNumber String? // Polish ID card number
@@ -35,6 +46,26 @@ model User {
   signatureBase64 String? // Base64 encoded signature image
   identityDocument String? // Identity document filename
   isVerified Boolean @default(false) // KYC verification status
+  
+  // KYC Status fields
+  kycStatus KYCStatus @default(PENDING) // KYC verification status
+  kycSubmittedAt DateTime? // When KYC was submitted
+  kycReviewedAt DateTime? // When KYC was reviewed by admin
+  kycRejectionReason String? // Reason for KYC rejection
+  kycReviewedBy String? // Admin who reviewed the KYC
+  
+  // GDPR / RODO consent fields
+  gdprConsent Boolean @default(false) // GDPR consent status
+  gdprConsentDate DateTime? // Date when GDPR consent was given
+  
+  // Verification fields
+  phoneVerified Boolean @default(false) // Phone number verification status
+  emailVerified Boolean @default(false) // Email verification status
+  
+  // Admin management fields
+  isSuspended Boolean @default(false) // User suspension status
+  suspensionReason String? // Reason for suspension
+  suspendedAt DateTime? // When user was suspended
   
   // 🚀 SCALABILITY: Landlord capacity management
   availability Boolean @default(true) // Whether landlord is accepting new requests (manual override)
@@ -512,4 +543,11 @@ enum PropertyStatus {
   MAINTENANCE
   RENTED
   UNAVAILABLE
+}
+
+enum KYCStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NOT_SUBMITTED
 } 
