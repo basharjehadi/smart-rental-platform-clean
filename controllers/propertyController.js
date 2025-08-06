@@ -91,9 +91,7 @@ export const createProperty = async (req, res) => {
       smokingAllowed = false,
       maxTenants = 1,
       description,
-      houseRules,
-      images,
-      videos
+      houseRules
     } = req.body;
 
     // Validate required fields
@@ -102,6 +100,20 @@ export const createProperty = async (req, res) => {
         success: false,
         error: 'Name, address, city, zip code, property type, and monthly rent are required'
       });
+    }
+
+    // Handle uploaded files
+    let imageUrls = [];
+    let videoUrls = [];
+
+    if (req.files) {
+      if (req.files.propertyImages) {
+        imageUrls = req.files.propertyImages.map(file => `/uploads/property_images/${file.filename}`);
+      }
+
+      if (req.files.propertyVideo) {
+        videoUrls = req.files.propertyVideo.map(file => `/uploads/property_videos/${file.filename}`);
+      }
     }
 
     const property = await prisma.property.create({
@@ -120,18 +132,18 @@ export const createProperty = async (req, res) => {
         totalFloors: totalFloors ? parseInt(totalFloors) : null,
         monthlyRent: parseFloat(monthlyRent),
         depositAmount: depositAmount ? parseFloat(depositAmount) : null,
-        utilitiesIncluded,
+        utilitiesIncluded: utilitiesIncluded === 'true' || utilitiesIncluded === true,
         availableFrom: availableFrom ? new Date(availableFrom) : null,
         availableUntil: availableUntil ? new Date(availableUntil) : null,
-        furnished,
-        parking,
-        petsAllowed,
-        smokingAllowed,
+        furnished: furnished === 'true' || furnished === true,
+        parking: parking === 'true' || parking === true,
+        petsAllowed: petsAllowed === 'true' || petsAllowed === true,
+        smokingAllowed: smokingAllowed === 'true' || smokingAllowed === true,
         maxTenants: parseInt(maxTenants),
         description,
         houseRules,
-        images: images ? JSON.stringify(images) : null,
-        videos: videos ? JSON.stringify(videos) : null
+        images: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
+        videos: videoUrls.length > 0 ? JSON.stringify(videoUrls) : null
       }
     });
 
@@ -186,9 +198,40 @@ export const updateProperty = async (req, res) => {
     if (updateData.availableFrom) updateData.availableFrom = new Date(updateData.availableFrom);
     if (updateData.availableUntil) updateData.availableUntil = new Date(updateData.availableUntil);
 
-    // Parse JSON fields
-    if (updateData.images) updateData.images = JSON.stringify(updateData.images);
-    if (updateData.videos) updateData.videos = JSON.stringify(updateData.videos);
+    // Parse boolean fields
+    if (updateData.utilitiesIncluded !== undefined) {
+      updateData.utilitiesIncluded = updateData.utilitiesIncluded === 'true' || updateData.utilitiesIncluded === true;
+    }
+    if (updateData.furnished !== undefined) {
+      updateData.furnished = updateData.furnished === 'true' || updateData.furnished === true;
+    }
+    if (updateData.parking !== undefined) {
+      updateData.parking = updateData.parking === 'true' || updateData.parking === true;
+    }
+    if (updateData.petsAllowed !== undefined) {
+      updateData.petsAllowed = updateData.petsAllowed === 'true' || updateData.petsAllowed === true;
+    }
+    if (updateData.smokingAllowed !== undefined) {
+      updateData.smokingAllowed = updateData.smokingAllowed === 'true' || updateData.smokingAllowed === true;
+    }
+
+    // Handle uploaded files
+    if (req.files) {
+      if (req.files.propertyImages) {
+        updateData.images = JSON.stringify(
+          req.files.propertyImages.map(file => `/uploads/property_images/${file.filename}`)
+        );
+      }
+      if (req.files.propertyVideo) {
+        updateData.videos = JSON.stringify(
+          req.files.propertyVideo.map(file => `/uploads/property_videos/${file.filename}`)
+        );
+      }
+    } else {
+      // Parse JSON fields if provided as arrays
+      if (updateData.images) updateData.images = JSON.stringify(updateData.images);
+      if (updateData.videos) updateData.videos = JSON.stringify(updateData.videos);
+    }
 
     const property = await prisma.property.update({
       where: {
