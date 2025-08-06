@@ -65,7 +65,8 @@ const Step2Location = ({ formData, errors, cities, onInputChange }) => {
   // Get districts for selected city
   const getDistrictsForCity = (city) => {
     const districts = cityDistricts[city] || [];
-    return districts;
+    const uniqueDistricts = Array.from(new Set(districts));
+    return uniqueDistricts;
   };
 
   // Handle city change - reset district when city changes
