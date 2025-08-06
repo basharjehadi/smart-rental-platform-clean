@@ -18,54 +18,164 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
 
   const { api } = useAuth();
 
+  // Polish cities with their districts
+  const cityDistricts = {
+    'Warsaw': [
+      'Mokotów', 'Praga-Południe', 'Wola', 'Śródmieście', 'Bielany', 'Targówek', 
+      'Bemowo', 'Ochota', 'Praga-Północ', 'Żoliborz', 'Włochy', 'Ursus', 
+      'Wilanów', 'Wesoła', 'Wawer', 'Rembertów', 'Ursynów', 'Saska Kępa'
+    ],
+    'Krakow': [
+      'Stare Miasto', 'Grzegórzki', 'Prądnik Czerwony', 'Prądnik Biały', 'Krowodrza', 
+      'Bronowice', 'Zwierzyniec', 'Dębniki', 'Łagiewniki-Borek Fałęcki', 'Swoszowice', 
+      'Podgórze Duchackie', 'Bieżanów-Prokocim', 'Podgórze', 'Czyżyny', 'Mistrzejowice', 
+      'Bieńczyce', 'Wzgórza Krzesławickie', 'Nowa Huta'
+    ],
+    'Poznan': [
+      'Stare Miasto', 'Wilda', 'Piątkowo', 'Nowe Miasto', 'Jeżyce', 'Grunwald', 
+      'Łazarz', 'Górczyn', 'Juniakowo', 'Chartowo', 'Winogrady', 'Piątkowo', 
+      'Naramowice', 'Umultowo', 'Piątkowo', 'Morasko', 'Radojewo', 'Kiekrz'
+    ],
+    'Gdansk': [
+      'Śródmieście', 'Chełm', 'Brzeźno', 'Nowy Port', 'Wrzeszcz Dolny', 'Wrzeszcz Górny', 
+      'Oliwa', 'Przymorze Wielkie', 'Przymorze Małe', 'Żabianka-Wejhera-Jelitkowo-Tysiąclecia', 
+      'Kokoszki', 'Kiełpino Górne', 'VII Dwór', 'Matarnia', 'Ujeścisko-Łostowice', 
+      'Piecki-Migowo', 'Rudniki', 'Suchanino', 'Siedlce', 'Aniołki', 'Młyniska', 
+      'Letnica', 'Krakowiec-Górki Zachodnie', 'Osowa', 'Jasień', 'Orunia-Św.Wojciech-Lipce'
+    ],
+    'Wroclaw': [
+      'Stare Miasto', 'Śródmieście', 'Krzyki', 'Fabryczna', 'Psie Pole', 'Karłowice', 
+      'Kleczków', 'Kowale', 'Leśnica', 'Muchobór Mały', 'Muchobór Wielki', 'Ołbin', 
+      'Ołtaszyn', 'Pilczyce', 'Pracze Odrzańskie', 'Różanka', 'Sępolno', 'Sołtysowice', 
+      'Stabłowice', 'Strachocin-Swojczyce-Wojnów', 'Świniary', 'Tarnogaj', 'Widawa', 'Wojszyce', 'Zalesie', 'Żerniki'
+    ],
+    'Lodz': [
+      'Bałuty', 'Górna', 'Polesie', 'Śródmieście', 'Widzew', 'Andrzejów', 'Chojny', 
+      'Dąbrowa', 'Doły', 'Fabryczna', 'Górniak', 'Karolew', 'Koziny', 'Kurczaki', 
+      'Lublinek', 'Łagiewniki', 'Mileszki', 'Mokra', 'Nowosolna', 'Olechów', 'Olechów-Janów', 
+      'Park Reymonta', 'Radogoszcz', 'Retkinia', 'Ruda', 'Sikawa', 'Smulsko', 'Stare Polesie', 
+      'Stary Widzew', 'Śródmieście', 'Teofilów', 'Wiskitno', 'Wzniesień Łódzkich', 'Zagórnik', 'Zielona Góra'
+    ],
+    'Szczecin': [
+      'Śródmieście', 'Pomorzany', 'Niebużany', 'Świerczewo', 'Warszewo', 'Arkońskie-Niemierzyn', 
+      'Głębokie-Pilchowo', 'Gumieńce', 'Krzekowo-Bezrzecze', 'Osów', 'Płonia-Śmierdnica-Jezierzyce', 
+      'Podjuchy', 'Wielgowo-Sławociesze', 'Załom-Kasztanowe', 'Bukowo', 'Centrum', 'Dąbie', 
+      'Kijewo', 'Międzyodrze-Wyspa Pucka', 'Niebuszewo', 'Nowe Miasto', 'Pogodno', 'Stołczyn', 'Turzyn', 'Warszewo', 'Zdroje'
+    ],
+    'Bydgoszcz': [
+      'Szwederowo', 'Błonie', 'Okole', 'Śródmieście', 'Fordon', 'Brdyujście', 'Bartodzieje', 
+      'Bielawy', 'Bocianowo', 'Czyżkówko', 'Fordon', 'Glinki', 'Jary', 'Kapuściska', 
+      'Łęgnowo', 'Miedzyń', 'Osowa Góra', 'Piaski', 'Prądy', 'Siernieczek', 'Skrzetusko', 
+      'Smukała', 'Stary Fordon', 'Szwederowo', 'Wzgórze Wolności', 'Wyżyny', 'Zimne Wody'
+    ],
+    'Lublin': [
+      'Śródmieście', 'Wieniawa', 'Zabłocie', 'Rury', 'Sławin', 'Sławinek', 'Wrotków', 
+      'Bronowice', 'Tatary', 'Kalinowszczyzna', 'Hajdów-Zadębie', 'Konstantynów', 'Lubelskiej Spółdzielni Mieszkaniowej', 
+      'Kościelniak', 'Rury', 'Szerokie', 'Zemborzyce', 'Dziesiąta', 'Głusk', 'Węglin', 'Felicity'
+    ],
+    'Katowice': [
+      'Śródmieście', 'Koszutka', 'Bogucice', 'Osiedle Paderewskiego-Muchowiec', 'Dąb', 
+      'Wełnowiec-Józefowiec', 'Załęże', 'Osiedle Witosa', 'Piotrowice-Ochojec', 'Ligota-Panewniki', 
+      'Brynowiec-Osiedle Zgrzebnioka', 'Giszowiec', 'Murcki', 'Kostuchna', 'Podlesie', 'Szopienice-Burowiec', 
+      'Janów-Nikiszowiec', 'Giszowiec', 'Dąbrówka Mała', 'Szopienice-Burowiec', 'Roździeń', 'Załęska Hałda-Brynów część zachodnia'
+    ],
+    'Bialystok': [
+      'Centrum', 'Białostoczek', 'Sienkiewicza', 'Bojary', 'Piaski', 'Przydworcowe', 
+      'Młynarskie', 'Piasta I', 'Piasta II', 'Skorupy', 'Mickiewicza', 'Dojlidy Górne', 
+      'Dojlidy', 'Białostoczek', 'Wygoda', 'Wysoki Stoczek', 'Dziesięciny I', 'Dziesięciny II', 
+      'Antoniuk', 'Jaroszówka', 'Wygoda', 'Krynicka', 'Mickiewicza', 'Nowe Miasto', 'Osiedle Leśne', 'Piasta', 'Przydworcowe', 'Sienkiewicza', 'Skorupy', 'Starosielce', 'Słoneczny Stok', 'Wysoki Stoczek', 'Zielone Wzgórza'
+    ],
+    'Gdynia': [
+      'Śródmieście', 'Kamienna Góra', 'Grabówek', 'Oksywie', 'Obłuże', 'Pogórze', 
+      'Działki Leśne', 'Leszczynki', 'Grabówek', 'Chwarzno-Wiczlino', 'Mały Kack', 'Wielki Kack', 
+      'Karwiny', 'Dąbrowa', 'Chylonia', 'Leszczynki', 'Pustki Cisowskie-Demptowo', 'Cisowa', 
+      'Pustki Cisowskie-Demptowo', 'Chylonia', 'Leszczynki', 'Pustki Cisowskie-Demptowo', 'Cisowa', 
+      'Pustki Cisowskie-Demptowo', 'Chylonia', 'Leszczynki', 'Pustki Cisowskie-Demptowo', 'Cisowa'
+    ],
+    'Czestochowa': [
+      'Śródmieście', 'Stare Miasto', 'Ostatni Grosz', 'Trzech Wieszczów', 'Tysiąclecie', 
+      'Północ', 'Raków', 'Błeszno', 'Częstochówka-Parkitka', 'Gnaszyn-Kawodrza', 'Grabówka', 
+      'Kiedrzyn', 'Lisiniec', 'Mirów', 'Ostatni Grosz', 'Podjasnogórska', 'Północ', 'Raków', 
+      'Stradom', 'Śródmieście', 'Tysiąclecie', 'Wrzosowiak', 'Wyczerpy-Aniołów', 'Zawodzie-Dąbie'
+    ],
+    'Radom': [
+      'Śródmieście', 'Ustronie', 'Gołębiów I', 'Gołębiów II', 'Kozia Góra', 'Klimontów', 
+      'Michałów', 'Obozisko', 'Planty', 'Potkanów', 'Prędocice', 'Sadków', 'Śródmieście', 
+      'Ustronie', 'Wacyn', 'Wośniki', 'Zakrzew', 'Żakowice'
+    ],
+    'Sosnowiec': [
+      'Śródmieście', 'Pogoń', 'Radocha', 'Rudna I', 'Rudna II', 'Rudna III', 'Rudna IV', 
+      'Rudna V', 'Rudna VI', 'Rudna VII', 'Rudna VIII', 'Rudna IX', 'Rudna X', 'Rudna XI', 
+      'Rudna XII', 'Rudna XIII', 'Rudna XIV', 'Rudna XV', 'Rudna XVI', 'Rudna XVII', 'Rudna XVIII', 'Rudna XIX', 'Rudna XX'
+    ],
+    'Torun': [
+      'Stare Miasto', 'Nowe Miasto', 'Rubinkowo', 'Bielany', 'Bydgoskie Przedmieście', 
+      'Chełmińskie Przedmieście', 'Jakubskie Przedmieście', 'Katarzynka', 'Koniuchy', 
+      'Mokre', 'Na Skarpie', 'Podgórz', 'Rynek Nowomiejski', 'Stawki', 'Wrzosy', 'Zieleniec'
+    ],
+    'Kielce': [
+      'Śródmieście', 'Barwinek', 'Białogon', 'Bocianek', 'Bukówka', 'Cedzyna', 'Ciekoty', 
+      'Dąbrowa', 'Dobromyśl', 'Domaszowice', 'Drozdów', 'Górno', 'Grabówka', 'Herby', 
+      'Jagiellońskie', 'Kadzielnia', 'Karczówka', 'Książnica', 'Laskówka', 'Leśnica', 
+      'Lipówka', 'Łazy', 'Maleszowa', 'Miedziana Góra', 'Niewachlów', 'Nowy Folwark', 
+      'Ostra Górka', 'Pakosz', 'Piekoszów', 'Piaski', 'Podkarczówka', 'Podklonówka', 
+      'Podłęże', 'Podmiejska', 'Podszkodzie', 'Podzamcze', 'Pogorzałe', 'Polanka', 
+      'Przypki', 'Raków', 'Reków', 'Słowik', 'Słowik Stary', 'Stadion', 'Stare Miasto', 
+      'Szydłówek', 'Ślichowice', 'Świętokrzyskie', 'Targi', 'Tomaszówka', 'Uroczysko', 
+      'Warszawskie', 'Wietrznia', 'Wzgórze Świętej Katarzyny', 'Zagórze', 'Zalesie', 'Zielona'
+    ],
+    'Rzeszow': [
+      'Śródmieście', 'Nowe Miasto', 'Pobitno', 'Drabinianka', 'Zalesie', 'Słocina', 
+      'Przybyszówka', 'Zwięczyca', 'Budziwój', 'Ruska Wieś', 'Załęże', 'Biała', 'Tyczyn', 
+      'Krasne', 'Boguchwała', 'Łańcut', 'Leżajsk', 'Przeworsk', 'Jarosław', 'Przemyśl'
+    ],
+    'Gliwice': [
+      'Śródmieście', 'Kozłów', 'Huta Andrzej', 'Ruda', 'Wirek', 'Bojków', 'Gaj', 'Kleszczów', 
+      'Kobiór', 'Krywałd', 'Łabędy', 'Mikołów', 'Ornontowice', 'Orzesze', 'Paniówki', 
+      'Pawłowice', 'Pielgrzymowice', 'Pilchowice', 'Pogrzebień', 'Pruchna', 'Pszczyna', 
+      'Pszów', 'Radlin', 'Radostowice', 'Rudy', 'Rybnik', 'Rydułtowy', 'Sośnicowice', 
+      'Suszec', 'Świerklany', 'Tychy', 'Wodzisław Śląski', 'Żory', 'Żywiec'
+    ],
+    'Zabrze': [
+      'Centrum Południe', 'Centrum Północ', 'Biskupice', 'Borsigwerk', 'Dorota', 'Grzegorz', 
+      'Helenka', 'Kończyce', 'Maczki', 'Mikulczyce', 'Osiedle Janek', 'Osiedle Tadeusza', 
+      'Pawłów', 'Rokitnica', 'Zaborze Południe', 'Zaborze Północ', 'Zandka'
+    ]
+  };
+
   // Polish cities for dropdown
-  const polishCities = [
-    'Warsaw',
-    'Krakow', 
-    'Poznan',
-    'Gdansk',
-    'Wroclaw',
-    'Lodz',
-    'Szczecin',
-    'Bydgoszcz',
-    'Lublin',
-    'Katowice',
-    'Bialystok',
-    'Gdynia',
-    'Czestochowa',
-    'Radom',
-    'Sosnowiec',
-    'Torun',
-    'Kielce',
-    'Rzeszow',
-    'Gliwice',
-    'Zabrze'
-  ];
+  const polishCities = Object.keys(cityDistricts);
 
   // Property types
   const propertyTypes = [
     'Room',
+    'Shared Room',
     'Studio',
     'Apartment',
-    'House',
-    'Loft',
-    'Penthouse',
-    'Duplex',
-    'Townhouse'
+    'House'
   ];
 
   // Number of rooms options
   const roomOptions = ['1', '2', '3', '4', '5', '6'];
 
+  // Get districts for selected city
+  const getDistrictsForCity = (city) => {
+    const districts = cityDistricts[city] || [];
+    return ['All', ...districts]; // Add "All" option at the beginning
+  };
+
   // Pre-fill form when in edit mode
   useEffect(() => {
     if (editMode && requestData) {
       const { city, district } = parseLocation(requestData.location);
+      // Handle district - if it's null or empty, set to "All"
+      const districtValue = requestData.district || district || 'All';
+      
       setFormData({
         city: city || '',
-        district: district || '',
-        budgetFrom: requestData.budget?.toString() || '',
-        budgetTo: requestData.budget?.toString() || '',
+        district: districtValue,
+        budgetFrom: requestData.budgetFrom?.toString() || requestData.budget?.toString() || '',
+        budgetTo: requestData.budgetTo?.toString() || requestData.budget?.toString() || '',
         propertyType: requestData.propertyType || '',
         numberOfRooms: requestData.bedrooms?.toString() || '',
         moveInDate: requestData.moveInDate ? requestData.moveInDate.split('T')[0] : '',
@@ -83,7 +193,7 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
     if (parts.length >= 2) {
       return { district: parts[0], city: parts[1] };
     }
-    return { city: location, district: '' };
+    return { city: location, district: 'All' }; // Default to "All" if no district specified
   };
 
   const handleInputChange = (field, value) => {
@@ -91,6 +201,27 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
       ...prev,
       [field]: value
     }));
+    
+    // Reset district when city changes
+    if (field === 'city') {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value,
+        district: ''
+      }));
+    }
+    
+    // Auto-set number of rooms to 1 for Room, Shared Room, and Studio
+    if (field === 'propertyType') {
+      const singleRoomTypes = ['Room', 'Shared Room', 'Studio'];
+      if (singleRoomTypes.includes(value)) {
+        setFormData(prev => ({
+          ...prev,
+          [field]: value,
+          numberOfRooms: '1'
+        }));
+      }
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -99,10 +230,15 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
     setError('');
 
     try {
+      // Handle "All" district option
+      const locationText = formData.district === 'All' 
+        ? formData.city 
+        : `${formData.district}, ${formData.city}`;
+      
       const requestData = {
         title: `Looking for ${formData.propertyType} in ${formData.city}`,
         description: formData.requirements,
-        location: `${formData.district}, ${formData.city}`,
+        location: locationText,
         budget: parseFloat(formData.budgetTo), // Using max budget as primary budget
         budgetFrom: parseFloat(formData.budgetFrom),
         budgetTo: parseFloat(formData.budgetTo),
@@ -110,7 +246,7 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
         bedrooms: parseInt(formData.numberOfRooms),
         propertyType: formData.propertyType,
         city: formData.city,
-        district: formData.district,
+        district: formData.district === 'All' ? null : formData.district, // Store null for "All"
         additionalRequirements: formData.requirements
       };
 
@@ -218,14 +354,20 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 District *
               </label>
-              <input
-                type="text"
+              <select
                 value={formData.district}
                 onChange={(e) => handleInputChange('district', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., Old Town, Downtown, Mokotow"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                 required
-              />
+                disabled={!formData.city}
+              >
+                <option value="">
+                  {formData.city ? 'Select a district' : 'Please select a city first'}
+                </option>
+                {getDistrictsForCity(formData.city).map(district => (
+                  <option key={district} value={district}>{district}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -288,14 +430,18 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
               <select
                 value={formData.numberOfRooms}
                 onChange={(e) => handleInputChange('numberOfRooms', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                 required
+                disabled={['Room', 'Shared Room', 'Studio'].includes(formData.propertyType)}
               >
                 <option value="">Select number of rooms</option>
                 {roomOptions.map(rooms => (
                   <option key={rooms} value={rooms}>{rooms}</option>
                 ))}
               </select>
+              {['Room', 'Shared Room', 'Studio'].includes(formData.propertyType) && (
+                <p className="text-xs text-gray-500 mt-1">Automatically set to 1 room for this property type</p>
+              )}
             </div>
           </div>
 

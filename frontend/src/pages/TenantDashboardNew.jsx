@@ -320,13 +320,7 @@ const TenantDashboardNew = () => {
                   </svg>
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">No Active Rental</h3>
-                <p className="text-gray-600 mb-6">You don't have any active rental properties yet. Start by creating a rental request to find your perfect home.</p>
-                <button 
-                  onClick={() => navigate('/tenant/requests')}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                >
-                  Create Rental Request
-                </button>
+                <p className="text-gray-600 mb-6">You don't have any active rental properties yet. To create a rental request, please go to the My Requests page from the sidebar.</p>
               </div>
             )}
 
@@ -346,7 +340,10 @@ const TenantDashboardNew = () => {
                       <p className="text-sm text-gray-600">{dashboardData.landlord?.phone}</p>
                       <p className="text-sm text-gray-600">{dashboardData.landlord?.address}</p>
                     </div>
-                    <button className="w-full mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    <button 
+                      onClick={() => navigate('/tenant-profile')}
+                      className="w-full mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    >
                       Contact Landlord
                     </button>
                   </div>
@@ -410,7 +407,10 @@ const TenantDashboardNew = () => {
                         {calculateDaysToRenewal()} days until lease renewal
                       </p>
                     </div>
-                    <button className="w-full bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                    <button 
+                      onClick={() => navigate('/contracts')}
+                      className="w-full bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                    >
                       View Lease Agreement
                     </button>
                   </div>
@@ -467,7 +467,10 @@ const TenantDashboardNew = () => {
               )}
               {dashboardData.payments && dashboardData.payments.length > 0 && (
                 <div className="mt-4 text-center">
-                  <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                  <button 
+                    onClick={() => navigate('/my-rents')}
+                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
                     View Full Payment History
                   </button>
                 </div>

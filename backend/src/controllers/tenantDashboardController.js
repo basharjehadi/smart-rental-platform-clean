@@ -60,14 +60,14 @@ export const getTenantDashboardData = async (req, res) => {
       });
     }
 
-    // Get property details from the rental request
+    // Get property details from the rental request and offer
     const propertyDetails = {
       address: activeLease.rentalRequest.location,
       rooms: activeLease.rentalRequest.bedrooms || 2,
-      bathrooms: 1, // Default value
-      area: 65, // Default value
-      leaseTerm: 12, // Default value
-      amenities: ['Parking Space', 'Washing Machine', 'Air Conditioning', 'Balcony', 'Internet', 'Elevator'] // Default amenities
+      bathrooms: activeLease.rentalRequest.bathrooms || 1,
+      area: activeLease.propertySize || '65 m²',
+      leaseTerm: activeLease.leaseDuration || 12,
+      amenities: activeLease.propertyAmenities ? JSON.parse(activeLease.propertyAmenities) : ['Parking Space', 'Washing Machine', 'Air Conditioning', 'Balcony', 'Internet', 'Elevator']
     };
 
     // Get landlord information
@@ -75,18 +75,20 @@ export const getTenantDashboardData = async (req, res) => {
       name: activeLease.landlord.firstName + ' ' + activeLease.landlord.lastName,
       company: activeLease.landlord.company || 'Individual Landlord',
       email: activeLease.landlord.email,
-      phone: activeLease.landlord.phone || '+48 987 654 321',
-      address: activeLease.landlord.address || 'ul. Marszałkowska 84/92, 00-514 Warszawa'
+      phone: activeLease.landlord.phoneNumber || 'Not provided',
+      address: activeLease.landlord.street && activeLease.landlord.city ? 
+        `${activeLease.landlord.street}, ${activeLease.landlord.city} ${activeLease.landlord.zipCode}, ${activeLease.landlord.country}` : 
+        'Not provided'
     };
 
     // Calculate lease information
     const leaseInfo = {
       startDate: activeLease.rentalRequest.moveInDate,
-      endDate: new Date(activeLease.rentalRequest.moveInDate).setFullYear(
+      endDate: activeLease.leaseEndDate || new Date(activeLease.rentalRequest.moveInDate).setFullYear(
         new Date(activeLease.rentalRequest.moveInDate).getFullYear() + 1
       ),
-      monthlyRent: activeLease.rentalRequest.budget || 3200,
-      securityDeposit: activeLease.rentalRequest.budget || 3200
+      monthlyRent: activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
+      securityDeposit: activeLease.depositAmount || activeLease.rentalRequest.budget || 0
     };
 
     // Calculate account status based on payment history
@@ -193,27 +195,29 @@ export const getTenantActiveLease = async (req, res) => {
     const propertyDetails = {
       address: activeLease.rentalRequest.location,
       rooms: activeLease.rentalRequest.bedrooms || 2,
-      bathrooms: 1,
-      area: 65,
-      leaseTerm: 12,
-      amenities: ['Parking Space', 'Washing Machine', 'Air Conditioning', 'Balcony', 'Internet', 'Elevator']
+      bathrooms: activeLease.rentalRequest.bathrooms || 1,
+      area: activeLease.propertySize || '65 m²',
+      leaseTerm: activeLease.leaseDuration || 12,
+      amenities: activeLease.propertyAmenities ? JSON.parse(activeLease.propertyAmenities) : ['Parking Space', 'Washing Machine', 'Air Conditioning', 'Balcony', 'Internet', 'Elevator']
     };
 
     const landlordInfo = {
       name: activeLease.landlord.firstName + ' ' + activeLease.landlord.lastName,
       company: activeLease.landlord.company || 'Individual Landlord',
       email: activeLease.landlord.email,
-      phone: activeLease.landlord.phone || '+48 987 654 321',
-      address: activeLease.landlord.address || 'ul. Marszałkowska 84/92, 00-514 Warszawa'
+      phone: activeLease.landlord.phoneNumber || 'Not provided',
+      address: activeLease.landlord.street && activeLease.landlord.city ? 
+        `${activeLease.landlord.street}, ${activeLease.landlord.city} ${activeLease.landlord.zipCode}, ${activeLease.landlord.country}` : 
+        'Not provided'
     };
 
     const leaseInfo = {
       startDate: activeLease.rentalRequest.moveInDate,
-      endDate: new Date(activeLease.rentalRequest.moveInDate).setFullYear(
+      endDate: activeLease.leaseEndDate || new Date(activeLease.rentalRequest.moveInDate).setFullYear(
         new Date(activeLease.rentalRequest.moveInDate).getFullYear() + 1
       ),
-      monthlyRent: activeLease.rentalRequest.budget || 3200,
-      securityDeposit: activeLease.rentalRequest.budget || 3200
+      monthlyRent: activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
+      securityDeposit: activeLease.depositAmount || activeLease.rentalRequest.budget || 0
     };
 
     res.json({

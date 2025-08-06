@@ -14,6 +14,8 @@ const createRentalRequest = async (req, res) => {
       budget,
       budgetFrom,
       budgetTo,
+      propertyType,
+      district,
       bedrooms,
       bathrooms,
       furnished,
@@ -48,6 +50,21 @@ const createRentalRequest = async (req, res) => {
       });
     }
 
+    // Validate property type and set bedrooms automatically
+    const validPropertyTypes = ['Room', 'Shared Room', 'Studio', 'Apartment', 'House'];
+    if (propertyType && !validPropertyTypes.includes(propertyType)) {
+      return res.status(400).json({
+        error: 'Invalid property type. Must be one of: Room, Shared Room, Studio, Apartment, House.'
+      });
+    }
+
+    // Auto-set bedrooms for single-room property types
+    let finalBedrooms = bedrooms;
+    const singleRoomTypes = ['Room', 'Shared Room', 'Studio'];
+    if (propertyType && singleRoomTypes.includes(propertyType)) {
+      finalBedrooms = 1;
+    }
+
     // 🚀 SCALABILITY: Create rental request with transaction
     const result = await prisma.$transaction(async (tx) => {
       // Create rental request
@@ -60,7 +77,9 @@ const createRentalRequest = async (req, res) => {
           budget: parseFloat(budget),
           budgetFrom: budgetFrom ? parseFloat(budgetFrom) : null,
           budgetTo: budgetTo ? parseFloat(budgetTo) : null,
-          bedrooms: bedrooms ? parseInt(bedrooms) : null,
+          propertyType: propertyType || null,
+          district: district || null,
+          bedrooms: finalBedrooms ? parseInt(finalBedrooms) : null,
           bathrooms: bathrooms ? parseInt(bathrooms) : null,
           furnished: furnished || false,
           parking: parking || false,
@@ -651,10 +670,24 @@ const updateRentalRequest = async (req, res) => {
       });
     }
 
+    // Validate property type and set bedrooms automatically
+    const validPropertyTypes = ['Room', 'Shared Room', 'Studio', 'Apartment', 'House'];
+    if (updateData.propertyType && !validPropertyTypes.includes(updateData.propertyType)) {
+      return res.status(400).json({
+        error: 'Invalid property type. Must be one of: Room, Shared Room, Studio, Apartment, House.'
+      });
+    }
+
+    // Auto-set bedrooms for single-room property types
+    const singleRoomTypes = ['Room', 'Shared Room', 'Studio'];
+    if (updateData.propertyType && singleRoomTypes.includes(updateData.propertyType)) {
+      updateData.bedrooms = 1;
+    }
+
     // Filter out fields that don't exist in the database schema
     const allowedFields = [
       'title', 'description', 'location', 'budget', 'budgetFrom', 'budgetTo', 'moveInDate', 
-      'bedrooms', 'additionalRequirements',
+      'propertyType', 'district', 'bedrooms', 'additionalRequirements',
       'bathrooms', 'furnished', 'parking', 'petsAllowed', 'status', 
       'isLocked', 'preferredNeighborhood', 'maxCommuteTime', 'mustHaveFeatures',
       'flexibleOnMoveInDate', 'poolStatus', 'matchScore', 'viewCount', 

@@ -115,7 +115,7 @@ const MyRequests = () => {
     if (parts.length >= 2) {
       return { district: parts[0], city: parts[1] };
     }
-    return { city: location, district: '' };
+    return { city: location, district: 'All' }; // Default to "All" if no district specified
   };
 
   // Filter and sort requests
@@ -130,10 +130,11 @@ const MyRequests = () => {
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
         const { city, district } = parseLocation(request.location);
+        const districtText = district || 'All';
         return (
           request.title.toLowerCase().includes(searchLower) ||
           city.toLowerCase().includes(searchLower) ||
-          district.toLowerCase().includes(searchLower) ||
+          districtText.toLowerCase().includes(searchLower) ||
           request.description.toLowerCase().includes(searchLower)
         );
       }
@@ -291,7 +292,7 @@ const MyRequests = () => {
                       
                       <div className="flex justify-between">
                         <span className="text-sm font-medium text-gray-500">District:</span>
-                        <span className="text-sm text-gray-900">{district}</span>
+                        <span className="text-sm text-gray-900">{district || 'All'}</span>
                       </div>
                       
                       <div className="flex justify-between">

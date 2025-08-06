@@ -225,6 +225,8 @@ model RentalRequest {
   budget    Float
   budgetFrom Float? // Minimum budget range
   budgetTo   Float? // Maximum budget range
+  propertyType String? // Room, Shared Room, Studio, Apartment, House
+  district  String? // Specific district or null for "All"
   bedrooms  Int?
   bathrooms Int?
   furnished Boolean  @default(false)

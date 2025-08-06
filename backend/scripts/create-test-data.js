@@ -30,6 +30,7 @@ async function main() {
         title: 'Modern 2-Bedroom Apartment in City Center',
         location: 'ul. Krakowskie Przedmieście 15/17, Śródmieście, Warszawa 00-071',
         bedrooms: 2,
+        bathrooms: 1,
         budget: 3200,
         moveInDate: new Date('2024-01-15'),
         description: 'Looking for a modern 2-bedroom apartment in the city center',
@@ -60,7 +61,10 @@ async function main() {
           depositAmount: 3200,
           leaseDuration: 12,
           availableFrom: new Date('2024-01-15'),
+          leaseEndDate: new Date('2025-01-15'),
           description: 'Beautiful 2-bedroom apartment in the heart of Warsaw',
+          propertyAmenities: JSON.stringify(['Parking Space', 'Washing Machine', 'Air Conditioning', 'Balcony', 'Internet', 'Elevator']),
+          propertySize: '65 m²',
           status: 'ACCEPTED',
           responseTime: 3600000, // 1 hour in milliseconds
           matchScore: 0.95

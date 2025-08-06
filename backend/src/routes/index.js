@@ -48,6 +48,6 @@ router.use('/admin', adminRoutes);
 router.use('/landlord-profile', landlordProfileRoutes);
 
 // Tenant dashboard routes
-router.use('/tenant', tenantDashboardRoutes);
+router.use('/tenant-dashboard', tenantDashboardRoutes);
 
 export default router; 
