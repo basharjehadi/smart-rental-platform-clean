@@ -12,6 +12,7 @@ import adminRoutes from './adminRoutes.js';
 import landlordProfileRoutes from './landlordProfileRoutes.js';
 import propertyRoutes from './propertyRoutes.js';
 import tenantDashboardRoutes from './tenantDashboardRoutes.js';
+import landlordDashboardRoutes from './landlordDashboardRoutes.js';
 
 const router = Router();
 
@@ -49,5 +50,8 @@ router.use('/landlord-profile', landlordProfileRoutes);
 
 // Tenant dashboard routes
 router.use('/tenant-dashboard', tenantDashboardRoutes);
+
+// Landlord dashboard routes
+router.use('/landlord', landlordDashboardRoutes);
 
 export default router; 

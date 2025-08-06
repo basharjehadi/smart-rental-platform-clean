@@ -5,6 +5,7 @@ import axios from 'axios';
 import Step1PropertyInfo from '../components/Step1PropertyInfo';
 import Step2Location from '../components/Step2Location';
 import Step3Media from '../components/Step3Media';
+import LandlordSidebar from '../components/LandlordSidebar';
 
 const LandlordEditProperty = () => {
   const { user, logout } = useAuth();
@@ -47,7 +48,8 @@ const LandlordEditProperty = () => {
     'apartment',
     'house', 
     'studio',
-    'room'
+    'room',
+    'shared room'
   ];
 
   const furnishingOptions = [
@@ -75,7 +77,41 @@ const LandlordEditProperty = () => {
     'Washing Machine', 
     'Dishwasher',
     'Air Conditioning',
-    'Elevator'
+    'Elevator',
+    'Heating',
+    'Garden',
+    'Terrace',
+    'Parking',
+    'Security System',
+    'Intercom',
+    'Furnished',
+    'Pet Friendly',
+    'Bike Storage',
+    'Gym',
+    'Swimming Pool',
+    'Sauna',
+    'Playground',
+    'BBQ Area',
+    'Storage Room',
+    'Wardrobe',
+    'Built-in Wardrobe',
+    'Hardwood Floors',
+    'Carpeted Floors',
+    'High Ceilings',
+    'Large Windows',
+    'South Facing',
+    'Quiet Location',
+    'Near Public Transport',
+    'Near Shopping Center',
+    'Near Park',
+    'Near School',
+    'Near Hospital',
+    'Near Restaurant',
+    'Near Bank',
+    'Near Pharmacy',
+    'Near Gym',
+    'Near Library',
+    'Near Post Office'
   ];
 
   useEffect(() => {
@@ -129,6 +165,18 @@ const LandlordEditProperty = () => {
       [field]: value
     }));
     
+    // Auto-set room number to 1 for specific property types
+    if (field === 'propertyType') {
+      const singleRoomTypes = ['room', 'shared room', 'studio'];
+      if (singleRoomTypes.includes(value.toLowerCase())) {
+        setFormData(prev => ({
+          ...prev,
+          rooms: '1'
+        }));
+      }
+    }
+    
+    // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({
         ...prev,
@@ -255,63 +303,7 @@ const LandlordEditProperty = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Left Sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        {/* Logo */}
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center mr-3">
-              <span className="text-white font-bold text-sm">R</span>
-            </div>
-            <span className="text-lg font-semibold text-gray-900">RentPlatform Poland</span>
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 p-4">
-          <div className="space-y-2">
-            <button
-              onClick={() => navigate('/landlord-dashboard')}
-              className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg w-full text-left"
-            >
-              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Dashboard
-            </button>
-            
-            <button
-              onClick={() => navigate('/landlord-profile')}
-              className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg w-full text-left"
-            >
-              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              My Profile
-            </button>
-            
-            <button
-              onClick={() => navigate('/landlord-my-property')}
-              className="flex items-center px-4 py-3 text-sm font-medium text-white bg-black rounded-lg w-full text-left"
-            >
-              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-              My Property
-            </button>
-            
-            <button
-              onClick={() => navigate('/requests')}
-              className="flex items-center px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg w-full text-left"
-            >
-              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              Requests
-            </button>
-          </div>
-        </nav>
-      </div>
+      <LandlordSidebar />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">

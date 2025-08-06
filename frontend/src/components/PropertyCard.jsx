@@ -51,7 +51,9 @@ const PropertyCard = ({ property, onEdit, onDelete }) => {
       'LOFT': 'Loft',
       'STUDIO': 'Studio',
       'PENTHOUSE': 'Penthouse',
-      'VILLA': 'Villa'
+      'VILLA': 'Villa',
+      'ROOM': 'Room',
+      'SHARED_ROOM': 'Shared Room'
     };
     return typeMap[type] || type;
   };

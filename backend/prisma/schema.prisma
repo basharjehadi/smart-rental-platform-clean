@@ -89,6 +89,8 @@ model User {
   landlordProfile LandlordProfile? @relation("LandlordProfile")
   landlordRequestMatches LandlordRequestMatch[] @relation("LandlordMatches")
   properties     Property[]      @relation("LandlordProperties")
+  leases         Lease[]         @relation("TenantLeases")
+  reviews        Review[]        @relation("TenantReviews")
 
   @@map("users")
   @@index([role, availability, autoAvailability, currentTenants]) // 🚀 SCALABILITY: Composite index for landlord queries
@@ -204,6 +206,7 @@ model Property {
   // Relations
   landlordId String
   landlord User @relation("LandlordProperties", fields: [landlordId], references: [id], onDelete: Cascade)
+  units      Unit[]   @relation("PropertyUnits")
   
   // Timestamps
   createdAt DateTime @default(now())
@@ -348,6 +351,9 @@ model Payment {
   
   offerId String?
   offer   Offer? @relation("OfferPayments", fields: [offerId], references: [id], onDelete: SetNull)
+  
+  leaseId String?
+  lease   Lease? @relation("LeasePayments", fields: [leaseId], references: [id], onDelete: SetNull)
   
   rentPayments RentPayment[] @relation("PaymentRentPayments")
   
@@ -552,4 +558,123 @@ enum KYCStatus {
   APPROVED
   REJECTED
   NOT_SUBMITTED
+}
+
+// Unit model for property units
+model Unit {
+  id          String   @id @default(cuid())
+  unitNumber  String   // Unit number (e.g., "A1", "101")
+  floor       Int?
+  bedrooms    Int
+  bathrooms   Int
+  area        Float    // Square meters
+  rentAmount  Float    // Monthly rent amount
+  status      PropertyStatus @default(AVAILABLE)
+  
+  // Property relationship
+  propertyId  String
+  property    Property @relation("PropertyUnits", fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  // Lease relationship
+  lease       Lease?   @relation("UnitLease")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("units")
+  @@index([propertyId, status])
+}
+
+// Lease model for rental agreements
+model Lease {
+  id          String   @id @default(cuid())
+  startDate   DateTime
+  endDate     DateTime
+  rentAmount  Float
+  depositAmount Float
+  status      LeaseStatus @default(ACTIVE)
+  
+  // Relationships
+  tenantId    String
+  tenant      User     @relation("TenantLeases", fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  unitId      String   @unique
+  unit        Unit     @relation("UnitLease", fields: [unitId], references: [id], onDelete: Cascade)
+  
+  // Payments and reviews
+  payments    Payment[] @relation("LeasePayments")
+  reviews     Review[]  @relation("LeaseReviews")
+  maintenanceRequests MaintenanceRequest[] @relation("LeaseMaintenance")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("leases")
+  @@index([tenantId])
+  @@index([status])
+  @@index([endDate])
+}
+
+// Review model for tenant reviews
+model Review {
+  id          String   @id @default(cuid())
+  rating      Int      // 1-5 stars
+  comment     String
+  isAnonymous Boolean  @default(false)
+  
+  // Relationships
+  tenantId    String
+  tenant      User     @relation("TenantReviews", fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  leaseId     String
+  lease       Lease    @relation("LeaseReviews", fields: [leaseId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("reviews")
+  @@index([leaseId])
+  @@index([rating])
+}
+
+// Maintenance request model
+model MaintenanceRequest {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  priority    MaintenancePriority @default(MEDIUM)
+  status      MaintenanceStatus @default(PENDING)
+  
+  // Relationships
+  leaseId     String
+  lease       Lease    @relation("LeaseMaintenance", fields: [leaseId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("maintenance_requests")
+  @@index([leaseId, status])
+  @@index([priority])
+}
+
+// Enums for new models
+enum LeaseStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+  PENDING
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MaintenanceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 } 

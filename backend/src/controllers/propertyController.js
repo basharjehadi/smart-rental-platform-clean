@@ -91,9 +91,7 @@ export const createProperty = async (req, res) => {
       smokingAllowed = false,
       maxTenants = 1,
       description,
-      houseRules,
-      images,
-      videos
+      houseRules
     } = req.body;
 
     // Validate required fields
@@ -102,6 +100,22 @@ export const createProperty = async (req, res) => {
         success: false,
         error: 'Name, address, city, zip code, property type, and monthly rent are required'
       });
+    }
+
+    // Handle uploaded files
+    let imageUrls = [];
+    let videoUrls = [];
+
+    if (req.files) {
+      // Handle property images
+      if (req.files.propertyImages) {
+        imageUrls = req.files.propertyImages.map(file => `/uploads/property_images/${file.filename}`);
+      }
+      
+      // Handle property videos
+      if (req.files.propertyVideo) {
+        videoUrls = req.files.propertyVideo.map(file => `/uploads/property_videos/${file.filename}`);
+      }
     }
 
     const property = await prisma.property.create({
@@ -120,18 +134,18 @@ export const createProperty = async (req, res) => {
         totalFloors: totalFloors ? parseInt(totalFloors) : null,
         monthlyRent: parseFloat(monthlyRent),
         depositAmount: depositAmount ? parseFloat(depositAmount) : null,
-        utilitiesIncluded,
+        utilitiesIncluded: utilitiesIncluded === 'true' || utilitiesIncluded === true,
         availableFrom: availableFrom ? new Date(availableFrom) : null,
         availableUntil: availableUntil ? new Date(availableUntil) : null,
-        furnished,
-        parking,
-        petsAllowed,
-        smokingAllowed,
+        furnished: furnished === 'true' || furnished === true,
+        parking: parking === 'true' || parking === true,
+        petsAllowed: petsAllowed === 'true' || petsAllowed === true,
+        smokingAllowed: smokingAllowed === 'true' || smokingAllowed === true,
         maxTenants: parseInt(maxTenants),
         description,
         houseRules,
-        images: images ? JSON.stringify(images) : null,
-        videos: videos ? JSON.stringify(videos) : null
+        images: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
+        videos: videoUrls.length > 0 ? JSON.stringify(videoUrls) : null
       }
     });
 

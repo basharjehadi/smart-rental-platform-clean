@@ -1,5 +1,6 @@
 import express from 'express';
 import { verifyToken, requireRole } from '../middlewares/authMiddleware.js';
+import { uploadMultipleFiles } from '../middlewares/uploadMiddleware.js';
 import {
   getLandlordProperties,
   getPropertyById,
@@ -21,8 +22,8 @@ router.get('/landlord-properties', getLandlordProperties);
 // Get a specific property by ID
 router.get('/properties/:id', getPropertyById);
 
-// Create a new property
-router.post('/properties', createProperty);
+// Create a new property with file upload support
+router.post('/properties', uploadMultipleFiles, createProperty);
 
 // Update a property
 router.put('/properties/:id', updateProperty);

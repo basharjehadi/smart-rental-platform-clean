@@ -933,6 +933,137 @@ const updateTenantOfferStatus = async (req, res) => {
   }
 };
 
+// Get all rental requests (for landlords to browse) - only those matching their properties
+const getAllRentalRequests = async (req, res) => {
+  try {
+    const landlordId = req.user.id;
+
+    // First, get all properties owned by this landlord
+    const landlordProperties = await prisma.property.findMany({
+      where: {
+        landlordId: landlordId,
+        status: 'AVAILABLE' // Only available properties
+      },
+      select: {
+        id: true,
+        city: true,
+        monthlyRent: true,
+        propertyType: true,
+        bedrooms: true,
+        bathrooms: true,
+        furnished: true,
+        parking: true,
+        petsAllowed: true
+      }
+    });
+
+    // If landlord has no properties, return empty array
+    if (landlordProperties.length === 0) {
+      return res.json({
+        success: true,
+        rentalRequests: [],
+        message: 'No properties found. Add properties to see matching rental requests.'
+      });
+    }
+
+    // Create matching criteria based on landlord's properties
+    const matchingCriteria = landlordProperties.map(property => ({
+      location: property.city,
+      budgetFrom: { lte: property.monthlyRent * 1.2 }, // Allow 20% flexibility
+      budgetTo: { gte: property.monthlyRent * 0.8 },   // Allow 20% flexibility
+      propertyType: property.propertyType,
+      poolStatus: 'ACTIVE',
+      status: 'ACTIVE'
+    }));
+
+    // Find rental requests that match any of the landlord's properties
+    const requests = await prisma.rentalRequest.findMany({
+      where: {
+        OR: matchingCriteria
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            profileImage: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json({
+      success: true,
+      rentalRequests: requests,
+      totalProperties: landlordProperties.length
+    });
+  } catch (error) {
+    console.error('Error fetching rental requests:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch rental requests'
+    });
+  }
+};
+
+// Decline rental request (for landlords)
+const declineRentalRequest = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { reason } = req.body;
+
+    // Validate rental request exists and is active
+    const rentalRequest = await prisma.rentalRequest.findUnique({
+      where: { id: parseInt(requestId) },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    if (!rentalRequest) {
+      return res.status(404).json({
+        error: 'Rental request not found.'
+      });
+    }
+
+    if (rentalRequest.poolStatus !== 'ACTIVE') {
+      return res.status(400).json({
+        error: 'This rental request is no longer active.'
+      });
+    }
+
+    // Update request status to declined
+    await prisma.rentalRequest.update({
+      where: { id: parseInt(requestId) },
+      data: {
+        poolStatus: 'CANCELLED',
+        status: 'CANCELLED'
+      }
+    });
+
+    res.json({
+      message: 'Rental request declined successfully.',
+      requestId: parseInt(requestId)
+    });
+  } catch (error) {
+    console.error('Decline rental request error:', error);
+    res.status(500).json({
+      error: 'Internal server error.'
+    });
+  }
+};
+
 // Export all functions
 export {
   createRentalRequest,
@@ -947,5 +1078,7 @@ export {
   getMyRequests,
   updateRentalRequest,
   deleteRentalRequest,
-  getMyOffers
+  getMyOffers,
+  getAllRentalRequests,
+  declineRentalRequest
 }; 

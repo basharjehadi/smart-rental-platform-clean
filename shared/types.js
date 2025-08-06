@@ -15,6 +15,7 @@ export const PROPERTY_TYPES = {
   HOUSE: 'HOUSE',
   STUDIO: 'STUDIO',
   ROOM: 'ROOM',
+  SHARED_ROOM: 'SHARED_ROOM',
   OFFICE: 'OFFICE'
 };
 

@@ -14,6 +14,23 @@ const Step3Media = ({ formData, errors, onFileUpload }) => {
     event.preventDefault();
   };
 
+  const removeFile = (field, index = null) => {
+    if (field === 'virtualTourVideo') {
+      onFileUpload(field, null);
+    } else if (field === 'propertyPhotos') {
+      const newPhotos = formData.propertyPhotos.filter((_, i) => i !== index);
+      onFileUpload(field, newPhotos);
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   return (
     <div>
       {/* Header */}
@@ -67,45 +84,80 @@ const Step3Media = ({ formData, errors, onFileUpload }) => {
         </div>
 
         {/* Video Upload Area */}
-        <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-            formData.virtualTourVideo 
-              ? 'border-green-300 bg-green-50' 
-              : errors.virtualTourVideo 
+        {formData.virtualTourVideo ? (
+          <div className="border-2 border-green-300 bg-green-50 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold text-green-900">Video Uploaded Successfully!</h4>
+              <button
+                onClick={() => removeFile('virtualTourVideo')}
+                className="text-red-600 hover:text-red-800 p-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="bg-white rounded-lg p-4 border border-green-200">
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h5 className="font-medium text-gray-900">{formData.virtualTourVideo.name}</h5>
+                  <p className="text-sm text-gray-600">
+                    Size: {formatFileSize(formData.virtualTourVideo.size)} | 
+                    Type: {formData.virtualTourVideo.type}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Video Preview */}
+              <div className="mt-4">
+                <video 
+                  controls 
+                  className="w-full h-48 object-cover rounded-lg bg-gray-100"
+                  src={URL.createObjectURL(formData.virtualTourVideo)}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              errors.virtualTourVideo 
                 ? 'border-red-300 bg-red-50' 
                 : 'border-gray-300 bg-gray-50 hover:border-gray-400'
-          }`}
-          onDrop={(e) => handleDrop('virtualTourVideo', e)}
-          onDragOver={handleDragOver}
-        >
-          <input
-            type="file"
-            accept="video/*"
-            onChange={(e) => handleFileChange('virtualTourVideo', e)}
-            className="hidden"
-            id="virtualTourVideo"
-          />
-          <label htmlFor="virtualTourVideo" className="cursor-pointer">
-            <div className="flex flex-col items-center">
-              <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-              {formData.virtualTourVideo ? (
-                <div>
-                  <p className="text-sm font-medium text-green-600 mb-2">Video uploaded successfully!</p>
-                  <p className="text-sm text-green-600">{formData.virtualTourVideo.name}</p>
-                </div>
-              ) : (
+            }`}
+            onDrop={(e) => handleDrop('virtualTourVideo', e)}
+            onDragOver={handleDragOver}
+          >
+            <input
+              type="file"
+              accept="video/*"
+              onChange={(e) => handleFileChange('virtualTourVideo', e)}
+              className="hidden"
+              id="virtualTourVideo"
+            />
+            <label htmlFor="virtualTourVideo" className="cursor-pointer">
+              <div className="flex flex-col items-center">
+                <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
                 <div>
                   <p className="text-sm font-medium text-gray-600 mb-2">
                     Listings with video walkthrough get <strong>3x more rent</strong> and <strong>5x more trust</strong>. Upload now to boost your listing.
                   </p>
                   <p className="text-sm text-gray-500">No editing needed. Just walk & talk with your phone camera.</p>
                 </div>
-              )}
-            </div>
-          </label>
-        </div>
+              </div>
+            </label>
+          </div>
+        )}
         {errors.virtualTourVideo && <p className="mt-2 text-sm text-red-600">{errors.virtualTourVideo}</p>}
       </div>
 
@@ -131,52 +183,91 @@ const Step3Media = ({ formData, errors, onFileUpload }) => {
         </div>
 
         {/* Photo Upload Area */}
-        <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-            formData.propertyPhotos.length > 0 
-              ? 'border-green-300 bg-green-50' 
-              : 'border-gray-300 bg-gray-50 hover:border-gray-400'
-          }`}
-          onDrop={(e) => handleDrop('propertyPhotos', e)}
-          onDragOver={handleDragOver}
-        >
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => handleFileChange('propertyPhotos', e)}
-            className="hidden"
-            id="propertyPhotos"
-          />
-          <label htmlFor="propertyPhotos" className="cursor-pointer">
-            <div className="flex flex-col items-center">
-              <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              {formData.propertyPhotos.length > 0 ? (
-                <div>
-                  <p className="text-sm font-medium text-green-600 mb-2">
-                    {formData.propertyPhotos.length} photo{formData.propertyPhotos.length !== 1 ? 's' : ''} uploaded!
-                  </p>
-                  <div className="grid grid-cols-3 gap-2 mt-4">
-                    {formData.propertyPhotos.slice(0, 6).map((photo, index) => (
-                      <div key={index} className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
-                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                    ))}
+        {formData.propertyPhotos.length > 0 ? (
+          <div className="border-2 border-green-300 bg-green-50 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold text-green-900">
+                {formData.propertyPhotos.length} Photo{formData.propertyPhotos.length !== 1 ? 's' : ''} Uploaded!
+              </h4>
+              <button
+                onClick={() => onFileUpload('propertyPhotos', [])}
+                className="text-red-600 hover:text-red-800 p-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {formData.propertyPhotos.map((photo, index) => (
+                <div key={index} className="relative group">
+                  <img
+                    src={URL.createObjectURL(photo)}
+                    alt={`Property photo ${index + 1}`}
+                    className="w-full h-32 object-cover rounded-lg border border-green-200"
+                  />
+                  <button
+                    onClick={() => removeFile('propertyPhotos', index)}
+                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                  <div className="mt-2 text-xs text-gray-600">
+                    <p className="truncate">{photo.name}</p>
+                    <p>{formatFileSize(photo.size)}</p>
                   </div>
                 </div>
-              ) : (
+              ))}
+            </div>
+            
+            {/* Add More Photos Button */}
+            <div className="mt-4">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => handleFileChange('propertyPhotos', e)}
+                className="hidden"
+                id="addMorePhotos"
+              />
+              <label htmlFor="addMorePhotos" className="cursor-pointer inline-flex items-center px-4 py-2 border border-green-300 text-sm font-medium rounded-md text-green-700 bg-white hover:bg-green-50">
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add More Photos
+              </label>
+            </div>
+          </div>
+        ) : (
+          <div
+            className="border-2 border-dashed rounded-lg p-8 text-center transition-colors border-gray-300 bg-gray-50 hover:border-gray-400"
+            onDrop={(e) => handleDrop('propertyPhotos', e)}
+            onDragOver={handleDragOver}
+          >
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => handleFileChange('propertyPhotos', e)}
+              className="hidden"
+              id="propertyPhotos"
+            />
+            <label htmlFor="propertyPhotos" className="cursor-pointer">
+              <div className="flex flex-col items-center">
+                <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
                 <div>
                   <p className="text-sm font-medium text-gray-600 mb-2">Drop property photos here, or click to browse</p>
                   <p className="text-sm text-gray-500">Supports: JPG, PNG, WebP (max 10MB each)</p>
                 </div>
-              )}
-            </div>
-          </label>
-        </div>
+              </div>
+            </label>
+          </div>
+        )}
 
         {/* Photo Recommendations */}
         <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
