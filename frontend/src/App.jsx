@@ -23,7 +23,9 @@ import LandlordHelpCenter from './pages/LandlordHelpCenter';
 import LandlordRentalRequests from './pages/LandlordRentalRequests';
 
 import MyOffers from './pages/MyOffers';
+import PropertyDetailsView from './pages/PropertyDetailsView';
 import PaymentPage from './pages/PaymentPage';
+import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import TenantDashboardRent from './pages/TenantDashboardRent';
 import TenantRentHistory from './pages/TenantRentHistory';
 
@@ -43,8 +45,20 @@ import TenantDashboardRedirect from './components/TenantDashboardRedirect';
 // Component to conditionally render Navbar
 const AppContent = () => {
   const location = useLocation();
-  const hideNavbarRoutes = ['/', '/login', '/register', '/dashboard', '/tenant-dashboard', '/tenant-help-center', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/contracts', '/payments', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details', '/landlord-help-center', '/admin'];
-  const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
+  const hideNavbarRoutes = ['/', '/login', '/register', '/dashboard', '/tenant-dashboard', '/tenant-help-center', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/property', '/contracts', '/payments', '/payment', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details', '/landlord-help-center', '/admin', '/payment-success'];
+  
+  // Check if current path should hide navbar (including parameterized routes)
+  const shouldHideNavbar = hideNavbarRoutes.some(route => {
+    if (route.includes(':')) {
+      // Handle parameterized routes
+      const routePattern = route.replace(/:[^/]+/g, '[^/]+');
+      const regex = new RegExp(`^${routePattern}$`);
+      return regex.test(location.pathname);
+    } else {
+      // Handle exact matches
+      return location.pathname === route || location.pathname.startsWith(route + '/');
+    }
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -141,6 +155,14 @@ const AppContent = () => {
           } 
         />
         <Route 
+          path="/property/:offerId" 
+          element={
+            <ProtectedRoute>
+              <PropertyDetailsView />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
           path="/payment" 
           element={
             <ProtectedRoute>
@@ -153,6 +175,14 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <PaymentPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/payment-success" 
+          element={
+            <ProtectedRoute>
+              <PaymentSuccessPage />
             </ProtectedRoute>
           } 
         />

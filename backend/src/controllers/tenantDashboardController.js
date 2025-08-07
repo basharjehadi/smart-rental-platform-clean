@@ -4,14 +4,15 @@ import { prisma } from '../utils/prisma.js';
 export const getTenantDashboardData = async (req, res) => {
   try {
     const tenantId = req.user.id;
+    console.log('🔍 Fetching dashboard data for tenant:', tenantId);
 
-    // Get tenant's active lease (assuming there's an active offer/lease)
+    // Get tenant's active lease (paid offers represent active leases)
     const activeLease = await prisma.offer.findFirst({
       where: {
         rentalRequest: {
           tenantId: tenantId
         },
-        status: 'ACCEPTED' // Assuming accepted offers represent active leases
+        status: 'PAID' // Paid offers represent active leases
       },
       include: {
         rentalRequest: {
@@ -19,34 +20,24 @@ export const getTenantDashboardData = async (req, res) => {
             tenant: true
           }
         },
-        landlord: {
-          include: {
-            properties: true
-          }
-        }
+        landlord: true
       }
     });
 
-    // Get payment history for the tenant
-    const payments = await prisma.payment.findMany({
-      where: {
-        userId: tenantId
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: 5 // Last 5 payments
-    });
-
+    console.log('🔍 Active lease found:', activeLease ? 'Yes' : 'No');
+    console.log('🔍 Active lease ID:', activeLease?.id);
+    
     // If no active lease, return appropriate empty state data
     if (!activeLease) {
+      console.log('❌ No active lease found for tenant:', tenantId);
       return res.json({
         tenant: req.user,
         hasActiveLease: false,
+        offerId: null,
         property: null,
         landlord: null,
         lease: null,
-        payments: payments,
+        payments: [],
         accountStatus: {
           paymentHistory: 'No Data',
           leaseCompliance: 'No Data',
@@ -60,58 +51,41 @@ export const getTenantDashboardData = async (req, res) => {
       });
     }
 
-    // Get property details from the rental request and offer
-    const propertyDetails = {
-      address: activeLease.rentalRequest.location,
-      rooms: activeLease.rentalRequest.bedrooms || 2,
-      bathrooms: activeLease.rentalRequest.bathrooms || 1,
-      area: activeLease.propertySize || '65 m²',
-      leaseTerm: activeLease.leaseDuration || 12,
-      amenities: activeLease.propertyAmenities ? JSON.parse(activeLease.propertyAmenities) : ['Parking Space', 'Washing Machine', 'Air Conditioning', 'Balcony', 'Internet', 'Elevator']
-    };
-
-    // Get landlord information
-    const landlordInfo = {
-      name: activeLease.landlord.firstName + ' ' + activeLease.landlord.lastName,
-      company: activeLease.landlord.company || 'Individual Landlord',
-      email: activeLease.landlord.email,
-      phone: activeLease.landlord.phoneNumber || 'Not provided',
-      address: activeLease.landlord.street && activeLease.landlord.city ? 
-        `${activeLease.landlord.street}, ${activeLease.landlord.city} ${activeLease.landlord.zipCode}, ${activeLease.landlord.country}` : 
-        'Not provided'
-    };
-
-    // Calculate lease information
-    const leaseInfo = {
-      startDate: activeLease.rentalRequest.moveInDate,
-      endDate: activeLease.leaseEndDate || new Date(activeLease.rentalRequest.moveInDate).setFullYear(
-        new Date(activeLease.rentalRequest.moveInDate).getFullYear() + 1
-      ),
-      monthlyRent: activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
-      securityDeposit: activeLease.depositAmount || activeLease.rentalRequest.budget || 0
-    };
-
-    // Calculate account status based on payment history
-    const paidPayments = payments.filter(p => p.status === 'SUCCEEDED').length;
-    const totalPayments = payments.length;
-    const paymentHistoryStatus = totalPayments > 0 ? 
-      (paidPayments / totalPayments > 0.8 ? 'Excellent' : 
-       paidPayments / totalPayments > 0.6 ? 'Good' : 'Needs Improvement') : 'No Data';
-
-    res.json({
+    // Simplified response with basic data
+    const responseData = {
       tenant: req.user,
       hasActiveLease: true,
-      property: propertyDetails,
-      landlord: landlordInfo,
-      lease: leaseInfo,
-      payments: payments.map(payment => ({
-        month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-        date: payment.createdAt,
-        amount: payment.amount,
-        status: payment.status === 'SUCCEEDED' ? 'Paid' : payment.status
-      })),
+      offerId: activeLease.id,
+      property: {
+        address: activeLease.rentalRequest.location,
+        rooms: activeLease.rentalRequest.bedrooms || 2,
+        bathrooms: activeLease.rentalRequest.bathrooms || 1,
+        area: activeLease.propertySize || '65 m²',
+        leaseTerm: activeLease.leaseDuration || 12,
+        amenities: ['Parking Space', 'Washing Machine', 'Air Conditioning', 'Balcony', 'Internet', 'Elevator']
+      },
+      landlord: {
+        name: activeLease.landlord.firstName && activeLease.landlord.lastName ? 
+          `${activeLease.landlord.firstName} ${activeLease.landlord.lastName}` : 
+          activeLease.landlord.name || 'Landlord',
+        company: 'Individual Landlord',
+        email: activeLease.landlord.email,
+        phone: activeLease.landlord.phoneNumber || 'Not provided',
+        address: activeLease.landlord.street && activeLease.landlord.city ? 
+          `${activeLease.landlord.street}, ${activeLease.landlord.city} ${activeLease.landlord.zipCode}, ${activeLease.landlord.country}` : 
+          'Not provided'
+      },
+      lease: {
+        startDate: activeLease.rentalRequest.moveInDate,
+        endDate: activeLease.leaseEndDate || new Date(activeLease.rentalRequest.moveInDate).setFullYear(
+          new Date(activeLease.rentalRequest.moveInDate).getFullYear() + 1
+        ),
+        monthlyRent: activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
+        securityDeposit: activeLease.depositAmount || activeLease.rentalRequest.budget || 0
+      },
+      payments: [],
       accountStatus: {
-        paymentHistory: paymentHistoryStatus,
+        paymentHistory: 'No Data',
         leaseCompliance: 'Good',
         communication: 'Responsive'
       },
@@ -120,11 +94,19 @@ export const getTenantDashboardData = async (req, res) => {
         'Annual inspection scheduled for next month',
         'Update emergency contact information'
       ]
-    });
+    };
+
+    console.log('✅ Dashboard data prepared successfully');
+    console.log('🔍 Offer ID in response:', responseData.offerId);
+    res.json(responseData);
 
   } catch (error) {
     console.error('Error fetching tenant dashboard data:', error);
-    res.status(500).json({ error: 'Failed to fetch dashboard data' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to fetch dashboard data',
+      details: error.message
+    });
   }
 };
 
@@ -167,7 +149,7 @@ export const getTenantActiveLease = async (req, res) => {
         rentalRequest: {
           tenantId: tenantId
         },
-        status: 'ACCEPTED'
+        status: 'PAID'
       },
       include: {
         rentalRequest: {

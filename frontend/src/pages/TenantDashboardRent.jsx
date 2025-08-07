@@ -100,10 +100,10 @@ const TenantDashboardRent = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 py-8">
+      <div className="min-h-screen bg-primary py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-4 text-gray-600">Loading rent payments...</p>
           </div>
         </div>
@@ -112,11 +112,11 @@ const TenantDashboardRent = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8">
+    <div className="min-h-screen bg-primary py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">
             My Rent Payments
           </h1>
           <p className="text-gray-600">
@@ -126,7 +126,7 @@ const TenantDashboardRent = () => {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          <div className="mb-6 text-sm text-red-600 p-4 bg-red-50 border border-red-200 rounded-lg">
             {error}
           </div>
         )}
@@ -135,7 +135,7 @@ const TenantDashboardRent = () => {
         <div className="mb-6">
           <button
             onClick={fetchRentPayments}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="btn-primary px-4 py-2"
           >
             Refresh Payments
           </button>

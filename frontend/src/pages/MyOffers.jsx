@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import OfferCard from '../components/OfferCard';
 import TenantSidebar from '../components/TenantSidebar';
-import { LogOut } from 'lucide-react';
+import { LogOut, CheckCircle, X } from 'lucide-react';
 
 const MyOffers = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [offers, setOffers] = useState([]);
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('ACTIVE');
+  const [activeTab, setActiveTab] = useState('PENDING');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const fetchOffers = async () => {
     try {
@@ -67,8 +69,9 @@ const MyOffers = () => {
   };
 
   const tabs = [
-    { key: 'ACTIVE', label: 'Active', count: getStatusCount('ACTIVE') },
+    { key: 'PENDING', label: 'Pending', count: getStatusCount('PENDING') },
     { key: 'ACCEPTED', label: 'Accepted', count: getStatusCount('ACCEPTED') },
+    { key: 'PAID', label: 'Paid', count: getStatusCount('PAID') },
     { key: 'DECLINED', label: 'Declined', count: getStatusCount('DECLINED') },
     { key: 'EXPIRED', label: 'Expired', count: getStatusCount('EXPIRED') }
   ];
@@ -77,42 +80,32 @@ const MyOffers = () => {
     fetchOffers();
   }, []);
 
+  useEffect(() => {
+    // Check for success message in location state
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+      setTimeout(() => setSuccessMessage(''), 5000); // Clear message after 5 seconds
+      // Clear the state to prevent showing the message again on refresh
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state, navigate]);
+
   return (
-    <div className="min-h-screen bg-white flex">
+    <div className="min-h-screen bg-primary flex">
       {/* Left Sidebar */}
       <TenantSidebar />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Top Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <header className="header-modern px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">My Offers from Landlord</h1>
+              <h1 className="text-xl font-semibold text-gray-900">My Offers from Landlord</h1>
               <p className="text-gray-600 mt-1">Review and manage offers from landlords who responded to my rental request.</p>
             </div>
             
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <span className="text-sm font-medium text-gray-900">{user?.name || 'Tenant'}</span>
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-md overflow-hidden">
-                  {profileData?.profileImage ? (
-                    <img
-                      src={profileData.profileImage.startsWith('/') 
-                        ? `http://localhost:3001${profileData.profileImage}`
-                        : `http://localhost:3001/uploads/profile_images/${profileData.profileImage}`
-                      }
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-base font-bold text-white">
-                      {user?.name?.charAt(0) || 'T'}
-                    </span>
-                  )}
-                </div>
-              </div>
-              
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"
@@ -128,21 +121,27 @@ const MyOffers = () => {
         <main className="flex-1 p-6">
           <div className="max-w-6xl mx-auto">
             {error && (
-              <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+              <div className="mb-6 text-sm text-red-600 p-4 bg-red-50 border border-red-200 rounded-lg">
                 {error}
+              </div>
+            )}
+            {successMessage && (
+              <div className="mb-6 text-sm text-green-600 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center">
+                <CheckCircle className="w-5 h-5 mr-2" />
+                {successMessage}
               </div>
             )}
 
             {/* Status Tabs */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-5 gap-4 mb-6">
               {tabs.map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`p-4 rounded-lg border transition-colors ${
+                  className={`card-modern p-4 transition-colors ${
                     activeTab === tab.key
                       ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 bg-white hover:bg-gray-50'
+                      : 'hover:bg-gray-50'
                   }`}
                 >
                   <div className="text-center">
@@ -155,10 +154,11 @@ const MyOffers = () => {
                       {tab.label}
                     </div>
                     <div className={`w-2 h-2 rounded-full mx-auto mt-2 ${
-                      tab.key === 'ACTIVE' ? 'bg-green-500' :
+                      tab.key === 'PENDING' ? 'bg-orange-500' :
                       tab.key === 'ACCEPTED' ? 'bg-blue-500' :
+                      tab.key === 'PAID' ? 'bg-green-500' :
                       tab.key === 'DECLINED' ? 'bg-red-500' :
-                      'bg-orange-500'
+                      'bg-gray-500'
                     }`}></div>
                   </div>
                 </button>
@@ -168,19 +168,20 @@ const MyOffers = () => {
             {/* Offers List */}
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                {activeTab === 'ACTIVE' && `${getStatusCount('ACTIVE')} Active Offers`}
+                {activeTab === 'PENDING' && `${getStatusCount('PENDING')} Pending Offers`}
                 {activeTab === 'ACCEPTED' && `${getStatusCount('ACCEPTED')} Accepted Offers`}
+                {activeTab === 'PAID' && `${getStatusCount('PAID')} Paid Offers`}
                 {activeTab === 'DECLINED' && `${getStatusCount('DECLINED')} Declined Offers`}
                 {activeTab === 'EXPIRED' && `${getStatusCount('EXPIRED')} Expired Offers`}
               </h2>
 
               {loading ? (
-                <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+                <div className="card-modern p-8 text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
                   <p className="text-gray-600">Loading your offers...</p>
                 </div>
               ) : filteredOffers.length === 0 ? (
-                <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+                <div className="card-modern p-8 text-center">
                   <div className="text-gray-400 text-4xl mb-4">📋</div>
                   <p className="text-gray-600 text-lg mb-4">
                     {activeTab === 'ACTIVE' && 'No active offers at the moment.'}
@@ -201,26 +202,26 @@ const MyOffers = () => {
                     <OfferCard
                       key={offer.id}
                       offerId={offer.id}
-                      propertyTitle={offer.propertyTitle || offer.rentalRequest?.title}
-                      location={offer.propertyAddress || offer.rentalRequest?.location}
+                      propertyTitle={offer.propertyTitle || offer.rentalRequest?.title || 'Property Offer'}
+                      location={offer.propertyAddress || offer.rentalRequest?.location || 'Location not specified'}
                       rent={offer.rentAmount}
                       deposit={offer.depositAmount}
                       availableFrom={offer.availableFrom}
                       duration={offer.leaseDuration}
-                      amenities={offer.propertyAmenities ? JSON.parse(offer.propertyAmenities) : []}
+                      amenities={offer.propertyAmenities ? (typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities) : offer.propertyAmenities) : []}
                       terms={offer.description}
                       status={offer.status}
-                      propertyImage={offer.propertyImages ? JSON.parse(offer.propertyImages)[0] : null}
+                      propertyImage={offer.propertyImages ? (typeof offer.propertyImages === 'string' ? JSON.parse(offer.propertyImages)[0] : offer.propertyImages[0]) : null}
                       landlordName={offer.landlord?.name}
                       landlordRating={offer.landlord?.rating}
                       landlordEmail={offer.landlord?.email}
-                      landlordPhone={offer.landlord?.phone}
-                      propertyType={offer.propertyType}
-                      rooms={offer.propertySize}
-                      area={offer.propertySize}
-                      bathrooms={offer.propertyAmenities ? JSON.parse(offer.propertyAmenities).filter(a => a.toLowerCase().includes('bath')).length : 1}
-                      furnishing={offer.propertyAmenities ? JSON.parse(offer.propertyAmenities).filter(a => a.toLowerCase().includes('furnish')).length > 0 ? 'Furnished' : 'Unfurnished' : 'Unfurnished'}
-                      parking={offer.propertyAmenities ? JSON.parse(offer.propertyAmenities).filter(a => a.toLowerCase().includes('park')).length > 0 ? 'Yes' : 'No' : 'No'}
+                      landlordPhone={offer.landlord?.phoneNumber}
+                      propertyType={offer.propertyType || 'Apartment'}
+                      rooms={offer.property?.bedrooms || offer.propertySize || offer.rentalRequest?.bedrooms || 1}
+                      area={offer.property?.size || offer.rentalRequest?.bedrooms || 1}
+                      bathrooms={offer.property?.bathrooms || (offer.propertyAmenities ? (typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities).filter(a => a.toLowerCase().includes('bath')).length : offer.propertyAmenities.filter(a => a.toLowerCase().includes('bath')).length) : 1)}
+                      furnishing={offer.property?.furnished ? 'Furnished' : (offer.propertyAmenities ? (typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities).filter(a => a.toLowerCase().includes('furnish')).length > 0 : offer.propertyAmenities.filter(a => a.toLowerCase().includes('furnish')).length > 0) ? 'Furnished' : 'Unfurnished' : 'Unfurnished')}
+                      parking={offer.property?.parking ? 'Yes' : (offer.propertyAmenities ? (typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities).filter(a => a.toLowerCase().includes('park')).length > 0 : offer.propertyAmenities.filter(a => a.toLowerCase().includes('park')).length > 0) ? 'Yes' : 'No' : 'No')}
                       isPaid={offer.isPaid || false}
                       onAccept={handleAcceptOffer}
                       onDecline={handleDeclineOffer}

@@ -235,6 +235,29 @@ const Step1PropertyInfo = ({
             </select>
           </div>
 
+          {/* Available From */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Available From *
+            </label>
+            <div className="relative">
+              <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <input
+                type="date"
+                value={formData.availableFrom}
+                onChange={(e) => onInputChange('availableFrom', e.target.value)}
+                min={new Date().toISOString().split('T')[0]} // Cannot select past dates
+                className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  errors.availableFrom ? 'border-red-500' : 'border-gray-300'
+                }`}
+              />
+            </div>
+            {errors.availableFrom && <p className="mt-1 text-sm text-red-600">{errors.availableFrom}</p>}
+            <p className="mt-1 text-sm text-gray-500">When is this property available for tenants to move in?</p>
+          </div>
+
           {/* Parking Space Available */}
           <div className="flex items-center">
             <input
@@ -401,22 +424,22 @@ const Step1PropertyInfo = ({
               {suggestedAmenities.filter(amenity => 
                 ['Hardwood Floors', 'Carpeted Floors', 'High Ceilings', 'Large Windows', 'South Facing', 'Quiet Location'].includes(amenity)
               ).map(amenity => (
-                <button
-                  key={amenity}
-                  type="button"
-                  onClick={() => onAmenityToggle(amenity)}
+            <button
+              key={amenity}
+              type="button"
+              onClick={() => onAmenityToggle(amenity)}
                   className={`flex items-center px-3 py-2 border-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                    formData.amenities.includes(amenity)
+                formData.amenities.includes(amenity)
                       ? 'bg-green-500 border-green-500 text-white shadow-lg transform scale-105'
                       : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
-                  }`}
-                >
+              }`}
+            >
                   {formData.amenities.includes(amenity) ? (
                     <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   ) : (
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                   )}
@@ -458,13 +481,13 @@ const Step1PropertyInfo = ({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                   )}
-                  {amenity}
-                </button>
-              ))}
+              {amenity}
+            </button>
+          ))}
             </div>
           </div>
         </div>
-
+        
         {/* Help Text */}
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-700">

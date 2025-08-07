@@ -14,8 +14,8 @@ const Step2Location = ({ formData, errors, cities, onInputChange }) => {
     ],
     'Poznan': [
       'Stare Miasto', 'Wilda', 'Piątkowo', 'Nowe Miasto', 'Jeżyce', 'Grunwald', 
-      'Łazarz', 'Górczyn', 'Juniakowo', 'Chartowo', 'Winogrady', 'Piątkowo', 
-      'Naramowice', 'Umultowo', 'Piątkowo', 'Morasko', 'Radojewo', 'Kiekrz'
+      'Łazarz', 'Górczyn', 'Juniakowo', 'Chartowo', 'Winogrady', 
+      'Naramowice', 'Umultowo', 'Morasko', 'Radojewo', 'Kiekrz'
     ],
     'Gdansk': [
       'Śródmieście', 'Chełm', 'Brzeźno', 'Nowy Port', 'Wrzeszcz Dolny', 'Wrzeszcz Górny', 
@@ -35,30 +35,30 @@ const Step2Location = ({ formData, errors, cities, onInputChange }) => {
       'Dąbrowa', 'Doły', 'Fabryczna', 'Górniak', 'Karolew', 'Koziny', 'Kurczaki', 
       'Lublinek', 'Łagiewniki', 'Mileszki', 'Mokra', 'Nowosolna', 'Olechów', 'Olechów-Janów', 
       'Park Reymonta', 'Radogoszcz', 'Retkinia', 'Ruda', 'Sikawa', 'Smulsko', 'Stare Polesie', 
-      'Stary Widzew', 'Śródmieście', 'Teofilów', 'Wiskitno', 'Wzniesień Łódzkich', 'Zagórnik', 'Zielona Góra'
+      'Stary Widzew', 'Teofilów', 'Wiskitno', 'Wzniesień Łódzkich', 'Zagórnik', 'Zielona Góra'
     ],
     'Szczecin': [
       'Śródmieście', 'Pomorzany', 'Niebużany', 'Świerczewo', 'Warszewo', 'Arkońskie-Niemierzyn', 
       'Głębokie-Pilchowo', 'Gumieńce', 'Krzekowo-Bezrzecze', 'Osów', 'Płonia-Śmierdnica-Jezierzyce', 
       'Podjuchy', 'Wielgowo-Sławociesze', 'Załom-Kasztanowe', 'Bukowo', 'Centrum', 'Dąbie', 
-      'Kijewo', 'Międzyodrze-Wyspa Pucka', 'Niebuszewo', 'Nowe Miasto', 'Pogodno', 'Stołczyn', 'Turzyn', 'Warszewo', 'Zdroje'
+      'Kijewo', 'Międzyodrze-Wyspa Pucka', 'Niebuszewo', 'Nowe Miasto', 'Pogodno', 'Stołczyn', 'Turzyn', 'Zdroje'
     ],
     'Bydgoszcz': [
       'Szwederowo', 'Błonie', 'Okole', 'Śródmieście', 'Fordon', 'Brdyujście', 'Bartodzieje', 
-      'Bielawy', 'Bocianowo', 'Czyżkówko', 'Fordon', 'Glinki', 'Jary', 'Kapuściska', 
+      'Bielawy', 'Bocianowo', 'Czyżkówko', 'Glinki', 'Jary', 'Kapuściska', 
       'Łęgnowo', 'Miedzyń', 'Osowa Góra', 'Piaski', 'Prądy', 'Siernieczek', 'Skrzetusko', 
-      'Smukała', 'Stary Fordon', 'Szwederowo', 'Wzgórze Wolności', 'Wyżyny', 'Zimne Wody'
+      'Smukała', 'Stary Fordon', 'Wzgórze Wolności', 'Wyżyny', 'Zimne Wody'
     ],
     'Lublin': [
       'Śródmieście', 'Wieniawa', 'Zabłocie', 'Rury', 'Sławin', 'Sławinek', 'Wrotków', 
       'Bronowice', 'Tatary', 'Kalinowszczyzna', 'Hajdów-Zadębie', 'Konstantynów', 'Lubelskiej Spółdzielni Mieszkaniowej', 
-      'Kościelniak', 'Rury', 'Szerokie', 'Zemborzyce', 'Dziesiąta', 'Głusk', 'Węglin', 'Felicity'
+      'Kościelniak', 'Szerokie', 'Zemborzyce', 'Dziesiąta', 'Głusk', 'Węglin', 'Felicity'
     ],
     'Katowice': [
       'Śródmieście', 'Koszutka', 'Bogucice', 'Osiedle Paderewskiego-Muchowiec', 'Dąb', 
       'Wełnowiec-Józefowiec', 'Załęże', 'Osiedle Witosa', 'Piotrowice-Ochojec', 'Ligota-Panewniki', 
       'Brynowiec-Osiedle Zgrzebnioka', 'Giszowiec', 'Murcki', 'Kostuchna', 'Podlesie', 'Szopienice-Burowiec', 
-      'Janów-Nikiszowiec', 'Giszowiec', 'Dąbrówka Mała', 'Szopienice-Burowiec', 'Roździeń', 'Załęska Hałda-Brynów część zachodnia'
+      'Janów-Nikiszowiec', 'Dąbrówka Mała', 'Roździeń', 'Załęska Hałda-Brynów część zachodnia'
     ]
   };
 

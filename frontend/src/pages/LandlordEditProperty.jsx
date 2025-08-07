@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
 import Step1PropertyInfo from '../components/Step1PropertyInfo';
 import Step2Location from '../components/Step2Location';
 import Step3Media from '../components/Step3Media';
 import LandlordSidebar from '../components/LandlordSidebar';
 
 const LandlordEditProperty = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, api } = useAuth();
   const navigate = useNavigate();
   const { propertyId } = useParams();
   const [currentStep, setCurrentStep] = useState(1);
@@ -24,6 +23,7 @@ const LandlordEditProperty = () => {
     buildingFloors: '',
     furnishing: '',
     parkingAvailable: false,
+    availableFrom: '', // When property is available for rent
     description: '',
     amenities: [],
     
@@ -43,6 +43,14 @@ const LandlordEditProperty = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+
+  // Convert relative URLs to absolute URLs (same as PropertyCard)
+  const getAbsoluteUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url; // Already absolute
+    if (url.startsWith('/')) return `http://localhost:3001${url}`; // Add server URL
+    return `http://localhost:3001/${url}`; // Add server URL and leading slash
+  };
 
   const propertyTypes = [
     'apartment',
@@ -121,14 +129,105 @@ const LandlordEditProperty = () => {
   const fetchProperty = async () => {
     try {
       setFetching(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/properties/${propertyId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/properties/${propertyId}`);
 
       if (response.data.success) {
         const property = response.data.property;
-        setFormData({
+        console.log('📋 Received property data:', property);
+        
+        // Parse address into separate components
+        let street = '';
+        let houseNumber = '';
+        let apartmentNumber = '';
+        
+        if (property.address) {
+          // Try to parse address like "Street Name 123/45" or "Street Name 123"
+          const addressParts = property.address.trim().split(' ');
+          
+          if (addressParts.length >= 2) {
+            const lastPart = addressParts[addressParts.length - 1];
+            
+            // Check if last part contains house number and apartment (e.g., "123/45")
+            if (lastPart.includes('/')) {
+              const [house, apartment] = lastPart.split('/');
+              if (!isNaN(house) && !isNaN(apartment)) {
+                houseNumber = house;
+                apartmentNumber = apartment;
+                street = addressParts.slice(0, -1).join(' ');
+              } else {
+                // If not numeric, treat as street name
+                street = property.address;
+              }
+            } else if (!isNaN(lastPart)) {
+              // Last part is just a house number
+              houseNumber = lastPart;
+              street = addressParts.slice(0, -1).join(' ');
+            } else {
+              // No clear house number pattern, use full address as street
+              street = property.address;
+            }
+          } else {
+            street = property.address;
+          }
+        }
+
+        // Parse existing amenities (stored in houseRules field)
+        let existingAmenities = [];
+        try {
+          if (property.houseRules) {
+            existingAmenities = typeof property.houseRules === 'string' 
+              ? JSON.parse(property.houseRules) 
+              : property.houseRules;
+            console.log('🏠 Parsed amenities from houseRules:', existingAmenities);
+          }
+        } catch (error) {
+          console.error('Error parsing amenities from houseRules:', error);
+          existingAmenities = [];
+        }
+
+        // Parse existing images
+        let existingImages = [];
+        try {
+          if (property.images) {
+            const imageUrls = typeof property.images === 'string' 
+              ? JSON.parse(property.images) 
+              : property.images;
+            existingImages = imageUrls.map(url => ({
+              name: url.split('/').pop(),
+              url: getAbsoluteUrl(url),
+              size: 0 // We don't have file size for existing images
+            }));
+          }
+        } catch (error) {
+          console.error('Error parsing images:', error);
+          existingImages = [];
+        }
+        console.log('📸 Parsed images:', existingImages);
+        console.log('📸 Image URLs:', existingImages.map(img => img.url));
+
+        // Parse existing videos
+        let existingVideo = null;
+        try {
+          if (property.videos) {
+            const videoUrls = typeof property.videos === 'string' 
+              ? JSON.parse(property.videos) 
+              : property.videos;
+            if (videoUrls.length > 0) {
+              existingVideo = {
+                name: videoUrls[0].split('/').pop(),
+                url: getAbsoluteUrl(videoUrls[0]),
+                size: 0 // We don't have file size for existing video
+              };
+            }
+          }
+        } catch (error) {
+          console.error('Error parsing videos:', error);
+          existingVideo = null;
+        }
+        console.log('🎥 Parsed video:', existingVideo);
+        console.log('🎥 Video URL:', existingVideo?.url);
+
+        const formDataToSet = {
           title: property.name || '',
           propertyType: property.propertyType || '',
           monthlyRent: property.monthlyRent || '',
@@ -139,20 +238,25 @@ const LandlordEditProperty = () => {
           buildingFloors: property.totalFloors || '',
           furnishing: property.furnished ? 'furnished' : 'unfurnished',
           parkingAvailable: property.parking || false,
+          availableFrom: property.availableFrom ? new Date(property.availableFrom).toISOString().split('T')[0] : '',
           description: property.description || '',
-          amenities: property.houseRules ? JSON.parse(property.houseRules) : [],
-          street: property.address || '',
-          houseNumber: '',
-          apartmentNumber: '',
+          amenities: existingAmenities,
+          street: street,
+          houseNumber: houseNumber,
+          apartmentNumber: apartmentNumber,
           postcode: property.zipCode || '',
-          district: '',
+          district: property.district || '',
           city: property.city || '',
-          virtualTourVideo: null,
-          propertyPhotos: []
-        });
+          virtualTourVideo: existingVideo,
+          propertyPhotos: existingImages
+        };
+        
+        console.log('📝 Setting form data:', formDataToSet);
+        setFormData(formDataToSet);
       }
     } catch (error) {
-      console.error('Error fetching property:', error);
+      console.error('❌ Error fetching property:', error);
+      console.error('❌ Error response:', error.response?.data);
       setErrors({ fetch: 'Failed to fetch property details.' });
     } finally {
       setFetching(false);
@@ -195,17 +299,64 @@ const LandlordEditProperty = () => {
   };
 
   const handleFileUpload = (field, files) => {
-    if (field === 'virtualTourVideo') {
-      setFormData(prev => ({
-        ...prev,
-        virtualTourVideo: files[0] || null
-      }));
-    } else if (field === 'propertyPhotos') {
-      const photoFiles = Array.from(files).slice(0, 12);
-      setFormData(prev => ({
-        ...prev,
-        propertyPhotos: photoFiles
-      }));
+    try {
+      if (field === 'virtualTourVideo') {
+        setFormData(prev => ({
+          ...prev,
+          virtualTourVideo: files ? (files[0] || null) : null
+        }));
+        
+        // Handle video error state
+        if (files && files[0]) {
+          // Clear video error when a video is uploaded
+          setErrors(prev => ({
+            ...prev,
+            virtualTourVideo: ''
+          }));
+        } else if (!files) {
+          // Set video error when video is removed
+          setErrors(prev => ({
+            ...prev,
+            virtualTourVideo: 'Virtual tour video is required'
+          }));
+        }
+      } else if (field === 'propertyPhotos') {
+        if (Array.isArray(files)) {
+          // Handle array of files (new uploads)
+          const photoFiles = Array.from(files).slice(0, 12);
+          setFormData(prev => ({
+            ...prev,
+            propertyPhotos: photoFiles
+          }));
+        } else if (files && files.length > 0) {
+          // Handle FileList from input
+          const photoFiles = Array.from(files).slice(0, 12);
+          setFormData(prev => ({
+            ...prev,
+            propertyPhotos: photoFiles
+          }));
+        } else {
+          // Clear photos
+          setFormData(prev => ({
+            ...prev,
+            propertyPhotos: []
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Error in handleFileUpload:', error);
+      // Set to null/empty array to prevent crashes
+      if (field === 'virtualTourVideo') {
+        setFormData(prev => ({
+          ...prev,
+          virtualTourVideo: null
+        }));
+      } else if (field === 'propertyPhotos') {
+        setFormData(prev => ({
+          ...prev,
+          propertyPhotos: []
+        }));
+      }
     }
   };
 
@@ -219,6 +370,7 @@ const LandlordEditProperty = () => {
       if (isNaN(formData.monthlyRent) || formData.monthlyRent <= 0) {
         newErrors.monthlyRent = 'Please enter a valid rent amount';
       }
+      if (!formData.availableFrom) newErrors.availableFrom = 'Available from date is required';
     }
     
     if (step === 2) {
@@ -227,6 +379,13 @@ const LandlordEditProperty = () => {
       if (!formData.postcode.trim()) newErrors.postcode = 'Postcode is required';
       if (!formData.district.trim()) newErrors.district = 'District is required';
       if (!formData.city) newErrors.city = 'City is required';
+    }
+    
+    if (step === 3) {
+      // Virtual tour video is required (either existing or new)
+      if (!formData.virtualTourVideo) {
+        newErrors.virtualTourVideo = 'Virtual tour video is required';
+      }
     }
     
     setErrors(newErrors);
@@ -252,23 +411,80 @@ const LandlordEditProperty = () => {
       
       const submitData = new FormData();
       
-      Object.keys(formData).forEach(key => {
-        if (key === 'virtualTourVideo' && formData[key]) {
-          submitData.append('virtualTourVideo', formData[key]);
-        } else if (key === 'propertyPhotos') {
-          formData[key].forEach((photo, index) => {
-            submitData.append(`propertyPhotos`, photo);
-          });
-        } else if (key === 'amenities') {
-          submitData.append('amenities', JSON.stringify(formData[key]));
-        } else {
-          submitData.append(key, formData[key]);
-        }
-      });
+      // Map frontend fields to backend expected fields
+      submitData.append('name', formData.title); // title -> name
+      submitData.append('address', `${formData.street} ${formData.houseNumber}${formData.apartmentNumber ? `/${formData.apartmentNumber}` : ''}`); // Combine address
+      submitData.append('city', formData.city);
+      submitData.append('district', formData.district); // Add district field
+      submitData.append('zipCode', formData.postcode); // postcode -> zipCode
+      submitData.append('propertyType', formData.propertyType);
+      submitData.append('bedrooms', formData.rooms || ''); // rooms -> bedrooms
+      submitData.append('bathrooms', formData.bathrooms || '');
+      submitData.append('size', formData.area || ''); // area -> size
+      submitData.append('floor', formData.floor || '');
+      submitData.append('totalFloors', formData.buildingFloors || ''); // buildingFloors -> totalFloors
+      submitData.append('monthlyRent', formData.monthlyRent);
+      submitData.append('availableFrom', formData.availableFrom); // When property is available
+      submitData.append('furnished', formData.furnishing === 'furnished'); // Convert to boolean
+      submitData.append('parking', formData.parkingAvailable); // Convert to boolean
+      submitData.append('petsAllowed', false); // Default value
+      submitData.append('smokingAllowed', false); // Default value
+      submitData.append('utilitiesIncluded', false); // Default value
+      submitData.append('description', formData.description || '');
       
-      const response = await axios.put(`/api/properties/${propertyId}`, submitData, {
+      // Handle amenities (send as houseRules)
+      if (formData.amenities && formData.amenities.length > 0) {
+        submitData.append('houseRules', JSON.stringify(formData.amenities));
+      } else {
+        submitData.append('houseRules', '[]'); // Send empty array if no amenities selected
+      }
+      
+      // Handle files: Separate new files from existing ones
+      let newVideoFile = null;
+      let retainedVideoUrl = null;
+      if (formData.virtualTourVideo) {
+        if (formData.virtualTourVideo instanceof File) {
+          newVideoFile = formData.virtualTourVideo;
+        } else if (formData.virtualTourVideo.url) {
+          retainedVideoUrl = formData.virtualTourVideo.url;
+        }
+      }
+
+      let newPhotoFiles = [];
+      let retainedImageUrls = [];
+      if (formData.propertyPhotos && formData.propertyPhotos.length > 0) {
+        formData.propertyPhotos.forEach(photo => {
+          if (photo instanceof File) {
+            newPhotoFiles.push(photo);
+          } else if (photo.url) {
+            retainedImageUrls.push(photo.url);
+          }
+        });
+      }
+
+      // Append new files to FormData for Multer
+      if (newVideoFile) {
+        submitData.append('propertyVideo', newVideoFile);
+      }
+      newPhotoFiles.forEach((photo, index) => {
+        submitData.append('propertyImages', photo);
+      });
+
+      // Append retained file URLs as JSON strings
+      if (retainedVideoUrl) {
+        submitData.append('retainedVideoUrl', retainedVideoUrl);
+      }
+      if (retainedImageUrls.length > 0) {
+        submitData.append('retainedImageUrls', JSON.stringify(retainedImageUrls));
+      }
+
+      // Debugging FormData content
+      for (let pair of submitData.entries()) {
+        console.log(pair[0]+ ', ' + pair[1]); 
+      }
+      
+      const response = await api.put(`/properties/${propertyId}`, submitData, {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
         }
       });
@@ -284,10 +500,7 @@ const LandlordEditProperty = () => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+
 
   const getProgressPercentage = () => {
     return (currentStep / 3) * 100;
@@ -303,6 +516,7 @@ const LandlordEditProperty = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      {/* Left Sidebar */}
       <LandlordSidebar />
 
       {/* Main Content */}
@@ -310,28 +524,32 @@ const LandlordEditProperty = () => {
         {/* Top Header */}
         <header className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <svg className="w-6 h-6 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
+            <div>
               <h1 className="text-2xl font-bold text-gray-900">Edit Property</h1>
+              <p className="text-gray-600 mt-1">Update your property listing to attract more tenants</p>
             </div>
             
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{user?.name || 'Landlord'}</span>
-              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
+              <div className="flex items-center space-x-3">
+                <span className="text-sm font-medium text-gray-900">{user?.name || 'Landlord'}</span>
+                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-md">
+                  <span className="text-base font-bold text-white">
+                    {user?.name?.charAt(0) || 'L'}
+                  </span>
+                </div>
               </div>
+              
               <button
-                onClick={handleLogout}
-                className="flex items-center text-sm text-gray-600 hover:text-gray-900"
+                onClick={() => {
+                  logout();
+                  navigate('/');
+                }}
+                className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"
               >
-                <span>Log out</span>
-                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
+                <span>Logout</span>
               </button>
             </div>
           </div>
@@ -340,23 +558,18 @@ const LandlordEditProperty = () => {
         {/* Form Content */}
         <main className="flex-1 p-6">
           <div className="max-w-4xl mx-auto">
-            {/* Header */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Edit Property</h1>
-                  <p className="text-gray-600">Update your property listing to attract more tenants.</p>
-                </div>
-                <button
-                  onClick={() => navigate('/landlord-my-property')}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-              </div>
+            {/* Progress Header */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6 relative">
+              {/* Cancel Button */}
+              <button
+                onClick={() => navigate('/landlord-my-property')}
+                className="absolute top-4 right-4 px-6 py-3 text-white bg-red-500 rounded-lg hover:bg-red-600 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 font-medium"
+              >
+                Cancel
+              </button>
 
               {/* Progress Bar */}
-              <div className="mb-6">
+              <div className="mb-6 pr-32">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-gray-700">Step {currentStep} of 3</span>
                   <span className="text-sm text-gray-500">{Math.round(getProgressPercentage())}% Complete</span>

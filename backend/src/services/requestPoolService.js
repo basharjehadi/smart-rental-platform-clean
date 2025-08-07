@@ -63,6 +63,8 @@ class RequestPoolService {
       console.log(`   💰 Request Budget: ${rentalRequest.budgetFrom}-${rentalRequest.budgetTo} PLN`);
       console.log(`   🏠 Request Bedrooms: ${rentalRequest.bedrooms}`);
       console.log(`   📅 Request Move-in: ${rentalRequest.moveInDate}`);
+      console.log(`   🏠 Request Property Type: ${rentalRequest.propertyType}`);
+      console.log(`   📅 Request Move-in Date Object: ${new Date(rentalRequest.moveInDate)}`);
 
       // Get all landlords who have properties that match the rental request criteria
       const matchingLandlords = await prisma.user.findMany({
@@ -70,10 +72,11 @@ class RequestPoolService {
           role: 'LANDLORD',
           properties: {
             some: {
-              // Location matching (simple string contains)
+              // Location matching (improved - check both city and full location)
               OR: [
-                { city: { contains: rentalRequest.location.split(',')[0].trim() } },
-                { address: { contains: rentalRequest.location.split(',')[0].trim() } }
+                { city: { contains: rentalRequest.location.includes(',') ? rentalRequest.location.split(',')[1].trim() : rentalRequest.location.trim() } },
+                { city: { contains: rentalRequest.location.includes(',') ? rentalRequest.location.split(',')[0].trim() : rentalRequest.location.trim() } },
+                { address: { contains: rentalRequest.location.includes(',') ? rentalRequest.location.split(',')[0].trim() : rentalRequest.location.trim() } }
               ],
               // Budget matching
               monthlyRent: {
@@ -94,10 +97,11 @@ class RequestPoolService {
         include: {
           properties: {
             where: {
-              // Location matching
+              // Location matching (improved - check both city and full location)
               OR: [
-                { city: { contains: rentalRequest.location.split(',')[0].trim() } },
-                { address: { contains: rentalRequest.location.split(',')[0].trim() } }
+                { city: { contains: rentalRequest.location.includes(',') ? rentalRequest.location.split(',')[1].trim() : rentalRequest.location.trim() } },
+                { city: { contains: rentalRequest.location.includes(',') ? rentalRequest.location.split(',')[0].trim() : rentalRequest.location.trim() } },
+                { address: { contains: rentalRequest.location.includes(',') ? rentalRequest.location.split(',')[0].trim() : rentalRequest.location.trim() } }
               ],
               // Budget matching
               monthlyRent: {
@@ -135,6 +139,44 @@ class RequestPoolService {
           console.log(`      🏢 Property: ${property.name} - ${property.city}, ${property.monthlyRent} PLN, ${property.bedrooms} bedrooms`);
         });
       });
+
+      // Debug: If no matches found, let's check what properties exist
+      if (matchingLandlords.length === 0) {
+        console.log(`🔍 No matches found. Checking all available properties...`);
+        const allProperties = await prisma.property.findMany({
+          where: { status: 'AVAILABLE' },
+          select: {
+            id: true,
+            name: true,
+            city: true,
+            address: true,
+            monthlyRent: true,
+            propertyType: true,
+            bedrooms: true,
+            availableFrom: true,
+            landlordId: true
+          }
+        });
+        
+        console.log(`📊 Total available properties: ${allProperties.length}`);
+        allProperties.forEach(property => {
+          console.log(`   🏢 Property: ${property.name} - ${property.city}, ${property.monthlyRent} PLN, ${property.propertyType}, ${property.bedrooms} bedrooms, Available: ${property.availableFrom}`);
+          
+          // Check why this property doesn't match
+          const locationMatch = property.city.toLowerCase().includes(rentalRequest.location.toLowerCase()) || 
+                               property.address.toLowerCase().includes(rentalRequest.location.toLowerCase());
+          const budgetMatch = property.monthlyRent >= (rentalRequest.budgetFrom || rentalRequest.budget * 0.8) && 
+                             property.monthlyRent <= (rentalRequest.budgetTo || rentalRequest.budget * 1.2);
+          const typeMatch = !rentalRequest.propertyType || property.propertyType.toLowerCase() === rentalRequest.propertyType.toLowerCase();
+          const dateMatch = new Date(property.availableFrom) <= new Date(rentalRequest.moveInDate);
+          
+          console.log(`      🔍 Match Analysis:`);
+          console.log(`         📍 Location: ${locationMatch ? '✅' : '❌'} (Property: ${property.city}, Request: ${rentalRequest.location})`);
+          console.log(`         💰 Budget: ${budgetMatch ? '✅' : '❌'} (Property: ${property.monthlyRent}, Request: ${rentalRequest.budgetFrom}-${rentalRequest.budgetTo})`);
+          console.log(`         🏠 Type: ${typeMatch ? '✅' : '❌'} (Property: ${property.propertyType}, Request: ${rentalRequest.propertyType})`);
+          console.log(`         📅 Date: ${dateMatch ? '✅' : '❌'} (Property: ${property.availableFrom}, Request: ${rentalRequest.moveInDate})`);
+        });
+      }
 
       // 🚀 SCALABILITY: Score and filter matches
       const scoredLandlords = matchingLandlords

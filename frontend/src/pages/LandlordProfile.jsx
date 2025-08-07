@@ -318,6 +318,7 @@ const LandlordProfile = () => {
         lastName: formData.get('lastName'),
         citizenship: selectedCitizenship?.value || selectedCitizenship?.label,
         pesel: formData.get('pesel'),
+        idCardNumber: formData.get('idCardNumber'),
         passportNumber: formData.get('passportNumber'),
         phoneNumber: formData.get('phoneNumber'),
         street: formData.get('street'),
@@ -723,6 +724,11 @@ const LandlordProfile = () => {
       errors[name] = 'PESEL must be exactly 11 digits';
     }
     
+    // ID Card Number validation (alphanumeric, 6-12 characters)
+    if (name === 'idCardNumber' && value && !/^[A-Z0-9]{6,12}$/.test(value)) {
+      errors[name] = 'ID Card Number must be 6-12 alphanumeric characters';
+    }
+    
     // Phone number validation
     if (name === 'phoneNumber' && value && !/^[\+]?[0-9\s\-\(\)]{9,15}$/.test(value)) {
       errors[name] = 'Please enter a valid phone number';
@@ -745,8 +751,8 @@ const LandlordProfile = () => {
     }
     
     // General required fields
-    if (['firstName', 'lastName', 'phoneNumber', 'street', 'city', 'zipCode', 'country'].includes(name) && !value) {
-      const fieldName = name === 'zipCode' ? 'ZIP Code' : name.charAt(0).toUpperCase() + name.slice(1).replace(/([A-Z])/g, ' $1');
+    if (['firstName', 'lastName', 'phoneNumber', 'street', 'city', 'zipCode', 'country', 'idCardNumber'].includes(name) && !value) {
+      const fieldName = name === 'zipCode' ? 'ZIP Code' : name === 'idCardNumber' ? 'ID Card Number' : name.charAt(0).toUpperCase() + name.slice(1).replace(/([A-Z])/g, ' $1');
       errors[name] = `${fieldName} is required`;
     }
     
@@ -791,7 +797,7 @@ const LandlordProfile = () => {
     const errors = {};
     
     // Validate all fields
-    const fields = ['firstName', 'lastName', 'phoneNumber', 'street', 'city', 'zipCode'];
+    const fields = ['firstName', 'lastName', 'phoneNumber', 'street', 'city', 'zipCode', 'idCardNumber'];
     const isPolish = citizenship === 'Polish' || citizenship?.includes('Polish');
     
     if (isPolish) {
@@ -916,7 +922,8 @@ const LandlordProfile = () => {
       'phoneNumber',
       'citizenship',
       'country',
-      'profession'
+      'profession',
+      'idCardNumber'
     ];
     
     const conditionalFields = [];
@@ -1004,14 +1011,17 @@ const LandlordProfile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-primary flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+          <p className="text-gray-600 text-sm">Loading profile...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-primary flex">
       {/* Left Sidebar */}
       <LandlordSidebar />
 
@@ -1020,37 +1030,18 @@ const LandlordProfile = () => {
         {/* Top Header */}
         <header className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
-            
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <span className="text-sm font-medium text-gray-900">{user?.name || 'Landlord'}</span>
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-md overflow-hidden">
-                  {profileData?.profileImage ? (
-                    <img
-                      src={profileData.profileImage.startsWith('/') 
-                        ? `http://localhost:3001${profileData.profileImage}`
-                        : `http://localhost:3001/uploads/profile_images/${profileData.profileImage}`
-                      }
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-base font-bold text-white">
-                      {user?.name?.charAt(0) || 'L'}
-                    </span>
-                  )}
-                </div>
-              </div>
-              
-              <button
-                onClick={handleLogout}
-                className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Logout</span>
-              </button>
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900">Profile</h1>
+              <p className="text-gray-600 text-sm">Manage your account settings</p>
             </div>
+            
+            <button
+              onClick={handleLogout}
+              className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Logout</span>
+            </button>
           </div>
         </header>
 
@@ -1058,13 +1049,13 @@ const LandlordProfile = () => {
         <main className="flex-1 p-6">
           <div className="max-w-4xl mx-auto space-y-6">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
 
             {/* Profile Header Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="card-modern p-6">
               <div className="flex items-start justify-between">
                 {/* Left side - Avatar and user info */}
                 <div className="flex items-start space-x-4">
@@ -1093,7 +1084,7 @@ const LandlordProfile = () => {
                       ) : (
                         <div className="w-full h-full bg-blue-100 flex items-center justify-center">
                           <User className="w-12 h-12 text-blue-600" />
-                        </div>
+              </div>
                       )}
                       
                       {/* Hover Overlay */}
@@ -1158,12 +1149,12 @@ const LandlordProfile = () => {
                   </div>
                   
                   <div>
-                    <h2 className="text-xl font-semibold text-gray-900 mb-1">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-1">
                       {profileData?.firstName} {profileData?.lastName}
                     </h2>
-                    <p className="text-gray-600 mb-1">{profileData?.email}</p>
-                    <p className="text-sm text-gray-500 mb-2">Member since {formatDate(user?.createdAt)}</p>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                    <p className="text-gray-600 text-sm mb-1">{profileData?.email}</p>
+                    <p className="text-xs text-gray-500 mb-2">Member since {formatDate(user?.createdAt)}</p>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                       Landlord
                     </span>
                   </div>
@@ -1178,16 +1169,16 @@ const LandlordProfile = () => {
                       style={{ width: `${profileStatus.completionPercentage}%` }}
                     ></div>
                   </div>
-                  <p className="text-sm text-gray-600">Complete</p>
-                                 </div>
+                  <p className="text-xs text-gray-600">Complete</p>
+                </div>
                </div>
-             </div>
+            </div>
 
             {/* Personal Information & Address Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="card-modern p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <svg className="w-5 h-5 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
@@ -1196,13 +1187,13 @@ const LandlordProfile = () => {
                 
                 <button
                   onClick={handleEditToggle}
-                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="btn-secondary"
                 >
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
-                  {isEditing ? 'Cancel' : 'Edit'}
-                </button>
+                    {isEditing ? 'Cancel' : 'Edit'}
+                  </button>
               </div>
 
               <form ref={formRef} onSubmit={handleFormSubmit} className={`${isFormShaking ? 'animate-pulse' : ''}`}>
@@ -1215,10 +1206,10 @@ const LandlordProfile = () => {
                     Personal Information
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
+                      <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         First Name <span className="text-red-500">*</span>
-                      </label>
+                        </label>
                       {isEditing ? (
                         <input
                           type="text"
@@ -1226,8 +1217,8 @@ const LandlordProfile = () => {
                           defaultValue={profileData?.firstName || ''}
                           onChange={(e) => handleFieldChange('firstName', e.target.value)}
                           onBlur={(e) => handleFieldBlur('firstName', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                            formErrors.firstName && formTouched.firstName ? 'border-red-500' : 'border-gray-300'
+                          className={`input-modern ${
+                            formErrors.firstName && formTouched.firstName ? 'border-red-300' : ''
                           }`}
                           required
                         />
@@ -1237,12 +1228,12 @@ const LandlordProfile = () => {
                       {formErrors.firstName && formTouched.firstName && (
                         <p className="mt-1 text-sm text-red-600">{formErrors.firstName}</p>
                       )}
-                    </div>
-                    
-                    <div>
+                      </div>
+
+                      <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Last Name <span className="text-red-500">*</span>
-                      </label>
+                        </label>
                       {isEditing ? (
                         <input
                           type="text"
@@ -1250,8 +1241,8 @@ const LandlordProfile = () => {
                           defaultValue={profileData?.lastName || ''}
                           onChange={(e) => handleFieldChange('lastName', e.target.value)}
                           onBlur={(e) => handleFieldBlur('lastName', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                            formErrors.lastName && formTouched.lastName ? 'border-red-500' : 'border-gray-300'
+                          className={`input-modern ${
+                            formErrors.lastName && formTouched.lastName ? 'border-red-300' : ''
                           }`}
                           required
                         />
@@ -1261,12 +1252,12 @@ const LandlordProfile = () => {
                       {formErrors.lastName && formTouched.lastName && (
                         <p className="mt-1 text-sm text-red-600">{formErrors.lastName}</p>
                       )}
-                    </div>
-                    
-                    <div>
+                      </div>
+
+                      <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Phone Number <span className="text-red-500">*</span>
-                      </label>
+                        </label>
                       {isEditing ? (
                         <input
                           type="tel"
@@ -1274,8 +1265,8 @@ const LandlordProfile = () => {
                           defaultValue={profileData?.phoneNumber || ''}
                           onChange={(e) => handleFieldChange('phoneNumber', e.target.value)}
                           onBlur={(e) => handleFieldBlur('phoneNumber', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                            formErrors.phoneNumber && formTouched.phoneNumber ? 'border-red-500' : 'border-gray-300'
+                          className={`input-modern ${
+                            formErrors.phoneNumber && formTouched.phoneNumber ? 'border-red-300' : ''
                           }`}
                           placeholder="+48 123 456 789"
                           required
@@ -1286,15 +1277,15 @@ const LandlordProfile = () => {
                       {formErrors.phoneNumber && formTouched.phoneNumber && (
                         <p className="mt-1 text-sm text-red-600">{formErrors.phoneNumber}</p>
                       )}
-                    </div>
-                    
-                    <div>
+                      </div>
+
+                      <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Citizenship <span className="text-red-500">*</span>
                         <div className="inline-flex items-center ml-1" title="Select your citizenship to determine required identification documents">
                           <Info className="w-4 h-4 text-gray-400" />
                         </div>
-                      </label>
+                        </label>
                       {isEditing ? (
                         <Select
                           options={citizenshipOptions}
@@ -1312,8 +1303,70 @@ const LandlordProfile = () => {
                         <p className="mt-1 text-sm text-red-600">{formErrors.citizenship}</p>
                       )}
                     </div>
-                  </div>
-                </div>
+
+                    {/* PESEL - Visible for Polish, optional for Non-Polish */}
+                    {getFieldVisibility('pesel', selectedCitizenship) && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          PESEL {getFieldRequirement('pesel', selectedCitizenship) && <span className="text-red-500">*</span>}
+                          <div className="inline-flex items-center ml-1" title="Date of birth is automatically calculated from PESEL for Polish citizens.">
+                            <Info className="w-4 h-4 text-gray-400" />
+                          </div>
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            name="pesel"
+                            defaultValue={profileData?.pesel || ''}
+                            onChange={(e) => handlePESELChange(e.target.value)}
+                            onBlur={(e) => handleFieldBlur('pesel', e.target.value)}
+                            className={`input-modern ${
+                              formErrors.pesel && formTouched.pesel ? 'border-red-300' : ''
+                            }`}
+                            placeholder="12345678901"
+                            required={getFieldRequirement('pesel', selectedCitizenship)}
+                          />
+                        ) : (
+                          <p className="text-gray-900">{profileData?.pesel || 'Not provided'}</p>
+                        )}
+                        {formErrors.pesel && formTouched.pesel && (
+                          <p className="mt-1 text-sm text-red-600">{formErrors.pesel}</p>
+                        )}
+                        {selectedCitizenship?.value === 'Polish' && profileData?.pesel && dateOfBirth && (
+                          <p className="mt-1 text-sm text-blue-600">
+                            Date of birth calculated from PESEL: {dateOfBirth.toLocaleDateString('en-GB')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ID Card Number */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        ID Card Number <span className="text-red-500">*</span>
+                      </label>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          name="idCardNumber"
+                          defaultValue={profileData?.idCardNumber || ''}
+                          onChange={(e) => handleFieldChange('idCardNumber', e.target.value)}
+                          onBlur={(e) => handleFieldBlur('idCardNumber', e.target.value)}
+                          className={`input-modern ${
+                            formErrors.idCardNumber && formTouched.idCardNumber ? 'border-red-300' : ''
+                          }`}
+                          placeholder="ABC123456"
+                          required
+                        />
+                      ) : (
+                        <p className="text-gray-900">{profileData?.idCardNumber || 'Not provided'}</p>
+                      )}
+                      {formErrors.idCardNumber && formTouched.idCardNumber && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.idCardNumber}</p>
+                      )}
+                    </div>
+                      </div>
+                    </div>
 
                 {/* Contact Information Section */}
                 <div className="mb-8">
@@ -1325,10 +1378,10 @@ const LandlordProfile = () => {
                     Contact Information
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
+                      <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Street Address <span className="text-red-500">*</span>
-                      </label>
+                        </label>
                       {isEditing ? (
                         <input
                           type="text"
@@ -1347,12 +1400,12 @@ const LandlordProfile = () => {
                       {formErrors.street && formTouched.street && (
                         <p className="mt-1 text-sm text-red-600">{formErrors.street}</p>
                       )}
-                    </div>
-                    
-                    <div>
+                      </div>
+
+                      <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         City <span className="text-red-500">*</span>
-                      </label>
+                        </label>
                       {isEditing ? (
                         <input
                           type="text"
@@ -1371,12 +1424,12 @@ const LandlordProfile = () => {
                       {formErrors.city && formTouched.city && (
                         <p className="mt-1 text-sm text-red-600">{formErrors.city}</p>
                       )}
-                    </div>
-                    
-                    <div>
+                      </div>
+
+                      <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         ZIP Code <span className="text-red-500">*</span>
-                      </label>
+                        </label>
                       {isEditing ? (
                         <input
                           type="text"
@@ -1395,12 +1448,12 @@ const LandlordProfile = () => {
                       {formErrors.zipCode && formTouched.zipCode && (
                         <p className="mt-1 text-sm text-red-600">{formErrors.zipCode}</p>
                       )}
-                    </div>
-                    
-                    <div>
+                      </div>
+
+                      <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Country <span className="text-red-500">*</span>
-                      </label>
+                        </label>
                       {isEditing ? (
                         <Select
                           options={countries}
@@ -1417,38 +1470,36 @@ const LandlordProfile = () => {
                       {formErrors.country && formTouched.country && (
                         <p className="mt-1 text-sm text-red-600">{formErrors.country}</p>
                       )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
                 {/* Save Changes Button */}
-                {isEditing && (
+                  {isEditing && (
                   <div className="flex justify-end">
-                    <button
-                      type="submit"
+                      <button
+                        type="submit"
                       disabled={!hasUnsavedChanges}
-                      className={`px-6 py-2 text-sm font-medium text-white rounded-lg transition-colors ${
-                        hasUnsavedChanges 
-                          ? 'bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500' 
-                          : 'bg-gray-400 cursor-not-allowed'
+                      className={`btn-primary ${
+                        !hasUnsavedChanges ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
-                    >
-                      Save Changes
-                    </button>
-                  </div>
-                )}
-              </form>
-            </div>
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  )}
+                </form>
+              </div>
 
             {/* Digital Signature Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="card-modern p-6">
               <div className="flex items-center mb-6">
                 <svg className="w-5 h-5 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
                 <h2 className="text-lg font-semibold text-gray-900">Digital Signature (Required)</h2>
-              </div>
-              
+            </div>
+
               {hasSignature && !isEditing ? (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
                   <div className="flex items-center justify-between mb-3">
@@ -1463,15 +1514,15 @@ const LandlordProfile = () => {
                     </div>
                     <button
                       onClick={handleEditToggle}
-                      className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                      className="btn-secondary"
                     >
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
                       Edit
                     </button>
-                  </div>
-                  
+              </div>
+
                   {/* Signature Preview */}
                   {(currentSignature || profileData?.signatureBase64) && (
                     <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -1486,11 +1537,11 @@ const LandlordProfile = () => {
                             e.target.style.display = 'none';
                           }}
                         />
-                      </div>
+                    </div>
                     </div>
                   )}
-                </div>
-              ) : (
+                  </div>
+                ) : (
                 <>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 mb-4">
                     {console.log('Rendering SignatureCanvas component')}
@@ -1509,7 +1560,7 @@ const LandlordProfile = () => {
                   <div className="flex space-x-3">
                     <button
                       onClick={handleSignatureClear}
-                      className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                      className="btn-secondary"
                     >
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1517,10 +1568,10 @@ const LandlordProfile = () => {
                       Clear signature
                     </button>
                     
-                    <button
-                      onClick={handleSignatureSave}
+                      <button
+                        onClick={handleSignatureSave}
                       disabled={isSavingSignature}
-                      className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="btn-primary disabled:opacity-50"
                     >
                       {isSavingSignature ? (
                         <>
@@ -1535,12 +1586,12 @@ const LandlordProfile = () => {
                           Save signature
                         </>
                       )}
-                    </button>
+                      </button>
                     
                     {isEditing && (
                       <button
                         onClick={handleEditToggle}
-                        className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                        className="btn-secondary"
                       >
                         <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1548,13 +1599,13 @@ const LandlordProfile = () => {
                         Cancel
                       </button>
                     )}
-                  </div>
+                    </div>
                 </>
               )}
-            </div>
+                  </div>
 
             {/* Contact Verification Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="card-modern p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Contact Verification</h2>
               
               <div className="space-y-4">
@@ -1569,7 +1620,7 @@ const LandlordProfile = () => {
                   <button
                     onClick={handlePhoneVerification}
                     disabled={phoneVerificationSent}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                    className="btn-secondary disabled:opacity-50"
                   >
                     Send OTP
                   </button>
@@ -1594,7 +1645,7 @@ const LandlordProfile = () => {
             </div>
 
             {/* Identity Verification (KYC) Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="card-modern p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
                   <svg className="w-5 h-5 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1628,15 +1679,15 @@ const LandlordProfile = () => {
                       </svg>
                     )}
                     {kycStatus === 'APPROVED' ? 'Approved' : kycStatus === 'REJECTED' ? 'Rejected' : 'Pending Review'}
-                  </div>
-                )}
               </div>
-              
+                )}
+            </div>
+
               {/* Success Message */}
               {kycSubmissionSuccess && (
                 <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">
                   {kycSubmissionSuccess}
-                </div>
+              </div>
               )}
               
               {/* Error Message */}
@@ -1681,8 +1732,8 @@ const LandlordProfile = () => {
                       className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100"
                     />
                   </div>
-                </div>
-                
+                  </div>
+
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
                   <div className="text-center">
                     {kycFiles.idBack ? (
@@ -1787,9 +1838,9 @@ const LandlordProfile = () => {
             <div className="border-t border-gray-200 my-6"></div>
 
             {/* Security Settings Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="card-modern p-6">
               <div className="flex items-center mb-6">
-                <Lock className="w-5 h-5 text-gray-600 mr-2" />
+                <Lock className="w-5 h-5 text-blue-600 mr-2" />
                 <h2 className="text-lg font-semibold text-gray-900">Security Settings</h2>
               </div>
               
@@ -1819,8 +1870,8 @@ const LandlordProfile = () => {
                     value={passwordData.currentPassword}
                     onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
                     placeholder="Enter current password"
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      passwordErrors.currentPassword ? 'border-red-300' : 'border-gray-300'
+                    className={`input-modern ${
+                      passwordErrors.currentPassword ? 'border-red-300' : ''
                     }`}
                   />
                   {passwordErrors.currentPassword && (
@@ -1840,8 +1891,8 @@ const LandlordProfile = () => {
                     value={passwordData.newPassword}
                     onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
                     placeholder="Enter new password"
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      passwordErrors.newPassword ? 'border-red-300' : 'border-gray-300'
+                    className={`input-modern ${
+                      passwordErrors.newPassword ? 'border-red-300' : ''
                     }`}
                   />
                   
@@ -1884,8 +1935,8 @@ const LandlordProfile = () => {
                     value={passwordData.confirmPassword}
                     onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
                     placeholder="Confirm new password"
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      passwordErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'
+                    className={`input-modern ${
+                      passwordErrors.confirmPassword ? 'border-red-300' : ''
                     }`}
                   />
                   {passwordErrors.confirmPassword && (
@@ -1898,15 +1949,15 @@ const LandlordProfile = () => {
                   <button
                     type="submit"
                     disabled={isPasswordLoading}
-                    className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                    className="btn-primary flex items-center space-x-2 disabled:opacity-50"
                   >
                     {isPasswordLoading ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Updating...
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Updating...</span>
                       </>
                     ) : (
-                      'Save Changes'
+                      <span>Save Changes</span>
                     )}
                   </button>
                 </div>

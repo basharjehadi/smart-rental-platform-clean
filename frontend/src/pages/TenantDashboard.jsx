@@ -30,11 +30,17 @@ const TenantDashboard = () => {
 
   const fetchRequests = async () => {
     try {
+      console.log('🔍 Dashboard: Starting requests fetch...');
+      console.log('🔍 Dashboard: Token in localStorage:', localStorage.getItem('token') ? 'Present' : 'Missing');
       setLoading(true);
       const response = await api.get('/my-requests');
+      console.log('✅ Dashboard: Requests response received:', response.data);
+      console.log('✅ Dashboard: Rental requests:', response.data.rentalRequests);
       setRequests(response.data.rentalRequests || []);
     } catch (error) {
-      console.error('Error fetching requests:', error);
+      console.error('❌ Dashboard: Error fetching requests:', error);
+      console.error('❌ Dashboard: Error response:', error.response?.data);
+      console.error('❌ Dashboard: Error status:', error.response?.status);
       setError('Failed to load requests');
     } finally {
       setLoading(false);
@@ -168,25 +174,32 @@ const TenantDashboard = () => {
     });
 
   useEffect(() => {
-    fetchRequests();
-  }, []);
+    console.log('🔍 Dashboard: User state changed:', user);
+    if (user) {
+      console.log('✅ Dashboard: User is authenticated, fetching requests...');
+      fetchRequests();
+    } else {
+      console.log('❌ Dashboard: No user found, not fetching requests');
+      setLoading(false);
+    }
+  }, [user]);
 
   // Separate useEffect for profile data fetching (like other working pages)
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        console.log('Fetching profile data from /users/profile...');
+        console.log('🔍 Dashboard: Starting profile data fetch...');
+        console.log('🔍 Dashboard: Token in localStorage:', localStorage.getItem('token') ? 'Present' : 'Missing');
+        console.log('🔍 Dashboard: User from context:', user);
+        
         const response = await api.get('/users/profile');
-        console.log('Profile response on dashboard:', response.data);
-        console.log('Profile user data:', response.data.user);
-        console.log('Profile image field:', response.data.user?.profileImage);
-        console.log('Profile image type:', typeof response.data.user?.profileImage);
-        console.log('Profile image length:', response.data.user?.profileImage?.length);
-        console.log('Full profile user object:', JSON.stringify(response.data.user, null, 2));
+        console.log('✅ Dashboard: Profile response received:', response.data);
+        console.log('✅ Dashboard: Profile user data:', response.data.user);
         setProfileData(response.data.user);
       } catch (error) {
-        console.error('Error fetching profile data:', error);
-        console.error('Profile error response:', error.response?.data);
+        console.error('❌ Dashboard: Error fetching profile data:', error);
+        console.error('❌ Dashboard: Error response:', error.response?.data);
+        console.error('❌ Dashboard: Error status:', error.response?.status);
         setProfileData(null);
       } finally {
         setProfileLoading(false);
@@ -194,7 +207,7 @@ const TenantDashboard = () => {
     };
     
     fetchProfileData();
-  }, []);
+  }, [user]); // Add user as dependency to refetch when user changes
 
   useEffect(() => {
     console.log('Profile data changed on dashboard:', profileData);
@@ -204,48 +217,31 @@ const TenantDashboard = () => {
     console.log('Profile loading state changed on dashboard:', profileLoading);
   }, [profileLoading]);
 
+  // Check if user is authenticated
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-primary flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading user data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-white flex">
+    <div className="min-h-screen bg-primary flex">
       {/* Left Sidebar */}
       <TenantSidebar />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        {/* Top Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">My Requests</h1>
+                 {/* Top Header */}
+         <header className="header-modern px-6 py-4">
+           <div className="flex items-center justify-between">
+             <h1 className="text-xl font-semibold text-gray-900">My Requests</h1>
             
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <span className="text-sm font-medium text-gray-900">{user?.name || 'Tenant'}</span>
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-md overflow-hidden">
-                  {profileLoading ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  ) : profileData && profileData.profileImage ? (
-                    <img
-                      src={getProfilePhotoUrl(profileData.profileImage)}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        console.error('Profile image failed to load on dashboard:', e.target.src);
-                        console.log('Profile data:', profileData);
-                        console.log('Profile image path:', profileData.profileImage);
-                        console.log('Constructed URL:', e.target.src);
-                      }}
-                      onLoad={() => {
-                        console.log('Profile image loaded successfully on dashboard');
-                        console.log('Loaded image URL:', getProfilePhotoUrl(profileData.profileImage));
-                      }}
-                    />
-                  ) : (
-                    <span className="text-base font-bold text-white">
-                      {user?.name?.charAt(0) || 'T'}
-                    </span>
-                  )}
-                </div>
-              </div>
-              
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"
@@ -259,20 +255,20 @@ const TenantDashboard = () => {
 
         {/* Main Content Area */}
         <main className="flex-1 p-6">
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-6xl mx-auto">
             {error && (
-              <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                {error}
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
             
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-900">Your rental requests</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Your rental requests</h2>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                className="btn-primary"
               >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
                 Create New Request
@@ -280,7 +276,7 @@ const TenantDashboard = () => {
             </div>
 
             {/* Search and Filter Section */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+            <div className="card-modern p-4 mb-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {/* Search */}
                 <div>
@@ -290,7 +286,7 @@ const TenantDashboard = () => {
                     placeholder="Search by title or description..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="input-modern"
                   />
                 </div>
 
@@ -300,7 +296,7 @@ const TenantDashboard = () => {
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="input-modern"
                   >
                     <option value="all">All Statuses</option>
                     <option value="ACTIVE">Active</option>
@@ -316,7 +312,7 @@ const TenantDashboard = () => {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="input-modern"
                   >
                     <option value="newest">Newest First</option>
                     <option value="oldest">Oldest First</option>
@@ -333,12 +329,12 @@ const TenantDashboard = () => {
             </div>
 
             {loading ? (
-              <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+              <div className="card-modern p-8 text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading your requests...</p>
+                <p className="text-sm text-gray-600">Loading your requests...</p>
               </div>
             ) : filteredAndSortedRequests.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+              <div className="card-modern p-8 text-center">
                 <div className="text-gray-400 text-4xl mb-4">📝</div>
                 <p className="text-gray-600 text-lg mb-4">
                   {searchTerm || statusFilter !== 'all' ? 'No matching requests found' : 'You don\'t have any requests yet.'}
@@ -348,9 +344,9 @@ const TenantDashboard = () => {
                 ) : (
                   <button
                     onClick={() => setShowCreateModal(true)}
-                    className="inline-flex items-center px-6 py-3 bg-black text-white font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                    className="btn-primary"
                   >
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                     Create first request
@@ -360,7 +356,7 @@ const TenantDashboard = () => {
             ) : (
               <div className="space-y-4">
                 {filteredAndSortedRequests.map((request) => (
-                  <div key={request.id} className="bg-white border border-gray-200 rounded-lg p-6">
+                  <div key={request.id} className="card-elevated p-6">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">{request.title}</h3>
@@ -397,14 +393,14 @@ const TenantDashboard = () => {
                         <button
                           onClick={() => handleEditClick(request)}
                           disabled={request.status === 'CANCELLED'}
-                          className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 font-medium border border-blue-200 rounded hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="btn-secondary"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => handleDeleteClick(request)}
                           disabled={request.status === 'CANCELLED'}
-                          className="px-3 py-1 text-sm text-red-600 hover:text-red-800 font-medium border border-red-200 rounded hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="btn-danger"
                         >
                           Delete
                         </button>

@@ -504,15 +504,15 @@ const PropertyMediaUpload = () => {
                     <div className="space-y-3">
                       {existingVideos.map((videoUrl, index) => (
                         <div key={index} className="relative group">
-                                                     <video
-                             src={`http://localhost:3001${videoUrl}`}
-                             controls
-                             className="w-full h-32 object-cover rounded-lg"
-                             onError={(e) => {
-                               e.target.style.display = 'none';
-                               e.target.nextSibling.style.display = 'block';
-                             }}
-                           />
+                          <video
+                            src={`http://localhost:3001${videoUrl}`}
+                            controls
+                            className="w-full h-32 object-cover rounded-lg"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'block';
+                            }}
+                          />
                           <div 
                             className="w-full h-32 bg-gray-200 rounded-lg flex items-center justify-center text-gray-500"
                             style={{ display: 'none' }}

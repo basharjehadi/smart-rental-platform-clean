@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
 import Step1PropertyInfo from '../components/Step1PropertyInfo';
 import Step2Location from '../components/Step2Location';
 import Step3Media from '../components/Step3Media';
 import LandlordSidebar from '../components/LandlordSidebar';
 
 const LandlordAddProperty = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, api } = useAuth();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -23,6 +22,7 @@ const LandlordAddProperty = () => {
     buildingFloors: '',
     furnishing: '',
     parkingAvailable: false,
+    availableFrom: '', // When property is available for rent
     description: '',
     amenities: [],
     
@@ -172,6 +172,7 @@ const LandlordAddProperty = () => {
       if (isNaN(formData.monthlyRent) || formData.monthlyRent <= 0) {
         newErrors.monthlyRent = 'Please enter a valid rent amount';
       }
+      if (!formData.availableFrom) newErrors.availableFrom = 'Available from date is required';
     }
     
     if (step === 2) {
@@ -182,7 +183,14 @@ const LandlordAddProperty = () => {
       if (!formData.city) newErrors.city = 'City is required';
     }
     
-    // Step 3 validation removed - virtual tour video is optional
+    if (step === 3) {
+      if (!formData.virtualTourVideo) {
+        newErrors.virtualTourVideo = 'Virtual tour video is required';
+      }
+      if (!formData.propertyPhotos || formData.propertyPhotos.length === 0) {
+        newErrors.propertyPhotos = 'At least one property photo is required';
+      }
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -199,79 +207,88 @@ const LandlordAddProperty = () => {
   };
 
   const handleSubmit = async () => {
-    if (!validateStep(3)) return;
-    
     setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      
-      // Create FormData for file upload
-      const submitData = new FormData();
-      
-      // Map frontend fields to backend expected fields
-      submitData.append('name', formData.title); // title -> name
-      submitData.append('address', `${formData.street} ${formData.houseNumber}${formData.apartmentNumber ? `/${formData.apartmentNumber}` : ''}`); // Combine address
-      submitData.append('city', formData.city);
-      submitData.append('zipCode', formData.postcode); // postcode -> zipCode
-      submitData.append('propertyType', formData.propertyType);
-      submitData.append('bedrooms', formData.rooms || ''); // rooms -> bedrooms
-      submitData.append('bathrooms', formData.bathrooms || '');
-      submitData.append('size', formData.area || ''); // area -> size
-      submitData.append('floor', formData.floor || '');
-      submitData.append('totalFloors', formData.buildingFloors || ''); // buildingFloors -> totalFloors
-      submitData.append('monthlyRent', formData.monthlyRent);
-      submitData.append('furnished', formData.furnishing === 'furnished'); // Convert to boolean
-      submitData.append('parking', formData.parkingAvailable); // Convert to boolean
-      submitData.append('petsAllowed', false); // Default value
-      submitData.append('smokingAllowed', false); // Default value
-      submitData.append('utilitiesIncluded', false); // Default value
-      submitData.append('description', formData.description || '');
-      
-      // Handle files
-      if (formData.virtualTourVideo) {
-        submitData.append('propertyVideo', formData.virtualTourVideo);
-      }
-      
-      if (formData.propertyPhotos && formData.propertyPhotos.length > 0) {
-        formData.propertyPhotos.forEach((photo, index) => {
-          submitData.append('propertyImages', photo);
-        });
-      }
-      
-      console.log('Submitting property data:', {
-        name: formData.title,
-        address: `${formData.street} ${formData.houseNumber}${formData.apartmentNumber ? `/${formData.apartmentNumber}` : ''}`,
-        city: formData.city,
-        zipCode: formData.postcode,
-        propertyType: formData.propertyType,
-        bedrooms: formData.rooms,
-        bathrooms: formData.bathrooms,
-        size: formData.area,
-        floor: formData.floor,
-        totalFloors: formData.buildingFloors,
-        monthlyRent: formData.monthlyRent,
-        furnished: formData.furnishing === 'furnished',
-        parking: formData.parkingAvailable,
-        description: formData.description,
-        hasVideo: !!formData.virtualTourVideo,
-        photoCount: formData.propertyPhotos?.length || 0
-      });
+    setErrors({});
 
-      // Log FormData contents for debugging
-      console.log('FormData contents:');
-      for (let [key, value] of submitData.entries()) {
-        console.log(`${key}:`, value);
+    try {
+      // Validate current step
+      if (!validateStep(currentStep)) {
+        setLoading(false);
+        return;
       }
+
+      // If this is the last step, submit the form
+      if (currentStep === 3) {
+        const submitData = new FormData();
       
-      const response = await axios.post('/api/properties', submitData, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
+        // Map frontend fields to backend expected fields
+        submitData.append('name', formData.title); // title -> name
+        submitData.append('address', `${formData.street} ${formData.houseNumber}${formData.apartmentNumber ? `/${formData.apartmentNumber}` : ''}`); // Combine address
+        submitData.append('city', formData.city);
+        submitData.append('district', formData.district); // Add district field
+        submitData.append('zipCode', formData.postcode); // postcode -> zipCode
+        submitData.append('propertyType', formData.propertyType);
+        submitData.append('bedrooms', formData.rooms || ''); // rooms -> bedrooms
+        submitData.append('bathrooms', formData.bathrooms || '');
+        submitData.append('size', formData.area || ''); // area -> size
+        submitData.append('floor', formData.floor || '');
+        submitData.append('totalFloors', formData.buildingFloors || ''); // buildingFloors -> totalFloors
+        submitData.append('monthlyRent', formData.monthlyRent);
+        submitData.append('availableFrom', formData.availableFrom); // When property is available
+        submitData.append('furnished', formData.furnishing === 'furnished'); // Convert to boolean
+        submitData.append('parking', formData.parkingAvailable); // Convert to boolean
+        submitData.append('petsAllowed', false); // Default value
+        submitData.append('smokingAllowed', false); // Default value
+        submitData.append('utilitiesIncluded', false); // Default value
+        submitData.append('description', formData.description || '');
+        
+        // Handle files
+        if (formData.virtualTourVideo) {
+          submitData.append('propertyVideo', formData.virtualTourVideo);
         }
-      });
-      
-      if (response.data.success) {
-        navigate('/landlord-my-property');
+        
+        if (formData.propertyPhotos && formData.propertyPhotos.length > 0) {
+          formData.propertyPhotos.forEach((photo, index) => {
+            submitData.append('propertyImages', photo);
+          });
+        }
+        
+        console.log('Submitting property data:', {
+          name: formData.title,
+          address: `${formData.street} ${formData.houseNumber}${formData.apartmentNumber ? `/${formData.apartmentNumber}` : ''}`,
+          city: formData.city,
+          district: formData.district,
+          zipCode: formData.postcode,
+          propertyType: formData.propertyType,
+          bedrooms: formData.rooms,
+          bathrooms: formData.bathrooms,
+          size: formData.area,
+          floor: formData.floor,
+          totalFloors: formData.buildingFloors,
+          monthlyRent: formData.monthlyRent,
+          availableFrom: formData.availableFrom,
+          furnished: formData.furnishing === 'furnished',
+          parking: formData.parkingAvailable,
+          description: formData.description,
+          hasVideo: !!formData.virtualTourVideo,
+          photoCount: formData.propertyPhotos?.length || 0
+        });
+
+        // Log FormData contents for debugging
+        console.log('FormData contents:');
+        for (let [key, value] of submitData.entries()) {
+          console.log(`${key}:`, value);
+        }
+        
+        const response = await api.post('/properties', submitData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+        
+        if (response.data.success) {
+          navigate('/landlord-my-property');
+        }
       }
     } catch (error) {
       console.error('Error creating property:', error);
@@ -308,7 +325,7 @@ const LandlordAddProperty = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-primary flex">
       <LandlordSidebar />
 
       {/* Main Content */}
@@ -316,30 +333,20 @@ const LandlordAddProperty = () => {
         {/* Top Header */}
         <header className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <svg className="w-6 h-6 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-              <h1 className="text-2xl font-bold text-gray-900">Add Property</h1>
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900">Add Property</h1>
+              <p className="text-gray-600 text-sm">Create a new property listing</p>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{user?.name || 'Landlord'}</span>
-              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="flex items-center text-sm text-gray-600 hover:text-gray-900"
-              >
-                <span>Log out</span>
-                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
-            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              <span>Logout</span>
+            </button>
           </div>
         </header>
 
@@ -347,15 +354,15 @@ const LandlordAddProperty = () => {
         <main className="flex-1 p-6">
           <div className="max-w-4xl mx-auto">
             {/* Header */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <div className="card-modern p-6 mb-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">List New Property</h1>
-                  <p className="text-gray-600">Create an attractive listing to find quality tenants faster.</p>
+                  <h2 className="text-lg font-semibold text-gray-900">List New Property</h2>
+                  <p className="text-gray-600 text-sm">Create an attractive listing to find quality tenants faster.</p>
                 </div>
                 <button
                   onClick={() => navigate('/landlord-my-property')}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                  className="btn-secondary"
                 >
                   Cancel
                 </button>
@@ -369,15 +376,15 @@ const LandlordAddProperty = () => {
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
-                    className="bg-black h-2 rounded-full transition-all duration-300"
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${getProgressPercentage()}%` }}
                   ></div>
                 </div>
                 
                 {/* Step Indicators */}
                 <div className="flex justify-between mt-4">
-                  <div className={`flex flex-col items-center ${currentStep >= 1 ? 'text-black' : 'text-gray-400'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${currentStep >= 1 ? 'bg-black text-white' : 'bg-gray-200'}`}>
+                  <div className={`flex flex-col items-center ${currentStep >= 1 ? 'text-blue-600' : 'text-gray-400'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${currentStep >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
                       {currentStep > 1 ? (
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -392,8 +399,8 @@ const LandlordAddProperty = () => {
                     <span className="text-xs text-gray-500">Details & features</span>
                   </div>
                   
-                  <div className={`flex flex-col items-center ${currentStep >= 2 ? 'text-black' : 'text-gray-400'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${currentStep >= 2 ? 'bg-black text-white' : 'bg-gray-200'}`}>
+                  <div className={`flex flex-col items-center ${currentStep >= 2 ? 'text-blue-600' : 'text-gray-400'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${currentStep >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
                       {currentStep > 2 ? (
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -409,8 +416,8 @@ const LandlordAddProperty = () => {
                     <span className="text-xs text-gray-500">Address & area</span>
                   </div>
                   
-                  <div className={`flex flex-col items-center ${currentStep >= 3 ? 'text-black' : 'text-gray-400'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${currentStep >= 3 ? 'bg-black text-white' : 'bg-gray-200'}`}>
+                  <div className={`flex flex-col items-center ${currentStep >= 3 ? 'text-blue-600' : 'text-gray-400'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${currentStep >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -424,7 +431,7 @@ const LandlordAddProperty = () => {
             </div>
 
             {/* Step Content */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="card-modern p-6">
               {currentStep === 1 && (
                 <Step1PropertyInfo 
                   formData={formData}
@@ -459,21 +466,21 @@ const LandlordAddProperty = () => {
                 <button
                   onClick={prevStep}
                   disabled={currentStep === 1}
-                  className="flex items-center px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-secondary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
-                  Previous
+                  <span>Previous</span>
                 </button>
                 
                 {currentStep < 3 ? (
                   <button
                     onClick={nextStep}
-                    className="flex items-center px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800"
+                    className="btn-primary flex items-center space-x-2"
                   >
-                    Next
-                    <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span>Next</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </button>
@@ -481,26 +488,26 @@ const LandlordAddProperty = () => {
                   <button
                     onClick={handleSubmit}
                     disabled={loading}
-                    className="flex items-center px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                    className="btn-success flex items-center space-x-2 disabled:opacity-50"
                   >
                     {loading ? (
-                      <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                     ) : (
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
-                    List Property
+                    <span>List Property</span>
                   </button>
                 )}
               </div>
 
               {errors.submit && (
                 <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-red-600">{errors.submit}</p>
+                  <p className="text-red-600 text-sm">{errors.submit}</p>
                 </div>
               )}
             </div>

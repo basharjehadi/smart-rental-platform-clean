@@ -33,8 +33,8 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
     ],
     'Poznan': [
       'Stare Miasto', 'Wilda', 'Piątkowo', 'Nowe Miasto', 'Jeżyce', 'Grunwald', 
-      'Łazarz', 'Górczyn', 'Juniakowo', 'Chartowo', 'Winogrady', 'Piątkowo', 
-      'Naramowice', 'Umultowo', 'Piątkowo', 'Morasko', 'Radojewo', 'Kiekrz'
+      'Łazarz', 'Górczyn', 'Juniakowo', 'Chartowo', 'Winogrady', 
+      'Naramowice', 'Umultowo', 'Morasko', 'Radojewo', 'Kiekrz'
     ],
     'Gdansk': [
       'Śródmieście', 'Chełm', 'Brzeźno', 'Nowy Port', 'Wrzeszcz Dolny', 'Wrzeszcz Górny', 
@@ -54,54 +54,51 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
       'Dąbrowa', 'Doły', 'Fabryczna', 'Górniak', 'Karolew', 'Koziny', 'Kurczaki', 
       'Lublinek', 'Łagiewniki', 'Mileszki', 'Mokra', 'Nowosolna', 'Olechów', 'Olechów-Janów', 
       'Park Reymonta', 'Radogoszcz', 'Retkinia', 'Ruda', 'Sikawa', 'Smulsko', 'Stare Polesie', 
-      'Stary Widzew', 'Śródmieście', 'Teofilów', 'Wiskitno', 'Wzniesień Łódzkich', 'Zagórnik', 'Zielona Góra'
+      'Stary Widzew', 'Teofilów', 'Wiskitno', 'Wzniesień Łódzkich', 'Zagórnik', 'Zielona Góra'
     ],
     'Szczecin': [
       'Śródmieście', 'Pomorzany', 'Niebużany', 'Świerczewo', 'Warszewo', 'Arkońskie-Niemierzyn', 
       'Głębokie-Pilchowo', 'Gumieńce', 'Krzekowo-Bezrzecze', 'Osów', 'Płonia-Śmierdnica-Jezierzyce', 
       'Podjuchy', 'Wielgowo-Sławociesze', 'Załom-Kasztanowe', 'Bukowo', 'Centrum', 'Dąbie', 
-      'Kijewo', 'Międzyodrze-Wyspa Pucka', 'Niebuszewo', 'Nowe Miasto', 'Pogodno', 'Stołczyn', 'Turzyn', 'Warszewo', 'Zdroje'
+      'Kijewo', 'Międzyodrze-Wyspa Pucka', 'Niebuszewo', 'Nowe Miasto', 'Pogodno', 'Stołczyn', 'Turzyn', 'Zdroje'
     ],
     'Bydgoszcz': [
       'Szwederowo', 'Błonie', 'Okole', 'Śródmieście', 'Fordon', 'Brdyujście', 'Bartodzieje', 
-      'Bielawy', 'Bocianowo', 'Czyżkówko', 'Fordon', 'Glinki', 'Jary', 'Kapuściska', 
+      'Bielawy', 'Bocianowo', 'Czyżkówko', 'Glinki', 'Jary', 'Kapuściska', 
       'Łęgnowo', 'Miedzyń', 'Osowa Góra', 'Piaski', 'Prądy', 'Siernieczek', 'Skrzetusko', 
-      'Smukała', 'Stary Fordon', 'Szwederowo', 'Wzgórze Wolności', 'Wyżyny', 'Zimne Wody'
+      'Smukała', 'Stary Fordon', 'Wzgórze Wolności', 'Wyżyny', 'Zimne Wody'
     ],
     'Lublin': [
       'Śródmieście', 'Wieniawa', 'Zabłocie', 'Rury', 'Sławin', 'Sławinek', 'Wrotków', 
       'Bronowice', 'Tatary', 'Kalinowszczyzna', 'Hajdów-Zadębie', 'Konstantynów', 'Lubelskiej Spółdzielni Mieszkaniowej', 
-      'Kościelniak', 'Rury', 'Szerokie', 'Zemborzyce', 'Dziesiąta', 'Głusk', 'Węglin', 'Felicity'
+      'Kościelniak', 'Szerokie', 'Zemborzyce', 'Dziesiąta', 'Głusk', 'Węglin', 'Felicity'
     ],
     'Katowice': [
       'Śródmieście', 'Koszutka', 'Bogucice', 'Osiedle Paderewskiego-Muchowiec', 'Dąb', 
       'Wełnowiec-Józefowiec', 'Załęże', 'Osiedle Witosa', 'Piotrowice-Ochojec', 'Ligota-Panewniki', 
       'Brynowiec-Osiedle Zgrzebnioka', 'Giszowiec', 'Murcki', 'Kostuchna', 'Podlesie', 'Szopienice-Burowiec', 
-      'Janów-Nikiszowiec', 'Giszowiec', 'Dąbrówka Mała', 'Szopienice-Burowiec', 'Roździeń', 'Załęska Hałda-Brynów część zachodnia'
+      'Janów-Nikiszowiec', 'Dąbrówka Mała', 'Roździeń', 'Załęska Hałda-Brynów część zachodnia'
     ],
     'Bialystok': [
       'Centrum', 'Białostoczek', 'Sienkiewicza', 'Bojary', 'Piaski', 'Przydworcowe', 
       'Młynarskie', 'Piasta I', 'Piasta II', 'Skorupy', 'Mickiewicza', 'Dojlidy Górne', 
-      'Dojlidy', 'Białostoczek', 'Wygoda', 'Wysoki Stoczek', 'Dziesięciny I', 'Dziesięciny II', 
-      'Antoniuk', 'Jaroszówka', 'Wygoda', 'Krynicka', 'Mickiewicza', 'Nowe Miasto', 'Osiedle Leśne', 'Piasta', 'Przydworcowe', 'Sienkiewicza', 'Skorupy', 'Starosielce', 'Słoneczny Stok', 'Wysoki Stoczek', 'Zielone Wzgórza'
+      'Dojlidy', 'Wygoda', 'Wysoki Stoczek', 'Dziesięciny I', 'Dziesięciny II', 
+      'Antoniuk', 'Jaroszówka', 'Krynicka', 'Nowe Miasto', 'Osiedle Leśne', 'Piasta', 'Starosielce', 'Słoneczny Stok', 'Zielone Wzgórza'
     ],
     'Gdynia': [
       'Śródmieście', 'Kamienna Góra', 'Grabówek', 'Oksywie', 'Obłuże', 'Pogórze', 
-      'Działki Leśne', 'Leszczynki', 'Grabówek', 'Chwarzno-Wiczlino', 'Mały Kack', 'Wielki Kack', 
-      'Karwiny', 'Dąbrowa', 'Chylonia', 'Leszczynki', 'Pustki Cisowskie-Demptowo', 'Cisowa', 
-      'Pustki Cisowskie-Demptowo', 'Chylonia', 'Leszczynki', 'Pustki Cisowskie-Demptowo', 'Cisowa', 
-      'Pustki Cisowskie-Demptowo', 'Chylonia', 'Leszczynki', 'Pustki Cisowskie-Demptowo', 'Cisowa'
+      'Działki Leśne', 'Leszczynki', 'Chwarzno-Wiczlino', 'Mały Kack', 'Wielki Kack', 
+      'Karwiny', 'Dąbrowa', 'Chylonia', 'Pustki Cisowskie-Demptowo', 'Cisowa'
     ],
     'Czestochowa': [
       'Śródmieście', 'Stare Miasto', 'Ostatni Grosz', 'Trzech Wieszczów', 'Tysiąclecie', 
       'Północ', 'Raków', 'Błeszno', 'Częstochówka-Parkitka', 'Gnaszyn-Kawodrza', 'Grabówka', 
-      'Kiedrzyn', 'Lisiniec', 'Mirów', 'Ostatni Grosz', 'Podjasnogórska', 'Północ', 'Raków', 
-      'Stradom', 'Śródmieście', 'Tysiąclecie', 'Wrzosowiak', 'Wyczerpy-Aniołów', 'Zawodzie-Dąbie'
+      'Kiedrzyn', 'Lisiniec', 'Mirów', 'Podjasnogórska', 'Stradom', 'Wrzosowiak', 'Wyczerpy-Aniołów', 'Zawodzie-Dąbie'
     ],
     'Radom': [
       'Śródmieście', 'Ustronie', 'Gołębiów I', 'Gołębiów II', 'Kozia Góra', 'Klimontów', 
-      'Michałów', 'Obozisko', 'Planty', 'Potkanów', 'Prędocice', 'Sadków', 'Śródmieście', 
-      'Ustronie', 'Wacyn', 'Wośniki', 'Zakrzew', 'Żakowice'
+      'Michałów', 'Obozisko', 'Planty', 'Potkanów', 'Prędocice', 'Sadków', 
+      'Wacyn', 'Wośniki', 'Zakrzew', 'Żakowice'
     ],
     'Sosnowiec': [
       'Śródmieście', 'Pogoń', 'Radocha', 'Rudna I', 'Rudna II', 'Rudna III', 'Rudna IV', 
@@ -120,7 +117,7 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
       'Lipówka', 'Łazy', 'Maleszowa', 'Miedziana Góra', 'Niewachlów', 'Nowy Folwark', 
       'Ostra Górka', 'Pakosz', 'Piekoszów', 'Piaski', 'Podkarczówka', 'Podklonówka', 
       'Podłęże', 'Podmiejska', 'Podszkodzie', 'Podzamcze', 'Pogorzałe', 'Polanka', 
-      'Przypki', 'Raków', 'Reków', 'Słowik', 'Słowik Stary', 'Stadion', 'Stare Miasto', 
+      'Przypki', 'Reków', 'Słowik', 'Słowik Stary', 'Stadion', 'Stare Miasto', 
       'Szydłówek', 'Ślichowice', 'Świętokrzyskie', 'Targi', 'Tomaszówka', 'Uroczysko', 
       'Warszawskie', 'Wietrznia', 'Wzgórze Świętej Katarzyny', 'Zagórze', 'Zalesie', 'Zielona'
     ],

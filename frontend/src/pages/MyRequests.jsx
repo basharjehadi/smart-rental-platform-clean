@@ -151,10 +151,10 @@ const MyRequests = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 py-8">
+      <div className="min-h-screen bg-primary py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-4 text-gray-600">Loading your rental requests...</p>
           </div>
         </div>
@@ -163,20 +163,20 @@ const MyRequests = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8">
+    <div className="min-h-screen bg-primary py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">My Rental Requests</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">My Rental Requests</h1>
               <p className="mt-2 text-gray-600">
                 Manage and track your rental requests
               </p>
             </div>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="btn-primary inline-flex items-center px-4 py-2"
             >
               <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -188,13 +188,13 @@ const MyRequests = () => {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          <div className="mb-6 text-sm text-red-600 p-4 bg-red-50 border border-red-200 rounded-lg">
             {error}
           </div>
         )}
 
         {/* Filters and Search */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className="card-modern p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Search */}
             <div>
@@ -204,7 +204,7 @@ const MyRequests = () => {
                 placeholder="Search by title, city, or description..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="input-modern w-full px-3 py-2"
               />
             </div>
 
@@ -214,7 +214,7 @@ const MyRequests = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="input-modern w-full px-3 py-2"
               >
                 <option value="all">All Statuses</option>
                 <option value="ACTIVE">Active</option>
@@ -230,7 +230,7 @@ const MyRequests = () => {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="input-modern w-full px-3 py-2"
               >
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>

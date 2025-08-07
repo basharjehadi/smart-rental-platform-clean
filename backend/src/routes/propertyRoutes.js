@@ -20,18 +20,18 @@ router.use(requireRole('LANDLORD'));
 router.get('/landlord-properties', getLandlordProperties);
 
 // Get a specific property by ID
-router.get('/properties/:id', getPropertyById);
+router.get('/:id', getPropertyById);
 
 // Create a new property with file upload support
-router.post('/properties', uploadMultipleFiles, createProperty);
+router.post('/', uploadMultipleFiles, createProperty);
 
 // Update a property
-router.put('/properties/:id', updateProperty);
+router.put('/:id', uploadMultipleFiles, updateProperty);
 
 // Delete a property
-router.delete('/properties/:id', deleteProperty);
+router.delete('/:id', deleteProperty);
 
 // Update property status
-router.patch('/properties/:id/status', updatePropertyStatus);
+router.patch('/:id/status', updatePropertyStatus);
 
 export default router; 

@@ -162,6 +162,7 @@ model Property {
   name String
   address String
   city String
+  district String? // District within the city
   zipCode String
   country String @default("Poland")
   
@@ -207,6 +208,7 @@ model Property {
   landlordId String
   landlord User @relation("LandlordProperties", fields: [landlordId], references: [id], onDelete: Cascade)
   units      Unit[]   @relation("PropertyUnits")
+  offers     Offer[]  @relation("PropertyOffers")
   
   // Timestamps
   createdAt DateTime @default(now())
@@ -233,8 +235,6 @@ model RentalRequest {
   bedrooms  Int?
   bathrooms Int?
   furnished Boolean  @default(false)
-  parking   Boolean  @default(false)
-  petsAllowed Boolean @default(false)
   status    RentalRequestStatus @default(ACTIVE)
   isLocked  Boolean  @default(false)
   
@@ -282,7 +282,9 @@ model Offer {
   utilitiesIncluded Boolean @default(false)
   availableFrom   DateTime
   status          OfferStatus @default(PENDING)
+  isPaid          Boolean @default(false)
   paymentIntentId String?
+  paymentDate     DateTime? // When the payment was made
   leaseStartDate  DateTime? // When the lease actually starts
   leaseEndDate    DateTime? // When the lease ends
   
@@ -316,12 +318,17 @@ model Offer {
   landlordId String
   landlord   User     @relation("LandlordOffers", fields: [landlordId], references: [id], onDelete: Cascade)
   
+  // 🏠 Link to existing property listing
+  propertyId String?
+  property   Property? @relation("PropertyOffers", fields: [propertyId], references: [id], onDelete: SetNull)
+  
   payments Payment[] @relation("OfferPayments")
   
   @@map("offers")
   @@index([landlordId, status]) // 🚀 SCALABILITY: Landlord's offers
   @@index([rentalRequestId, status]) // 🚀 SCALABILITY: Request's offers
   @@index([status, createdAt]) // 🚀 SCALABILITY: Status-based queries
+  @@index([propertyId]) // 🚀 SCALABILITY: Property-based queries
 }
 
 model Payment {

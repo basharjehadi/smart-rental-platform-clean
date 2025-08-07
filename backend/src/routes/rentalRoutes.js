@@ -14,7 +14,8 @@ import {
   deleteRentalRequest,
   getMyOffers,
   getAllRentalRequests,
-  declineRentalRequest
+  declineRentalRequest,
+  getOfferDetails
 } from '../controllers/rentalController.js';
 import { uploadRulesPdf } from '../middlewares/uploadMiddleware.js';
 import { verifyToken, requireLandlord, requireTenant, requireAdmin } from '../middlewares/authMiddleware.js';
@@ -29,6 +30,7 @@ router.delete('/rental-request/:id', verifyToken, requireTenant, deleteRentalReq
 
 // 🚀 SCALABILITY: Tenant offer routes
 router.get('/tenant/offers', verifyToken, requireTenant, getMyOffers);
+router.get('/tenant/offer/:offerId', verifyToken, requireTenant, getOfferDetails);
 router.patch('/tenant/offer/:offerId', verifyToken, requireTenant, updateTenantOfferStatus);
 
 // 🚀 SCALABILITY: Landlord routes with pool integration (MUST come after tenant routes)

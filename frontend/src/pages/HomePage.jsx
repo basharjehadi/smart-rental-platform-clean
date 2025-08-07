@@ -18,10 +18,10 @@ const HomePage = () => {
   // Show loading while checking authentication
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-primary flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-sm text-gray-600">Loading...</p>
         </div>
       </div>
     );
@@ -40,7 +40,7 @@ const HomePage = () => {
           <div className="flex justify-between items-center py-4">
             {/* Logo */}
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center mr-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
@@ -67,7 +67,7 @@ const HomePage = () => {
               </Link>
               <Link 
                 to="/register" 
-                className="bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-900 transition-colors"
+                className="btn-primary"
               >
                 Sign Up
               </Link>
@@ -85,63 +85,62 @@ const HomePage = () => {
           </div>
 
           {/* Main Heading */}
-          <h1 className="text-5xl md:text-6xl font-bold text-purple-600 mb-6">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
             Find your place in Poland
           </h1>
 
           {/* Subtitle */}
-          <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
+          <p className="text-lg text-gray-600 mb-12 max-w-2xl mx-auto">
             Connect tenants with landlords through smart matching, transparent processes, and multilingual support
           </p>
 
           {/* Feature Cards */}
           <div className="grid md:grid-cols-2 gap-6 mb-12">
             {/* Looking for apartment card */}
-            <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-lg hover:shadow-xl transition-shadow">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="card-modern p-8">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-6">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Looking for apartment</h3>
-              <p className="text-gray-600">Find verified properties with transparent pricing</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Looking for an apartment?</h3>
+              <p className="text-gray-600 mb-6">Find your perfect home with our smart matching system. Browse verified properties and connect directly with landlords.</p>
+              <Link to="/register" className="btn-primary">Start Searching</Link>
             </div>
 
             {/* Renting property card */}
-            <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-lg hover:shadow-xl transition-shadow">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            <div className="card-modern p-8">
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-6">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Renting property</h3>
-              <p className="text-gray-600">Connect with verified tenants efficiently</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Have a property to rent?</h3>
+              <p className="text-gray-600 mb-6">List your property and find reliable tenants. Our platform helps you manage everything from applications to contracts.</p>
+              <Link to="/register" className="btn-primary">List Your Property</Link>
             </div>
           </div>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/register"
-              className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-3 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center justify-center"
-            >
-              Get Started
-              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-              </svg>
-            </Link>
-            <Link
-              to="/login"
-              className="bg-white border border-gray-300 text-gray-700 px-8 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-            >
-              Log In
-            </Link>
+          {/* Stats Section */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-gray-900 mb-2">10,000+</div>
+              <div className="text-gray-600">Happy Tenants</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-gray-900 mb-2">5,000+</div>
+              <div className="text-gray-600">Verified Properties</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-gray-900 mb-2">98%</div>
+              <div className="text-gray-600">Satisfaction Rate</div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-16 bg-gray-50">
+      {/* Features Section */}
+      <section className="py-16 bg-primary">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             <div className="text-center">
@@ -168,31 +167,29 @@ const HomePage = () => {
       <section className="py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Key Features</h2>
-            <p className="text-xl text-gray-600">Everything you need for efficient rental management</p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Why Choose RentPlatform?</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">We make renting simple, transparent, and secure for everyone involved</p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {/* Smart Matching */}
-            <div className="bg-gray-50 rounded-xl p-6 text-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center mb-6 mx-auto">
+                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Smart Matching</h3>
-              <p className="text-gray-600 text-sm">AI-powered matching system connects the right tenants with the right properties</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Verified Properties</h3>
+              <p className="text-gray-600">All properties are verified and inspected to ensure quality and safety standards.</p>
             </div>
 
-            {/* KYC Verification */}
-            <div className="bg-gray-50 rounded-xl p-6 text-center">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-lg flex items-center justify-center mb-6 mx-auto">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">KYC Verification</h3>
-              <p className="text-gray-600 text-sm">Complete identity and income verification for all users</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Secure Payments</h3>
+              <p className="text-gray-600">Safe and transparent payment processing with escrow protection for your peace of mind.</p>
             </div>
 
             {/* Automated Process */}

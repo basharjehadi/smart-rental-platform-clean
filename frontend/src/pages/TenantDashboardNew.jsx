@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import TenantSidebar from '../components/TenantSidebar';
 import { LogOut } from 'lucide-react';
+import { viewContract, downloadContract } from '../utils/contractGenerator.js';
 
 const TenantDashboardNew = () => {
   const { user, logout } = useAuth();
@@ -12,6 +13,7 @@ const TenantDashboardNew = () => {
   const [dashboardData, setDashboardData] = useState({
     tenant: null,
     hasActiveLease: false,
+    offerId: null,
     property: null,
     landlord: null,
     lease: null,
@@ -33,8 +35,15 @@ const TenantDashboardNew = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    console.log('🔍 Frontend: User state changed:', user);
+    if (user) {
+      console.log('✅ Frontend: User is authenticated, fetching dashboard data...');
+      fetchDashboardData();
+    } else {
+      console.log('❌ Frontend: No user found, not fetching dashboard data');
+      setLoading(false);
+    }
+  }, [user]);
 
   // Separate useEffect for profile data fetching (like other working pages)
   useEffect(() => {
@@ -76,17 +85,34 @@ const TenantDashboardNew = () => {
     console.log('Profile loading state changed on dashboard:', profileLoading);
   }, [profileLoading]);
 
+  useEffect(() => {
+    console.log('🔍 Frontend: Dashboard data changed:', dashboardData);
+    console.log('🔍 Frontend: Has active lease:', dashboardData.hasActiveLease);
+    console.log('🔍 Frontend: Property data:', dashboardData.property);
+    console.log('🔍 Frontend: Landlord data:', dashboardData.landlord);
+  }, [dashboardData]);
+
   const fetchDashboardData = async () => {
     try {
+      console.log('🔍 Frontend: Starting dashboard data fetch...');
       setLoading(true);
       
       // Fetch tenant dashboard data
       const dashboardResponse = await api.get('/tenant-dashboard/dashboard');
+      console.log('✅ Frontend: Dashboard response received:', dashboardResponse.data);
+      console.log('🔍 Frontend: Offer ID from backend:', dashboardResponse.data.offerId);
+      console.log('🔍 Frontend: Offer ID type:', typeof dashboardResponse.data.offerId);
+      console.log('🔍 Frontend: Offer ID length:', dashboardResponse.data.offerId?.length);
       
       // Set the dashboard data
       setDashboardData(dashboardResponse.data);
+      console.log('✅ Frontend: Dashboard data set successfully');
+      console.log('🔍 Frontend: Dashboard data after set:', dashboardResponse.data);
+      console.log('🔍 Frontend: Offer ID in dashboard data:', dashboardResponse.data.offerId);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('❌ Frontend: Error fetching dashboard data:', error);
+      console.error('❌ Frontend: Error response:', error.response?.data);
+      console.error('❌ Frontend: Error status:', error.response?.status);
       setError('Failed to load dashboard data');
     } finally {
       setLoading(false);
@@ -98,6 +124,79 @@ const TenantDashboardNew = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleViewContract = async () => {
+    try {
+      console.log('🔍 Dashboard: Viewing contract...');
+      console.log('🔍 Dashboard: hasActiveLease:', dashboardData.hasActiveLease);
+      console.log('🔍 Dashboard: offerId:', dashboardData.offerId);
+      console.log('🔍 Dashboard: Full dashboard data:', dashboardData);
+      
+      // Get the active lease data from dashboard
+      if (!dashboardData.hasActiveLease || !dashboardData.offerId) {
+        console.log('❌ Dashboard: Missing data - hasActiveLease:', dashboardData.hasActiveLease, 'offerId:', dashboardData.offerId);
+        alert('No active lease found to view contract.');
+        return;
+      }
+
+      // Validate offer ID format
+      if (typeof dashboardData.offerId !== 'string' || dashboardData.offerId.length < 20) {
+        console.log('❌ Dashboard: Invalid offer ID format:', dashboardData.offerId);
+        alert('Invalid offer ID format. Please refresh the page and try again.');
+        return;
+      }
+
+      // Add a small delay to ensure dashboard data is properly loaded
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Fetch the actual offer data using the offer ID
+      console.log('🔍 Dashboard: Fetching offer details for ID:', dashboardData.offerId);
+      console.log('🔍 Dashboard: Full URL being called:', `/tenant/offer/${dashboardData.offerId}`);
+      const response = await api.get(`/tenant/offer/${dashboardData.offerId}`);
+      const offerData = response.data;
+      
+      console.log('🔍 Dashboard: Offer data for contract:', offerData);
+      await viewContract(offerData, user);
+    } catch (error) {
+      console.error('❌ Dashboard: Error viewing contract:', error);
+      console.error('❌ Dashboard: Error response:', error.response?.data);
+      alert('Error viewing contract. Please try again.');
+    }
+  };
+
+  const handleDownloadContract = async () => {
+    try {
+      console.log('🔍 Dashboard: Downloading contract...');
+      console.log('🔍 Dashboard: hasActiveLease:', dashboardData.hasActiveLease);
+      console.log('🔍 Dashboard: offerId:', dashboardData.offerId);
+      
+      if (!dashboardData.hasActiveLease || !dashboardData.offerId) {
+        console.log('❌ Dashboard: Missing data - hasActiveLease:', dashboardData.hasActiveLease, 'offerId:', dashboardData.offerId);
+        alert('No active lease found to download contract.');
+        return;
+      }
+
+      // Validate offer ID format
+      if (typeof dashboardData.offerId !== 'string' || dashboardData.offerId.length < 20) {
+        console.log('❌ Dashboard: Invalid offer ID format:', dashboardData.offerId);
+        alert('Invalid offer ID format. Please refresh the page and try again.');
+        return;
+      }
+
+      // Fetch the actual offer data using the offer ID
+      console.log('🔍 Dashboard: Fetching offer details for ID:', dashboardData.offerId);
+      console.log('🔍 Dashboard: Full URL being called:', `/tenant/offer/${dashboardData.offerId}`);
+      const response = await api.get(`/tenant/offer/${dashboardData.offerId}`);
+      const offerData = response.data;
+      
+      console.log('🔍 Dashboard: Offer data for download:', offerData);
+      await downloadContract(offerData, user);
+    } catch (error) {
+      console.error('❌ Dashboard: Error downloading contract:', error);
+      console.error('❌ Dashboard: Error response:', error.response?.data);
+      alert('Error downloading contract. Please try again.');
+    }
   };
 
   const calculateDaysToRenewal = () => {
@@ -173,53 +272,18 @@ const TenantDashboardNew = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-primary flex">
       {/* Left Sidebar */}
       <TenantSidebar />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Top Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <header className="header-modern px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <svg className="w-6 h-6 text-gray-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
-              </svg>
-              <h1 className="text-2xl font-bold text-gray-900">Tenant Dashboard</h1>
-            </div>
+            <h1 className="text-xl font-semibold text-gray-900">Welcome back, {user?.name || 'Tenant'}</h1>
             
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <span className="text-sm font-medium text-gray-900">{user?.name || 'Tenant'}</span>
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-md overflow-hidden">
-                  {profileLoading ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  ) : profileData && profileData.profileImage ? (
-                    <img
-                      src={getProfilePhotoUrl(profileData.profileImage)}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        console.error('Profile image failed to load on dashboard:', e.target.src);
-                        console.log('Profile data:', profileData);
-                        console.log('Profile image path:', profileData.profileImage);
-                        console.log('Constructed URL:', e.target.src);
-                      }}
-                      onLoad={() => {
-                        console.log('Profile image loaded successfully on dashboard');
-                        console.log('Loaded image URL:', getProfilePhotoUrl(profileData.profileImage));
-                      }}
-                    />
-                  ) : (
-                    <span className="text-base font-bold text-white">
-                      {user?.name?.charAt(0) || 'T'}
-                    </span>
-                  )}
-                </div>
-              </div>
-              
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"
@@ -233,10 +297,10 @@ const TenantDashboardNew = () => {
 
         {/* Main Content Area */}
         <main className="flex-1 p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="max-w-6xl mx-auto space-y-6">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                {error}
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
 
@@ -407,12 +471,20 @@ const TenantDashboardNew = () => {
                         {calculateDaysToRenewal()} days until lease renewal
                       </p>
                     </div>
-                    <button 
-                      onClick={() => navigate('/contracts')}
-                      className="w-full bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
-                    >
-                      View Lease Agreement
-                    </button>
+                    <div className="space-y-2">
+                      <button 
+                        onClick={handleViewContract}
+                        className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        View Lease Agreement
+                      </button>
+                      <button 
+                        onClick={handleDownloadContract}
+                        className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        Download Contract
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

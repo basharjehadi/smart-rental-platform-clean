@@ -15,11 +15,32 @@ const Step3Media = ({ formData, errors, onFileUpload }) => {
   };
 
   const removeFile = (field, index = null) => {
-    if (field === 'virtualTourVideo') {
-      onFileUpload(field, null);
-    } else if (field === 'propertyPhotos') {
-      const newPhotos = formData.propertyPhotos.filter((_, i) => i !== index);
-      onFileUpload(field, newPhotos);
+    try {
+      console.log('🗑️ Removing file:', field, index);
+      if (field === 'virtualTourVideo') {
+        onFileUpload(field, null);
+      } else if (field === 'propertyPhotos') {
+        const newPhotos = formData.propertyPhotos.filter((_, i) => i !== index);
+        onFileUpload(field, newPhotos);
+      }
+    } catch (error) {
+      console.error('Error in removeFile:', error);
+    }
+  };
+
+  const addMorePhotos = (event) => {
+    try {
+      const files = event.target.files;
+      console.log('📸 Adding more photos:', files);
+      if (files && files.length > 0) {
+        const currentPhotos = formData.propertyPhotos || [];
+        const newPhotos = Array.from(files);
+        const totalPhotos = [...currentPhotos, ...newPhotos].slice(0, 12);
+        console.log('📸 Total photos after adding:', totalPhotos.length);
+        onFileUpload('propertyPhotos', totalPhotos);
+      }
+    } catch (error) {
+      console.error('Error in addMorePhotos:', error);
     }
   };
 
@@ -30,6 +51,8 @@ const Step3Media = ({ formData, errors, onFileUpload }) => {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
+
+
 
   return (
     <div>
@@ -106,10 +129,16 @@ const Step3Media = ({ formData, errors, onFileUpload }) => {
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h5 className="font-medium text-gray-900">{formData.virtualTourVideo.name}</h5>
+                  <h5 className="font-medium text-gray-900">
+                    {formData.virtualTourVideo.name || 'Virtual Tour Video'}
+                  </h5>
                   <p className="text-sm text-gray-600">
-                    Size: {formatFileSize(formData.virtualTourVideo.size)} | 
-                    Type: {formData.virtualTourVideo.type}
+                    {formData.virtualTourVideo.size ? (
+                      <>Size: {formatFileSize(formData.virtualTourVideo.size)} | </>
+                    ) : (
+                      <>Existing video | </>
+                    )}
+                    Type: {formData.virtualTourVideo.type || 'video/mp4'}
                   </p>
                 </div>
               </div>
@@ -119,7 +148,7 @@ const Step3Media = ({ formData, errors, onFileUpload }) => {
                 <video 
                   controls 
                   className="w-full h-48 object-cover rounded-lg bg-gray-100"
-                  src={URL.createObjectURL(formData.virtualTourVideo)}
+                  src={formData.virtualTourVideo.url || URL.createObjectURL(formData.virtualTourVideo)}
                 >
                   Your browser does not support the video tag.
                 </video>
@@ -136,6 +165,16 @@ const Step3Media = ({ formData, errors, onFileUpload }) => {
             onDrop={(e) => handleDrop('virtualTourVideo', e)}
             onDragOver={handleDragOver}
           >
+            {errors.virtualTourVideo && (
+              <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg">
+                <div className="flex items-center text-red-700">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <span className="font-medium">Virtual tour video is required</span>
+                </div>
+              </div>
+            )}
             <input
               type="file"
               accept="video/*"
@@ -203,7 +242,7 @@ const Step3Media = ({ formData, errors, onFileUpload }) => {
               {formData.propertyPhotos.map((photo, index) => (
                 <div key={index} className="relative group">
                   <img
-                    src={URL.createObjectURL(photo)}
+                    src={photo.url || URL.createObjectURL(photo)}
                     alt={`Property photo ${index + 1}`}
                     className="w-full h-32 object-cover rounded-lg border border-green-200"
                   />
@@ -216,30 +255,30 @@ const Step3Media = ({ formData, errors, onFileUpload }) => {
                     </svg>
                   </button>
                   <div className="mt-2 text-xs text-gray-600">
-                    <p className="truncate">{photo.name}</p>
-                    <p>{formatFileSize(photo.size)}</p>
+                    <p className="truncate">{photo.name || `Photo ${index + 1}`}</p>
+                    <p>{photo.size ? formatFileSize(photo.size) : 'Existing photo'}</p>
                   </div>
                 </div>
               ))}
             </div>
             
-            {/* Add More Photos Button */}
-            <div className="mt-4">
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => handleFileChange('propertyPhotos', e)}
-                className="hidden"
-                id="addMorePhotos"
-              />
-              <label htmlFor="addMorePhotos" className="cursor-pointer inline-flex items-center px-4 py-2 border border-green-300 text-sm font-medium rounded-md text-green-700 bg-white hover:bg-green-50">
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Add More Photos
-              </label>
-            </div>
+                         {/* Add More Photos Button */}
+             <div className="mt-4">
+               <input
+                 type="file"
+                 accept="image/*"
+                 multiple
+                 onChange={addMorePhotos}
+                 className="hidden"
+                 id="addMorePhotos"
+               />
+               <label htmlFor="addMorePhotos" className="cursor-pointer inline-flex items-center px-4 py-2 border border-green-300 text-sm font-medium rounded-md text-green-700 bg-white hover:bg-green-50">
+                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                 </svg>
+                 Add More Photos
+               </label>
+             </div>
           </div>
         ) : (
           <div

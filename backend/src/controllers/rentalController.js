@@ -16,6 +16,7 @@ const createRentalRequest = async (req, res) => {
       budgetTo,
       propertyType,
       district,
+      city,
       bedrooms,
       bathrooms,
       furnished,
@@ -123,8 +124,15 @@ const createRentalRequest = async (req, res) => {
     });
   } catch (error) {
     console.error('Create rental request error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      meta: error.meta
+    });
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -192,6 +200,7 @@ const createOffer = async (req, res) => {
       description,
       utilitiesIncluded,
       availableFrom,
+      propertyId, // 🏠 Link to existing property
       propertyAddress,
       propertyImages,
       propertyVideo,
@@ -233,18 +242,68 @@ const createOffer = async (req, res) => {
       });
     }
 
+    // 🏠 Get property details if propertyId is provided
+    let propertyData = null;
+    if (propertyId) {
+      propertyData = await prisma.property.findFirst({
+        where: {
+          id: propertyId,
+          landlordId: req.user.id // Ensure landlord owns this property
+        }
+      });
+
+      if (!propertyData) {
+        return res.status(404).json({
+          error: 'Property not found or you do not have permission to use it.'
+        });
+      }
+    }
+
     // 🏠 Get landlord profile for auto-fill templates
     const landlordProfile = await prisma.landlordProfile.findUnique({
       where: { userId: req.user.id }
     });
 
-    // 🚀 SCALABILITY: Auto-fill from profile templates
+    // 🚀 SCALABILITY: Auto-fill from property or profile templates
     let finalPropertyImages = propertyImages || [];
     let finalPropertyVideo = propertyVideo || null;
     let finalPropertyDescription = propertyDescription || '';
     let finalRulesText = rulesText || '';
+    let finalPropertyAddress = propertyAddress || '';
+    let finalPropertyType = propertyType || '';
+    let finalPropertySize = propertySize || '';
+    let finalPropertyAmenities = propertyAmenities || '';
 
-    if (landlordProfile) {
+    // 🏠 Priority 1: Use property data if available
+    if (propertyData) {
+      finalPropertyAddress = propertyData.address + ', ' + propertyData.zipCode + ', ' + propertyData.city;
+      finalPropertyType = propertyData.propertyType;
+      finalPropertySize = propertyData.size?.toString() || propertyData.bedrooms?.toString() || '';
+      finalPropertyDescription = propertyData.name || propertyData.description || '';
+      
+      // Parse and use property images
+      if (propertyData.images) {
+        try {
+          const images = JSON.parse(propertyData.images);
+          finalPropertyImages = images;
+        } catch (error) {
+          console.error('Error parsing property images:', error);
+        }
+      }
+
+      // Create amenities array from property features
+      const amenities = [];
+      if (propertyData.furnished) amenities.push('Furnished');
+      if (propertyData.parking) amenities.push('Parking');
+      if (propertyData.petsAllowed) amenities.push('Pets Allowed');
+      if (propertyData.bedrooms) amenities.push(`${propertyData.bedrooms} Bedrooms`);
+      if (propertyData.bathrooms) amenities.push(`${propertyData.bathrooms} Bathrooms`);
+      if (propertyData.size) amenities.push(`${propertyData.size} m²`);
+      
+      finalPropertyAmenities = JSON.stringify(amenities);
+    }
+    // Priority 2: Use profile templates if no property data
+    else if (landlordProfile) {
       // Auto-fill media if enabled
       if (landlordProfile.autoFillMedia) {
         if (landlordProfile.propertyImages && (!propertyImages || propertyImages.length === 0)) {
@@ -314,17 +373,18 @@ const createOffer = async (req, res) => {
           description: description || null,
           utilitiesIncluded: utilitiesIncluded || false,
           availableFrom: new Date(availableFrom),
-          propertyAddress: propertyAddress || null,
+          propertyAddress: finalPropertyAddress || null,
           propertyImages: JSON.stringify(finalPropertyImages),
           propertyVideo: finalPropertyVideo || null,
-          propertyType: propertyType || null,
-          propertySize: propertySize || null,
-          propertyAmenities: propertyAmenities || null,
+          propertyType: finalPropertyType || null,
+          propertySize: finalPropertySize || null,
+          propertyAmenities: finalPropertyAmenities || null,
           propertyDescription: finalPropertyDescription || null,
           rulesText: finalRulesText || null,
           rulesPdf: rulesPdf || null,
           rentalRequestId: parseInt(requestId),
           landlordId: req.user.id,
+          propertyId: propertyId || null, // 🏠 Link to existing property
           responseTime: Date.now() - new Date(rentalRequest.createdAt).getTime()
         },
         include: {
@@ -824,6 +884,26 @@ const getMyOffers = async (req, res) => {
             phoneNumber: true,
             profileImage: true
           }
+        },
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            district: true,
+            zipCode: true,
+            propertyType: true,
+            bedrooms: true,
+            bathrooms: true,
+            size: true,
+            furnished: true,
+            parking: true,
+            petsAllowed: true,
+            description: true,
+            images: true,
+            videos: true
+          }
         }
       },
       orderBy: {
@@ -831,19 +911,52 @@ const getMyOffers = async (req, res) => {
       }
     });
 
-    // Transform offers to include all necessary fields for frontend
-    const transformedOffers = offers.map(offer => ({
-      ...offer,
-      // Add computed fields for frontend
-      propertyTitle: offer.rentalRequest?.title || 'Property Offer',
-      propertyAddress: offer.propertyAddress || offer.rentalRequest?.location || 'Location not specified',
-      propertyImages: offer.propertyImages || null,
-      propertyAmenities: offer.propertyAmenities || null,
-      propertyType: offer.propertyType || 'Apartment',
-      propertySize: offer.propertySize || offer.rentalRequest?.bedrooms?.toString() || '1',
-      // Add payment status
-      isPaid: offer.status === 'ACCEPTED' && offer.paymentIntentId ? true : false
-    }));
+    // Transform offers to include actual property data from the offer or linked property
+    const transformedOffers = offers.map(offer => {
+      // 🏠 Priority 1: Use linked property data if available
+      if (offer.property) {
+        return {
+          ...offer,
+          propertyTitle: offer.property.name || offer.property.description || 'Property Offer',
+          propertyAddress: `${offer.property.address}, ${offer.property.zipCode}, ${offer.property.city}`,
+          propertyImages: offer.property.images || offer.propertyImages || null,
+          propertyVideo: offer.property.videos || offer.propertyVideo || null,
+          propertyAmenities: offer.propertyAmenities || JSON.stringify([
+            offer.property.furnished ? 'Furnished' : 'Unfurnished',
+            offer.property.parking ? 'Parking' : 'No Parking',
+            offer.property.petsAllowed ? 'Pets Allowed' : 'No Pets',
+            offer.property.bedrooms ? `${offer.property.bedrooms} Bedrooms` : '',
+            offer.property.bathrooms ? `${offer.property.bathrooms} Bathrooms` : '',
+            offer.property.size ? `${offer.property.size} m²` : ''
+          ].filter(Boolean)),
+          propertyType: offer.property.propertyType || offer.propertyType || 'Apartment',
+          propertySize: offer.property.bedrooms?.toString() || offer.property.size?.toString() || offer.propertySize || '1',
+          // 🏠 Pass property data explicitly
+          property: {
+            bedrooms: offer.property.bedrooms,
+            bathrooms: offer.property.bathrooms,
+            size: offer.property.size,
+            furnished: offer.property.furnished,
+            parking: offer.property.parking,
+            petsAllowed: offer.property.petsAllowed
+          },
+          isPaid: offer.status === 'ACCEPTED' && offer.paymentIntentId ? true : false
+        };
+      }
+      
+      // Priority 2: Use offer data (fallback)
+      return {
+        ...offer,
+        propertyTitle: offer.propertyDescription || offer.rentalRequest?.title || 'Property Offer',
+        propertyAddress: offer.propertyAddress || offer.rentalRequest?.location || 'Location not specified',
+        propertyImages: offer.propertyImages || null,
+        propertyVideo: offer.propertyVideo || null,
+        propertyAmenities: offer.propertyAmenities || null,
+        propertyType: offer.propertyType || 'Apartment',
+        propertySize: offer.propertySize || offer.rentalRequest?.bedrooms?.toString() || '1',
+        isPaid: offer.status === 'ACCEPTED' && offer.paymentIntentId ? true : false
+      };
+    });
 
     res.json({
       offers: transformedOffers
@@ -856,17 +969,179 @@ const getMyOffers = async (req, res) => {
   }
 };
 
+// 🚀 SCALABILITY: Get single offer details for property view
+const getOfferDetails = async (req, res) => {
+  try {
+    const { offerId } = req.params;
+    const { id: tenantId } = req.user;
+    
+    console.log('🔍 GetOfferDetails called with:', { offerId, tenantId });
+
+    const offer = await prisma.offer.findFirst({
+      where: {
+        id: offerId,
+        rentalRequest: {
+          tenantId: tenantId
+        }
+      },
+      include: {
+        rentalRequest: {
+          select: {
+            id: true,
+            title: true,
+            location: true,
+            description: true,
+            budgetFrom: true,
+            budgetTo: true,
+            bedrooms: true,
+            moveInDate: true,
+            status: true
+          },
+          include: {
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                signatureBase64: true
+              }
+            }
+          }
+        },
+        landlord: {
+          select: {
+            id: true,
+            name: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+            signatureBase64: true
+          }
+        },
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            district: true,
+            zipCode: true,
+            propertyType: true,
+            bedrooms: true,
+            bathrooms: true,
+            size: true,
+            furnished: true,
+            parking: true,
+            petsAllowed: true,
+            description: true,
+            images: true,
+            videos: true
+          }
+        }
+      }
+    });
+
+    if (!offer) {
+      console.log('❌ Offer not found for:', { offerId, tenantId });
+      return res.status(404).json({
+        error: 'Offer not found or you do not have permission to view it.'
+      });
+    }
+    
+    console.log('✅ Offer found:', { 
+      offerId: offer.id, 
+      status: offer.status, 
+      landlordId: offer.landlordId,
+      landlordName: offer.landlord?.name,
+      landlordFirstName: offer.landlord?.firstName,
+      landlordLastName: offer.landlord?.lastName
+    });
+
+    // Simplified transformation to avoid complex logic
+    const transformedOffer = {
+      id: offer.id,
+      status: offer.status,
+      rentAmount: offer.rentAmount,
+      depositAmount: offer.depositAmount,
+      leaseDuration: offer.leaseDuration,
+      description: offer.description,
+      availableFrom: offer.availableFrom,
+      isPaid: offer.isPaid,
+      paymentIntentId: offer.paymentIntentId,
+      paymentDate: offer.paymentDate,
+      leaseStartDate: offer.leaseStartDate,
+      leaseEndDate: offer.leaseEndDate,
+      propertyAddress: offer.propertyAddress,
+      propertyImages: offer.propertyImages,
+      propertyVideo: offer.propertyVideo,
+      propertyType: offer.propertyType,
+      propertySize: offer.propertySize,
+      propertyAmenities: offer.propertyAmenities,
+      propertyDescription: offer.propertyDescription,
+      rulesText: offer.rulesText,
+      rulesPdf: offer.rulesPdf,
+      preferredPaymentGateway: offer.preferredPaymentGateway,
+      responseTime: offer.responseTime,
+      matchScore: offer.matchScore,
+      createdAt: offer.createdAt,
+      updatedAt: offer.updatedAt,
+      rentalRequestId: offer.rentalRequestId,
+      landlordId: offer.landlordId,
+      propertyId: offer.propertyId,
+      
+      // Include rental request data
+      rentalRequest: offer.rentalRequest,
+      
+      // Include landlord data
+      landlord: {
+        ...offer.landlord,
+        name: offer.landlord?.firstName && offer.landlord?.lastName ? 
+          `${offer.landlord.firstName} ${offer.landlord.lastName}` : 
+          offer.landlord?.name || 'Landlord'
+      },
+      
+      // Include property data if available
+      property: offer.property,
+      
+      // Include tenant data
+      tenant: {
+        id: offer.rentalRequest.tenantId,
+        name: offer.rentalRequest.tenant?.name || 'Tenant',
+        email: offer.rentalRequest.tenant?.email || 'tenant@email.com',
+        signatureBase64: offer.rentalRequest.tenant?.signatureBase64 || null
+      }
+    };
+
+    console.log('✅ Transformation completed successfully');
+    res.json({
+      offer: transformedOffer
+    });
+  } catch (error) {
+    console.error('Get offer details error:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      error: 'Internal server error.',
+      details: error.message
+    });
+  }
+};
+
 // 🚀 SCALABILITY: Update tenant offer status (Accept/Decline)
 const updateTenantOfferStatus = async (req, res) => {
   try {
     const { offerId } = req.params;
-    const { status } = req.body;
+    const { status, paymentDate } = req.body;
     const { id: tenantId } = req.user;
 
+    console.log('🔍 UpdateTenantOfferStatus called:', { offerId, status, tenantId });
+
     // Validate status
-    if (!['ACCEPTED', 'DECLINED'].includes(status)) {
+    if (!['ACCEPTED', 'DECLINED', 'PAID'].includes(status)) {
+      console.log('❌ Invalid status:', status);
       return res.status(400).json({
-        error: 'Invalid status. Must be either ACCEPTED or DECLINED.'
+        error: 'Invalid status. Must be either ACCEPTED, DECLINED, or PAID.'
       });
     }
 
@@ -883,27 +1158,51 @@ const updateTenantOfferStatus = async (req, res) => {
       }
     });
 
+    console.log('🔍 Found offer:', offer ? { id: offer.id, status: offer.status, tenantId: offer.rentalRequest?.tenantId } : 'Not found');
+
     if (!offer) {
+      console.log('❌ Offer not found for tenant');
       return res.status(404).json({
         error: 'Offer not found or you do not have permission to update it.'
       });
     }
 
-    if (offer.status !== 'PENDING') {
+    console.log('🔍 Current offer status:', offer.status);
+    console.log('🔍 Requested status:', status);
+
+    if (offer.status !== 'PENDING' && offer.status !== 'ACCEPTED') {
+      console.log('❌ Invalid offer status for update:', offer.status);
       return res.status(400).json({
-        error: 'Only pending offers can be updated.'
+        error: 'Only pending or accepted offers can be updated.'
+      });
+    }
+
+    // Additional validation for PAID status
+    if (status === 'PAID' && offer.status !== 'ACCEPTED') {
+      console.log('❌ Cannot mark as PAID - offer not accepted:', offer.status);
+      return res.status(400).json({
+        error: 'Only accepted offers can be marked as paid.'
       });
     }
 
     // Update offer status
+    const updateData = {
+      status: status
+    };
+    
+    // Add payment date if provided and status is PAID
+    if (status === 'PAID' && paymentDate) {
+      updateData.paymentDate = new Date(paymentDate);
+    }
+    
     await prisma.offer.update({
       where: {
         id: offerId
       },
-      data: {
-        status: status
-      }
+      data: updateData
     });
+
+    console.log('✅ Offer status updated successfully to:', status);
 
     // If accepted, update rental request status
     if (status === 'ACCEPTED') {
@@ -926,7 +1225,7 @@ const updateTenantOfferStatus = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Update offer status error:', error);
+    console.error('❌ Update offer status error:', error);
     res.status(500).json({
       error: 'Internal server error.'
     });
@@ -946,14 +1245,19 @@ const getAllRentalRequests = async (req, res) => {
       },
       select: {
         id: true,
+        name: true,
+        address: true,
         city: true,
+        district: true,
+        zipCode: true,
         monthlyRent: true,
         propertyType: true,
         bedrooms: true,
         bathrooms: true,
         furnished: true,
         parking: true,
-        petsAllowed: true
+        petsAllowed: true,
+        availableFrom: true // Include available from date
       }
     });
 
@@ -966,20 +1270,46 @@ const getAllRentalRequests = async (req, res) => {
       });
     }
 
-    // Create matching criteria based on landlord's properties
-    const matchingCriteria = landlordProperties.map(property => ({
-      location: property.city,
-      budgetFrom: { lte: property.monthlyRent * 1.2 }, // Allow 20% flexibility
-      budgetTo: { gte: property.monthlyRent * 0.8 },   // Allow 20% flexibility
-      propertyType: property.propertyType,
-      poolStatus: 'ACTIVE',
-      status: 'ACTIVE'
-    }));
-
     // Find rental requests that match any of the landlord's properties
     const requests = await prisma.rentalRequest.findMany({
       where: {
-        OR: matchingCriteria
+        AND: [
+          {
+            poolStatus: 'ACTIVE',
+            status: 'ACTIVE'
+          },
+          {
+            OR: landlordProperties.map(property => ({
+              AND: [
+                // Location matching (improved - check both city and full location)
+                {
+                  OR: [
+                    { location: { contains: property.city } },
+                    { location: { contains: property.city.toLowerCase() } },
+                    { location: { contains: property.city.toUpperCase() } }
+                  ]
+                },
+                // Budget matching
+                {
+                  AND: [
+                    { budgetFrom: { lte: property.monthlyRent * 1.2 } },
+                    { budgetTo: { gte: property.monthlyRent * 0.8 } }
+                  ]
+                },
+                // Property type matching (case-insensitive)
+                {
+                  OR: [
+                    { propertyType: property.propertyType },
+                    { propertyType: property.propertyType.charAt(0).toUpperCase() + property.propertyType.slice(1) },
+                    { propertyType: property.propertyType.toLowerCase() }
+                  ]
+                },
+                // Date matching
+                { moveInDate: { gte: property.availableFrom || new Date() } }
+              ]
+            }))
+          }
+        ]
       },
       include: {
         tenant: {
@@ -990,6 +1320,16 @@ const getAllRentalRequests = async (req, res) => {
             email: true,
             profileImage: true
           }
+        },
+        offers: {
+          where: {
+            landlordId: landlordId
+          },
+          select: {
+            id: true,
+            status: true,
+            createdAt: true
+          }
         }
       },
       orderBy: {
@@ -997,9 +1337,32 @@ const getAllRentalRequests = async (req, res) => {
       }
     });
 
+    // For each rental request, find the best matching property
+    const requestsWithMatchedProperties = requests.map(request => {
+      // Find the best matching property for this request
+      const matchedProperty = landlordProperties.find(property => {
+        const locationMatch = request.location.toLowerCase().includes(property.city.toLowerCase());
+        const budgetMatch = request.budgetFrom <= property.monthlyRent * 1.2 && 
+                           request.budgetTo >= property.monthlyRent * 0.8;
+        const typeMatch = request.propertyType === property.propertyType;
+        const dateMatch = new Date(request.moveInDate) >= (property.availableFrom || new Date());
+        
+        // More flexible matching - only require location and budget match
+        return locationMatch && budgetMatch;
+      });
+
+      // If no specific match found, use the first available property as fallback
+      const finalMatchedProperty = matchedProperty || landlordProperties[0];
+
+      return {
+        ...request,
+        matchedProperty: finalMatchedProperty
+      };
+    });
+
     res.json({
       success: true,
-      rentalRequests: requests,
+      rentalRequests: requestsWithMatchedProperties,
       totalProperties: landlordProperties.length
     });
   } catch (error) {
@@ -1080,5 +1443,6 @@ export {
   deleteRentalRequest,
   getMyOffers,
   getAllRentalRequests,
-  declineRentalRequest
+  declineRentalRequest,
+  getOfferDetails
 }; 

@@ -518,70 +518,52 @@ const LandlordHelpCenter = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="min-h-screen bg-primary flex">
       <LandlordSidebar />
       
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
-          <div className="flex items-center justify-between px-6 py-4">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-xl font-semibold text-gray-800">Help Center</h1>
+        <header className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900">Help Center</h1>
+              <p className="text-gray-600 text-sm">Get support and find answers</p>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center overflow-hidden">
-                  {profileLoading ? (
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
-                  ) : profileData && profileData.profileImage ? (
-                    <img
-                      src={getProfilePhotoUrl(profileData.profileImage)}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-sm font-medium text-blue-600">
-                      {profileData?.name?.charAt(0) || 'L'}
-                    </span>
-                  )}
-                </div>
-                <span className="text-sm font-medium text-gray-700">{profileData?.name || 'Landlord'}</span>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Logout</span>
+            </button>
           </div>
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-6 py-8">
+        <main className="flex-1 p-6">
+          <div className="max-w-4xl mx-auto">
             {/* Header */}
-            <div className="text-center space-y-4 mb-8">
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                  <HelpCircle className="w-6 h-6 text-purple-600" />
+            <div className="text-center mb-6">
+              <div className="flex items-center justify-center space-x-3 mb-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <HelpCircle className="w-5 h-5 text-blue-600" />
                 </div>
-                <h1 className="text-3xl font-bold text-purple-600">Landlord Help Center</h1>
+                <h1 className="text-2xl font-semibold text-gray-900">Help Center</h1>
               </div>
-              <p className="text-gray-600 max-w-2xl mx-auto">
+              <p className="text-gray-600 text-sm max-w-2xl mx-auto">
                 Find answers to common questions, get support, and learn about property management best practices.
               </p>
             </div>
 
             {/* Search Bar */}
-            <div className="max-w-md mx-auto mb-8">
+            <div className="max-w-md mx-auto mb-6">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
                   placeholder="Search help topics..."
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="input-modern pl-10"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -589,115 +571,111 @@ const LandlordHelpCenter = () => {
             </div>
 
             {/* Support Options */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-blue-50 p-6 rounded-lg text-center space-y-3">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
-                  <MessageCircle className="w-6 h-6 text-blue-600" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="card-modern p-4 text-center">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <MessageCircle className="w-5 h-5 text-blue-600" />
                 </div>
-                <h3 className="font-semibold text-blue-800">Live Chat</h3>
-                <p className="text-sm text-blue-600">Get instant help</p>
-                <p className="text-xs text-blue-500">Chat with our support team</p>
+                <h3 className="font-medium text-gray-900 text-sm mb-1">Live Chat</h3>
+                <p className="text-xs text-gray-600">Get instant help</p>
               </div>
 
-              <div className="bg-green-50 p-6 rounded-lg text-center space-y-3">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                  <Phone className="w-6 h-6 text-green-600" />
+              <div className="card-modern p-4 text-center">
+                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <Phone className="w-5 h-5 text-green-600" />
                 </div>
-                <h3 className="font-semibold text-green-800">Call Support</h3>
-                <p className="text-sm text-green-600">Call 888-XXX-XXX</p>
-                <p className="text-xs text-green-500">Speak with an expert</p>
+                <h3 className="font-medium text-gray-900 text-sm mb-1">Call Support</h3>
+                <p className="text-xs text-gray-600">Call 888-XXX-XXX</p>
               </div>
 
-              <div className="bg-purple-50 p-6 rounded-lg text-center space-y-3">
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto">
-                  <Mail className="w-6 h-6 text-purple-600" />
+              <div className="card-modern p-4 text-center">
+                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <Mail className="w-5 h-5 text-purple-600" />
                 </div>
-                <h3 className="font-semibold text-purple-800">Email Us</h3>
-                <p className="text-sm text-purple-600">support@landlord.ai</p>
-                <p className="text-xs text-purple-500">Send us a message</p>
+                <h3 className="font-medium text-gray-900 text-sm mb-1">Email Us</h3>
+                <p className="text-xs text-gray-600">support@landlord.ai</p>
               </div>
 
-              <div className="bg-orange-50 p-6 rounded-lg text-center space-y-3">
-                <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto">
-                  <FileText className="w-6 h-6 text-orange-600" />
+              <div className="card-modern p-4 text-center">
+                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <FileText className="w-5 h-5 text-orange-600" />
                 </div>
-                <h3 className="font-semibold text-orange-800">Submit Ticket</h3>
-                <p className="text-sm text-orange-600">Track your request</p>
-                <p className="text-xs text-orange-500">Create a support ticket</p>
+                <h3 className="font-medium text-gray-900 text-sm mb-1">Submit Ticket</h3>
+                <p className="text-xs text-gray-600">Track your request</p>
               </div>
             </div>
 
             {/* Navigation Buttons */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <button 
                 onClick={() => setActiveSection('faq')}
-                className={`p-6 rounded-lg text-center space-y-3 transition-colors ${
+                className={`card-modern p-4 text-center transition-colors ${
                   activeSection === 'faq' 
-                    ? 'bg-blue-100 border-2 border-blue-300' 
-                    : 'bg-blue-50 hover:bg-blue-100'
+                    ? 'bg-blue-50 border-blue-200' 
+                    : 'hover:bg-gray-50'
                 }`}
               >
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
-                  <HelpCircle className="w-6 h-6 text-blue-600" />
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <HelpCircle className="w-5 h-5 text-blue-600" />
                 </div>
-                <h3 className="font-semibold text-blue-800">FAQ</h3>
+                <h3 className="font-medium text-gray-900 text-sm">FAQ</h3>
               </button>
 
               <button 
                 onClick={() => setActiveSection('guides')}
-                className={`p-6 rounded-lg text-center space-y-3 transition-colors ${
+                className={`card-modern p-4 text-center transition-colors ${
                   activeSection === 'guides' 
-                    ? 'bg-green-100 border-2 border-green-300' 
-                    : 'bg-green-50 hover:bg-green-100'
+                    ? 'bg-green-50 border-green-200' 
+                    : 'hover:bg-gray-50'
                 }`}
               >
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                  <BookOpen className="w-6 h-6 text-green-600" />
+                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <BookOpen className="w-5 h-5 text-green-600" />
                 </div>
-                <h3 className="font-semibold text-green-800">Guides</h3>
+                <h3 className="font-medium text-gray-900 text-sm">Guides</h3>
               </button>
 
               <button 
                 onClick={() => setActiveSection('legal')}
-                className={`p-6 rounded-lg text-center space-y-3 transition-colors ${
+                className={`card-modern p-4 text-center transition-colors ${
                   activeSection === 'legal' 
-                    ? 'bg-purple-100 border-2 border-purple-300' 
-                    : 'bg-purple-50 hover:bg-purple-100'
+                    ? 'bg-purple-50 border-purple-200' 
+                    : 'hover:bg-gray-50'
                 }`}
               >
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto">
-                  <Scale className="w-6 h-6 text-purple-600" />
+                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <Scale className="w-5 h-5 text-purple-600" />
                 </div>
-                <h3 className="font-semibold text-purple-800">Legal Info</h3>
+                <h3 className="font-medium text-gray-900 text-sm">Legal Info</h3>
               </button>
 
               <button 
                 onClick={() => setActiveSection('emergency')}
-                className={`p-6 rounded-lg text-center space-y-3 transition-colors ${
+                className={`card-modern p-4 text-center transition-colors ${
                   activeSection === 'emergency' 
-                    ? 'bg-red-100 border-2 border-red-300' 
-                    : 'bg-red-50 hover:bg-red-100'
+                    ? 'bg-red-50 border-red-200' 
+                    : 'hover:bg-gray-50'
                 }`}
               >
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto">
-                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
                 </div>
-                <h3 className="font-semibold text-red-800">Emergency</h3>
+                <h3 className="font-medium text-gray-900 text-sm">Emergency</h3>
               </button>
             </div>
 
             {/* Content Section */}
             {activeSection !== 'main' && (
-              <div className="mt-8">
+              <div className="mt-6">
                 {renderContent()}
               </div>
             )}
 
             {/* FAQ Preview - Only show when no section is selected */}
             {activeSection === 'main' && (
-              <div className="space-y-4">
-                <h2 className="text-2xl font-bold text-gray-800">Frequently Asked Questions</h2>
-                <p className="text-gray-600">Find answers to common landlord-related questions.</p>
+              <div className="space-y-3">
+                <h2 className="text-lg font-semibold text-gray-900">Frequently Asked Questions</h2>
+                <p className="text-gray-600 text-sm">Find answers to common landlord-related questions.</p>
               </div>
             )}
           </div>

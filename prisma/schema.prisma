@@ -247,6 +247,7 @@ model Offer {
   availableFrom   DateTime
   status          OfferStatus @default(PENDING)
   paymentIntentId String?
+  paymentDate     DateTime? // When the payment was made
   leaseStartDate  DateTime? // When the lease actually starts
   leaseEndDate    DateTime? // When the lease ends
   
