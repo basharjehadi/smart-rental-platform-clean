@@ -180,7 +180,7 @@ const LandlordDashboard = () => {
           ))
         ) : (
           <div className="text-center py-4">
-            <p className="text-sm text-gray-500">No recent tenants data</p>
+            <p className="text-sm text-gray-500">No tenants yet. Start by creating offers!</p>
           </div>
         )}
       </div>
@@ -204,17 +204,17 @@ const LandlordDashboard = () => {
         {dashboardData?.upcomingTasks && dashboardData.upcomingTasks.length > 0 ? (
           dashboardData.upcomingTasks.slice(0, 3).map((task, index) => (
             <div key={index} className={`p-3 rounded-lg ${
-              task.priority === "high" ? "bg-red-50" :
-              task.priority === "medium" ? "bg-yellow-50" : "bg-blue-50"
+              task.type === "renewal" ? "bg-red-50" :
+              task.type === "inspection" ? "bg-yellow-50" : "bg-blue-50"
             }`}>
               <div className="flex items-center space-x-3">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                  task.priority === "high" ? "bg-red-100" :
-                  task.priority === "medium" ? "bg-yellow-100" : "bg-blue-100"
+                  task.type === "renewal" ? "bg-red-100" :
+                  task.type === "inspection" ? "bg-yellow-100" : "bg-blue-100"
                 }`}>
                   <AlertTriangle className={`w-3 h-3 ${
-                    task.priority === "high" ? "text-red-600" :
-                    task.priority === "medium" ? "text-yellow-600" : "text-blue-600"
+                    task.type === "renewal" ? "text-red-600" :
+                    task.type === "inspection" ? "text-yellow-600" : "text-blue-600"
                   }`} />
                 </div>
                 <div className="flex-1">
@@ -255,7 +255,7 @@ const LandlordDashboard = () => {
               }`}></div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-gray-900">{payment.month || 'Month'}</p>
-                <p className="text-xs text-gray-500">{payment.date || 'Date'}</p>
+                <p className="text-xs text-gray-500">{payment.collectedDate || 'Date'}</p>
               </div>
               <div className="text-right">
                 <p className="text-sm font-semibold text-gray-900">{payment.amount || '0 zł'}</p>

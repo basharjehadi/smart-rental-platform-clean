@@ -301,25 +301,9 @@ const handlePaymentSucceeded = async (paymentIntent) => {
 
       console.log('✅ Offer status updated to PAID:', offerId);
 
-      // Create RentPayment record for DEPOSIT_AND_FIRST_MONTH payments
-      if (metadata.purpose === 'DEPOSIT_AND_FIRST_MONTH') {
-        const currentMonth = new Date().getMonth() + 1;
-        const currentYear = new Date().getFullYear();
-
-        await prisma.rentPayment.create({
-          data: {
-            offerId: offerId,
-            month: currentMonth,
-            year: currentYear,
-            amount: amount / 100,
-            purpose: 'DEPOSIT_AND_FIRST_MONTH',
-            status: 'SUCCEEDED',
-            paidDate: new Date()
-          }
-        });
-
-        console.log('✅ RentPayment record created for DEPOSIT_AND_FIRST_MONTH');
-      }
+      // Note: RentPayment records should only be created for monthly rent payments
+      // DEPOSIT_AND_FIRST_MONTH payments are stored only in the Payment table
+      // to avoid duplication in payment history
     }
 
     // BULLETPROOF CONTRACT GENERATION

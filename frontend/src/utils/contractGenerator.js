@@ -100,6 +100,14 @@ export const generateRentalContract = async (offer, user = null) => {
     bedrooms: offer.property?.bedrooms || 2,
     rentAmount: offer.rentAmount || 0,
     depositAmount: offer.depositAmount || offer.rentAmount || 0,
+    // Calculate prorated first month for contract display
+    proratedFirstMonth: (() => {
+      if (!offer.availableFrom || !offer.rentAmount) return 0;
+      const moveInDate = new Date(offer.availableFrom);
+      const daysInMonth = new Date(moveInDate.getFullYear(), moveInDate.getMonth() + 1, 0).getDate();
+      const daysFromMoveIn = daysInMonth - moveInDate.getDate() + 1;
+      return Math.round((offer.rentAmount * daysFromMoveIn) / daysInMonth);
+    })(),
     leaseDuration: offer.leaseDuration || 12,
     availableFrom: leaseStartDate.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -444,19 +452,17 @@ export const viewContract = async (offer, user = null) => {
             padding: 0 !important; 
             background: transparent !important; 
             box-shadow: none !important;
-            filter: contrast(1.2) brightness(0.8) saturate(0.8) sepia(0.2);
+            filter: contrast(1.4) brightness(0.6) saturate(0.6) sepia(0.4);
             mix-blend-mode: multiply;
-            opacity: 0.95;
-            transform: rotate(-1deg) scale(0.98);
+            opacity: 0.85;
+            transform: rotate(-2deg) scale(0.95);
             display: block;
             margin-left: auto;
             margin-right: auto;
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-            image-rendering: pixelated;
-            -webkit-image-smoothing: none;
-            -moz-image-smoothing: none;
-            image-smoothing: none;
+            image-rendering: auto;
+            -webkit-image-smoothing: auto;
+            -moz-image-smoothing: auto;
+            image-smoothing: auto;
             object-fit: contain;
             width: auto;
             height: auto;
@@ -645,10 +651,18 @@ export const viewContract = async (offer, user = null) => {
                   <span class="clause-letter">b)</span> The security deposit is ${contractData.depositAmount} PLN, which has been paid upon signing this agreement.
                 </div>
                 <div class="clause">
-                  <span class="clause-letter">c)</span> The tenant agrees to pay the monthly rent by the 10th of each month.
+                  <span class="clause-letter">c)</span> Initial payment breakdown:
+                  <ul style="margin-left: 20px; margin-top: 5px;">
+                    <li>• First month (prorated for ${contractData.availableFrom}): ${contractData.proratedFirstMonth} PLN</li>
+                    <li>• Security deposit: ${contractData.depositAmount} PLN</li>
+                    <li>• Total initial payment: ${contractData.proratedFirstMonth + contractData.depositAmount} PLN</li>
+                  </ul>
                 </div>
                 <div class="clause">
-                  <span class="clause-letter">d)</span> Utilities are ${contractData.utilitiesIncluded}.
+                  <span class="clause-letter">d)</span> The tenant agrees to pay the monthly rent by the 10th of each month.
+                </div>
+                <div class="clause">
+                  <span class="clause-letter">e)</span> Utilities are ${contractData.utilitiesIncluded}.
                 </div>
               </div>
               <div class="polish-column">
@@ -659,10 +673,18 @@ export const viewContract = async (offer, user = null) => {
                   <span class="clause-letter">b)</span> Kaucja wynosi ${contractData.depositAmount} PLN, która została zapłacona przy podpisaniu niniejszej umowy.
                 </div>
                 <div class="clause">
-                  <span class="clause-letter">c)</span> Najemca zgadza się płacić miesięczny czynsz do 10. dnia każdego miesiąca.
+                  <span class="clause-letter">c)</span> Szczegóły płatności początkowej:
+                  <ul style="margin-left: 20px; margin-top: 5px;">
+                    <li>• Pierwszy miesiąc (proporcjonalnie od ${contractData.availableFromPolish}): ${contractData.proratedFirstMonth} PLN</li>
+                    <li>• Kaucja: ${contractData.depositAmount} PLN</li>
+                    <li>• Łączna płatność początkowa: ${contractData.proratedFirstMonth + contractData.depositAmount} PLN</li>
+                  </ul>
                 </div>
                 <div class="clause">
-                  <span class="clause-letter">d)</span> Media są ${contractData.utilitiesIncludedPolish}.
+                  <span class="clause-letter">d)</span> Najemca zgadza się płacić miesięczny czynsz do 10. dnia każdego miesiąca.
+                </div>
+                <div class="clause">
+                  <span class="clause-letter">e)</span> Media są ${contractData.utilitiesIncludedPolish}.
                 </div>
               </div>
             </div>
@@ -1078,19 +1100,17 @@ export const downloadContract = async (offer, user = null) => {
             padding: 0 !important; 
             background: transparent !important; 
             box-shadow: none !important;
-            filter: contrast(1.2) brightness(0.8) saturate(0.8) sepia(0.2);
+            filter: contrast(1.4) brightness(0.6) saturate(0.6) sepia(0.4);
             mix-blend-mode: multiply;
-            opacity: 0.95;
-            transform: rotate(-1deg) scale(0.98);
+            opacity: 0.85;
+            transform: rotate(-2deg) scale(0.95);
             display: block;
             margin-left: auto;
             margin-right: auto;
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-            image-rendering: pixelated;
-            -webkit-image-smoothing: none;
-            -moz-image-smoothing: none;
-            image-smoothing: none;
+            image-rendering: auto;
+            -webkit-image-smoothing: auto;
+            -moz-image-smoothing: auto;
+            image-smoothing: auto;
             object-fit: contain;
             width: auto;
             height: auto;
@@ -1279,10 +1299,18 @@ export const downloadContract = async (offer, user = null) => {
                   <span class="clause-letter">b)</span> The security deposit is ${contractData.depositAmount} PLN, which has been paid upon signing this agreement.
                 </div>
                 <div class="clause">
-                  <span class="clause-letter">c)</span> The tenant agrees to pay the monthly rent by the 10th of each month.
+                  <span class="clause-letter">c)</span> Initial payment breakdown:
+                  <ul style="margin-left: 20px; margin-top: 5px;">
+                    <li>• First month (prorated for ${contractData.availableFrom}): ${contractData.proratedFirstMonth} PLN</li>
+                    <li>• Security deposit: ${contractData.depositAmount} PLN</li>
+                    <li>• Total initial payment: ${contractData.proratedFirstMonth + contractData.depositAmount} PLN</li>
+                  </ul>
                 </div>
                 <div class="clause">
-                  <span class="clause-letter">d)</span> Utilities are ${contractData.utilitiesIncluded}.
+                  <span class="clause-letter">d)</span> The tenant agrees to pay the monthly rent by the 10th of each month.
+                </div>
+                <div class="clause">
+                  <span class="clause-letter">e)</span> Utilities are ${contractData.utilitiesIncluded}.
                 </div>
               </div>
               <div class="polish-column">
@@ -1293,10 +1321,18 @@ export const downloadContract = async (offer, user = null) => {
                   <span class="clause-letter">b)</span> Kaucja wynosi ${contractData.depositAmount} PLN, która została zapłacona przy podpisaniu niniejszej umowy.
                 </div>
                 <div class="clause">
-                  <span class="clause-letter">c)</span> Najemca zgadza się płacić miesięczny czynsz do 10. dnia każdego miesiąca.
+                  <span class="clause-letter">c)</span> Szczegóły płatności początkowej:
+                  <ul style="margin-left: 20px; margin-top: 5px;">
+                    <li>• Pierwszy miesiąc (proporcjonalnie od ${contractData.availableFromPolish}): ${contractData.proratedFirstMonth} PLN</li>
+                    <li>• Kaucja: ${contractData.depositAmount} PLN</li>
+                    <li>• Łączna płatność początkowa: ${contractData.proratedFirstMonth + contractData.depositAmount} PLN</li>
+                  </ul>
                 </div>
                 <div class="clause">
-                  <span class="clause-letter">d)</span> Media są ${contractData.utilitiesIncludedPolish}.
+                  <span class="clause-letter">d)</span> Najemca zgadza się płacić miesięczny czynsz do 10. dnia każdego miesiąca.
+                </div>
+                <div class="clause">
+                  <span class="clause-letter">e)</span> Media są ${contractData.utilitiesIncludedPolish}.
                 </div>
               </div>
             </div>

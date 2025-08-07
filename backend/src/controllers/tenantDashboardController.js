@@ -1,5 +1,67 @@
 import { prisma } from '../utils/prisma.js';
 
+// Helper function to get tenant payment data
+const getTenantPaymentsData = async (tenantId) => {
+  try {
+    // Get general payments (deposits, first month payments, etc.)
+    const generalPayments = await prisma.payment.findMany({
+      where: {
+        userId: tenantId,
+        status: 'SUCCEEDED'
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Get rent payments (monthly rent)
+    const rentPayments = await prisma.rentPayment.findMany({
+      where: {
+        userId: tenantId,
+        status: 'SUCCEEDED'
+      },
+      orderBy: {
+        paidDate: 'desc'
+      }
+    });
+
+    // Combine and format all payments
+    const allPayments = [];
+
+    // Add general payments
+    generalPayments.forEach(payment => {
+      allPayments.push({
+        month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        date: payment.createdAt,
+        amount: payment.amount,
+        status: payment.status === 'SUCCEEDED' ? 'Paid' : payment.status,
+        purpose: payment.purpose,
+        type: 'general'
+      });
+    });
+
+    // Add rent payments
+    rentPayments.forEach(payment => {
+      allPayments.push({
+        month: new Date(payment.paidDate || payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        date: payment.paidDate || payment.createdAt,
+        amount: payment.amount,
+        status: payment.status === 'SUCCEEDED' ? 'Paid' : payment.status,
+        purpose: 'RENT',
+        type: 'rent'
+      });
+    });
+
+    // Sort by date (most recent first)
+    allPayments.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    return allPayments;
+  } catch (error) {
+    console.error('Error fetching tenant payments:', error);
+    return [];
+  }
+};
+
 // Get tenant's active lease and dashboard data
 export const getTenantDashboardData = async (req, res) => {
   try {
@@ -58,11 +120,12 @@ export const getTenantDashboardData = async (req, res) => {
       offerId: activeLease.id,
       property: {
         address: activeLease.rentalRequest.location,
+        propertyType: activeLease.propertyType || activeLease.rentalRequest.propertyType || 'Apartment',
         rooms: activeLease.rentalRequest.bedrooms || 2,
         bathrooms: activeLease.rentalRequest.bathrooms || 1,
         area: activeLease.propertySize || '65 m²',
         leaseTerm: activeLease.leaseDuration || 12,
-        amenities: ['Parking Space', 'Washing Machine', 'Air Conditioning', 'Balcony', 'Internet', 'Elevator']
+        amenities: activeLease.propertyAmenities ? JSON.parse(activeLease.propertyAmenities) : ['No amenities listed']
       },
       landlord: {
         name: activeLease.landlord.firstName && activeLease.landlord.lastName ? 
@@ -83,7 +146,7 @@ export const getTenantDashboardData = async (req, res) => {
         monthlyRent: activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
         securityDeposit: activeLease.depositAmount || activeLease.rentalRequest.budget || 0
       },
-      payments: [],
+      payments: await getTenantPaymentsData(tenantId),
       accountStatus: {
         paymentHistory: 'No Data',
         leaseCompliance: 'Good',
@@ -212,4 +275,107 @@ export const getTenantActiveLease = async (req, res) => {
     console.error('Error fetching tenant active lease:', error);
     res.status(500).json({ error: 'Failed to fetch active lease' });
   }
+}; 
+
+// Get tenant's payment history with upcoming payments
+export const getTenantPaymentHistory = async (req, res) => {
+  try {
+    const tenantId = req.user.id;
+
+    // Get past payments
+    const pastPayments = await getTenantPaymentsData(tenantId);
+
+    // Get lease information to generate upcoming payments
+    const activeLease = await prisma.offer.findFirst({
+      where: {
+        rentalRequest: {
+          tenantId: tenantId
+        },
+        status: 'PAID'
+      },
+      include: {
+        rentalRequest: true
+      }
+    });
+
+    let upcomingPayments = [];
+    if (activeLease) {
+      upcomingPayments = generateUpcomingPayments(activeLease);
+    }
+
+    res.json({
+      payments: pastPayments,
+      upcomingPayments: upcomingPayments,
+      lease: activeLease ? {
+        startDate: activeLease.rentalRequest.moveInDate,
+        endDate: activeLease.leaseEndDate || new Date(activeLease.rentalRequest.moveInDate).setFullYear(
+          new Date(activeLease.rentalRequest.moveInDate).getFullYear() + 1
+        ),
+        monthlyRent: activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
+        securityDeposit: activeLease.depositAmount || activeLease.rentalRequest.budget || 0
+      } : null
+    });
+
+  } catch (error) {
+    console.error('Error fetching tenant payment history:', error);
+    res.status(500).json({ error: 'Failed to fetch payment history' });
+  }
+};
+
+// Helper function to generate upcoming payments
+const generateUpcomingPayments = (lease) => {
+  if (!lease || !lease.rentalRequest.moveInDate || !lease.rentAmount) {
+    return [];
+  }
+
+  const upcoming = [];
+  const startDate = new Date(lease.rentalRequest.moveInDate);
+  const endDate = lease.leaseEndDate ? new Date(lease.leaseEndDate) : new Date(startDate.getFullYear() + 1, startDate.getMonth(), startDate.getDate());
+  const monthlyRent = lease.rentAmount;
+
+  // Polish landlord-friendly approach: Standard monthly payments
+  // First month is already paid with deposit (prorated for partial month)
+  // All other months: Full monthly rent due on 10th of each month
+  
+  // Start from the second month (first month is already paid)
+  let currentDate = new Date(startDate);
+  currentDate.setMonth(currentDate.getMonth() + 1);
+  
+  // Set to 1st of the month for consistent calculation
+  currentDate.setDate(1);
+
+  // Generate payments for each month until lease end
+  while (currentDate < endDate) {
+    // Calculate due date (10th of the month)
+    const dueDate = new Date(currentDate);
+    dueDate.setDate(10);
+
+    // Check if this is the last month (August 2026)
+    const isLastMonth = currentDate.getMonth() === endDate.getMonth() && currentDate.getFullYear() === endDate.getFullYear();
+    
+    let amount = monthlyRent;
+    let description = 'Monthly Rent';
+    
+    if (isLastMonth) {
+      // Last month: prorated for August 1-16 (16 days)
+      const daysInLastMonth = endDate.getDate(); // 16 days
+      amount = Math.round((monthlyRent * daysInLastMonth) / 30);
+      description = 'Final Month (Prorated)';
+    }
+
+    upcoming.push({
+      month: currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      dueDate: dueDate,
+      amount: amount,
+      status: 'PENDING',
+      type: 'monthly_rent',
+      description: description,
+      isLastMonth: isLastMonth
+    });
+
+    // Move to next month
+    currentDate.setMonth(currentDate.getMonth() + 1);
+  }
+
+  return upcoming;
 }; 

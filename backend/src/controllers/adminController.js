@@ -374,6 +374,127 @@ export const getAllPayments = async (req, res) => {
   }
 };
 
+// 🚀 SCALABILITY: Get overdue payments for admin monitoring
+export const getOverduePayments = async (req, res) => {
+  try {
+    const { page = 1, limit = 20, search, daysOverdue } = req.query;
+    const skip = (page - 1) * limit;
+
+    // Get current date
+    const currentDate = new Date();
+    
+    // Calculate overdue threshold (default: 1 day overdue)
+    const overdueThreshold = daysOverdue ? 
+      new Date(currentDate.getTime() - (parseInt(daysOverdue) * 24 * 60 * 60 * 1000)) : 
+      new Date(currentDate.getTime() - (1 * 24 * 60 * 60 * 1000));
+
+    // Build where clause for overdue payments
+    const where = {
+      dueDate: {
+        lt: currentDate
+      },
+      status: {
+        not: 'SUCCEEDED'
+      }
+    };
+
+    // Add search filter
+    if (search) {
+      where.OR = [
+        { rentalRequest: { tenant: { name: { contains: search, mode: 'insensitive' } } } },
+        { rentalRequest: { tenant: { email: { contains: search, mode: 'insensitive' } } } },
+        { rentalRequest: { tenant: { firstName: { contains: search, mode: 'insensitive' } } } },
+        { rentalRequest: { tenant: { lastName: { contains: search, mode: 'insensitive' } } } }
+      ];
+    }
+
+    // Get overdue payments from RentPayment table
+    const [overduePayments, total] = await Promise.all([
+      prisma.rentPayment.findMany({
+        where,
+        skip: parseInt(skip),
+        take: parseInt(limit),
+        include: {
+          rentalRequest: {
+            include: {
+              tenant: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  phoneNumber: true,
+                  firstName: true,
+                  lastName: true
+                }
+              },
+              offers: {
+                include: {
+                  landlord: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                      phoneNumber: true
+                    }
+                  },
+                  property: {
+                    select: {
+                      id: true,
+                      title: true,
+                      address: true,
+                      city: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        orderBy: { dueDate: 'asc' }
+      }),
+      prisma.rentPayment.count({ where })
+    ]);
+
+    // Calculate days overdue for each payment
+    const paymentsWithOverdueDays = overduePayments.map(payment => {
+      const dueDate = new Date(payment.dueDate);
+      const daysOverdue = Math.ceil((currentDate - dueDate) / (1000 * 60 * 60 * 24));
+      
+      return {
+        ...payment,
+        daysOverdue,
+        isCritical: daysOverdue > 30, // Critical if more than 30 days overdue
+        isSevere: daysOverdue > 15,   // Severe if more than 15 days overdue
+        isModerate: daysOverdue > 7   // Moderate if more than 7 days overdue
+      };
+    });
+
+    // Get summary statistics
+    const summary = {
+      total: total,
+      critical: paymentsWithOverdueDays.filter(p => p.isCritical).length,
+      severe: paymentsWithOverdueDays.filter(p => p.isSevere && !p.isCritical).length,
+      moderate: paymentsWithOverdueDays.filter(p => p.isModerate && !p.isSevere).length,
+      totalAmount: paymentsWithOverdueDays.reduce((sum, p) => sum + p.amount, 0),
+      criticalAmount: paymentsWithOverdueDays.filter(p => p.isCritical).reduce((sum, p) => sum + p.amount, 0)
+    };
+
+    res.json({
+      overduePayments: paymentsWithOverdueDays,
+      summary,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Get overdue payments error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 // 🚀 SCALABILITY: Suspend/unsuspend user
 export const toggleUserSuspension = async (req, res) => {
   try {

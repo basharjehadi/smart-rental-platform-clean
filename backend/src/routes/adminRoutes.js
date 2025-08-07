@@ -6,6 +6,7 @@ import {
   getSystemAnalytics,
   getAllRentalRequests,
   getAllPayments,
+  getOverduePayments,
   toggleUserSuspension,
   getSystemHealth,
   triggerSystemMaintenance
@@ -34,6 +35,7 @@ router.get('/rental-requests', getAllRentalRequests);
 
 // Payment Management
 router.get('/payments', getAllPayments);
+router.get('/payments/overdue', getOverduePayments);
 
 // System Maintenance
 router.post('/maintenance', triggerSystemMaintenance);

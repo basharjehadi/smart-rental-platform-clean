@@ -198,7 +198,20 @@ const PaymentPage = () => {
     );
   }
 
-  const totalAmount = (offer.rentAmount || 0) + (offer.depositAmount || offer.rentAmount || 0);
+  // Calculate prorated first month based on move-in date
+  const calculateProratedFirstMonth = () => {
+    if (!offer.availableFrom || !offer.rentAmount) return 0;
+    
+    const moveInDate = new Date(offer.availableFrom);
+    const daysInMonth = new Date(moveInDate.getFullYear(), moveInDate.getMonth() + 1, 0).getDate();
+    const daysFromMoveIn = daysInMonth - moveInDate.getDate() + 1; // Days from move-in to end of month
+    
+    return Math.round((offer.rentAmount * daysFromMoveIn) / daysInMonth);
+  };
+
+  const proratedFirstMonth = calculateProratedFirstMonth();
+  const securityDeposit = offer.depositAmount || offer.rentAmount || 0;
+  const totalAmount = proratedFirstMonth + securityDeposit;
   const serviceFee = Math.round(totalAmount * 0.03); // 3% service fee
   const finalTotal = totalAmount + serviceFee;
 
@@ -518,12 +531,12 @@ const PaymentPage = () => {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Breakdown</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">First month's rent</span>
-                    <span className="font-semibold">{formatCurrency(offer.rentAmount || 0)}</span>
+                    <span className="text-gray-600">First month (prorated)</span>
+                    <span className="font-semibold">{formatCurrency(proratedFirstMonth)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Security deposit</span>
-                    <span className="font-semibold">{formatCurrency(offer.depositAmount || offer.rentAmount || 0)}</span>
+                    <span className="font-semibold">{formatCurrency(securityDeposit)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Service fee</span>
