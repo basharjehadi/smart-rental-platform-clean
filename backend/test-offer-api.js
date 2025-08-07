@@ -23,7 +23,7 @@ async function testOfferApi() {
     
     // Create a test token
     const token = jwt.sign(
-      { id: tenant.id, email: tenant.email, role: tenant.role },
+      { userId: tenant.id, email: tenant.email, role: tenant.role },
       'your_super_secret_jwt_key_for_smart_rental_system_2024',
       { expiresIn: '1h' }
     );

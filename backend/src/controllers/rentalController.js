@@ -986,24 +986,24 @@ const getOfferDetails = async (req, res) => {
       },
       include: {
         rentalRequest: {
-          select: {
-            id: true,
-            title: true,
-            location: true,
-            description: true,
-            budgetFrom: true,
-            budgetTo: true,
-            bedrooms: true,
-            moveInDate: true,
-            status: true
-          },
           include: {
             tenant: {
               select: {
                 id: true,
                 name: true,
+                firstName: true,
+                lastName: true,
                 email: true,
-                signatureBase64: true
+                signatureBase64: true,
+                pesel: true,
+                passportNumber: true,
+                kartaPobytuNumber: true,
+                phoneNumber: true,
+                street: true,
+                city: true,
+                zipCode: true,
+                country: true,
+                address: true
               }
             }
           }
@@ -1017,7 +1017,13 @@ const getOfferDetails = async (req, res) => {
             email: true,
             phoneNumber: true,
             profileImage: true,
-            signatureBase64: true
+            signatureBase64: true,
+            pesel: true,
+            street: true,
+            city: true,
+            zipCode: true,
+            country: true,
+            address: true
           }
         },
         property: {
@@ -1068,7 +1074,7 @@ const getOfferDetails = async (req, res) => {
       leaseDuration: offer.leaseDuration,
       description: offer.description,
       availableFrom: offer.availableFrom,
-      isPaid: offer.isPaid,
+      isPaid: offer.status === 'PAID' || (offer.status === 'ACCEPTED' && offer.paymentIntentId),
       paymentIntentId: offer.paymentIntentId,
       paymentDate: offer.paymentDate,
       leaseStartDate: offer.leaseStartDate,
@@ -1099,7 +1105,8 @@ const getOfferDetails = async (req, res) => {
         ...offer.landlord,
         name: offer.landlord?.firstName && offer.landlord?.lastName ? 
           `${offer.landlord.firstName} ${offer.landlord.lastName}` : 
-          offer.landlord?.name || 'Landlord'
+          offer.landlord?.name || 'Landlord',
+        signatureBase64: offer.landlord?.signatureBase64 || null
       },
       
       // Include property data if available
@@ -1108,13 +1115,30 @@ const getOfferDetails = async (req, res) => {
       // Include tenant data
       tenant: {
         id: offer.rentalRequest.tenantId,
-        name: offer.rentalRequest.tenant?.name || 'Tenant',
+        name: offer.rentalRequest.tenant?.firstName && offer.rentalRequest.tenant?.lastName ? 
+          `${offer.rentalRequest.tenant.firstName} ${offer.rentalRequest.tenant.lastName}` : 
+          offer.rentalRequest.tenant?.name || 'Tenant',
         email: offer.rentalRequest.tenant?.email || 'tenant@email.com',
-        signatureBase64: offer.rentalRequest.tenant?.signatureBase64 || null
+        signatureBase64: offer.rentalRequest.tenant?.signatureBase64 || null,
+        pesel: offer.rentalRequest.tenant?.pesel || null,
+        passportNumber: offer.rentalRequest.tenant?.passportNumber || null,
+        kartaPobytuNumber: offer.rentalRequest.tenant?.kartaPobytuNumber || null,
+        phoneNumber: offer.rentalRequest.tenant?.phoneNumber || null,
+        street: offer.rentalRequest.tenant?.street || null,
+        city: offer.rentalRequest.tenant?.city || null,
+        zipCode: offer.rentalRequest.tenant?.zipCode || null,
+        country: offer.rentalRequest.tenant?.country || null,
+        address: offer.rentalRequest.tenant?.address || null
       }
     };
 
     console.log('✅ Transformation completed successfully');
+    console.log('🔍 Signature Debug in getOfferDetails:');
+    console.log('Tenant signature present:', !!transformedOffer.tenant.signatureBase64);
+    console.log('Landlord signature present:', !!transformedOffer.landlord.signatureBase64);
+    console.log('Tenant signature length:', transformedOffer.tenant.signatureBase64?.length || 0);
+    console.log('Landlord signature length:', transformedOffer.landlord.signatureBase64?.length || 0);
+    
     res.json({
       offer: transformedOffer
     });

@@ -157,7 +157,10 @@ const TenantDashboardNew = () => {
       const offerData = response.data;
       
       console.log('🔍 Dashboard: Offer data for contract:', offerData);
-      await viewContract(offerData, user);
+      console.log('🔍 Dashboard: Offer object from response:', offerData.offer);
+      console.log('🔍 Dashboard: Tenant signature present:', !!offerData.offer?.tenant?.signatureBase64);
+      console.log('🔍 Dashboard: Landlord signature present:', !!offerData.offer?.landlord?.signatureBase64);
+      await viewContract(offerData.offer, user);
     } catch (error) {
       console.error('❌ Dashboard: Error viewing contract:', error);
       console.error('❌ Dashboard: Error response:', error.response?.data);
@@ -191,7 +194,10 @@ const TenantDashboardNew = () => {
       const offerData = response.data;
       
       console.log('🔍 Dashboard: Offer data for download:', offerData);
-      await downloadContract(offerData, user);
+      console.log('🔍 Dashboard: Offer object from response:', offerData.offer);
+      console.log('🔍 Dashboard: Tenant signature present:', !!offerData.offer?.tenant?.signatureBase64);
+      console.log('🔍 Dashboard: Landlord signature present:', !!offerData.offer?.landlord?.signatureBase64);
+      await downloadContract(offerData.offer, user);
     } catch (error) {
       console.error('❌ Dashboard: Error downloading contract:', error);
       console.error('❌ Dashboard: Error response:', error.response?.data);
