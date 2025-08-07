@@ -158,7 +158,8 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
   // Get districts for selected city
   const getDistrictsForCity = (city) => {
     const districts = cityDistricts[city] || [];
-    return ['All', ...districts]; // Add "All" option at the beginning
+    const uniqueDistricts = Array.from(new Set(districts));
+    return ['All', ...uniqueDistricts]; // Add "All" option at the beginning
   };
 
   // Pre-fill form when in edit mode
