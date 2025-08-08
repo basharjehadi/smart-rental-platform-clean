@@ -121,11 +121,11 @@ const PaymentPage = () => {
       await new Promise(resolve => setTimeout(resolve, 2500));
       console.log('Step 3: Confirming with landlord - completed');
       
-      console.log('Updating offer status to PAID...');
+          console.log('Updating offer status to PAID...');
       // Update offer status to paid with payment timestamp
       const paymentTimestamp = new Date().toISOString();
       const response = await api.patch(`/tenant/offer/${offer.id}`, { 
-        status: 'PAID',
+            status: 'PAID',
         paymentDate: paymentTimestamp
       });
       console.log('Offer status update response:', response.data);
@@ -177,7 +177,7 @@ const PaymentPage = () => {
   }
 
   if (error || !offer) {
-    return (
+  return (
       <div className="min-h-screen bg-primary flex items-center justify-center">
         <div className="text-center max-w-md mx-auto">
           <div className="text-red-500 mb-4">
@@ -253,14 +253,14 @@ const PaymentPage = () => {
               <div>
                 <div className="font-medium">Easy Disputes</div>
                 <div className="text-xs">Simple resolution process</div>
-              </div>
-            </div>
+          </div>
+          </div>
             <div className="flex items-center space-x-2 text-green-700">
               <Home className="w-4 h-4" />
               <div>
                 <div className="font-medium">How it works</div>
                 <div className="text-xs">Your payment is held in secure escrow. After check-in, you have 24 hours to report any issues. If the property doesn't match what was advertised, we'll help resolve the issue or provide a full refund.</div>
-              </div>
+          </div>
             </div>
           </div>
         </div>
@@ -315,7 +315,7 @@ const PaymentPage = () => {
                       <div className="text-sm text-green-700">Simple resolution process</div>
                     </div>
                   </div>
-                </div>
+          </div>
                 <div className="border-t border-green-200 pt-4">
                   <p className="text-sm text-green-800">
                     <strong>How it works:</strong> Your payment is held in secure escrow. After check-in, you have 24 hours to report any issues. If the property doesn't match what was advertised, we'll help resolve the issue or provide a full refund.
@@ -330,11 +330,11 @@ const PaymentPage = () => {
                 <div className="flex items-center space-x-2 mb-4">
                   <CreditCard className="w-5 h-5 text-gray-600" />
                   <h2 className="text-lg font-semibold text-gray-900">Choose Payment Method</h2>
-                </div>
-                
+          </div>
+
                 {/* Payment Method Options */}
                 <div className="grid grid-cols-3 gap-4 mb-6">
-                  <button
+          <button
                     onClick={() => handlePaymentMethodChange('credit-card')}
                     className={`p-4 rounded-lg border-2 transition-colors ${
                       selectedPaymentMethod === 'credit-card'
@@ -346,7 +346,7 @@ const PaymentPage = () => {
                       <CreditCard className="w-5 h-5 text-gray-600" />
                       <span className="font-medium">Credit Card</span>
                     </div>
-                  </button>
+          </button>
                   
                   <button
                     onClick={() => handlePaymentMethodChange('bank-transfer')}
@@ -359,7 +359,7 @@ const PaymentPage = () => {
                     <div className="flex items-center space-x-2">
                       <Building className="w-5 h-5 text-gray-600" />
                       <span className="font-medium">Bank Transfer</span>
-                    </div>
+        </div>
                   </button>
                   
                   <button
@@ -373,9 +373,9 @@ const PaymentPage = () => {
                     <div className="flex items-center space-x-2">
                       <Wallet className="w-5 h-5 text-gray-600" />
                       <span className="font-medium">Digital Wallet</span>
-                    </div>
+      </div>
                   </button>
-                </div>
+    </div>
 
                 {/* Credit Card Form */}
                 {selectedPaymentMethod === 'credit-card' && (
@@ -422,9 +422,9 @@ const PaymentPage = () => {
                             placeholder="123"
                           />
                         </div>
-                      </div>
-                    </div>
-                  </div>
+          </div>
+        </div>
+      </div>
                 )}
               </div>
             </div>
@@ -458,9 +458,9 @@ const PaymentPage = () => {
                       <div className="text-sm text-gray-600">Report any issues or get automatic release to landlord</div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
+          </div>
+        </div>
+      </div>
 
             {/* Terms Agreement */}
             <div className="card-modern">
@@ -520,17 +520,17 @@ const PaymentPage = () => {
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <Calendar className="w-4 h-4" />
                     <span>Move-in: {formatDate(offer.availableFrom)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+          </div>
+        </div>
+      </div>
+        </div>
 
-            {/* Payment Breakdown */}
+        {/* Payment Breakdown */}
             <div className="card-modern">
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Breakdown</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
+          <div className="space-y-3">
+            <div className="flex justify-between">
                     <span className="text-gray-600">First month (prorated)</span>
                     <span className="font-semibold">{formatCurrency(proratedFirstMonth)}</span>
                   </div>

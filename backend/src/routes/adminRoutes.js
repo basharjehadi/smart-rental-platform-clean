@@ -9,7 +9,10 @@ import {
   getOverduePayments,
   toggleUserSuspension,
   getSystemHealth,
-  triggerSystemMaintenance
+  triggerSystemMaintenance,
+  getAllContracts,
+  adminDownloadContract,
+  getContractDetails
 } from '../controllers/adminController.js';
 import verifyToken from '../middlewares/verifyToken.js';
 import { requireAdmin } from '../middlewares/requireAdmin.js';
@@ -39,5 +42,10 @@ router.get('/payments/overdue', getOverduePayments);
 
 // System Maintenance
 router.post('/maintenance', triggerSystemMaintenance);
+
+// Contract Management
+router.get('/contracts', getAllContracts);
+router.get('/contracts/:contractId', getContractDetails);
+router.get('/contracts/:contractId/download', adminDownloadContract);
 
 export default router; 

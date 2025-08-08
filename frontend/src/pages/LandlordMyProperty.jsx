@@ -12,6 +12,7 @@ const LandlordMyProperty = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteProperty, setDeleteProperty] = useState(null);
@@ -84,12 +85,17 @@ const LandlordMyProperty = () => {
       filtered = filtered.filter(property => property.propertyType === filterType);
     }
 
+    // Filter by status
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(property => property.status === filterStatus);
+    }
+
     // Filter by search term
     if (searchTerm) {
       filtered = filtered.filter(property =>
-        property.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        property.city.toLowerCase().includes(searchTerm.toLowerCase())
+        property.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        property.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        property.city?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -120,10 +126,18 @@ const LandlordMyProperty = () => {
   };
 
   const handleEditProperty = (property) => {
+    // Prevent editing locked properties
+    if (isPropertyLocked(property)) {
+      return;
+    }
     navigate(`/landlord-edit-property/${property.id}`);
   };
 
   const handleDeleteProperty = (property) => {
+    // Prevent deleting locked properties
+    if (isPropertyLocked(property)) {
+      return;
+    }
     setDeleteProperty(property);
     setShowDeleteModal(true);
   };
@@ -147,6 +161,11 @@ const LandlordMyProperty = () => {
     return types;
   };
 
+  const getPropertyStatuses = () => {
+    const statuses = [...new Set(properties.map(p => p.status))];
+    return statuses;
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('pl-PL', {
       style: 'currency',
@@ -162,6 +181,11 @@ const LandlordMyProperty = () => {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  // Check if property is locked (occupied or rented)
+  const isPropertyLocked = (property) => {
+    return ['OCCUPIED', 'RENTED'].includes(property.status);
   };
 
   const filteredProperties = filterAndSortProperties();
@@ -197,7 +221,11 @@ const LandlordMyProperty = () => {
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 animate-fade-in-up">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 font-poppins">Property Management</h2>
-                <p className="text-gray-600 mt-1">You have {properties.length} properties listed</p>
+                <p className="text-gray-600 mt-1">
+                  You have {properties.length} properties listed • 
+                  <span className="text-green-600 font-medium"> {properties.filter(p => !isPropertyLocked(p)).length} editable</span> • 
+                  <span className="text-orange-600 font-medium"> {properties.filter(p => isPropertyLocked(p)).length} locked</span>
+                </p>
               </div>
               
               <Link
@@ -211,7 +239,7 @@ const LandlordMyProperty = () => {
 
             {/* Filters and Search */}
             <div className="card-modern p-6 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 {/* Search */}
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -236,6 +264,20 @@ const LandlordMyProperty = () => {
                   ))}
                 </select>
 
+                {/* Status Filter */}
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="input-modern"
+                >
+                  <option value="all">All Status</option>
+                  <option value="AVAILABLE">Available</option>
+                  <option value="OCCUPIED">Occupied</option>
+                  <option value="RENTED">Rented</option>
+                  <option value="MAINTENANCE">Maintenance</option>
+                  <option value="UNAVAILABLE">Unavailable</option>
+                </select>
+
                 {/* Sort By */}
                 <select
                   value={sortBy}
@@ -254,6 +296,50 @@ const LandlordMyProperty = () => {
                     {filteredProperties.length} of {properties.length} properties
                   </span>
                 </div>
+              </div>
+
+              {/* Quick Filter Buttons */}
+              <div className="flex flex-wrap gap-2 mt-4">
+                <button
+                  onClick={() => setFilterStatus('all')}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    filterStatus === 'all' 
+                      ? 'bg-blue-100 text-blue-700' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  All Properties ({properties.length})
+                </button>
+                <button
+                  onClick={() => setFilterStatus('AVAILABLE')}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    filterStatus === 'AVAILABLE' 
+                      ? 'bg-green-100 text-green-700' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Available ({properties.filter(p => p.status === 'AVAILABLE').length})
+                </button>
+                <button
+                  onClick={() => setFilterStatus('OCCUPIED')}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    filterStatus === 'OCCUPIED' 
+                      ? 'bg-orange-100 text-orange-700' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Occupied ({properties.filter(p => p.status === 'OCCUPIED').length})
+                </button>
+                <button
+                  onClick={() => setFilterStatus('RENTED')}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    filterStatus === 'RENTED' 
+                      ? 'bg-purple-100 text-purple-700' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Rented ({properties.filter(p => p.status === 'RENTED').length})
+                </button>
               </div>
             </div>
 
@@ -324,8 +410,17 @@ const LandlordMyProperty = () => {
                         {/* Status Badge */}
                         <div className="absolute top-3 left-3">
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            property.status === 'AVAILABLE' ? 'badge-success' : 'badge-warning'
+                            property.status === 'AVAILABLE' 
+                              ? 'bg-green-100 text-green-700' 
+                              : property.status === 'OCCUPIED'
+                              ? 'bg-orange-100 text-orange-700'
+                              : property.status === 'RENTED'
+                              ? 'bg-purple-100 text-purple-700'
+                              : property.status === 'MAINTENANCE'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-gray-100 text-gray-700'
                           }`}>
+                            {isPropertyLocked(property) && <span className="mr-1">🔒</span>}
                             {property.status}
                           </span>
                         </div>
@@ -368,19 +463,45 @@ const LandlordMyProperty = () => {
                             <Eye className="w-4 h-4" />
                             <span>View Details</span>
                           </button>
+                          
+                          {/* Edit Button - Disabled for occupied/rented properties */}
                           <button
                             onClick={() => handleEditProperty(property)}
-                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors duration-200"
+                            disabled={isPropertyLocked(property)}
+                            className={`px-4 py-2 rounded-xl transition-colors duration-200 ${
+                              isPropertyLocked(property)
+                                ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                                : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+                            }`}
+                            title={isPropertyLocked(property) ? 'Cannot edit occupied/rented property' : 'Edit Property'}
                           >
                             <Edit className="w-4 h-4" />
                           </button>
+                          
+                          {/* Delete Button - Disabled for occupied/rented properties */}
                           <button
                             onClick={() => handleDeleteProperty(property)}
-                            className="px-4 py-2 text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-colors duration-200"
+                            disabled={isPropertyLocked(property)}
+                            className={`px-4 py-2 rounded-xl transition-colors duration-200 ${
+                              isPropertyLocked(property)
+                                ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                                : 'text-red-600 bg-red-50 hover:bg-red-100'
+                            }`}
+                            title={isPropertyLocked(property) ? 'Cannot delete occupied/rented property' : 'Delete Property'}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
+
+                        {/* Warning Message for Locked Properties */}
+                        {isPropertyLocked(property) && (
+                          <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p className="text-xs text-yellow-700 flex items-center">
+                              <span className="mr-1">🔒</span>
+                              This property is {property.status.toLowerCase()}. Edit and delete actions are disabled.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

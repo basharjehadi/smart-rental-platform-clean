@@ -1,6 +1,13 @@
 import puppeteer from 'puppeteer';
 import { PrismaClient } from '@prisma/client';
-import { generateBilingualContractHTML } from '../utils/contractTemplate.js';
+import { 
+  generateContractHTML, 
+  generateContractPDF, 
+  saveContractPDF,
+  generateContractDataForAPI 
+} from '../utils/contractGenerator.js';
+import fs from 'fs';
+import path from 'path';
 
 const prisma = new PrismaClient();
 
@@ -181,10 +188,20 @@ export const generateContract = async (req, res) => {
             passportNumber: true,
             kartaPobytuNumber: true,
             phoneNumber: true,
-            signatureBase64: true
+            signatureBase64: true,
+            street: true,
+            city: true,
+            zipCode: true,
+            country: true,
+            citizenship: true,
+            dateOfBirth: true,
+            profession: true
           }
         },
-        offer: {
+        offers: {
+          where: {
+            status: 'PAID'
+          },
           include: {
             landlord: {
               select: {
@@ -193,9 +210,17 @@ export const generateContract = async (req, res) => {
                 email: true,
                 firstName: true,
                 lastName: true,
+                pesel: true,
                 dowodOsobistyNumber: true,
                 phoneNumber: true,
                 address: true,
+                street: true,
+                city: true,
+                zipCode: true,
+                country: true,
+                citizenship: true,
+                dateOfBirth: true,
+                profession: true,
                 signatureBase64: true
               }
             }
@@ -209,15 +234,27 @@ export const generateContract = async (req, res) => {
       return res.status(404).json({ error: 'Rental request not found' });
     }
 
-    // Check if user is authorized
-    if (rentalRequest.tenantId !== userId && rentalRequest.offer?.landlordId !== userId) {
-      return res.status(403).json({ error: 'Unauthorized to generate contract for this rental request' });
+    // Check if user is authorized (either tenant or landlord)
+    const isTenant = rentalRequest.tenantId === userId;
+    const isLandlord = rentalRequest.offers[0]?.landlordId === userId;
+    
+    if (!isTenant && !isLandlord) {
+      return res.status(403).json({ 
+        error: 'Unauthorized to generate contract for this rental request',
+        details: {
+          userId,
+          tenantId: rentalRequest.tenantId,
+          landlordId: rentalRequest.offers[0]?.landlordId,
+          isTenant,
+          isLandlord
+        }
+      });
     }
 
     // Check if offer exists and is paid
-    if (!rentalRequest.offer || rentalRequest.offer.status !== 'PAID') {
+    if (!rentalRequest.offers || rentalRequest.offers.length === 0) {
       return res.status(400).json({ 
-        error: 'Cannot generate contract - offer is not paid',
+        error: 'Cannot generate contract - no paid offer found',
         reason: 'Offer must be paid before contract generation'
       });
     }
@@ -260,6 +297,12 @@ export const generateContract = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error generating contract:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      stack: error.stack,
+      rentalRequestId,
+      userId
+    });
     res.status(500).json({ 
       error: 'Failed to generate contract',
       message: error.message 
@@ -365,10 +408,20 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
             passportNumber: true,
             kartaPobytuNumber: true,
             phoneNumber: true,
-            signatureBase64: true
+            signatureBase64: true,
+            street: true,
+            city: true,
+            zipCode: true,
+            country: true,
+            citizenship: true,
+            dateOfBirth: true,
+            profession: true
           }
         },
-        offer: {
+        offers: {
+          where: {
+            status: 'PAID'
+          },
           include: {
             landlord: {
               select: {
@@ -377,9 +430,17 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
                 email: true,
                 firstName: true,
                 lastName: true,
+                pesel: true,
                 dowodOsobistyNumber: true,
                 phoneNumber: true,
                 address: true,
+                street: true,
+                city: true,
+                zipCode: true,
+                country: true,
+                citizenship: true,
+                dateOfBirth: true,
+                profession: true,
                 signatureBase64: true
               }
             }
@@ -393,9 +454,11 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
       throw new Error('Rental request not found');
     }
 
-    if (!rentalRequest.offer) {
-      throw new Error('No offer found for this rental request');
+    if (!rentalRequest.offers || rentalRequest.offers.length === 0) {
+      throw new Error('No paid offer found for this rental request');
     }
+
+    const paidOffer = rentalRequest.offers[0]; // Get the first paid offer
 
     // Check if contract already exists
     if (rentalRequest.contract) {
@@ -408,23 +471,23 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
     console.log(`📄 Generated contract number: ${contractNumber}`);
 
     // Calculate lease dates
-    const leaseStartDate = new Date(rentalRequest.offer.availableFrom);
+    const leaseStartDate = new Date(paidOffer.availableFrom);
     const leaseEndDate = new Date(leaseStartDate);
-    leaseEndDate.setMonth(leaseEndDate.getMonth() + rentalRequest.offer.leaseDuration);
+    leaseEndDate.setMonth(leaseEndDate.getMonth() + paidOffer.leaseDuration);
 
     // Enhanced contract data with full identity details
     const contractData = {
       contractNumber,
       agreementDate: new Date(),
       landlord: {
-        name: rentalRequest.offer.landlord.name,
-        firstName: rentalRequest.offer.landlord.firstName || 'Landlord',
-        lastName: rentalRequest.offer.landlord.lastName || 'Name',
-        email: rentalRequest.offer.landlord.email,
-        dowodOsobistyNumber: rentalRequest.offer.landlord.dowodOsobistyNumber || 'N/A',
-        phoneNumber: rentalRequest.offer.landlord.phoneNumber || 'N/A',
-        address: rentalRequest.offer.landlord.address || 'N/A',
-        signature: rentalRequest.offer.landlord.signatureBase64 || null
+        name: paidOffer.landlord.name,
+        firstName: paidOffer.landlord.firstName || 'Landlord',
+        lastName: paidOffer.landlord.lastName || 'Name',
+        email: paidOffer.landlord.email,
+        dowodOsobistyNumber: paidOffer.landlord.dowodOsobistyNumber || 'N/A',
+        phoneNumber: paidOffer.landlord.phoneNumber || 'N/A',
+        address: paidOffer.landlord.address || 'N/A',
+        signature: paidOffer.landlord.signatureBase64 || null
       },
       tenant: {
         name: rentalRequest.tenant.name,
@@ -437,16 +500,16 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
         phoneNumber: rentalRequest.tenant.phoneNumber || 'N/A',
         signature: rentalRequest.tenant.signatureBase64 || null
       },
-      propertyAddress: rentalRequest.offer.propertyAddress || rentalRequest.location,
+      propertyAddress: paidOffer.propertyAddress || rentalRequest.location,
       leaseStartDate,
       leaseEndDate,
-      rentAmount: rentalRequest.offer.rentAmount,
-      depositAmount: rentalRequest.offer.depositAmount || 0,
-      leaseDuration: rentalRequest.offer.leaseDuration,
+      rentAmount: paidOffer.rentAmount,
+      depositAmount: paidOffer.depositAmount || 0,
+      leaseDuration: paidOffer.leaseDuration,
       // Include house rules data
       houseRules: {
-        rulesText: rentalRequest.offer.rulesText || null,
-        rulesPdf: rentalRequest.offer.rulesPdf || null
+        rulesText: paidOffer.rulesText || null,
+        rulesPdf: paidOffer.rulesPdf || null
       }
     };
 
@@ -459,45 +522,47 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
       propertyAddress: contractData.propertyAddress
     });
 
-    // Generate HTML
-    const htmlContent = generateBilingualContractHTML(contractData);
-    console.log('📄 HTML content generated');
+    // Prepare offer data for the new contract generator
+    const offerForContract = {
+      ...paidOffer,
+      rentalRequest: {
+        tenant: rentalRequest.tenant
+      },
+      property: {
+        address: paidOffer.propertyAddress || rentalRequest.location
+      },
+      leaseStartDate: leaseStartDate,
+      leaseEndDate: leaseEndDate,
+      rentAmount: paidOffer.rentAmount,
+      depositAmount: paidOffer.depositAmount || 0
+    };
 
-    // Generate PDF
-    const pdfBuffer = await generatePDF(htmlContent);
-    console.log('📄 PDF generated, size:', pdfBuffer.length, 'bytes');
-
-    // Save PDF to file system
-    const fs = await import('fs');
-    const path = await import('path');
-    
-    const uploadsDir = 'uploads/contracts';
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-
-    const filename = `contract-${contractNumber}.pdf`;
-    const filePath = path.join(uploadsDir, filename);
-    
-    fs.writeFileSync(filePath, pdfBuffer);
-    console.log('📄 PDF saved to:', filePath);
+    // Generate and save PDF using the new server-side approach
+    const pdfResult = await saveContractPDF(offerForContract, rentalRequest.tenant, contractNumber);
+    console.log('📄 PDF generated and saved:', {
+      filename: pdfResult.filename,
+      originalSize: `${(pdfResult.originalSize / 1024 / 1024).toFixed(2)} MB`,
+      compressedSize: `${(pdfResult.compressedSize / 1024 / 1024).toFixed(2)} MB`,
+      compressionRatio: `${pdfResult.compressionRatio}%`
+    });
 
     // Create contract record in database
     const contract = await prisma.contract.create({
       data: {
         rentalRequestId: parseInt(rentalRequestId),
         contractNumber,
+        pdfUrl: pdfResult.url,
         status: 'GENERATED',
-        pdfUrl: `/uploads/contracts/${filename}`,
-        leaseStartDate,
-        leaseEndDate,
-        rentAmount: rentalRequest.offer.rentAmount,
-        depositAmount: rentalRequest.offer.depositAmount || 0,
-        generatedAt: new Date()
+        createdAt: new Date(),
+        paymentDate: new Date()
       }
     });
 
-    console.log('✅ Contract record created in database:', contract.id);
+    console.log('✅ Contract saved to database:', {
+      contractId: contract.id,
+      contractNumber,
+      pdfUrl: contract.pdfUrl
+    });
 
     return contract;
 
@@ -737,7 +802,14 @@ export const previewContract = async (req, res) => {
                 passportNumber: true,
                 kartaPobytuNumber: true,
                 phoneNumber: true,
-                signatureBase64: true
+                signatureBase64: true,
+                street: true,
+                city: true,
+                zipCode: true,
+                country: true,
+                citizenship: true,
+                dateOfBirth: true,
+                profession: true
               }
             }
           }
@@ -749,9 +821,17 @@ export const previewContract = async (req, res) => {
             email: true,
             firstName: true,
             lastName: true,
+            pesel: true,
             dowodOsobistyNumber: true,
             phoneNumber: true,
             address: true,
+            street: true,
+            city: true,
+            zipCode: true,
+            country: true,
+            citizenship: true,
+            dateOfBirth: true,
+            profession: true,
             signatureBase64: true
           }
         }
@@ -973,35 +1053,37 @@ export const getLandlordContracts = async (req, res) => {
     const contracts = await prisma.contract.findMany({
       where: {
         rentalRequest: {
-          offer: {
-            landlordId: userId
+          offers: {
+            some: {
+              landlordId: userId
+            }
           }
         }
       },
-      include: {
-        rentalRequest: {
-          include: {
-            tenant: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            },
-            offer: {
               include: {
-                landlord: {
-                  select: {
-                    id: true,
-                    name: true,
-                    email: true
+          rentalRequest: {
+            include: {
+              tenant: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true
+                }
+              },
+              offers: {
+                include: {
+                  landlord: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true
+                    }
                   }
                 }
               }
             }
           }
-        }
-      },
+        },
       orderBy: {
         createdAt: 'desc'
       }
@@ -1016,6 +1098,97 @@ export const getLandlordContracts = async (req, res) => {
     res.status(500).json({
       error: 'Internal server error'
     });
+  }
+};
+
+export const downloadGeneratedContract = async (req, res) => {
+  try {
+    const { contractId } = req.params;
+    const userId = req.user.id;
+
+    console.log('📥 Download generated contract requested for contract:', contractId);
+
+    // Find the contract with related data
+    const contract = await prisma.contract.findUnique({
+      where: { id: contractId },
+      include: {
+        rentalRequest: {
+          include: {
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                firstName: true,
+                lastName: true
+              }
+            },
+            offers: {
+              where: { status: 'PAID' },
+              include: {
+                landlord: {
+                  select: {
+                    id: true,
+                    name: true,
+                    firstName: true,
+                    lastName: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!contract) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+
+    // Verify the user is authorized (either tenant or landlord)
+    const { tenant, offers } = contract.rentalRequest;
+    const paidOffer = offers[0];
+    if (tenant.id !== userId && paidOffer.landlord.id !== userId) {
+      return res.status(403).json({ error: 'Access denied. You can only download contracts you are involved in.' });
+    }
+
+    // Check if contract PDF exists
+    if (!contract.pdfUrl) {
+      return res.status(404).json({ error: 'Contract PDF not found' });
+    }
+
+    // Construct file path
+    const filePath = path.join(process.cwd(), contract.pdfUrl);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      console.error('❌ Contract PDF file not found:', filePath);
+      return res.status(404).json({ error: 'Contract PDF file not found' });
+    }
+
+    // Generate filename with contract number and creation date
+    const creationDate = new Date(contract.createdAt).toISOString().split('T')[0];
+    const filename = `rental-contract-${contract.contractNumber}-${creationDate}.pdf`;
+
+    console.log('✅ Downloading generated contract:', {
+      contractId,
+      contractNumber: contract.contractNumber,
+      createdAt: contract.createdAt,
+      userRole: tenant.id === userId ? 'tenant' : 'landlord',
+      filename
+    });
+
+    // Set headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', fs.statSync(filePath).size);
+
+    // Stream the file
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+
+  } catch (error) {
+    console.error('❌ Error downloading generated contract:', error);
+    res.status(500).json({ error: 'Failed to download generated contract' });
   }
 };
 

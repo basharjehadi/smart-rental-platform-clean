@@ -20,6 +20,8 @@ const AdminDashboard = () => {
   const [payments, setPayments] = useState([]);
   const [overduePayments, setOverduePayments] = useState([]);
   const [overdueSummary, setOverdueSummary] = useState(null);
+  const [contracts, setContracts] = useState([]);
+  const [contractSummary, setContractSummary] = useState(null);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -30,12 +32,13 @@ const AdminDashboard = () => {
   const [requestFilter, setRequestFilter] = useState({ status: '', search: '' });
   const [paymentFilter, setPaymentFilter] = useState({ status: '', purpose: '' });
   const [overdueFilter, setOverdueFilter] = useState({ search: '', daysOverdue: '' });
+  const [contractFilter, setContractFilter] = useState({ status: '', search: '' });
 
   useEffect(() => {
     if (user?.role === 'ADMIN') {
       fetchDashboardData();
     }
-  }, [user, activeTab, currentPage, userFilter, requestFilter, paymentFilter, overdueFilter]);
+  }, [user, activeTab, currentPage, userFilter, requestFilter, paymentFilter, overdueFilter, contractFilter]);
 
   const fetchDashboardData = async () => {
     try {
@@ -64,6 +67,9 @@ const AdminDashboard = () => {
           break;
         case 'overdue':
           await fetchOverduePayments();
+          break;
+        case 'contracts':
+          await fetchContracts();
           break;
       }
     } catch (error) {
@@ -160,6 +166,22 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchContracts = async () => {
+    try {
+      const params = new URLSearchParams({
+        page: currentPage,
+        limit: 20,
+        ...contractFilter
+      });
+      const response = await api.get(`/admin/contracts?${params}`);
+      setContracts(response.data.contracts);
+      setContractSummary(response.data.summary);
+      setTotalPages(response.data.pagination.pages);
+    } catch (error) {
+      console.error('Error fetching contracts:', error);
+    }
+  };
+
   const handleKYCVerification = async (userId, isApproved, rejectionReason = '') => {
     try {
       await api.put(`/admin/users/${userId}/kyc`, {
@@ -198,6 +220,44 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDownloadContract = async (contractId) => {
+    try {
+      const response = await api.get(`/admin/contracts/${contractId}/download`, {
+        responseType: 'blob'
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `admin-contract-${contractId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading contract:', error);
+      setError('Failed to download contract');
+    }
+  };
+
+  const handleViewContract = async (contractId) => {
+    try {
+      const response = await api.get(`/admin/contracts/${contractId}`);
+      if (response.data.contract?.pdfUrl) {
+        // Open contract in new tab - use the backend URL directly
+        const contractUrl = `http://localhost:3001${response.data.contract.pdfUrl}`;
+        console.log('Opening contract URL:', contractUrl);
+        window.open(contractUrl, '_blank');
+      } else {
+        setError('Contract PDF not available');
+      }
+    } catch (error) {
+      console.error('Error viewing contract:', error);
+      setError('Failed to view contract');
+    }
+  };
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -222,7 +282,9 @@ const AdminDashboard = () => {
         PENDING: { bg: 'bg-yellow-100', textColor: 'text-yellow-800', label: 'Pending' },
         APPROVED: { bg: 'bg-green-100', textColor: 'text-green-800', label: 'Approved' },
         REJECTED: { bg: 'bg-red-100', textColor: 'text-red-800', label: 'Rejected' },
+        SIGNED: { bg: 'bg-green-100', textColor: 'text-green-800', label: 'Signed' },
         COMPLETED: { bg: 'bg-blue-100', textColor: 'text-blue-800', label: 'Completed' },
+        EXPIRED: { bg: 'bg-red-100', textColor: 'text-red-800', label: 'Expired' },
         CANCELLED: { bg: 'bg-gray-100', textColor: 'text-gray-800', label: 'Cancelled' }
       }
     };
@@ -832,6 +894,208 @@ const AdminDashboard = () => {
     </div>
   );
 
+  const renderContracts = () => (
+    <div>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Contract Management</h2>
+        <p className="text-gray-600">View and manage all rental contracts across the platform</p>
+      </div>
+
+      {/* Summary Cards */}
+      {contractSummary && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="flex items-center">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Total Contracts</p>
+                <p className="text-2xl font-bold text-gray-900">{contracts.length}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="flex items-center">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Signed</p>
+                <p className="text-2xl font-bold text-green-600">{contractSummary.SIGNED || 0}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="flex items-center">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Signed</p>
+                <p className="text-2xl font-bold text-purple-600">{contractSummary.SIGNED || 0}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="flex items-center">
+              <div className="p-2 bg-gray-100 rounded-lg">
+                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Completed</p>
+                <p className="text-2xl font-bold text-gray-600">{contractSummary.COMPLETED || 0}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+            <input
+              type="text"
+              placeholder="Search by contract number, tenant, or landlord..."
+              value={contractFilter.search}
+              onChange={(e) => setContractFilter(prev => ({ ...prev, search: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <select
+              value={contractFilter.status}
+              onChange={(e) => setContractFilter(prev => ({ ...prev, status: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Statuses</option>
+              <option value="SIGNED">Signed</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="EXPIRED">Expired</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Contracts List */}
+      <div className="bg-white shadow overflow-hidden sm:rounded-md">
+        {contracts.length === 0 ? (
+          <div className="text-center py-12">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No contracts found</h3>
+            <p className="mt-1 text-sm text-gray-500">No contracts match your current filters.</p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-gray-200">
+            {contracts.map((contract) => (
+              <li key={contract.id} className="px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900">
+                          Contract #{contract.contractNumber}
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {contract.rentalRequest?.tenant?.name || 'Unknown Tenant'} - {contract.rentalRequest?.offers?.[0]?.landlord?.name || 'Unknown Landlord'}
+                        </p>
+                        <div className="flex items-center mt-2 space-x-4 text-sm text-gray-500">
+                          <span>Created: {formatDate(contract.createdAt)}</span>
+                          {contract.signedAt && (
+                            <span>Signed: {formatDate(contract.signedAt)}</span>
+                          )}
+                          <span>Status: {getStatusBadge(contract.status)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={() => handleViewContract(contract.id)}
+                          className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={() => handleDownloadContract(contract.id)}
+                          className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                        >
+                          Download
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between">
+          <div className="flex-1 flex justify-between sm:hidden">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Showing page <span className="font-medium">{currentPage}</span> of{' '}
+                <span className="font-medium">{totalPages}</span>
+              </p>
+            </div>
+            <div>
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -846,6 +1110,8 @@ const AdminDashboard = () => {
         return renderPayments();
       case 'overdue':
         return renderOverduePayments();
+      case 'contracts':
+        return renderContracts();
       default:
         return renderOverview();
     }
@@ -951,6 +1217,20 @@ const AdminDashboard = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
               Overdue Payments
+            </button>
+            
+            <button
+              onClick={() => setActiveTab('contracts')}
+              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'contracts'
+                  ? 'text-white bg-black'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Contracts
             </button>
           </div>
         </nav>

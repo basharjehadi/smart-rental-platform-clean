@@ -1,5 +1,7 @@
 import { prisma } from '../utils/prisma.js';
 import { sendKYCApprovalEmail, sendKYCRejectionEmail } from '../utils/emailService.js';
+import fs from 'fs';
+import path from 'path';
 
 // 🚀 SCALABILITY: Get all users with pagination and filtering
 export const getAllUsers = async (req, res) => {
@@ -643,6 +645,239 @@ export const triggerSystemMaintenance = async (req, res) => {
     }
   } catch (error) {
     console.error('Trigger system maintenance error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}; 
+
+// 🚀 SCALABILITY: Get all contracts for admin
+export const getAllContracts = async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status = '', search = '' } = req.query;
+
+    // Build where clause
+    const whereClause = {};
+    
+    if (status) {
+      whereClause.status = status;
+    }
+    
+    if (search) {
+      whereClause.OR = [
+        { contractNumber: { contains: search, mode: 'insensitive' } },
+        { rentalRequest: { tenant: { name: { contains: search, mode: 'insensitive' } } } },
+        { rentalRequest: { offer: { landlord: { name: { contains: search, mode: 'insensitive' } } } } }
+      ];
+    }
+
+    // Get contracts with pagination
+    const contracts = await prisma.contract.findMany({
+      where: whereClause,
+      include: {
+        rentalRequest: {
+          include: {
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                firstName: true,
+                lastName: true
+              }
+            },
+            offer: {
+              include: {
+                landlord: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    firstName: true,
+                    lastName: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      skip: (parseInt(page) - 1) * parseInt(limit),
+      take: parseInt(limit)
+    });
+
+    // Get total count for pagination
+    const total = await prisma.contract.count({ where: whereClause });
+
+    // Get summary statistics
+    const summary = await prisma.contract.groupBy({
+      by: ['status'],
+      _count: {
+        status: true
+      }
+    });
+
+    const statusSummary = summary.reduce((acc, item) => {
+      acc[item.status] = item._count.status;
+      return acc;
+    }, {});
+
+    res.json({
+      contracts,
+      summary: statusSummary,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Get all contracts error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// 🚀 SCALABILITY: Admin download contract
+export const adminDownloadContract = async (req, res) => {
+  try {
+    const { contractId } = req.params;
+
+    console.log('📥 Admin downloading contract:', contractId);
+
+    // Find the contract with related data
+    const contract = await prisma.contract.findUnique({
+      where: { id: contractId },
+      include: {
+        rentalRequest: {
+          include: {
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                firstName: true,
+                lastName: true
+              }
+            },
+            offer: {
+              include: {
+                landlord: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    firstName: true,
+                    lastName: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!contract) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+
+    // Check if contract PDF exists
+    if (!contract.pdfUrl) {
+      return res.status(404).json({ error: 'Contract PDF not found' });
+    }
+
+    // Construct file path
+    const filePath = path.join(process.cwd(), contract.pdfUrl);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      console.error('❌ Contract PDF file not found:', filePath);
+      return res.status(404).json({ error: 'Contract PDF file not found' });
+    }
+
+    // Generate filename with contract number and admin prefix
+    const filename = `admin-contract-${contract.contractNumber}-${new Date().toISOString().split('T')[0]}.pdf`;
+
+    console.log('✅ Admin downloading contract:', {
+      contractId,
+      contractNumber: contract.contractNumber,
+      filename
+    });
+
+    // Set headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', fs.statSync(filePath).size);
+
+    // Stream the file
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+
+  } catch (error) {
+    console.error('❌ Error admin downloading contract:', error);
+    res.status(500).json({ error: 'Failed to download contract' });
+  }
+};
+
+// 🚀 SCALABILITY: Admin view contract details
+export const getContractDetails = async (req, res) => {
+  try {
+    const { contractId } = req.params;
+
+    const contract = await prisma.contract.findUnique({
+      where: { id: contractId },
+      include: {
+        rentalRequest: {
+          include: {
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                phoneNumber: true,
+                pesel: true,
+                passportNumber: true,
+                citizenship: true,
+                dateOfBirth: true
+              }
+            },
+            offer: {
+              include: {
+                landlord: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    firstName: true,
+                    lastName: true,
+                    phoneNumber: true,
+                    pesel: true,
+                    dowodOsobistyNumber: true,
+                    citizenship: true,
+                    dateOfBirth: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!contract) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+
+    res.json({
+      contract,
+      message: 'Contract details retrieved successfully'
+    });
+  } catch (error) {
+    console.error('Get contract details error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 }; 

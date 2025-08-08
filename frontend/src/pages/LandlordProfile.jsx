@@ -313,12 +313,13 @@ const LandlordProfile = () => {
     
     try {
       const formData = new FormData(formRef.current);
+      
       const updateData = {
         firstName: formData.get('firstName'),
         lastName: formData.get('lastName'),
         citizenship: selectedCitizenship?.value || selectedCitizenship?.label,
         pesel: formData.get('pesel'),
-        idCardNumber: formData.get('idCardNumber'),
+        dowodOsobistyNumber: formData.get('idCardNumber')?.toUpperCase(), // Map idCardNumber to dowodOsobistyNumber and convert to uppercase
         passportNumber: formData.get('passportNumber'),
         phoneNumber: formData.get('phoneNumber'),
         street: formData.get('street'),
@@ -724,8 +725,8 @@ const LandlordProfile = () => {
       errors[name] = 'PESEL must be exactly 11 digits';
     }
     
-    // ID Card Number validation (alphanumeric, 6-12 characters)
-    if (name === 'idCardNumber' && value && !/^[A-Z0-9]{6,12}$/.test(value)) {
+    // ID Card Number validation (alphanumeric, 6-12 characters, case insensitive)
+    if (name === 'idCardNumber' && value && !/^[A-Za-z0-9]{6,12}$/.test(value)) {
       errors[name] = 'ID Card Number must be 6-12 alphanumeric characters';
     }
     
@@ -1349,9 +1350,9 @@ const LandlordProfile = () => {
                         <input
                           type="text"
                           name="idCardNumber"
-                          defaultValue={profileData?.idCardNumber || ''}
-                          onChange={(e) => handleFieldChange('idCardNumber', e.target.value)}
-                          onBlur={(e) => handleFieldBlur('idCardNumber', e.target.value)}
+                          defaultValue={profileData?.dowodOsobistyNumber || ''}
+                          onChange={(e) => handleFieldChange('idCardNumber', e.target.value.toUpperCase())}
+                          onBlur={(e) => handleFieldBlur('idCardNumber', e.target.value.toUpperCase())}
                           className={`input-modern ${
                             formErrors.idCardNumber && formTouched.idCardNumber ? 'border-red-300' : ''
                           }`}
@@ -1359,7 +1360,7 @@ const LandlordProfile = () => {
                           required
                         />
                       ) : (
-                        <p className="text-gray-900">{profileData?.idCardNumber || 'Not provided'}</p>
+                        <p className="text-gray-900">{profileData?.dowodOsobistyNumber || 'Not provided'}</p>
                       )}
                       {formErrors.idCardNumber && formTouched.idCardNumber && (
                         <p className="mt-1 text-sm text-red-600">{formErrors.idCardNumber}</p>

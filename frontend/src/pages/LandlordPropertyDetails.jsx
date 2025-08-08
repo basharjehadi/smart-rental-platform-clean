@@ -90,6 +90,11 @@ const LandlordPropertyDetails = () => {
     return parts.filter(Boolean).join(', ');
   };
 
+  // Check if property is locked (occupied or rented)
+  const isPropertyLocked = (property) => {
+    return property && ['OCCUPIED', 'RENTED'].includes(property.status);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -108,17 +113,17 @@ const LandlordPropertyDetails = () => {
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Oops! Something went wrong</h3>
             <p className="text-gray-600 mb-6">{error || 'Property not found'}</p>
-            <button
-              onClick={() => navigate('/landlord-my-property')}
+          <button
+            onClick={() => navigate('/landlord-my-property')}
               className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
-            >
-              Back to My Properties
-            </button>
+          >
+            Back to My Properties
+          </button>
           </div>
         </div>
       </div>
@@ -152,11 +157,12 @@ const LandlordPropertyDetails = () => {
               <div className="flex-1">
                 <div className="flex items-center space-x-3 mb-2">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(property.status)}`}>
+                    {isPropertyLocked(property) && <span className="mr-1">🔒</span>}
                     {property.status}
                   </span>
                   <span className="text-sm text-gray-500">•</span>
                   <span className="text-sm text-gray-500">{property.propertyType}</span>
-                </div>
+          </div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">{property.name}</h1>
                 <div className="flex items-center space-x-2 text-gray-600">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -172,15 +178,31 @@ const LandlordPropertyDetails = () => {
                     <p className="text-sm text-gray-500">Monthly Rent</p>
                     <p className="text-3xl font-bold text-gray-900">{property.monthlyRent} zł</p>
                   </div>
-                <button
-                  onClick={() => navigate(`/landlord-edit-property/${propertyId}`)}
-                  className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-md"
+                  <button
+                    onClick={() => navigate(`/landlord-edit-property/${propertyId}`)}
+                  disabled={isPropertyLocked(property)}
+                  className={`flex items-center space-x-2 px-6 py-3 rounded-lg transition-colors duration-200 shadow-md ${
+                    isPropertyLocked(property)
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                  title={isPropertyLocked(property) ? 'Cannot edit occupied/rented property' : 'Edit Property'}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
-                  <span>Edit Property</span>
-                </button>
+                  <span>{isPropertyLocked(property) ? 'Property Locked' : 'Edit Property'}</span>
+                  </button>
+                
+                {/* Warning Message for Locked Properties */}
+                {isPropertyLocked(property) && (
+                  <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-700 flex items-center">
+                      <span className="mr-2">🔒</span>
+                      This property is {property.status.toLowerCase()}. Editing is disabled to protect tenant data and rental agreements.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -221,15 +243,15 @@ const LandlordPropertyDetails = () => {
                 </div>
                 <p className="text-sm text-gray-500">Floor</p>
                 <p className="text-lg font-semibold text-gray-900">{property.floor || 'N/A'}</p>
+                </div>
               </div>
             </div>
-          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Content */}
+              {/* Main Content */}
             <div className="lg:col-span-2 space-y-8">
               {/* Property Images Gallery */}
-              {propertyImages.length > 0 && (
+                {propertyImages.length > 0 && (
                 <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
                   <div className="p-6 border-b border-gray-200">
                     <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
@@ -257,12 +279,12 @@ const LandlordPropertyDetails = () => {
                         </div>
                       ))}
                     </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Virtual Tour Videos */}
-              {propertyVideos.length > 0 && (
+                {propertyVideos.length > 0 && (
                 <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
                   <div className="p-6 border-b border-gray-200">
                     <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
@@ -289,17 +311,17 @@ const LandlordPropertyDetails = () => {
                         </div>
                       ))}
                     </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Property Description */}
-              {property.description && (
+                {/* Property Description */}
+                {property.description && (
                 <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4">About This Property</h2>
                   <p className="text-gray-700 leading-relaxed text-lg">{property.description}</p>
-                </div>
-              )}
+                  </div>
+                )}
 
               {/* Amenities & Features */}
               {amenities.length > 0 && (
@@ -310,16 +332,16 @@ const LandlordPropertyDetails = () => {
                       <div key={index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                         <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                          </svg>
                         <span className="text-gray-700 font-medium">{amenity}</span>
-                      </div>
-                    ))}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-            {/* Sidebar */}
+              {/* Sidebar */}
             <div className="space-y-8">
               {/* Property Features */}
               <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
@@ -329,14 +351,14 @@ const LandlordPropertyDetails = () => {
                     <div className="flex items-center space-x-3">
                       <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                      </svg>
+                        </svg>
                       <span className="text-gray-700">Furnished</span>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${property.furnished ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                       {property.furnished ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-                  
+                      </span>
+                    </div>
+
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -347,8 +369,8 @@ const LandlordPropertyDetails = () => {
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${property.parking ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                       {property.parking ? 'Available' : 'Not Available'}
                     </span>
-                  </div>
-                  
+                </div>
+
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -358,8 +380,8 @@ const LandlordPropertyDetails = () => {
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${property.petsAllowed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                       {property.petsAllowed ? 'Yes' : 'No'}
-                    </span>
-                  </div>
+                      </span>
+                    </div>
                   
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-3">
@@ -369,13 +391,13 @@ const LandlordPropertyDetails = () => {
                       <span className="text-gray-700">Smoking Allowed</span>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${property.smokingAllowed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                      {property.smokingAllowed ? 'Yes' : 'No'}
-                    </span>
+                        {property.smokingAllowed ? 'Yes' : 'No'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Property Timeline */}
+                {/* Property Timeline */}
               <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">Property Timeline</h2>
                 <div className="space-y-4">
@@ -411,7 +433,7 @@ const LandlordPropertyDetails = () => {
                     </div>
                   </div>
                   
-                  {property.availableFrom && (
+                    {property.availableFrom && (
                     <div className="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg">
                       <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -426,10 +448,10 @@ const LandlordPropertyDetails = () => {
                           })}
                         </p>
                       </div>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
               {/* Rental Statistics */}
               <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
@@ -466,10 +488,10 @@ const LandlordPropertyDetails = () => {
                   </div>
                 </div>
               </div>
+              </div>
             </div>
           </div>
-        </div>
-      </main>
+        </main>
     </div>
   );
 };

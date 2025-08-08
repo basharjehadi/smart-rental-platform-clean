@@ -301,6 +301,25 @@ const handlePaymentSucceeded = async (paymentIntent) => {
 
       console.log('✅ Offer status updated to PAID:', offerId);
 
+      // Update property status to OCCUPIED when offer is paid
+      try {
+        const offer = await prisma.offer.findUnique({
+          where: { id: offerId },
+          select: { propertyId: true }
+        });
+
+        if (offer && offer.propertyId) {
+          await prisma.property.update({
+            where: { id: offer.propertyId },
+            data: { status: 'OCCUPIED' }
+          });
+          console.log('✅ Property status updated to OCCUPIED:', offer.propertyId);
+        }
+      } catch (propertyUpdateError) {
+        console.error('❌ Error updating property status:', propertyUpdateError);
+        // Don't fail the payment if property status update fails
+      }
+
       // Note: RentPayment records should only be created for monthly rent payments
       // DEPOSIT_AND_FIRST_MONTH payments are stored only in the Payment table
       // to avoid duplication in payment history

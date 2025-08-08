@@ -42,8 +42,8 @@ const validateKartaPobytu = (kartaPobytuNumber) => {
 
 const validateDowodOsobisty = (dowodOsobistyNumber) => {
   if (!dowodOsobistyNumber) return false;
-  // Basic Polish ID card validation
-  const dowodRegex = /^[A-Z]{3}\d{6}$/;
+  // More flexible Polish ID card validation (6-12 alphanumeric characters)
+  const dowodRegex = /^[A-Z0-9]{6,12}$/;
   return dowodRegex.test(dowodOsobistyNumber);
 };
 

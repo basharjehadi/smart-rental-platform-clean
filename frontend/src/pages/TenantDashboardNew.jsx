@@ -150,17 +150,79 @@ const TenantDashboardNew = () => {
       // Add a small delay to ensure dashboard data is properly loaded
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Fetch the actual offer data using the offer ID
-      console.log('🔍 Dashboard: Fetching offer details for ID:', dashboardData.offerId);
-      console.log('🔍 Dashboard: Full URL being called:', `/tenant/offer/${dashboardData.offerId}`);
-      const response = await api.get(`/tenant/offer/${dashboardData.offerId}`);
-      const offerData = response.data;
+      // First, check if there's an existing contract in the database
+      let existingContract = null;
+      try {
+        console.log('🔍 Dashboard: Checking for existing contract...');
+        const contractResponse = await api.get(`/contracts/my-contracts`);
+        console.log('🔍 Dashboard: Contract response:', contractResponse.data);
+        
+        if (contractResponse.data.contracts) {
+          console.log('🔍 Dashboard: Found contracts, searching for offer ID:', dashboardData.offerId);
+          existingContract = contractResponse.data.contracts.find(
+            contract => contract.rentalRequest.offers.some(offer => offer.id === dashboardData.offerId)
+          );
+          
+          if (existingContract) {
+            console.log('✅ Dashboard: Found existing contract, checking PDF URL:', existingContract.pdfUrl);
+            
+            // Check if PDF URL exists and is valid
+            if (existingContract.pdfUrl && existingContract.pdfUrl !== 'null' && existingContract.pdfUrl !== null) {
+              console.log('✅ Dashboard: Opening saved contract with URL:', `http://localhost:3001${existingContract.pdfUrl}`);
+              window.open(`http://localhost:3001${existingContract.pdfUrl}`, '_blank');
+              return;
+            } else {
+              console.log('⚠️ Dashboard: Contract found but PDF URL is invalid, will generate on-the-fly');
+            }
+          } else {
+            console.log('ℹ️ Dashboard: No matching contract found for offer ID:', dashboardData.offerId);
+          }
+        } else {
+          console.log('ℹ️ Dashboard: No contracts in response');
+        }
+      } catch (contractError) {
+        console.error('❌ Dashboard: Error checking for existing contract:', contractError);
+        console.log('ℹ️ Dashboard: Will generate on-the-fly due to error');
+      }
+
+      // If no existing contract, generate on-the-fly using backend
+      console.log('🔍 Dashboard: No existing contract found, generating via backend...');
       
-      console.log('🔍 Dashboard: Offer data for contract:', offerData);
-      console.log('🔍 Dashboard: Offer object from response:', offerData.offer);
-      console.log('🔍 Dashboard: Tenant signature present:', !!offerData.offer?.tenant?.signatureBase64);
-      console.log('🔍 Dashboard: Landlord signature present:', !!offerData.offer?.landlord?.signatureBase64);
-      await viewContract(offerData.offer, user);
+      try {
+        // Call backend to generate contract by offer ID
+        const generateResponse = await api.post(`/contracts/generate-by-offer/${dashboardData.offerId}`);
+        
+        if (generateResponse.data.success) {
+          // Open the newly generated contract in a new tab
+          const contractUrl = `http://localhost:3001${generateResponse.data.contract.pdfUrl}`;
+          window.open(contractUrl, '_blank');
+          return;
+        }
+      } catch (generateError) {
+        console.error('❌ Dashboard: Error generating contract via backend:', generateError);
+        console.log('⚠️ Dashboard: Falling back to frontend generation');
+        
+        // Fallback to frontend generation
+        const response = await api.get(`/tenant/offer/${dashboardData.offerId}`);
+        const offerData = response.data;
+        
+        // If we found an existing contract but with invalid PDF, use its data for consistency
+        if (existingContract) {
+          console.log('🔍 Dashboard: Using existing contract data for consistency:', {
+            contractNumber: existingContract.contractNumber,
+            createdAt: existingContract.createdAt,
+            paymentDate: existingContract.paymentDate
+          });
+          
+          // Add the original contract data to the offer
+          offerData.offer.originalContractNumber = existingContract.contractNumber;
+          offerData.offer.originalContractDate = existingContract.createdAt;
+          offerData.offer.originalPaymentDate = existingContract.paymentDate;
+        }
+        
+        console.log('🔍 Dashboard: Offer data for contract:', offerData);
+        await viewContract(offerData.offer, user);
+      }
     } catch (error) {
       console.error('❌ Dashboard: Error viewing contract:', error);
       console.error('❌ Dashboard: Error response:', error.response?.data);
@@ -187,17 +249,113 @@ const TenantDashboardNew = () => {
         return;
       }
 
-      // Fetch the actual offer data using the offer ID
-      console.log('🔍 Dashboard: Fetching offer details for ID:', dashboardData.offerId);
-      console.log('🔍 Dashboard: Full URL being called:', `/tenant/offer/${dashboardData.offerId}`);
-      const response = await api.get(`/tenant/offer/${dashboardData.offerId}`);
-      const offerData = response.data;
+      // First, check if there's an existing contract in the database
+      let existingContract = null;
+      try {
+        console.log('🔍 Dashboard: Checking for existing contract...');
+        const contractResponse = await api.get(`/contracts/my-contracts`);
+        console.log('🔍 Dashboard: Contract response:', contractResponse.data);
+        
+        if (contractResponse.data.contracts) {
+          console.log('🔍 Dashboard: Found contracts, searching for offer ID:', dashboardData.offerId);
+          existingContract = contractResponse.data.contracts.find(
+            contract => contract.rentalRequest.offers.some(offer => offer.id === dashboardData.offerId)
+          );
+          
+          if (existingContract) {
+            console.log('✅ Dashboard: Found existing contract, checking PDF URL:', existingContract.pdfUrl);
+            
+            // Check if PDF URL exists and is valid
+            if (existingContract.pdfUrl && existingContract.pdfUrl !== 'null' && existingContract.pdfUrl !== null) {
+              console.log('✅ Dashboard: Downloading saved contract with URL:', `http://localhost:3001${existingContract.pdfUrl}`);
+              
+              // Download the existing contract
+              const response = await fetch(`http://localhost:3001${existingContract.pdfUrl}`, {
+                headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+              });
+              
+              if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `rental-contract-${existingContract.contractNumber}.pdf`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+                return;
+              }
+            } else {
+              console.log('⚠️ Dashboard: Contract found but PDF URL is invalid, will generate on-the-fly');
+            }
+          } else {
+            console.log('ℹ️ Dashboard: No matching contract found for offer ID:', dashboardData.offerId);
+          }
+        } else {
+          console.log('ℹ️ Dashboard: No contracts in response');
+        }
+      } catch (contractError) {
+        console.error('❌ Dashboard: Error checking for existing contract:', contractError);
+        console.log('ℹ️ Dashboard: Will generate on-the-fly due to error');
+      }
+
+      // If no existing contract, generate on-the-fly using backend
+      console.log('🔍 Dashboard: No existing contract found, generating via backend...');
       
-      console.log('🔍 Dashboard: Offer data for download:', offerData);
-      console.log('🔍 Dashboard: Offer object from response:', offerData.offer);
-      console.log('🔍 Dashboard: Tenant signature present:', !!offerData.offer?.tenant?.signatureBase64);
-      console.log('🔍 Dashboard: Landlord signature present:', !!offerData.offer?.landlord?.signatureBase64);
-      await downloadContract(offerData.offer, user);
+      try {
+        // Call backend to generate contract by offer ID
+        const generateResponse = await api.post(`/contracts/generate-by-offer/${dashboardData.offerId}`);
+        
+        if (generateResponse.data.success) {
+          // Download the newly generated contract
+          const contractUrl = `http://localhost:3001${generateResponse.data.contract.pdfUrl}`;
+          const response = await fetch(contractUrl, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `rental-contract-${generateResponse.data.contract.contractNumber}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            return;
+          }
+        }
+      } catch (generateError) {
+        console.error('❌ Dashboard: Error generating contract via backend:', generateError);
+        console.log('⚠️ Dashboard: Falling back to frontend generation');
+        
+        // Fallback to frontend generation
+        const response = await api.get(`/tenant/offer/${dashboardData.offerId}`);
+        const offerData = response.data;
+        
+        // If we found an existing contract but with invalid PDF, use its data for consistency
+        if (existingContract) {
+          console.log('🔍 Dashboard: Using existing contract data for consistency:', {
+            contractNumber: existingContract.contractNumber,
+            createdAt: existingContract.createdAt,
+            paymentDate: existingContract.paymentDate
+          });
+          
+          // Add the original contract data to the offer
+          offerData.offer.originalContractNumber = existingContract.contractNumber;
+          offerData.offer.originalContractDate = existingContract.createdAt;
+          offerData.offer.originalPaymentDate = existingContract.paymentDate;
+        }
+        
+        console.log('🔍 Dashboard: Offer data for download:', offerData);
+        await downloadContract(offerData.offer, user);
+      }
     } catch (error) {
       console.error('❌ Dashboard: Error downloading contract:', error);
       console.error('❌ Dashboard: Error response:', error.response?.data);

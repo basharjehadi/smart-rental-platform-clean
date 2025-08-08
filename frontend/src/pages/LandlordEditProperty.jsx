@@ -135,6 +135,13 @@ const LandlordEditProperty = () => {
         const property = response.data.property;
         console.log('📋 Received property data:', property);
         
+        // Check if property is locked (occupied or rented)
+        if (['OCCUPIED', 'RENTED'].includes(property.status)) {
+          setErrors({ fetch: 'This property is currently occupied/rented and cannot be edited. Please contact support if you need to make changes.' });
+          setFetching(false);
+          return;
+        }
+        
         // Parse address into separate components
         let street = '';
         let houseNumber = '';
@@ -558,6 +565,23 @@ const LandlordEditProperty = () => {
         {/* Form Content */}
         <main className="flex-1 p-6">
           <div className="max-w-4xl mx-auto">
+            {/* Error Message for Locked Properties */}
+            {errors.fetch && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center">
+                  <span className="mr-2 text-red-600">🔒</span>
+                  <p className="text-red-700 font-medium">{errors.fetch}</p>
+                </div>
+                <div className="mt-3">
+                  <button
+                    onClick={() => navigate('/landlord-my-property')}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200"
+                  >
+                    Back to Properties
+                  </button>
+                </div>
+              </div>
+            )}
             {/* Progress Header */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6 relative">
               {/* Cancel Button */}

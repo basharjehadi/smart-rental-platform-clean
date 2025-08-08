@@ -2,7 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -415,7 +416,7 @@ model ContractSignature {
 model Contract {
   id              String   @id @default(cuid())
   contractNumber  String   @unique
-  status          ContractStatus @default(GENERATED)
+  status          ContractStatus @default(SIGNED)
   pdfUrl          String?
   signedAt        DateTime?
   
@@ -538,9 +539,7 @@ enum PaymentPurpose {
 }
 
 enum ContractStatus {
-  GENERATED
-  TENANT_SIGNED
-  LANDLORD_SIGNED
+  SIGNED
   COMPLETED
   EXPIRED
 }

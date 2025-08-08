@@ -185,7 +185,10 @@ const LandlordDashboard = () => {
         )}
       </div>
 
-      <button className="btn-secondary flex items-center space-x-2 w-full justify-center">
+      <button 
+        onClick={() => navigate('/landlord-my-tenants')}
+        className="btn-secondary flex items-center space-x-2 w-full justify-center"
+      >
         <Users className="w-4 h-4" />
         <span>View All Tenants</span>
       </button>

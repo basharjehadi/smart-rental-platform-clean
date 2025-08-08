@@ -21,6 +21,8 @@ import LandlordEditProperty from './pages/LandlordEditProperty';
 import LandlordPropertyDetails from './pages/LandlordPropertyDetails';
 import LandlordHelpCenter from './pages/LandlordHelpCenter';
 import LandlordRentalRequests from './pages/LandlordRentalRequests';
+import LandlordMyTenants from './pages/LandlordMyTenants';
+import LandlordTenantProfile from './pages/LandlordTenantProfile';
 
 import MyOffers from './pages/MyOffers';
 import PropertyDetailsView from './pages/PropertyDetailsView';
@@ -46,7 +48,7 @@ import TenantDashboardRedirect from './components/TenantDashboardRedirect';
 // Component to conditionally render Navbar
 const AppContent = () => {
   const location = useLocation();
-  const hideNavbarRoutes = ['/', '/login', '/register', '/dashboard', '/tenant-dashboard', '/tenant-help-center', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/property', '/contracts', '/payments', '/payment', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details', '/landlord-help-center', '/admin', '/payment-success', '/payment-history'];
+  const hideNavbarRoutes = ['/', '/login', '/register', '/dashboard', '/tenant-dashboard', '/tenant-help-center', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/property', '/contracts', '/payments', '/payment', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details', '/landlord-help-center', '/landlord-my-tenants', '/landlord-tenant-profile', '/admin', '/payment-success', '/payment-history'];
   
   // Check if current path should hide navbar (including parameterized routes)
   const shouldHideNavbar = hideNavbarRoutes.some(route => {
@@ -267,6 +269,24 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <LandlordHelpCenter />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/landlord-my-tenants" 
+          element={
+            <ProtectedRoute>
+              <LandlordMyTenants />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/landlord-tenant-profile/:tenantId" 
+          element={
+            <ProtectedRoute>
+              <LandlordTenantProfile />
             </ProtectedRoute>
           } 
         />

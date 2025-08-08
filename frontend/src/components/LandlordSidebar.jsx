@@ -10,7 +10,8 @@ import {
   X,
   Building,
   Plus,
-  Settings
+  Settings,
+  Users
 } from 'lucide-react';
 
 const SidebarItem = ({ to, icon: Icon, children, isActive, isCollapsed }) => {
@@ -59,6 +60,11 @@ const LandlordSidebar = () => {
       to: '/landlord-dashboard',
       icon: Home,
       label: 'Dashboard'
+    },
+    {
+      to: '/landlord-my-tenants',
+      icon: Users,
+      label: 'My Tenants'
     },
     {
       to: '/tenant-rental-requests',

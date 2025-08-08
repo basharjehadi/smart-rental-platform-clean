@@ -140,7 +140,8 @@ export const updateUserProfile = async (req, res) => {
       if (kartaPobytuNumber !== undefined) updateData.kartaPobytuNumber = kartaPobytuNumber;
       if (address !== undefined) updateData.address = address; // Allow address for tenants too
     } else if (user.role === 'LANDLORD') {
-      // Landlord-specific fields
+      // Landlord-specific fields - handle both PESEL and ID card number
+      if (pesel !== undefined) updateData.pesel = pesel;
       if (dowodOsobistyNumber !== undefined) updateData.dowodOsobistyNumber = dowodOsobistyNumber;
       if (address !== undefined) updateData.address = address;
     }

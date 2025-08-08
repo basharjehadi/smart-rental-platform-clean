@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { CheckCircle, Shield, Clock, MapPin, Calendar, Home, MessageCircle, Phone, AlertTriangle, FileText, Download, Info, Zap } from 'lucide-react';
-import { viewContract, downloadContract, downloadReceipt } from '../utils/contractGenerator.js';
+import { viewContract, downloadContract } from '../utils/contractGenerator.js';
 
 const PaymentSuccessPage = () => {
   const [offer, setOffer] = useState(null);
@@ -61,7 +61,62 @@ const PaymentSuccessPage = () => {
   const handleDownloadReceipt = async () => {
     try {
       console.log('🔍 Downloading receipt for offer:', offer);
-      await downloadReceipt(offer);
+      
+      // Create a simple receipt HTML
+      const receiptHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Payment Receipt</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+            .receipt-details { margin-bottom: 20px; }
+            .receipt-details div { margin-bottom: 10px; }
+            .total { font-weight: bold; font-size: 18px; border-top: 2px solid #333; padding-top: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Payment Receipt</h1>
+            <p><strong>Smart Rental System</strong></p>
+            <p>Date: ${new Date().toLocaleDateString()}</p>
+          </div>
+          
+          <div class="receipt-details">
+            <div><strong>Property:</strong> ${offer?.propertyAddress || 'N/A'}</div>
+            <div><strong>Landlord:</strong> ${offer?.landlord?.name || 'N/A'}</div>
+            <div><strong>Tenant:</strong> ${offer?.rentalRequest?.tenant?.name || 'N/A'}</div>
+            <div><strong>Payment Date:</strong> ${new Date().toLocaleDateString()}</div>
+            <div><strong>First Month Rent:</strong> ${offer?.rentAmount || 0} PLN</div>
+            <div><strong>Security Deposit:</strong> ${offer?.depositAmount || 0} PLN</div>
+          </div>
+          
+          <div class="total">
+            <strong>Total Amount:</strong> ${(offer?.rentAmount || 0) + (offer?.depositAmount || 0)} PLN
+          </div>
+          
+          <div style="margin-top: 30px; text-align: center; color: #666;">
+            <p>Thank you for using Smart Rental System!</p>
+            <p>This receipt serves as proof of payment.</p>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      // Download as HTML file
+      const blob = new Blob([receiptHTML], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Payment_Receipt_${new Date().toISOString().split('T')[0]}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      console.log('✅ Receipt downloaded successfully');
     } catch (error) {
       console.error('❌ Error downloading receipt:', error);
       alert('Error downloading receipt. Please try again.');
