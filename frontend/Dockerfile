@@ -16,5 +16,5 @@ COPY . .
 # Expose port
 EXPOSE 5173
 
-# Start development server with host binding for Docker
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Start development server
+CMD ["npm", "run", "dev"]
