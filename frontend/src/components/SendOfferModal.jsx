@@ -195,22 +195,6 @@ const SendOfferModal = ({ request, offerForm, setOfferForm, onClose, onSubmit })
             </div>
           </div>
 
-                                {/* Tenant's Expected Move-in Date */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900">Tenant's Expected Move-in Date</h3>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-700">
-                    {request.moveInDate ? new Date(request.moveInDate).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    }) : 'Not specified'}
-                  </div>
-                </div>
-              </div>
-            </div>
-
           {/* Lease Terms Section */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-gray-900">Lease Terms</h3>
