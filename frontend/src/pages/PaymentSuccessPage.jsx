@@ -9,6 +9,7 @@ const PaymentSuccessPage = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (location.state?.offer) {

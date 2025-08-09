@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: smart-rental-postgres-dev
+    environment:
+      POSTGRES_DB: smart_rental_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    networks:
+      - smart-rental-dev-network
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: smart-rental-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - smart-rental-dev-network
+    restart: unless-stopped
+
+  # MinIO (Object Storage) - for file uploads
+  minio:
+    image: minio/minio:latest
+    container_name: smart-rental-minio-dev
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_dev_data:/data
+    networks:
+      - smart-rental-dev-network
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+
+  # Adminer (Database Management)
+  adminer:
+    image: adminer:latest
+    container_name: smart-rental-adminer-dev
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha-dark
+    depends_on:
+      - postgres
+    networks:
+      - smart-rental-dev-network
+    profiles:
+      - tools
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  minio_dev_data:
+    driver: local
+
+networks:
+  smart-rental-dev-network:
+    driver: bridge

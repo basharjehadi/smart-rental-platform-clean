@@ -195,3 +195,4 @@ const DigitalSignature = ({ signature, onSignatureSave, onSignatureClear, signat
 };
 
 export default DigitalSignature; 
+

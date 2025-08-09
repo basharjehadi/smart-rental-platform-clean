@@ -151,12 +151,30 @@ const getAllActiveRequests = async (req, res) => {
     );
 
     // Transform data for frontend compatibility
-    const requests = poolRequests.requests.map(match => ({
-      ...match.rentalRequest,
-      matchScore: match.matchScore,
-      matchReason: match.matchReason,
-      tenant: match.rentalRequest.tenant
-    }));
+    const requests = poolRequests.requests.map(match => {
+      // Get the best matching property for this landlord and request
+      const bestProperty = match.rentalRequest.bestMatchingProperty || null;
+      
+      return {
+        ...match.rentalRequest,
+        matchScore: match.matchScore,
+        matchReason: match.matchReason,
+        tenant: match.rentalRequest.tenant,
+        propertyMatch: bestProperty ? {
+          id: bestProperty.id,
+          name: bestProperty.name,
+          city: bestProperty.city,
+          address: bestProperty.address,
+          rent: `${bestProperty.monthlyRent.toLocaleString('pl-PL')} zł`,
+          available: bestProperty.availableFrom ? new Date(bestProperty.availableFrom).toISOString() : null,
+          bedrooms: bestProperty.bedrooms,
+          propertyType: bestProperty.propertyType,
+          furnished: bestProperty.furnished,
+          parking: bestProperty.parking,
+          petsAllowed: bestProperty.petsAllowed
+        } : null
+      };
+    });
 
     res.json({
       rentalRequests: requests,
@@ -216,6 +234,14 @@ const createOffer = async (req, res) => {
     if (!rentAmount || !leaseDuration || !availableFrom) {
       return res.status(400).json({
         error: 'Rent amount, lease duration, and available from date are required.'
+      });
+    }
+
+    // Validate lease duration for Polish digital signature compliance
+    const leaseDurationMonths = parseInt(leaseDuration);
+    if (leaseDurationMonths < 1 || leaseDurationMonths > 12) {
+      return res.status(400).json({
+        error: 'Lease duration must be between 1 and 12 months for digital signature compliance under Polish law. Longer contracts require traditional wet signatures and notarization.'
       });
     }
 
@@ -951,7 +977,7 @@ const getMyOffers = async (req, res) => {
         propertyAddress: offer.propertyAddress || offer.rentalRequest?.location || 'Location not specified',
         propertyImages: offer.propertyImages || null,
         propertyVideo: offer.propertyVideo || null,
-        propertyAmenities: offer.propertyAmenities || null,
+        propertyAmenities: offer.propertyAmenities ? (typeof offer.propertyAmenities === 'string' && offer.propertyAmenities.startsWith('[') ? offer.propertyAmenities : JSON.stringify([offer.propertyAmenities])) : null,
         propertyType: offer.propertyType || 'Apartment',
         propertySize: offer.propertySize || offer.rentalRequest?.bedrooms?.toString() || '1',
         isPaid: offer.status === 'ACCEPTED' && offer.paymentIntentId ? true : false
@@ -1209,7 +1235,7 @@ const updateTenantOfferStatus = async (req, res) => {
       });
     }
 
-    // Update offer status
+    // Update offer status and create payment record if PAID
     const updateData = {
       status: status
     };
@@ -1227,6 +1253,53 @@ const updateTenantOfferStatus = async (req, res) => {
     });
 
     console.log('✅ Offer status updated successfully to:', status);
+
+    // If status is PAID, create a payment record
+    if (status === 'PAID') {
+      try {
+        // Calculate pro-rated first month rent
+        const moveInDate = new Date(offer.rentalRequest.moveInDate);
+        const daysInMonth = new Date(moveInDate.getFullYear(), moveInDate.getMonth() + 1, 0).getDate();
+        const daysFromMoveIn = daysInMonth - moveInDate.getDate() + 1;
+        const proRatedRent = Math.round((offer.rentAmount * daysFromMoveIn) / daysInMonth);
+        const totalAmount = proRatedRent + (offer.depositAmount || 0);
+        
+        console.log('💰 Payment calculation:', {
+          monthlyRent: offer.rentAmount,
+          deposit: offer.depositAmount,
+          moveInDate: moveInDate.toDateString(),
+          daysInMonth,
+          daysFromMoveIn,
+          proRatedRent,
+          totalAmount
+        });
+        
+        // Create payment record
+        const payment = await prisma.payment.create({
+          data: {
+            amount: totalAmount,
+            status: 'SUCCEEDED',
+            purpose: 'DEPOSIT_AND_FIRST_MONTH',
+            userId: tenantId,
+            rentalRequestId: offer.rentalRequestId,
+            paymentIntentId: `manual_payment_${offerId}_${Date.now()}`, // Generate a unique ID
+            gateway: 'STRIPE', // Default gateway
+            createdAt: paymentDate ? new Date(paymentDate) : new Date(),
+            updatedAt: new Date()
+          }
+        });
+
+        console.log('✅ Payment record created:', {
+          paymentId: payment.id,
+          amount: payment.amount,
+          purpose: payment.purpose,
+          rentalRequestId: payment.rentalRequestId
+        });
+      } catch (paymentError) {
+        console.error('❌ Error creating payment record:', paymentError);
+        // Don't fail the offer update if payment record creation fails
+      }
+    }
 
     // If accepted, update rental request status
     if (status === 'ACCEPTED') {

@@ -4,7 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import CreateRentalRequestModal from '../components/CreateRentalRequestModal';
 import TenantSidebar from '../components/TenantSidebar';
-import { LogOut } from 'lucide-react';
+import Chat from '../components/chat/Chat';
+import { LogOut, MessageCircle } from 'lucide-react';
 
 const TenantDashboard = () => {
   const { user, logout } = useAuth();
@@ -27,6 +28,9 @@ const TenantDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
+  
+  // Chat states
+  const [showChat, setShowChat] = useState(false);
 
   const fetchRequests = async () => {
     try {
@@ -242,6 +246,13 @@ const TenantDashboard = () => {
              <h1 className="text-xl font-semibold text-gray-900">My Requests</h1>
             
             <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setShowChat(!showChat)}
+                className="flex items-center space-x-2 text-sm bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors duration-200"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Messages</span>
+              </button>
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"
@@ -466,6 +477,32 @@ const TenantDashboard = () => {
               >
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chat Modal */}
+      {showChat && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-6xl h-[80vh] relative">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Messages</h3>
+              <button
+                onClick={() => setShowChat(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-4 h-full">
+              <Chat 
+                conversationStatus="ACTIVE"
+                paymentStatus="PAID"
+                className="h-full"
+              />
             </div>
           </div>
         </div>

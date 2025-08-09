@@ -11,7 +11,10 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
     propertyType: '',
     numberOfRooms: '',
     moveInDate: '',
-    requirements: ''
+    requirements: '',
+    furnished: false,
+    parking: false,
+    petsAllowed: false
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -177,7 +180,10 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
         propertyType: requestData.propertyType || '',
         numberOfRooms: requestData.bedrooms?.toString() || '',
         moveInDate: requestData.moveInDate ? requestData.moveInDate.split('T')[0] : '',
-        requirements: requestData.description || ''
+        requirements: requestData.description || '',
+        furnished: requestData.furnished || false,
+        parking: requestData.parking || false,
+        petsAllowed: requestData.petsAllowed || false
       });
       // Store the original request ID for editing
       setOriginalRequestId(requestData.id);
@@ -245,7 +251,10 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
         propertyType: formData.propertyType,
         city: formData.city,
         district: formData.district === 'All' ? null : formData.district, // Store null for "All"
-        additionalRequirements: formData.requirements
+        additionalRequirements: formData.requirements,
+        furnished: formData.furnished,
+        parking: formData.parking,
+        petsAllowed: formData.petsAllowed
       };
 
       let response;
@@ -267,7 +276,10 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
           propertyType: '',
           numberOfRooms: '',
           moveInDate: '',
-          requirements: ''
+          requirements: '',
+          furnished: false,
+          parking: false,
+          petsAllowed: false
         });
         
         setOriginalRequestId(null);
@@ -295,7 +307,10 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
       propertyType: '',
       numberOfRooms: '',
       moveInDate: '',
-      requirements: ''
+      requirements: '',
+      furnished: false,
+      parking: false,
+      petsAllowed: false
     });
     setError('');
     setOriginalRequestId(null);
@@ -462,13 +477,60 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Requirements Description *
             </label>
-            <textarea
-              value={formData.requirements}
-              onChange={(e) => handleInputChange('requirements', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-32 resize-none"
-              placeholder="Describe your requirements, preferences, and any specific needs (e.g., furnished, parking, pets allowed, etc.)"
-              required
-            />
+                         <textarea
+               value={formData.requirements}
+               onChange={(e) => handleInputChange('requirements', e.target.value)}
+               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-32 resize-none"
+               placeholder="Describe your specific requirements, lifestyle preferences, or any other important details (e.g., quiet neighborhood, close to public transport, specific amenities, etc.)"
+               required
+             />
+          </div>
+
+          {/* Property Preferences */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Property Preferences
+            </label>
+            <div className="space-y-3">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="furnished"
+                  checked={formData.furnished}
+                  onChange={(e) => handleInputChange('furnished', e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="furnished" className="ml-2 block text-sm text-gray-900">
+                  Furnished accommodation
+                </label>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="parking"
+                  checked={formData.parking}
+                  onChange={(e) => handleInputChange('parking', e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="parking" className="ml-2 block text-sm text-gray-900">
+                  Parking available
+                </label>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="petsAllowed"
+                  checked={formData.petsAllowed}
+                  onChange={(e) => handleInputChange('petsAllowed', e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="petsAllowed" className="ml-2 block text-sm text-gray-900">
+                  Pets allowed
+                </label>
+              </div>
+            </div>
           </div>
 
           {/* Action Buttons */}

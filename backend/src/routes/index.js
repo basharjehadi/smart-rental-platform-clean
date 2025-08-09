@@ -14,6 +14,7 @@ import propertyRoutes from './propertyRoutes.js';
 import tenantDashboardRoutes from './tenantDashboardRoutes.js';
 import landlordDashboardRoutes from './landlordDashboardRoutes.js';
 import landlordTenantRoutes from './landlordTenantRoutes.js';
+import messagingRoutes from './messaging.js';
 
 const router = Router();
 
@@ -57,5 +58,8 @@ router.use('/landlord', landlordDashboardRoutes);
 
 // Landlord tenant management routes
 router.use('/landlord', landlordTenantRoutes);
+
+// Messaging routes
+router.use('/messaging', messagingRoutes);
 
 export default router; 

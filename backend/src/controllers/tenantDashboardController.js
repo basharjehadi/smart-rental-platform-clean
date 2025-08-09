@@ -3,11 +3,31 @@ import { prisma } from '../utils/prisma.js';
 // Helper function to get tenant payment data
 const getTenantPaymentsData = async (tenantId) => {
   try {
+    console.log('🔍 getTenantPaymentsData called with tenantId:', tenantId);
+    
     // Get general payments (deposits, first month payments, etc.)
+    // Look for payments by userId OR by rentalRequestId where the rental request belongs to this tenant
     const generalPayments = await prisma.payment.findMany({
       where: {
-        userId: tenantId,
-        status: 'SUCCEEDED'
+        OR: [
+          {
+            userId: tenantId,
+            status: 'SUCCEEDED'
+          },
+          {
+            rentalRequest: {
+              tenantId: tenantId
+            },
+            status: 'SUCCEEDED'
+          }
+        ]
+      },
+      include: {
+        rentalRequest: {
+          include: {
+            tenant: true
+          }
+        }
       },
       orderBy: {
         createdAt: 'desc'
@@ -19,6 +39,9 @@ const getTenantPaymentsData = async (tenantId) => {
       where: {
         userId: tenantId,
         status: 'SUCCEEDED'
+      },
+      include: {
+        user: true
       },
       orderBy: {
         paidDate: 'desc'
@@ -54,6 +77,9 @@ const getTenantPaymentsData = async (tenantId) => {
 
     // Sort by date (most recent first)
     allPayments.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    console.log('🔍 getTenantPaymentsData returning payments:', allPayments.length);
+    console.log('🔍 Payment details:', allPayments);
 
     return allPayments;
   } catch (error) {
@@ -125,7 +151,14 @@ export const getTenantDashboardData = async (req, res) => {
         bathrooms: activeLease.rentalRequest.bathrooms || 1,
         area: activeLease.propertySize || '65 m²',
         leaseTerm: activeLease.leaseDuration || 12,
-        amenities: activeLease.propertyAmenities ? JSON.parse(activeLease.propertyAmenities) : ['No amenities listed']
+        amenities: activeLease.propertyAmenities ? (() => {
+          try {
+            return typeof activeLease.propertyAmenities === 'string' ? JSON.parse(activeLease.propertyAmenities) : activeLease.propertyAmenities;
+          } catch (error) {
+            console.warn('Failed to parse propertyAmenities:', activeLease.propertyAmenities, error);
+            return ['No amenities listed'];
+          }
+        })() : ['No amenities listed']
       },
       landlord: {
         name: activeLease.landlord.firstName && activeLease.landlord.lastName ? 
@@ -161,6 +194,9 @@ export const getTenantDashboardData = async (req, res) => {
 
     console.log('✅ Dashboard data prepared successfully');
     console.log('🔍 Offer ID in response:', responseData.offerId);
+    console.log('🔍 Payments data in response:', responseData.payments);
+    console.log('🔍 Payments count:', responseData.payments?.length || 0);
+    console.log('🔍 Full response data:', JSON.stringify(responseData, null, 2));
     res.json(responseData);
 
   } catch (error) {
@@ -178,22 +214,11 @@ export const getTenantPayments = async (req, res) => {
   try {
     const tenantId = req.user.id;
 
-    const payments = await prisma.payment.findMany({
-      where: {
-        userId: tenantId
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+    // Use the enhanced payment query that looks for payments by userId OR rentalRequestId
+    const payments = await getTenantPaymentsData(tenantId);
 
     res.json({
-      payments: payments.map(payment => ({
-        month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-        date: payment.createdAt,
-        amount: payment.amount,
-        status: payment.status === 'SUCCEEDED' ? 'Paid' : payment.status
-      }))
+      payments: payments
     });
 
   } catch (error) {
@@ -243,7 +268,14 @@ export const getTenantActiveLease = async (req, res) => {
       bathrooms: activeLease.rentalRequest.bathrooms || 1,
       area: activeLease.propertySize || '65 m²',
       leaseTerm: activeLease.leaseDuration || 12,
-      amenities: activeLease.propertyAmenities ? JSON.parse(activeLease.propertyAmenities) : ['Parking Space', 'Washing Machine', 'Air Conditioning', 'Balcony', 'Internet', 'Elevator']
+              amenities: activeLease.propertyAmenities ? (() => {
+          try {
+            return typeof activeLease.propertyAmenities === 'string' ? JSON.parse(activeLease.propertyAmenities) : activeLease.propertyAmenities;
+          } catch (error) {
+            console.warn('Failed to parse propertyAmenities:', activeLease.propertyAmenities, error);
+            return ['Parking Space', 'Washing Machine', 'Air Conditioning', 'Balcony', 'Internet', 'Elevator'];
+          }
+        })() : ['Parking Space', 'Washing Machine', 'Air Conditioning', 'Balcony', 'Internet', 'Elevator']
     };
 
     const landlordInfo = {

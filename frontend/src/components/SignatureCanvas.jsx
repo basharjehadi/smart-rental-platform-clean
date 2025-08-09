@@ -77,3 +77,4 @@ const SignatureCanvasComponent = ({ onSave, onClear, initialSignature = null }) 
 };
 
 export default SignatureCanvasComponent; 
+

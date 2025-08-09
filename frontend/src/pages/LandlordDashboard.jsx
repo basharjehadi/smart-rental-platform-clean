@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import LandlordSidebar from '../components/LandlordSidebar';
+import Chat from '../components/chat/Chat';
 import { 
   LogOut, 
   DollarSign, 
@@ -33,6 +34,9 @@ const LandlordDashboard = () => {
   const [error, setError] = useState('');
   const [profileData, setProfileData] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  
+  // Chat states
+  const [showChat, setShowChat] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -420,13 +424,22 @@ const LandlordDashboard = () => {
               <p className="text-gray-600 text-sm">Welcome back, {user?.name || 'Landlord'}</p>
             </div>
             
-            <button
-              onClick={handleLogout}
-              className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Logout</span>
-            </button>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setShowChat(!showChat)}
+                className="flex items-center space-x-2 text-sm bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Messages</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
         </header>
 
@@ -485,6 +498,32 @@ const LandlordDashboard = () => {
           </div>
         </main>
       </div>
+
+      {/* Chat Modal */}
+      {showChat && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-6xl h-[80vh] relative">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Messages</h3>
+              <button
+                onClick={() => setShowChat(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-4 h-full">
+              <Chat 
+                conversationStatus="ACTIVE"
+                paymentStatus="PAID"
+                className="h-full"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

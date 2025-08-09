@@ -1,10 +1,12 @@
 import dotenv from 'dotenv';
 import cron from 'node-cron';
+import { createServer } from 'http';
 import app from './app.js';
 import { prisma } from './utils/prisma.js';
 import { dailyRentCheck } from './controllers/cronController.js';
 import { startContractMonitoring, stopContractMonitoring } from './controllers/contractController.js';
 import { logger } from './utils/logger.js';
+import { initializeSocket } from './socket/socketServer.js';
 
 // Load environment variables
 dotenv.config();
@@ -52,13 +54,21 @@ const startServer = async () => {
     // Start contract generation scheduler
     startContractMonitoring();
 
+    // Create HTTP server
+    const server = createServer(app);
+
+    // Initialize Socket.io
+    const io = initializeSocket(server);
+    logger.info('🔌 Socket.io initialized');
+
     // Start server
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       logger.info(`🚀 Server running on port ${PORT}`);
       logger.info(`📱 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
       logger.info(`🔐 Social Auth URLs:`);
       logger.info(`   Google: http://localhost:${PORT}/api/auth/google`);
       logger.info(`   Facebook: http://localhost:${PORT}/api/auth/facebook`);
+      logger.info(`💬 WebSocket server ready for real-time messaging`);
     });
   } catch (error) {
     logger.error('❌ Failed to start server:', error);

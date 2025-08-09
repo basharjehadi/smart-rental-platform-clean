@@ -154,3 +154,4 @@ const KYCDocumentUpload = ({ identityDocument, onDocumentChange, onDocumentUploa
 };
 
 export default KYCDocumentUpload; 
+

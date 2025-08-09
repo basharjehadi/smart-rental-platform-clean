@@ -513,8 +513,4 @@ enum PropertyStatus {
   MAINTENANCE
   RENTED
   UNAVAILABLE
-} 
-  UNAVAILABLE
-} 
-  UNAVAILABLE
-} 
+}

@@ -301,6 +301,51 @@ const OfferCard = ({
             </button>
           </div>
         )}
+
+        {(status === 'PAID' || isPaid) && (
+          <div className="flex space-x-3 pt-4 border-t border-gray-200">
+            <button
+              onClick={() => navigate(`/property/${offerId}`)}
+              className="flex-1 px-4 py-2 text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              View Offer
+            </button>
+            <button
+              onClick={() => navigate('/tenant-dashboard')}
+              className="flex-1 px-4 py-2 text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        )}
+
+        {status === 'ACCEPTED' && !isPaid && (
+          <div className="flex space-x-3 pt-4 border-t border-gray-200">
+            <button
+              onClick={() => navigate(`/property/${offerId}`)}
+              className="flex-1 px-4 py-2 text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              View Offer
+            </button>
+            <button
+              onClick={() => navigate('/payment')}
+              className="flex-1 px-4 py-2 text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+            >
+              Proceed to Payment
+            </button>
+          </div>
+        )}
+
+        {(status === 'DECLINED' || status === 'EXPIRED') && (
+          <div className="flex space-x-3 pt-4 border-t border-gray-200">
+            <button
+              onClick={() => navigate(`/property/${offerId}`)}
+              className="flex-1 px-4 py-2 text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              View Details
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Confirmation Modals */}

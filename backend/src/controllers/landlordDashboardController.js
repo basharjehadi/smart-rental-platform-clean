@@ -70,11 +70,18 @@ const getLandlordDashboard = async (req, res) => {
       take: 3
     });
 
-    const tenantData = recentTenants.map(offer => ({
-      name: `${offer.rentalRequest.tenant.firstName} ${offer.rentalRequest.tenant.lastName}`,
-      property: offer.property.title || offer.property.name,
-      status: 'Paid' // You can add payment status logic here
-    }));
+    const tenantData = recentTenants.map(offer => {
+      const tenant = offer.rentalRequest.tenant;
+      const tenantName = tenant.firstName && tenant.lastName 
+        ? `${tenant.firstName} ${tenant.lastName}`
+        : tenant.email || 'Tenant';
+      
+      return {
+        name: tenantName,
+        property: offer.property?.title || offer.property?.name || 'Property',
+        status: offer.status === 'PAID' ? 'Paid' : 'Active'
+      };
+    });
 
     // Get upcoming tasks (lease renewals, inspections, etc.)
     const upcomingTasks = [];

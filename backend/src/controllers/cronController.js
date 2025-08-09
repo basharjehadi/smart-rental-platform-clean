@@ -190,20 +190,53 @@ export const initializeLeaseDates = async (offerId) => {
   }
 };
 
-// 🚀 SCALABILITY: Create rent payment records for lease duration
+// 🚀 SCALABILITY: Create rent payment records for lease duration with Polish rental logic
 const createRentPayments = async (offerId, leaseStartDate, leaseEndDate, rentAmount) => {
   try {
     const payments = [];
     const currentDate = new Date(leaseStartDate);
+    const leaseStart = new Date(leaseStartDate);
+    const leaseEnd = new Date(leaseEndDate);
     
-    while (currentDate < leaseEndDate) {
+    // Polish rental logic: Always calculate based on 30 days per month
+    const DAYS_PER_MONTH = 30;
+    
+    while (currentDate < leaseEnd) {
       const month = currentDate.getMonth() + 1;
       const year = currentDate.getFullYear();
       const dueDate = new Date(currentDate);
-      dueDate.setDate(dueDate.getDate() + 1); // Due on 1st of each month
+      dueDate.setDate(10); // Due on 10th of each month (Polish standard)
+      
+      let paymentAmount = rentAmount;
+      
+      // Check if this is the first month (move-in month)
+      const isFirstMonth = currentDate.getMonth() === leaseStart.getMonth() && 
+                          currentDate.getFullYear() === leaseStart.getFullYear();
+      
+      // Check if this is the last month (move-out month)
+      const nextMonth = new Date(currentDate);
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      const isLastMonth = nextMonth > leaseEnd;
+      
+      if (isFirstMonth) {
+        // Pro-rate first month based on actual occupancy days in 30-day month
+        const moveInDay = leaseStart.getDate();
+        const daysOccupied = DAYS_PER_MONTH - moveInDay + 1;
+        paymentAmount = (rentAmount / DAYS_PER_MONTH) * daysOccupied;
+        
+        console.log(`📅 First month pro-rating: ${daysOccupied} days out of ${DAYS_PER_MONTH} = ${paymentAmount.toFixed(2)} zł`);
+      } else if (isLastMonth) {
+        // Pro-rate last month based on actual occupancy days in 30-day month
+        const moveOutDay = leaseEnd.getDate();
+        const daysOccupied = moveOutDay;
+        paymentAmount = (rentAmount / DAYS_PER_MONTH) * daysOccupied;
+        
+        console.log(`📅 Last month pro-rating: ${daysOccupied} days out of ${DAYS_PER_MONTH} = ${paymentAmount.toFixed(2)} zł`);
+      }
+      // Regular months: Full monthly rent (always same regardless of calendar days)
 
       payments.push({
-        amount: rentAmount,
+        amount: Math.round(paymentAmount * 100) / 100, // Round to 2 decimal places
         status: 'PENDING',
         dueDate: dueDate,
         month: month,
@@ -226,6 +259,11 @@ const createRentPayments = async (offerId, leaseStartDate, leaseEndDate, rentAmo
       });
 
       console.log(`💰 Created ${payments.length} rent payment records for offer ${offerId}`);
+      console.log(`📊 Payment breakdown:`, payments.map(p => ({
+        month: `${p.month}/${p.year}`,
+        amount: `${p.amount} zł`,
+        dueDate: p.dueDate.toLocaleDateString()
+      })));
     }
   } catch (error) {
     console.error('❌ Error creating rent payments:', error);

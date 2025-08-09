@@ -29,3 +29,4 @@ const TenantDashboardRedirect = () => {
 };
 
 export default TenantDashboardRedirect; 
+

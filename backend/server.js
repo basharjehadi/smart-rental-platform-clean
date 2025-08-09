@@ -17,7 +17,7 @@ import adminRoutes from './src/routes/adminRoutes.js';
 import landlordProfileRoutes from './src/routes/landlordProfileRoutes.js';
 import propertyRoutes from './src/routes/propertyRoutes.js';
 import tenantDashboardRoutes from './src/routes/tenantDashboardRoutes.js';
-import prisma from './src/lib/prisma.js';
+import prisma from './src/utils/prisma.js';
 import { dailyRentCheck } from './src/controllers/cronController.js';
 import { startContractMonitoring, stopContractMonitoring } from './src/controllers/contractController.js';
 import { errorHandler, notFoundHandler } from './src/middlewares/errorHandler.js';

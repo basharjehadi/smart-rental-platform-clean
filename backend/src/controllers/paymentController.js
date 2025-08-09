@@ -323,6 +323,9 @@ const handlePaymentSucceeded = async (paymentIntent) => {
       // Note: RentPayment records should only be created for monthly rent payments
       // DEPOSIT_AND_FIRST_MONTH payments are stored only in the Payment table
       // to avoid duplication in payment history
+      // 
+      // Polish rental logic: First month rent is pro-rated based on 30-day calculation
+      // Regular months: Full monthly rent regardless of calendar days
     }
 
     // BULLETPROOF CONTRACT GENERATION

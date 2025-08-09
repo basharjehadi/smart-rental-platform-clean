@@ -82,15 +82,36 @@ const PropertyDetailsView = () => {
 
   // Parse data early to avoid undefined errors
   const propertyImages = offer?.propertyImages ? 
-    (typeof offer.propertyImages === 'string' ? JSON.parse(offer.propertyImages) : offer.propertyImages) : 
+    (() => {
+      try {
+        return typeof offer.propertyImages === 'string' ? JSON.parse(offer.propertyImages) : offer.propertyImages;
+      } catch (error) {
+        console.warn('Failed to parse propertyImages:', offer.propertyImages, error);
+        return [];
+      }
+    })() : 
     [];
 
   const propertyVideo = offer?.propertyVideo ? 
-    (typeof offer.propertyVideo === 'string' ? JSON.parse(offer.propertyVideo) : offer.propertyVideo) : 
+    (() => {
+      try {
+        return typeof offer.propertyVideo === 'string' ? JSON.parse(offer.propertyVideo) : offer.propertyVideo;
+      } catch (error) {
+        console.warn('Failed to parse propertyVideo:', offer.propertyVideo, error);
+        return null;
+      }
+    })() : 
     null;
 
   const amenities = offer?.propertyAmenities ? 
-    (typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities) : offer.propertyAmenities) : 
+                    (() => {
+                  try {
+                    return typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities) : offer.propertyAmenities;
+                  } catch (error) {
+                    console.warn('Failed to parse propertyAmenities:', offer.propertyAmenities, error);
+                    return [];
+                  }
+                })() : 
     [];
 
   // Add some default amenities that are commonly shown in the screenshots
@@ -207,17 +228,40 @@ const PropertyDetailsView = () => {
             </div>
             
             <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-2 text-sm text-blue-600">
-                <Shield className="w-4 h-4" />
-                <span className="font-medium">Protected</span>
-              </div>
-              <div className="flex items-center space-x-2 text-sm text-orange-600">
-                <Users className="w-4 h-4" />
-                <span className="font-medium">1 other tenant viewing</span>
-              </div>
+              {offer?.status === 'PAID' ? (
+                <div className="flex items-center space-x-2 text-sm text-green-600">
+                  <Shield className="w-4 h-4" />
+                  <span className="font-medium">✅ Paid & Secured</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center space-x-2 text-sm text-blue-600">
+                    <Shield className="w-4 h-4" />
+                    <span className="font-medium">Protected</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm text-orange-600">
+                    <Users className="w-4 h-4" />
+                    <span className="font-medium">1 other tenant viewing</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>
+
+        {/* Paid Status Banner */}
+        {offer?.status === 'PAID' && (
+          <div className="bg-green-50 border-b border-green-200 px-6 py-4">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex items-center justify-center text-green-800">
+                <Shield className="w-5 h-5 mr-2" />
+                <span className="text-lg font-semibold">
+                  🎉 Congratulations! You have successfully paid for this property and it is now yours!
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Main Content Area */}
         <main className="flex-1 p-6 pb-24">
@@ -414,7 +458,7 @@ const PropertyDetailsView = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Preferred Move-in</span>
-                        <span className="text-sm font-semibold">{formatDate(offer.availableFrom)}</span>
+                        <span className="text-sm font-semibold">{formatDate(offer.rentalRequest?.moveInDate || offer.availableFrom)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Property Type</span>
@@ -437,11 +481,48 @@ const PropertyDetailsView = () => {
                         <span className="text-gray-600">Security Deposit</span>
                         <span className="font-semibold">{formatCurrency(offer.depositAmount || offer.rentAmount)}</span>
                       </div>
+                      {/* Pro-rated First Month Rent */}
+                      {(() => {
+                        const moveInDate = new Date(offer.availableFrom);
+                        const moveInDay = moveInDate.getDate();
+                        const daysInMonth = 30; // Polish rental standard
+                        const daysOccupied = daysInMonth - moveInDay + 1;
+                        
+                        // Only show pro-rated if not moving in on the 1st
+                        if (moveInDay > 1) {
+                          const proRatedRent = Math.round((offer.rentAmount / daysInMonth) * daysOccupied);
+                          return (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">First Month (Pro-rated)</span>
+                              <span className="font-semibold text-blue-600">
+                                {formatCurrency(proRatedRent)}
+                                <span className="text-xs text-gray-500 ml-1">
+                                  ({daysOccupied}/{daysInMonth} days)
+                                </span>
+                              </span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                       <div className="border-t pt-3">
                         <div className="flex justify-between">
                           <span className="text-gray-900 font-semibold">Total Initial Cost</span>
                           <span className="text-green-600 font-bold">
-                            {formatCurrency((offer.rentAmount || 0) + (offer.depositAmount || offer.rentAmount || 0))}
+                            {(() => {
+                              const moveInDate = new Date(offer.availableFrom);
+                              const moveInDay = moveInDate.getDate();
+                              const daysInMonth = 30;
+                              const daysOccupied = daysInMonth - moveInDay + 1;
+                              
+                              let firstMonthRent = offer.rentAmount;
+                              if (moveInDay > 1) {
+                                firstMonthRent = Math.round((offer.rentAmount / daysInMonth) * daysOccupied);
+                              }
+                              
+                              const deposit = offer.depositAmount || offer.rentAmount || 0;
+                              return formatCurrency(firstMonthRent + deposit);
+                            })()}
                           </span>
                         </div>
                       </div>
@@ -481,75 +562,149 @@ const PropertyDetailsView = () => {
                   </div>
                 </div>
 
-                {/* Landlord Profile */}
-                <div className="card-modern">
-                  <div className="p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Landlord Profile</h3>
-                    <div className="flex items-center space-x-3 mb-4">
-                      <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                        <Users className="w-6 h-6 text-gray-400" />
+                {/* Landlord Profile - Only show for unpaid offers */}
+                {offer?.status !== 'PAID' && (
+                  <div className="card-modern">
+                    <div className="p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Landlord Profile</h3>
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
+                          <Users className="w-6 h-6 text-gray-400" />
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900">{offer.landlord?.name || 'Landlord'}</div>
+                          <div className="text-sm text-gray-600">Contact details available after payment</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-semibold text-gray-900">{offer.landlord?.name || 'Landlord'}</div>
-                        <div className="text-sm text-gray-600">Contact details available after payment</div>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Star className="w-4 h-4 text-yellow-400" />
+                          <span className="text-sm">4.8 (127 reviews)</span>
+                        </div>
+                        <div className="text-sm text-gray-600">Since 2019</div>
+                        <div className="text-sm text-gray-600">Within 2 hours</div>
+                      </div>
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-800">
+                          Full contact details will be available after payment completion to protect both parties.
+                        </p>
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Star className="w-4 h-4 text-yellow-400" />
-                        <span className="text-sm">4.8 (127 reviews)</span>
-                      </div>
-                      <div className="text-sm text-gray-600">Since 2019</div>
-                      <div className="text-sm text-gray-600">Within 2 hours</div>
-                    </div>
-                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-800">
-                        Full contact details will be available after payment completion to protect both parties.
+                  </div>
+                )}
+
+                {/* Protection Information - Only show for unpaid offers */}
+                {offer?.status !== 'PAID' && (
+                  <div className="card-modern border-green-200 bg-green-50">
+                    <div className="p-6">
+                      <h3 className="text-lg font-semibold text-green-900 mb-2">You're Protected</h3>
+                      <p className="text-sm text-green-800">
+                        When you accept this offer, your payment will be held in secure escrow. 
+                        You'll have 24 hours after check-in to ensure everything matches. 
+                        Full refund if property doesn't match description.
                       </p>
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* Protection Information */}
-                <div className="card-modern border-green-200 bg-green-50">
-                  <div className="p-6">
-                    <h3 className="text-lg font-semibold text-green-900 mb-2">You're Protected</h3>
-                    <p className="text-sm text-green-800">
-                      When you accept this offer, your payment will be held in secure escrow. 
-                      You'll have 24 hours after check-in to ensure everything matches. 
-                      Full refund if property doesn't match description.
-                    </p>
+                {/* Landlord Contact Information - Only show for paid offers */}
+                {offer?.status === 'PAID' && (
+                  <div className="card-modern border-blue-200 bg-blue-50">
+                    <div className="p-6">
+                      <h3 className="text-lg font-semibold text-blue-900 mb-4">Landlord Contact Information</h3>
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="w-12 h-12 bg-blue-200 rounded-full flex items-center justify-center">
+                          <Users className="w-6 h-6 text-blue-600" />
+                        </div>
+                        <div>
+                          <div className="font-semibold text-blue-900">{offer.landlord?.name || 'Landlord'}</div>
+                          <div className="text-sm text-blue-700">Your landlord</div>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-2">
+                          <Star className="w-4 h-4 text-yellow-400" />
+                          <span className="text-sm text-blue-800">4.8 (127 reviews)</span>
+                        </div>
+                        <div className="text-sm text-blue-700">Since 2019</div>
+                        <div className="text-sm text-blue-700">Response time: Within 2 hours</div>
+                      </div>
+                      <div className="mt-4 p-3 bg-white border border-blue-200 rounded-lg">
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                              <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                            </svg>
+                            <span className="text-sm text-blue-800">{offer.landlord?.email || 'landlord@example.com'}</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                            </svg>
+                            <span className="text-sm text-blue-800">{offer.landlord?.phoneNumber || '+48 123 456 789'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
         </main>
 
         {/* Fixed Bottom Bar */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
-          <div className="flex items-center justify-between max-w-7xl mx-auto">
-            <div className="text-sm text-gray-600">
-              Ready to accept this offer? Your payment will be protected by our escrow system.
-            </div>
-            <div className="flex space-x-3">
-              <button
-                onClick={handleDeclineOffer}
-                disabled={isProcessing}
-                className="btn-secondary disabled:opacity-50"
-              >
-                {isProcessing ? 'Processing...' : 'Decline Offer'}
-              </button>
-              <button
-                onClick={handleAcceptOffer}
-                disabled={isProcessing}
-                className="btn-success disabled:opacity-50"
-              >
-                {isProcessing ? 'Processing...' : 'Accept with Protection'}
-              </button>
+        {offer?.status === 'PAID' ? (
+          <div className="fixed bottom-0 left-0 right-0 bg-green-50 border-t border-green-200 p-4">
+            <div className="flex items-center justify-between max-w-7xl mx-auto">
+              <div className="flex items-center text-green-800">
+                <Shield className="w-5 h-5 mr-2" />
+                <span className="text-sm font-medium">
+                  ✅ Payment Completed! This property is now yours.
+                </span>
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => navigate('/tenant-dashboard')}
+                  className="btn-success"
+                >
+                  Go to Dashboard
+                </button>
+                <button
+                  onClick={() => navigate('/my-offers')}
+                  className="btn-secondary"
+                >
+                  Back to Offers
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
+            <div className="flex items-center justify-between max-w-7xl mx-auto">
+              <div className="text-sm text-gray-600">
+                Ready to accept this offer? Your payment will be protected by our escrow system.
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleDeclineOffer}
+                  disabled={isProcessing}
+                  className="btn-secondary disabled:opacity-50"
+                >
+                  {isProcessing ? 'Processing...' : 'Decline Offer'}
+                </button>
+                <button
+                  onClick={handleAcceptOffer}
+                  disabled={isProcessing}
+                  className="btn-success disabled:opacity-50"
+                >
+                  {isProcessing ? 'Processing...' : 'Accept with Protection'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Photo Gallery Modal */}

@@ -6,12 +6,26 @@ const PropertyMediaViewer = ({ propertyImages, propertyVideo, propertyAddress, p
 
   // Parse property images if it's a string (JSON)
   const images = typeof propertyImages === 'string' 
-    ? (propertyImages ? JSON.parse(propertyImages) : [])
+    ? (propertyImages ? (() => {
+        try {
+          return JSON.parse(propertyImages);
+        } catch (error) {
+          console.warn('Failed to parse propertyImages:', propertyImages, error);
+          return [];
+        }
+      })() : [])
     : (Array.isArray(propertyImages) ? propertyImages : []);
 
   // Parse property amenities if it's a string (JSON)
   const amenities = typeof propertyAmenities === 'string'
-    ? (propertyAmenities ? JSON.parse(propertyAmenities) : [])
+    ? (propertyAmenities ? (() => {
+  try {
+    return typeof propertyAmenities === 'string' ? JSON.parse(propertyAmenities) : propertyAmenities;
+  } catch (error) {
+    console.warn('Failed to parse propertyAmenities:', propertyAmenities, error);
+    return [];
+  }
+})() : [])
     : (Array.isArray(propertyAmenities) ? propertyAmenities : []);
 
   // Convert relative URLs to absolute URLs for images

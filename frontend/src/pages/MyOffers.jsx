@@ -208,10 +208,25 @@ const MyOffers = () => {
                       deposit={offer.depositAmount}
                       availableFrom={offer.availableFrom}
                       duration={offer.leaseDuration}
-                      amenities={offer.propertyAmenities ? (typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities) : offer.propertyAmenities) : []}
+                      amenities={offer.propertyAmenities ? (() => {
+                        try {
+                          return typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities) : offer.propertyAmenities;
+                        } catch (error) {
+                          console.warn('Failed to parse propertyAmenities:', offer.propertyAmenities, error);
+                          return [];
+                        }
+                      })() : []}
                       terms={offer.description}
                       status={offer.status}
-                      propertyImage={offer.propertyImages ? (typeof offer.propertyImages === 'string' ? JSON.parse(offer.propertyImages)[0] : offer.propertyImages[0]) : null}
+                      propertyImage={offer.propertyImages ? (() => {
+                        try {
+                          const images = typeof offer.propertyImages === 'string' ? JSON.parse(offer.propertyImages) : offer.propertyImages;
+                          return Array.isArray(images) ? images[0] : null;
+                        } catch (error) {
+                          console.warn('Failed to parse propertyImages:', offer.propertyImages, error);
+                          return null;
+                        }
+                      })() : null}
                       landlordName={offer.landlord?.name}
                       landlordRating={offer.landlord?.rating}
                       landlordEmail={offer.landlord?.email}
@@ -219,10 +234,34 @@ const MyOffers = () => {
                       propertyType={offer.propertyType || 'Apartment'}
                       rooms={offer.property?.bedrooms || offer.propertySize || offer.rentalRequest?.bedrooms || 1}
                       area={offer.property?.size || offer.rentalRequest?.bedrooms || 1}
-                      bathrooms={offer.property?.bathrooms || (offer.propertyAmenities ? (typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities).filter(a => a.toLowerCase().includes('bath')).length : offer.propertyAmenities.filter(a => a.toLowerCase().includes('bath')).length) : 1)}
-                      furnishing={offer.property?.furnished ? 'Furnished' : (offer.propertyAmenities ? (typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities).filter(a => a.toLowerCase().includes('furnish')).length > 0 : offer.propertyAmenities.filter(a => a.toLowerCase().includes('furnish')).length > 0) ? 'Furnished' : 'Unfurnished' : 'Unfurnished')}
-                      parking={offer.property?.parking ? 'Yes' : (offer.propertyAmenities ? (typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities).filter(a => a.toLowerCase().includes('park')).length > 0 : offer.propertyAmenities.filter(a => a.toLowerCase().includes('park')).length > 0) ? 'Yes' : 'No' : 'No')}
-                      isPaid={offer.isPaid || false}
+                      bathrooms={offer.property?.bathrooms || (offer.propertyAmenities ? (() => {
+                        try {
+                          const amenities = typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities) : offer.propertyAmenities;
+                          return Array.isArray(amenities) ? amenities.filter(a => a.toLowerCase().includes('bath')).length : 1;
+                        } catch (error) {
+                          console.warn('Failed to parse propertyAmenities for bathrooms:', offer.propertyAmenities, error);
+                          return 1;
+                        }
+                      })() : 1)}
+                      furnishing={offer.property?.furnished ? 'Furnished' : (offer.propertyAmenities ? (() => {
+                        try {
+                          const amenities = typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities) : offer.propertyAmenities;
+                          return Array.isArray(amenities) && amenities.filter(a => a.toLowerCase().includes('furnish')).length > 0 ? 'Furnished' : 'Unfurnished';
+                        } catch (error) {
+                          console.warn('Failed to parse propertyAmenities for furnishing:', offer.propertyAmenities, error);
+                          return 'Unfurnished';
+                        }
+                      })() : 'Unfurnished')}
+                      parking={offer.property?.parking ? 'Yes' : (offer.propertyAmenities ? (() => {
+                        try {
+                          const amenities = typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities) : offer.propertyAmenities;
+                          return Array.isArray(amenities) && amenities.filter(a => a.toLowerCase().includes('park')).length > 0 ? 'Yes' : 'No';
+                        } catch (error) {
+                          console.warn('Failed to parse propertyAmenities for parking:', offer.propertyAmenities, error);
+                          return 'No';
+                        }
+                      })() : 'No')}
+                      isPaid={offer.status === 'PAID'}
                       onAccept={handleAcceptOffer}
                       onDecline={handleDeclineOffer}
                     />

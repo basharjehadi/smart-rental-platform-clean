@@ -58,13 +58,41 @@ const LandlordRentalRequests = () => {
     fetchProfileData();
   }, []);
 
-  // Calculate total initial cost when rent or deposit changes
+  // Calculate total initial cost and pro-rated amounts when rent, deposit, or available date changes
   useEffect(() => {
     const rent = parseFloat(offerData.monthlyRent) || 0;
     const deposit = parseFloat(offerData.securityDeposit) || 0;
-    const total = rent + deposit;
-    setOfferData(prev => ({ ...prev, totalInitialCost: total }));
-  }, [offerData.monthlyRent, offerData.securityDeposit]);
+    
+    // Calculate pro-rated first month rent using Polish rental logic (30 days per month)
+    let firstMonthRent = rent;
+    let proRatedCalculation = null;
+    
+    if (offerData.availableFrom && rent > 0) {
+      const moveInDate = new Date(offerData.availableFrom);
+      const moveInDay = moveInDate.getDate();
+      const daysInMonth = 30; // Polish rental standard
+      const daysOccupied = daysInMonth - moveInDay + 1;
+      
+      // Only pro-rate if not moving in on the 1st
+      if (moveInDay > 1) {
+        firstMonthRent = (rent / daysInMonth) * daysOccupied;
+        proRatedCalculation = {
+          daysOccupied,
+          daysInMonth,
+          originalRent: rent,
+          proRatedRent: firstMonthRent
+        };
+      }
+    }
+    
+    const total = firstMonthRent + deposit;
+    setOfferData(prev => ({ 
+      ...prev, 
+      totalInitialCost: total,
+      firstMonthRent: firstMonthRent,
+      proRatedCalculation: proRatedCalculation
+    }));
+  }, [offerData.monthlyRent, offerData.securityDeposit, offerData.availableFrom]);
 
   // Clear success message after 5 seconds
   useEffect(() => {
@@ -197,23 +225,68 @@ const LandlordRentalRequests = () => {
      // Extract rent amount from property match (remove "zł" and convert to number)
      const rentAmount = parseInt(tenant.propertyMatch.rent.replace(' zł', '').replace(/\s/g, ''));
      
-     // Convert the formatted date back to YYYY-MM-DD format for the date input
+     // Get the property's actual available date from the database
      let availableFromDate = '';
-     console.log('Original available date:', tenant.propertyMatch.available);
+     console.log('Property available date from database:', tenant.propertyMatch.available);
+     
      if (tenant.propertyMatch.available) {
        try {
+         // The available date comes from the database as a Date object or ISO string
+         // Convert it to YYYY-MM-DD format for the date input
          const date = new Date(tenant.propertyMatch.available);
-         availableFromDate = date.toISOString().split('T')[0]; // Convert to YYYY-MM-DD format
-         console.log('Converted date:', availableFromDate);
+         if (!isNaN(date.getTime())) {
+           // Use local date to avoid timezone issues
+           const year = date.getFullYear();
+           const month = String(date.getMonth() + 1).padStart(2, '0');
+           const day = String(date.getDate()).padStart(2, '0');
+           availableFromDate = `${year}-${month}-${day}`;
+           console.log('Successfully parsed property available date (local):', availableFromDate);
+         } else {
+           throw new Error('Invalid date from database');
+         }
        } catch (error) {
-         console.error('Error parsing date:', error);
-         // Fallback to today's date if parsing fails
-         availableFromDate = new Date().toISOString().split('T')[0];
+         console.error('Error parsing property available date:', error);
+         console.log('Falling back to tenant move-in date');
+         // Fallback to tenant's expected move-in date
+         if (tenant.moveInDate) {
+           const tenantDate = new Date(tenant.moveInDate);
+           const year = tenantDate.getFullYear();
+           const month = String(tenantDate.getMonth() + 1).padStart(2, '0');
+           const day = String(tenantDate.getDate()).padStart(2, '0');
+           availableFromDate = `${year}-${month}-${day}`;
+           console.log('Using tenant move-in date as fallback:', availableFromDate);
+         } else {
+           // Last fallback to today's date
+           const today = new Date();
+           const year = today.getFullYear();
+           const month = String(today.getMonth() + 1).padStart(2, '0');
+           const day = String(today.getDate()).padStart(2, '0');
+           availableFromDate = `${year}-${month}-${day}`;
+           console.log('Using today as fallback:', availableFromDate);
+         }
        }
      } else {
-       // If no date available, use today's date
-       availableFromDate = new Date().toISOString().split('T')[0];
+       console.log('No property available date found, using fallbacks');
+       // If no property date available, use tenant's expected move-in date
+       if (tenant.moveInDate) {
+         const tenantDate = new Date(tenant.moveInDate);
+         const year = tenantDate.getFullYear();
+         const month = String(tenantDate.getMonth() + 1).padStart(2, '0');
+         const day = String(tenantDate.getDate()).padStart(2, '0');
+         availableFromDate = `${year}-${month}-${day}`;
+         console.log('No property date, using tenant move-in date:', availableFromDate);
+       } else {
+         // Last fallback to today's date
+         const today = new Date();
+         const year = today.getFullYear();
+         const month = String(today.getMonth() + 1).padStart(2, '0');
+         const day = String(today.getDate()).padStart(2, '0');
+         availableFromDate = `${year}-${month}-${day}`;
+         console.log('No dates available, using today:', availableFromDate);
+       }
      }
+     
+     console.log('Final available from date for offer:', availableFromDate);
      
      setOfferData({
        monthlyRent: rentAmount.toString(),
@@ -298,6 +371,11 @@ const LandlordRentalRequests = () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(amount);
+  };
+
+  const formatCurrencyWithDecimals = (amount) => {
+    if (!amount || amount === 0) return '0.00';
+    return parseFloat(amount).toFixed(2);
   };
 
   // Mock data for demonstration - replace with real data
@@ -866,16 +944,52 @@ const LandlordRentalRequests = () => {
                   </div>
                 </div>
 
+
+
+                {/* First Month Calculation */}
+                {offerData.proRatedCalculation && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                    <h4 className="text-sm font-medium text-yellow-800 mb-2">First Month Pro-rating</h4>
+                    <div className="text-xs text-yellow-700 space-y-1">
+                      <p>Move-in date: {new Date(offerData.availableFrom).toLocaleDateString()}</p>
+                      <p>Days occupied: {offerData.proRatedCalculation.daysOccupied} out of {offerData.proRatedCalculation.daysInMonth}</p>
+                      <p>Calculation: {offerData.proRatedCalculation.daysOccupied}/{offerData.proRatedCalculation.daysInMonth} × {offerData.proRatedCalculation.originalRent.toLocaleString('pl-PL')} zł</p>
+                      <p className="font-medium">First month rent: {offerData.proRatedCalculation.proRatedRent.toFixed(2)} zł</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Total Initial Cost */}
                 <div className="bg-green-50 border border-green-100 rounded-lg p-4">
                   <div className="text-center">
-                    <p className="text-sm text-green-700 mb-1">Total Initial Cost (Rent + Deposit)</p>
+                    <p className="text-sm text-green-700 mb-1">Total Initial Cost</p>
                     <p className="text-2xl font-bold text-green-600">
                       {formatCurrencyDisplay(offerData.totalInitialCost || 0)} zł
                     </p>
-                    <p className="text-sm text-green-600">
+                    <div className="text-sm text-green-600 mt-2 space-y-1">
+                      <p>• First month rent: {formatCurrencyWithDecimals(offerData.firstMonthRent)} zł</p>
+                      <p>• Security deposit: {formatCurrencyWithDecimals(offerData.securityDeposit)} zł</p>
+                    </div>
+                    <p className="text-sm text-green-600 mt-2">
                       This is what the tenant will need to pay upfront to secure the property
                     </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tenant's Expected Move-in Date */}
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-3">Tenant's Expected Move-in Date</h3>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-blue-800 mb-2">Expected Move-in Date</div>
+                    <div className="text-2xl font-bold text-blue-700">
+                      {selectedTenant.moveInDate ? new Date(selectedTenant.moveInDate).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      }) : 'Not specified'}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -902,6 +1016,15 @@ const LandlordRentalRequests = () => {
                       {offerData.availableFrom && (
                         <p className="text-xs text-gray-500 mt-1">Selected: {offerData.availableFrom}</p>
                       )}
+                      {selectedTenant.moveInDate && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Tenant expects: {new Date(selectedTenant.moveInDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div>
@@ -914,10 +1037,18 @@ const LandlordRentalRequests = () => {
                         onChange={(e) => setOfferData(prev => ({ ...prev, leaseDuration: e.target.value }))}
                         className="input-modern appearance-none"
                       >
+                        <option value="1 month">1 month</option>
+                        <option value="2 months">2 months</option>
+                        <option value="3 months">3 months</option>
+                        <option value="4 months">4 months</option>
+                        <option value="5 months">5 months</option>
                         <option value="6 months">6 months</option>
+                        <option value="7 months">7 months</option>
+                        <option value="8 months">8 months</option>
+                        <option value="9 months">9 months</option>
+                        <option value="10 months">10 months</option>
+                        <option value="11 months">11 months</option>
                         <option value="12 months">12 months</option>
-                        <option value="18 months">18 months</option>
-                        <option value="24 months">24 months</option>
                       </select>
                       <div className="absolute right-3 top-2.5 pointer-events-none">
                         <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -928,6 +1059,8 @@ const LandlordRentalRequests = () => {
                   </div>
                 </div>
               </div>
+
+
 
               {/* Additional Terms & Conditions */}
               <div>
@@ -944,17 +1077,7 @@ const LandlordRentalRequests = () => {
                 </p>
               </div>
 
-              {/* Contract Integration Box */}
-              <div className="bg-orange-50 border border-orange-100 rounded-lg p-4">
-                <div className="flex items-start space-x-3">
-                  <FileText className="h-5 w-5 text-orange-500 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-orange-800">
-                      These additional terms & conditions will be automatically included in the rental contract that will be generated after the tenant pays for the property.
-                    </p>
-                  </div>
-                </div>
-              </div>
+
             </div>
 
             {/* Modal Footer */}

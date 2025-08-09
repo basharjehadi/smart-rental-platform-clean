@@ -3,11 +3,48 @@ import React, { useState, useEffect } from 'react';
 const SendOfferModal = ({ request, offerForm, setOfferForm, onClose, onSubmit }) => {
   const [totalCost, setTotalCost] = useState(0);
 
+  // Debug logging for availableFrom date
+  useEffect(() => {
+    console.log('SendOfferModal - offerForm.availableFrom:', offerForm.availableFrom);
+    console.log('SendOfferModal - request.moveInDate:', request.moveInDate);
+  }, [offerForm.availableFrom, request.moveInDate]);
+
   useEffect(() => {
     const rent = parseInt(offerForm.monthlyRent) || 0;
     const deposit = parseInt(offerForm.securityDeposit) || 0;
-    setTotalCost(rent + deposit);
-  }, [offerForm.monthlyRent, offerForm.securityDeposit]);
+    
+    // Calculate pro-rated first month rent using Polish rental logic (30 days per month)
+    let firstMonthRent = rent;
+    let proRatedCalculation = null;
+    
+    if (offerForm.availableFrom && rent > 0) {
+      const moveInDate = new Date(offerForm.availableFrom);
+      const moveInDay = moveInDate.getDate();
+      const daysInMonth = 30; // Polish rental standard
+      const daysOccupied = daysInMonth - moveInDay + 1;
+      
+      // Only pro-rate if not moving in on the 1st
+      if (moveInDay > 1) {
+        firstMonthRent = (rent / daysInMonth) * daysOccupied;
+        proRatedCalculation = {
+          daysOccupied,
+          daysInMonth,
+          originalRent: rent,
+          proRatedRent: firstMonthRent
+        };
+      }
+    }
+    
+    const total = firstMonthRent + deposit;
+    setTotalCost(total);
+    
+    // Update offerForm with calculated values
+    setOfferForm(prev => ({
+      ...prev,
+      firstMonthRent: firstMonthRent,
+      proRatedCalculation: proRatedCalculation
+    }));
+  }, [offerForm.monthlyRent, offerForm.securityDeposit, offerForm.availableFrom]);
 
   const handleInputChange = (field, value) => {
     setOfferForm(prev => ({
@@ -125,19 +162,54 @@ const SendOfferModal = ({ request, offerForm, setOfferForm, onClose, onSubmit })
               </div>
             </div>
 
+            
+
+            {/* First Month Calculation */}
+            {offerForm.proRatedCalculation && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <h4 className="text-sm font-medium text-yellow-800 mb-2">First Month Pro-rating</h4>
+                <div className="text-xs text-yellow-700 space-y-1">
+                  <p>Move-in date: {new Date(offerForm.availableFrom).toLocaleDateString()}</p>
+                  <p>Days occupied: {offerForm.proRatedCalculation.daysOccupied} out of {offerForm.proRatedCalculation.daysInMonth}</p>
+                  <p>Calculation: {offerForm.proRatedCalculation.daysOccupied}/{offerForm.proRatedCalculation.daysInMonth} × {offerForm.proRatedCalculation.originalRent.toLocaleString('pl-PL')} zł</p>
+                  <p className="font-medium">First month rent: {offerForm.proRatedCalculation.proRatedRent.toFixed(2)} zł</p>
+                </div>
+              </div>
+            )}
+
             {/* Total Initial Cost */}
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-green-800">Total Initial Cost (Rent + Deposit)</span>
+                <span className="text-sm font-medium text-green-800">Total Initial Cost</span>
                 <span className="text-2xl font-bold text-green-600">
-                  {totalCost.toLocaleString('pl-PL')} zł
+                  {totalCost.toFixed(2)} zł
                 </span>
               </div>
-              <p className="text-sm text-green-700 mt-1">
+              <div className="text-sm text-green-700 mt-2 space-y-1">
+                <p>• First month rent: {offerForm.firstMonthRent ? offerForm.firstMonthRent.toFixed(2) : '0'} zł</p>
+                <p>• Security deposit: {offerForm.securityDeposit ? parseFloat(offerForm.securityDeposit).toFixed(2) : '0'} zł</p>
+              </div>
+              <p className="text-sm text-green-700 mt-2">
                 This is what the tenant will need to pay upfront to secure the property.
               </p>
             </div>
           </div>
+
+                                {/* Tenant's Expected Move-in Date */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-900">Tenant's Expected Move-in Date</h3>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-700">
+                    {request.moveInDate ? new Date(request.moveInDate).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    }) : 'Not specified'}
+                  </div>
+                </div>
+              </div>
+            </div>
 
           {/* Lease Terms Section */}
           <div className="space-y-4">
@@ -155,24 +227,52 @@ const SendOfferModal = ({ request, offerForm, setOfferForm, onClose, onSubmit })
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
+                {request.moveInDate && (
+                  <div className="text-xs text-gray-600 mt-1 space-y-1">
+                    <p>Selected: {offerForm.availableFrom}</p>
+                    <p>Tenant expects: {new Date(request.moveInDate).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    })}</p>
+                    {offerForm.availableFrom && request.moveInDate && (
+                      <p className={`font-medium ${
+                        new Date(offerForm.availableFrom) <= new Date(request.moveInDate) 
+                          ? 'text-green-600' 
+                          : 'text-orange-600'
+                      }`}>
+                        {new Date(offerForm.availableFrom) <= new Date(request.moveInDate) 
+                          ? '✅ Available on time' 
+                          : '⚠️ Available after tenant expects'}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Lease Duration
                 </label>
-                <select
-                  value={offerForm.leaseDuration}
-                  onChange={(e) => handleInputChange('leaseDuration', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="6">6 months</option>
-                  <option value="12">12 months</option>
-                  <option value="18">18 months</option>
-                  <option value="24">24 months</option>
-                  <option value="36">36 months</option>
-                </select>
+                                 <select
+                   value={offerForm.leaseDuration}
+                   onChange={(e) => handleInputChange('leaseDuration', e.target.value)}
+                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                   required
+                 >
+                   <option value="1">1 month</option>
+                   <option value="2">2 months</option>
+                   <option value="3">3 months</option>
+                   <option value="4">4 months</option>
+                   <option value="5">5 months</option>
+                   <option value="6">6 months</option>
+                   <option value="7">7 months</option>
+                   <option value="8">8 months</option>
+                   <option value="9">9 months</option>
+                   <option value="10">10 months</option>
+                   <option value="11">11 months</option>
+                   <option value="12">12 months</option>
+                 </select>
               </div>
             </div>
           </div>
@@ -193,20 +293,7 @@ const SendOfferModal = ({ request, offerForm, setOfferForm, onClose, onSubmit })
               </p>
             </div>
 
-            {/* Contract Integration Note */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-start">
-                <svg className="w-5 h-5 text-yellow-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <p className="text-sm text-yellow-800 font-medium">Contract Integration</p>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    These additional terms & conditions will be automatically included in the rental contract that will be generated after the tenant pays for the property.
-                  </p>
-                </div>
-              </div>
-            </div>
+                         
           </div>
 
           {/* Action Buttons */}

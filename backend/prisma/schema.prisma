@@ -1,497 +1,501 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "sqlite" // Using SQLite for development
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String?
-  role      UserRole @default(TENANT)
-  googleId  String?  @unique
-  
-  // Identity fields for contracts
-  firstName String?
-  lastName  String?
-  pesel     String?  // Polish national identification number
-  passportNumber String?
-  kartaPobytuNumber String? // Residence card number
-  phoneNumber String?
-  citizenship String? // Polish or Non-Polish
-  dateOfBirth DateTime? // Date of birth for non-Polish citizens
-  
-  // Address fields
-  street    String?
-  city      String?
-  zipCode   String?
-  country   String?
-  
-  // Professional information
-  profession String? // User's profession/occupation
-  
-  // Landlord-specific fields
-  dowodOsobistyNumber String? // Polish ID card number
-  address   String?
-  
-  // Profile and signature data
-  profileImage String? // Profile image URL
-  signatureBase64 String? // Base64 encoded signature image
-  identityDocument String? // Identity document filename
-  isVerified Boolean @default(false) // KYC verification status
-  
-  // KYC Status fields
-  kycStatus KYCStatus @default(PENDING) // KYC verification status
-  kycSubmittedAt DateTime? // When KYC was submitted
-  kycReviewedAt DateTime? // When KYC was reviewed by admin
-  kycRejectionReason String? // Reason for KYC rejection
-  kycReviewedBy String? // Admin who reviewed the KYC
-  
-  // GDPR / RODO consent fields
-  gdprConsent Boolean @default(false) // GDPR consent status
-  gdprConsentDate DateTime? // Date when GDPR consent was given
-  
-  // Verification fields
-  phoneVerified Boolean @default(false) // Phone number verification status
-  emailVerified Boolean @default(false) // Email verification status
-  
-  // Admin management fields
-  isSuspended Boolean @default(false) // User suspension status
-  suspensionReason String? // Reason for suspension
-  suspendedAt DateTime? // When user was suspended
-  
-  // 🚀 SCALABILITY: Landlord capacity management
-  availability Boolean @default(true) // Whether landlord is accepting new requests (manual override)
-  autoAvailability Boolean @default(true) // Auto-manage availability based on capacity
-  maxTenants Int @default(5) // Maximum number of tenants landlord can handle
-  currentTenants Int @default(0) // Current number of active tenants
-  
-  // 🚀 SCALABILITY: Performance tracking
-  lastActiveAt DateTime @default(now())
-  requestCount Int @default(0) // Number of requests processed
-  responseTime Int? // Average response time in ms
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                       String                    @id @default(cuid())
+  name                     String
+  email                    String                    @unique
+  password                 String?
+  role                     UserRole                  @default(TENANT)
+  googleId                 String?                   @unique
+  firstName                String?
+  lastName                 String?
+  pesel                    String?
+  passportNumber           String?
+  kartaPobytuNumber        String?
+  phoneNumber              String?
+  citizenship              String?
+  dateOfBirth              DateTime?
+  street                   String?
+  city                     String?
+  zipCode                  String?
+  country                  String?
+  profession               String?
+  dowodOsobistyNumber      String?
+  address                  String?
+  profileImage             String?
+  signatureBase64          String?
+  identityDocument         String?
+  isVerified               Boolean                   @default(false)
+  kycStatus                KYCStatus                 @default(PENDING)
+  kycSubmittedAt           DateTime?
+  kycReviewedAt            DateTime?
+  kycRejectionReason       String?
+  kycReviewedBy            String?
+  gdprConsent              Boolean                   @default(false)
+  gdprConsentDate          DateTime?
+  phoneVerified            Boolean                   @default(false)
+  emailVerified            Boolean                   @default(false)
+  isSuspended              Boolean                   @default(false)
+  suspensionReason         String?
+  suspendedAt              DateTime?
+  availability             Boolean                   @default(true)
+  autoAvailability         Boolean                   @default(true)
+  maxTenants               Int                       @default(5)
+  currentTenants           Int                       @default(0)
+  lastActiveAt             DateTime                  @default(now())
+  requestCount             Int                       @default(0)
+  responseTime             Int?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  conversationParticipants ConversationParticipant[] @relation("UserConversations")
+  landlordProfile          LandlordProfile?          @relation("LandlordProfile")
+  landlordRequestMatches   LandlordRequestMatch[]    @relation("LandlordMatches")
+  leases                   Lease[]                   @relation("TenantLeases")
+  sentMessages             Message[]                 @relation("SentMessages")
+  offers                   Offer[]                   @relation("LandlordOffers")
+  payments                 Payment[]                 @relation("UserPayments")
+  properties               Property[]                @relation("LandlordProperties")
+  rentPayments             RentPayment[]             @relation("TenantRentPayments")
+  rentalRequests           RentalRequest[]           @relation("TenantRequests")
+  reviews                  Review[]                  @relation("TenantReviews")
 
-  // Relationships
-  rentalRequests RentalRequest[] @relation("TenantRequests")
-  offers         Offer[]         @relation("LandlordOffers")
-  payments       Payment[]       @relation("UserPayments")
-  rentPayments   RentPayment[]   @relation("TenantRentPayments")
-  landlordProfile LandlordProfile? @relation("LandlordProfile")
-  landlordRequestMatches LandlordRequestMatch[] @relation("LandlordMatches")
-  properties     Property[]      @relation("LandlordProperties")
-  leases         Lease[]         @relation("TenantLeases")
-  reviews        Review[]        @relation("TenantReviews")
-
+  @@index([role, availability, autoAvailability, currentTenants])
+  @@index([email])
+  @@index([lastActiveAt])
   @@map("users")
-  @@index([role, availability, autoAvailability, currentTenants]) // 🚀 SCALABILITY: Composite index for landlord queries
-  @@index([email]) // 🚀 SCALABILITY: Email lookup optimization
-  @@index([lastActiveAt]) // 🚀 SCALABILITY: Activity tracking
 }
 
-// 🚀 SCALABILITY: New model for landlord-specific data
 model LandlordProfile {
-  id String @id @default(cuid())
-  
-  // Location preferences for efficient matching
-  preferredLocations String? // JSON string of preferred cities/areas
-  maxBudget Float? // Maximum budget landlord typically works with
-  minBudget Float? // Minimum budget landlord typically works with
-  
-  // 🏠 NEW: Capacity management
-  maxTenants Int @default(5) // Maximum number of tenants landlord can handle
-  currentTenants Int @default(0) // Current number of active tenants
-  
-  // 🎛️ NEW: Availability control
-  manualAvailability Boolean @default(true) // Manual override for availability
-  autoAvailability Boolean @default(true) // Auto-manage based on capacity
-  
-  // Property types and preferences
-  propertyTypes String? // JSON string of property types ["apartment", "house", "studio"]
-  amenities String? // JSON string of amenities ["parking", "furnished", "pets_allowed"]
-  
-  // 🏠 NEW: Property templates for offers
-  propertyRules String? // Standard house rules template
-  propertyDescription String? // Standard property description template
-  
-  // 🖼️ NEW: Property media library
-  propertyImages String? // JSON string of image URLs for reuse
-  propertyVideos String? // JSON string of video URLs for reuse
-  
-  // 🚀 NEW: Auto-fill preferences
-  autoFillMedia Boolean @default(true) // Auto-fill media in offers
-  autoFillRules Boolean @default(true) // Auto-fill rules in offers
-  autoFillDescription Boolean @default(true) // Auto-fill description in offers
-  
-  // Response preferences
-  autoResponse Boolean @default(false) // Auto-generate offers
-  responseTemplate String? // Template for auto-responses
-  
-  // Performance metrics
-  averageResponseTime Int? // Average time to respond to requests
-  acceptanceRate Float? // Percentage of offers accepted
-  
-  // Relations
-  userId String @unique
-  user User @relation("LandlordProfile", fields: [userId], references: [id], onDelete: Cascade)
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  preferredLocations  String?
+  maxBudget           Float?
+  minBudget           Float?
+  maxTenants          Int      @default(5)
+  currentTenants      Int      @default(0)
+  manualAvailability  Boolean  @default(true)
+  autoAvailability    Boolean  @default(true)
+  propertyTypes       String?
+  amenities           String?
+  propertyRules       String?
+  propertyDescription String?
+  propertyImages      String?
+  propertyVideos      String?
+  autoFillMedia       Boolean  @default(true)
+  autoFillRules       Boolean  @default(true)
+  autoFillDescription Boolean  @default(true)
+  autoResponse        Boolean  @default(false)
+  responseTemplate    String?
+  averageResponseTime Int?
+  acceptanceRate      Float?
+  userId              String   @unique
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation("LandlordProfile", fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([preferredLocations])
+  @@index([maxBudget, minBudget])
+  @@index([maxTenants, currentTenants])
+  @@index([manualAvailability, autoAvailability])
   @@map("landlord_profiles")
-  @@index([preferredLocations]) // 🚀 SCALABILITY: Location-based queries
-  @@index([maxBudget, minBudget]) // 🚀 SCALABILITY: Budget range queries
-  @@index([maxTenants, currentTenants]) // 🚀 SCALABILITY: Capacity-based queries
-  @@index([manualAvailability, autoAvailability]) // 🚀 SCALABILITY: Availability queries
 }
 
-// 🏠 NEW: Property model for landlord property management
 model Property {
-  id String @id @default(cuid())
-  
-  // Basic property information
-  name String
-  address String
-  city String
-  district String? // District within the city
-  zipCode String
-  country String @default("Poland")
-  
-  // Property details
-  propertyType String // "apartment", "house", "studio", "room"
-  bedrooms Int?
-  bathrooms Int?
-  size Float? // in square meters
-  floor Int?
-  totalFloors Int?
-  
-  // Rental information
-  monthlyRent Float
-  depositAmount Float?
-  utilitiesIncluded Boolean @default(false)
-  availableFrom DateTime?
-  availableUntil DateTime?
-  
-  // Property features
-  furnished Boolean @default(false)
-  parking Boolean @default(false)
-  petsAllowed Boolean @default(false)
-  smokingAllowed Boolean @default(false)
-  
-  // Property status
-  status PropertyStatus @default(AVAILABLE)
-  maxTenants Int @default(1)
-  currentTenants Int @default(0)
-  
-  // Property description and rules
-  description String?
-  houseRules String?
-  
-  // Media
-  images String? // JSON string of image URLs
-  videos String? // JSON string of video URLs
-  
-  // Location coordinates (optional)
-  latitude Float?
-  longitude Float?
-  
-  // Relations
-  landlordId String
-  landlord User @relation("LandlordProperties", fields: [landlordId], references: [id], onDelete: Cascade)
-  units      Unit[]   @relation("PropertyUnits")
-  offers     Offer[]  @relation("PropertyOffers")
-  
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String         @id @default(cuid())
+  name              String
+  address           String
+  city              String
+  district          String?
+  zipCode           String
+  country           String         @default("Poland")
+  propertyType      String
+  bedrooms          Int?
+  bathrooms         Int?
+  size              Float?
+  floor             Int?
+  totalFloors       Int?
+  monthlyRent       Float
+  depositAmount     Float?
+  utilitiesIncluded Boolean        @default(false)
+  availableFrom     DateTime?
+  availableUntil    DateTime?
+  furnished         Boolean        @default(false)
+  parking           Boolean        @default(false)
+  petsAllowed       Boolean        @default(false)
+  smokingAllowed    Boolean        @default(false)
+  status            PropertyStatus @default(AVAILABLE)
+  maxTenants        Int            @default(1)
+  currentTenants    Int            @default(0)
+  description       String?
+  houseRules        String?
+  images            String?
+  videos            String?
+  latitude          Float?
+  longitude         Float?
+  landlordId        String
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  conversations     Conversation[] @relation("PropertyConversations")
+  offers            Offer[]        @relation("PropertyOffers")
+  landlord          User           @relation("LandlordProperties", fields: [landlordId], references: [id], onDelete: Cascade)
+  units             Unit[]         @relation("PropertyUnits")
 
+  @@index([landlordId, status])
+  @@index([city, status])
+  @@index([propertyType, status])
+  @@index([monthlyRent, status])
   @@map("properties")
-  @@index([landlordId, status]) // 🚀 SCALABILITY: Landlord's properties
-  @@index([city, status]) // 🚀 SCALABILITY: Location-based queries
-  @@index([propertyType, status]) // 🚀 SCALABILITY: Type-based queries
-  @@index([monthlyRent, status]) // 🚀 SCALABILITY: Price-based queries
 }
 
 model RentalRequest {
-  id        Int      @id @default(autoincrement())
-  title     String
-  description String
-  location  String
-  moveInDate DateTime
-  budget    Float
-  budgetFrom Float? // Minimum budget range
-  budgetTo   Float? // Maximum budget range
-  propertyType String? // Room, Shared Room, Studio, Apartment, House
-  district  String? // Specific district or null for "All"
-  bedrooms  Int?
-  bathrooms Int?
-  furnished Boolean  @default(false)
-  status    RentalRequestStatus @default(ACTIVE)
-  isLocked  Boolean  @default(false)
-  
-  // Enhanced fields for better landlord attraction
+  id                     Int                    @id @default(autoincrement())
+  title                  String
+  description            String
+  location               String
+  moveInDate             DateTime
+  budget                 Float
+  budgetFrom             Float?
+  budgetTo               Float?
+  propertyType           String?
+  district               String?
+  bedrooms               Int?
+  bathrooms              Int?
+  furnished              Boolean                @default(false)
+  status                 RentalRequestStatus    @default(ACTIVE)
+  isLocked               Boolean                @default(false)
   additionalRequirements String?
-  preferredNeighborhood String?
-  maxCommuteTime String?
-  mustHaveFeatures String?
-  flexibleOnMoveInDate Boolean @default(false)
-  
-  // 🚀 SCALABILITY: Request pool management
-  poolStatus RequestPoolStatus @default(ACTIVE) // ACTIVE, MATCHED, EXPIRED, CANCELLED
-  matchScore Float? // Algorithm-generated match score
-  viewCount Int @default(0) // Number of landlords who viewed this request
-  responseCount Int @default(0) // Number of offers received
-  
-  // 🚀 SCALABILITY: Performance tracking
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  expiresAt DateTime? // When request expires from pool
-  
-  // Relations
-  tenantId String
-  tenant   User     @relation("TenantRequests", fields: [tenantId], references: [id], onDelete: Cascade)
-  
-  offers   Offer[]  @relation("RequestOffer")
-  contractSignature ContractSignature? @relation("ContractSignature")
-  contract Contract? @relation("Contract")
-  payments Payment[] @relation("RequestPayments")
+  preferredNeighborhood  String?
+  maxCommuteTime         String?
+  mustHaveFeatures       String?
+  flexibleOnMoveInDate   Boolean                @default(false)
+  poolStatus             RequestPoolStatus      @default(ACTIVE)
+  matchScore             Float?
+  viewCount              Int                    @default(0)
+  responseCount          Int                    @default(0)
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  expiresAt              DateTime?
+  tenantId               String
+  parking                Boolean?               @default(false)
+  petsAllowed            Boolean?               @default(false)
+  contractSignature      ContractSignature?     @relation("ContractSignature")
+  contract               Contract?              @relation("Contract")
   landlordRequestMatches LandlordRequestMatch[] @relation("RequestMatches")
-  
+  offers                 Offer[]                @relation("RequestOffer")
+  payments               Payment[]              @relation("RequestPayments")
+  tenant                 User                   @relation("TenantRequests", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([location, status, poolStatus])
+  @@index([budget, status])
+  @@index([createdAt, poolStatus])
+  @@index([tenantId, status])
   @@map("rental_requests")
-  @@index([location, status, poolStatus]) // 🚀 SCALABILITY: Location-based request queries
-  @@index([budget, status]) // 🚀 SCALABILITY: Budget-based filtering
-  @@index([createdAt, poolStatus]) // 🚀 SCALABILITY: Time-based queries
-  @@index([tenantId, status]) // 🚀 SCALABILITY: User's requests
 }
 
 model Offer {
-  id              String   @id @default(cuid())
-  rentAmount      Float
-  depositAmount   Float?
-  leaseDuration   Int      // in months
-  description     String?
-  utilitiesIncluded Boolean @default(false)
-  availableFrom   DateTime
-  status          OfferStatus @default(PENDING)
-  isPaid          Boolean @default(false)
-  paymentIntentId String?
-  paymentDate     DateTime? // When the payment was made
-  leaseStartDate  DateTime? // When the lease actually starts
-  leaseEndDate    DateTime? // When the lease ends
-  
-  // Property Information
-  propertyAddress String?
-  propertyImages  String? // JSON string of image URLs
-  propertyVideo   String?
-  propertyType    String?
-  propertySize    String?
-  propertyAmenities String?
-  propertyDescription String?
-  
-  // 🚀 SCALABILITY: House rules support
-  rulesText String?
-  rulesPdf  String?
-  
-  // 🚀 SCALABILITY: Payment gateway selection
+  id                      String          @id @default(cuid())
+  rentAmount              Float
+  depositAmount           Float?
+  leaseDuration           Int
+  description             String?
+  utilitiesIncluded       Boolean         @default(false)
+  availableFrom           DateTime
+  status                  OfferStatus     @default(PENDING)
+  isPaid                  Boolean         @default(false)
+  paymentIntentId         String?
+  paymentDate             DateTime?
+  leaseStartDate          DateTime?
+  leaseEndDate            DateTime?
+  propertyAddress         String?
+  propertyImages          String?
+  propertyVideo           String?
+  propertyType            String?
+  propertySize            String?
+  propertyAmenities       String?
+  propertyDescription     String?
+  rulesText               String?
+  rulesPdf                String?
   preferredPaymentGateway PaymentGateway?
-  
-  // 🚀 SCALABILITY: Performance tracking
-  responseTime Int? // Time from request to offer in ms
-  matchScore Float? // How well this offer matches the request
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  // Relations
-  rentalRequestId Int
-  rentalRequest   RentalRequest @relation("RequestOffer", fields: [rentalRequestId], references: [id], onDelete: Cascade)
-  
-  landlordId String
-  landlord   User     @relation("LandlordOffers", fields: [landlordId], references: [id], onDelete: Cascade)
-  
-  // 🏠 Link to existing property listing
-  propertyId String?
-  property   Property? @relation("PropertyOffers", fields: [propertyId], references: [id], onDelete: SetNull)
-  
-  payments Payment[] @relation("OfferPayments")
-  
+  responseTime            Int?
+  matchScore              Float?
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+  rentalRequestId         Int
+  landlordId              String
+  propertyId              String?
+  landlord                User            @relation("LandlordOffers", fields: [landlordId], references: [id], onDelete: Cascade)
+  property                Property?       @relation("PropertyOffers", fields: [propertyId], references: [id])
+  rentalRequest           RentalRequest   @relation("RequestOffer", fields: [rentalRequestId], references: [id], onDelete: Cascade)
+  payments                Payment[]       @relation("OfferPayments")
+
+  @@index([landlordId, status])
+  @@index([rentalRequestId, status])
+  @@index([status, createdAt])
+  @@index([propertyId])
   @@map("offers")
-  @@index([landlordId, status]) // 🚀 SCALABILITY: Landlord's offers
-  @@index([rentalRequestId, status]) // 🚀 SCALABILITY: Request's offers
-  @@index([status, createdAt]) // 🚀 SCALABILITY: Status-based queries
-  @@index([propertyId]) // 🚀 SCALABILITY: Property-based queries
 }
 
 model Payment {
-  id              String   @id @default(cuid())
+  id              String         @id @default(cuid())
   amount          Float
-  currency        String   @default("PLN")
-  status          PaymentStatus @default(PENDING)
-  paymentIntentId String?  @unique
+  currency        String         @default("PLN")
+  status          PaymentStatus  @default(PENDING)
+  paymentIntentId String?        @unique
   purpose         PaymentPurpose
   gateway         PaymentGateway
-  
-  // 🚀 SCALABILITY: Enhanced payment tracking
-  processingTime Int? // Time from creation to completion in ms
-  retryCount Int @default(0) // Number of retry attempts
-  errorMessage String? // Last error message if failed
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  paidAt    DateTime?
-  
-  // Relations
-  userId String
-  user   User   @relation("UserPayments", fields: [userId], references: [id], onDelete: Cascade)
-  
+  processingTime  Int?
+  retryCount      Int            @default(0)
+  errorMessage    String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  paidAt          DateTime?
+  userId          String
   rentalRequestId Int?
-  rentalRequest   RentalRequest? @relation("RequestPayments", fields: [rentalRequestId], references: [id], onDelete: SetNull)
-  
-  offerId String?
-  offer   Offer? @relation("OfferPayments", fields: [offerId], references: [id], onDelete: SetNull)
-  
-  leaseId String?
-  lease   Lease? @relation("LeasePayments", fields: [leaseId], references: [id], onDelete: SetNull)
-  
-  rentPayments RentPayment[] @relation("PaymentRentPayments")
-  
+  offerId         String?
+  leaseId         String?
+  lease           Lease?         @relation("LeasePayments", fields: [leaseId], references: [id])
+  offer           Offer?         @relation("OfferPayments", fields: [offerId], references: [id])
+  rentalRequest   RentalRequest? @relation("RequestPayments", fields: [rentalRequestId], references: [id])
+  user            User           @relation("UserPayments", fields: [userId], references: [id], onDelete: Cascade)
+  rentPayments    RentPayment[]  @relation("PaymentRentPayments")
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@index([paymentIntentId])
   @@map("payments")
-  @@index([userId, status]) // 🚀 SCALABILITY: User's payments
-  @@index([status, createdAt]) // 🚀 SCALABILITY: Payment status queries
-  @@index([paymentIntentId]) // 🚀 SCALABILITY: Payment intent lookup
 }
 
 model RentPayment {
-  id        String   @id @default(cuid())
-  amount    Float
-  status    PaymentStatus @default(PENDING)
-  dueDate   DateTime
-  paidDate  DateTime?
-  month     Int
-  year      Int
-  
-  // 🚀 SCALABILITY: Enhanced rent tracking
-  lateFee Float @default(0) // Late payment fees
-  gracePeriod Int @default(5) // Days of grace period
-  isOverdue Boolean @default(false)
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  // Relations
-  userId String
-  user   User   @relation("TenantRentPayments", fields: [userId], references: [id], onDelete: Cascade)
-  
-  paymentId String?
-  payment   Payment? @relation("PaymentRentPayments", fields: [paymentId], references: [id], onDelete: SetNull)
-  
+  id          String        @id @default(cuid())
+  amount      Float
+  status      PaymentStatus @default(PENDING)
+  dueDate     DateTime
+  paidDate    DateTime?
+  month       Int
+  year        Int
+  lateFee     Float         @default(0)
+  gracePeriod Int           @default(5)
+  isOverdue   Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  userId      String
+  paymentId   String?
+  payment     Payment?      @relation("PaymentRentPayments", fields: [paymentId], references: [id])
+  user        User          @relation("TenantRentPayments", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, month, year])
+  @@index([status, dueDate])
+  @@index([isOverdue, dueDate])
   @@map("rent_payments")
-  @@index([userId, month, year]) // 🚀 SCALABILITY: User's rent history
-  @@index([status, dueDate]) // 🚀 SCALABILITY: Overdue payments
-  @@index([isOverdue, dueDate]) // 🚀 SCALABILITY: Overdue tracking
 }
 
 model ContractSignature {
-  id        String   @id @default(cuid())
-  signature String   // Base64 encoded signature
-  signedAt  DateTime @default(now())
-  
-  // Relations
-  rentalRequestId Int @unique
+  id              String        @id @default(cuid())
+  signature       String
+  signedAt        DateTime      @default(now())
+  rentalRequestId Int           @unique
   rentalRequest   RentalRequest @relation("ContractSignature", fields: [rentalRequestId], references: [id], onDelete: Cascade)
-  
+
   @@map("contract_signatures")
 }
 
 model Contract {
-  id              String   @id @default(cuid())
-  contractNumber  String   @unique
+  id              String         @id @default(cuid())
+  contractNumber  String         @unique
   status          ContractStatus @default(SIGNED)
   pdfUrl          String?
   signedAt        DateTime?
-  
-  // 🚀 SCALABILITY: Contract metadata
-  generationTime Int? // Time to generate contract in ms
-  fileSize Int? // PDF file size in bytes
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  // Relations
-  rentalRequestId Int @unique
-  rentalRequest   RentalRequest @relation("Contract", fields: [rentalRequestId], references: [id], onDelete: Cascade)
-  
+  generationTime  Int?
+  fileSize        Int?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  rentalRequestId Int            @unique
+  rentalRequest   RentalRequest  @relation("Contract", fields: [rentalRequestId], references: [id], onDelete: Cascade)
+
+  @@index([status, signedAt])
+  @@index([contractNumber])
   @@map("contracts")
-  @@index([status, signedAt]) // 🚀 SCALABILITY: Contract status queries
-  @@index([contractNumber]) // 🚀 SCALABILITY: Contract number lookup
 }
 
-// 🚀 SCALABILITY: New model for request pool analytics
 model RequestPoolAnalytics {
-  id String @id @default(cuid())
-  
-  // Pool metrics
-  totalRequests Int @default(0)
-  activeRequests Int @default(0)
-  matchedRequests Int @default(0)
-  expiredRequests Int @default(0)
-  
-  // Performance metrics
-  averageResponseTime Int? // Average time for landlords to respond
-  averageMatchScore Float? // Average match score
-  conversionRate Float? // Requests to offers conversion rate
-  
-  // Location-based metrics
-  location String
-  requestCount Int @default(0)
-  landlordCount Int @default(0) // Number of active landlords in this location
-  
-  // Time-based tracking
-  date DateTime @default(now())
-  
+  id                  String   @id @default(cuid())
+  totalRequests       Int      @default(0)
+  activeRequests      Int      @default(0)
+  matchedRequests     Int      @default(0)
+  expiredRequests     Int      @default(0)
+  averageResponseTime Int?
+  averageMatchScore   Float?
+  conversionRate      Float?
+  location            String
+  requestCount        Int      @default(0)
+  landlordCount       Int      @default(0)
+  date                DateTime @default(now())
+
+  @@index([location, date])
+  @@index([date])
   @@map("request_pool_analytics")
-  @@index([location, date]) // 🚀 SCALABILITY: Location-based analytics
-  @@index([date]) // 🚀 SCALABILITY: Time-based analytics
 }
 
-// 🚀 SCALABILITY: New model for landlord-request matching
 model LandlordRequestMatch {
-  id String @id @default(cuid())
-  
-  // Match details
-  matchScore Float // 0-100 score
-  matchReason String? // Why this match was made
-  isViewed Boolean @default(false)
-  isResponded Boolean @default(false)
-  
-  // Relations
-  landlordId String
-  landlord User @relation("LandlordMatches", fields: [landlordId], references: [id], onDelete: Cascade)
-  
+  id              String        @id @default(cuid())
+  matchScore      Float
+  matchReason     String?
+  isViewed        Boolean       @default(false)
+  isResponded     Boolean       @default(false)
+  landlordId      String
   rentalRequestId Int
-  rentalRequest RentalRequest @relation("RequestMatches", fields: [rentalRequestId], references: [id], onDelete: Cascade)
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@unique([landlordId, rentalRequestId]) // Prevent duplicate matches
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  landlord        User          @relation("LandlordMatches", fields: [landlordId], references: [id], onDelete: Cascade)
+  rentalRequest   RentalRequest @relation("RequestMatches", fields: [rentalRequestId], references: [id], onDelete: Cascade)
+
+  @@unique([landlordId, rentalRequestId])
+  @@index([landlordId, matchScore])
+  @@index([rentalRequestId, matchScore])
+  @@index([isViewed, isResponded])
   @@map("landlord_request_matches")
-  @@index([landlordId, matchScore]) // 🚀 SCALABILITY: Landlord's best matches
-  @@index([rentalRequestId, matchScore]) // 🚀 SCALABILITY: Request's best matches
-  @@index([isViewed, isResponded]) // 🚀 SCALABILITY: Response tracking
 }
 
-// Enums
+model Unit {
+  id         String         @id @default(cuid())
+  unitNumber String
+  floor      Int?
+  bedrooms   Int
+  bathrooms  Int
+  area       Float
+  rentAmount Float
+  status     PropertyStatus @default(AVAILABLE)
+  propertyId String
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  lease      Lease?         @relation("UnitLease")
+  property   Property       @relation("PropertyUnits", fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, status])
+  @@map("units")
+}
+
+model Lease {
+  id                  String               @id @default(cuid())
+  startDate           DateTime
+  endDate             DateTime
+  rentAmount          Float
+  depositAmount       Float
+  status              LeaseStatus          @default(ACTIVE)
+  tenantId            String
+  unitId              String               @unique
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  tenant              User                 @relation("TenantLeases", fields: [tenantId], references: [id], onDelete: Cascade)
+  unit                Unit                 @relation("UnitLease", fields: [unitId], references: [id], onDelete: Cascade)
+  maintenanceRequests MaintenanceRequest[] @relation("LeaseMaintenance")
+  payments            Payment[]            @relation("LeasePayments")
+  reviews             Review[]             @relation("LeaseReviews")
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([endDate])
+  @@map("leases")
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  rating      Int
+  comment     String
+  isAnonymous Boolean  @default(false)
+  tenantId    String
+  leaseId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lease       Lease    @relation("LeaseReviews", fields: [leaseId], references: [id], onDelete: Cascade)
+  tenant      User     @relation("TenantReviews", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([leaseId])
+  @@index([rating])
+  @@map("reviews")
+}
+
+model MaintenanceRequest {
+  id          String              @id @default(cuid())
+  title       String
+  description String
+  priority    MaintenancePriority @default(MEDIUM)
+  status      MaintenanceStatus   @default(PENDING)
+  leaseId     String
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  lease       Lease               @relation("LeaseMaintenance", fields: [leaseId], references: [id], onDelete: Cascade)
+
+  @@index([leaseId, status])
+  @@index([priority])
+  @@map("maintenance_requests")
+}
+
+model Conversation {
+  id           String                    @id @default(cuid())
+  title        String?
+  type         ConversationType          @default(DIRECT)
+  propertyId   String?
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  participants ConversationParticipant[] @relation("ConversationParticipants")
+  property     Property?                 @relation("PropertyConversations", fields: [propertyId], references: [id])
+  messages     Message[]                 @relation("ConversationMessages")
+
+  @@index([propertyId])
+  @@index([type])
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String          @id @default(cuid())
+  conversationId String
+  userId         String
+  role           ParticipantRole @default(MEMBER)
+  joinedAt       DateTime        @default(now())
+  leftAt         DateTime?
+  conversation   Conversation    @relation("ConversationParticipants", fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User            @relation("UserConversations", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([conversationId])
+  @@index([userId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  content        String
+  messageType    MessageType  @default(TEXT)
+  attachmentUrl  String?
+  attachmentName String?
+  attachmentSize Int?
+  attachmentType String?
+  isRead         Boolean      @default(false)
+  readAt         DateTime?
+  conversationId String
+  senderId       String
+  replyToId      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  conversation   Conversation @relation("ConversationMessages", fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo        Message?     @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies        Message[]    @relation("MessageReplies")
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@index([isRead])
+  @@map("messages")
+}
+
 enum UserRole {
   TENANT
   LANDLORD
@@ -566,104 +570,6 @@ enum KYCStatus {
   NOT_SUBMITTED
 }
 
-// Unit model for property units
-model Unit {
-  id          String   @id @default(cuid())
-  unitNumber  String   // Unit number (e.g., "A1", "101")
-  floor       Int?
-  bedrooms    Int
-  bathrooms   Int
-  area        Float    // Square meters
-  rentAmount  Float    // Monthly rent amount
-  status      PropertyStatus @default(AVAILABLE)
-  
-  // Property relationship
-  propertyId  String
-  property    Property @relation("PropertyUnits", fields: [propertyId], references: [id], onDelete: Cascade)
-  
-  // Lease relationship
-  lease       Lease?   @relation("UnitLease")
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@map("units")
-  @@index([propertyId, status])
-}
-
-// Lease model for rental agreements
-model Lease {
-  id          String   @id @default(cuid())
-  startDate   DateTime
-  endDate     DateTime
-  rentAmount  Float
-  depositAmount Float
-  status      LeaseStatus @default(ACTIVE)
-  
-  // Relationships
-  tenantId    String
-  tenant      User     @relation("TenantLeases", fields: [tenantId], references: [id], onDelete: Cascade)
-  
-  unitId      String   @unique
-  unit        Unit     @relation("UnitLease", fields: [unitId], references: [id], onDelete: Cascade)
-  
-  // Payments and reviews
-  payments    Payment[] @relation("LeasePayments")
-  reviews     Review[]  @relation("LeaseReviews")
-  maintenanceRequests MaintenanceRequest[] @relation("LeaseMaintenance")
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@map("leases")
-  @@index([tenantId])
-  @@index([status])
-  @@index([endDate])
-}
-
-// Review model for tenant reviews
-model Review {
-  id          String   @id @default(cuid())
-  rating      Int      // 1-5 stars
-  comment     String
-  isAnonymous Boolean  @default(false)
-  
-  // Relationships
-  tenantId    String
-  tenant      User     @relation("TenantReviews", fields: [tenantId], references: [id], onDelete: Cascade)
-  
-  leaseId     String
-  lease       Lease    @relation("LeaseReviews", fields: [leaseId], references: [id], onDelete: Cascade)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@map("reviews")
-  @@index([leaseId])
-  @@index([rating])
-}
-
-// Maintenance request model
-model MaintenanceRequest {
-  id          String   @id @default(cuid())
-  title       String
-  description String
-  priority    MaintenancePriority @default(MEDIUM)
-  status      MaintenanceStatus @default(PENDING)
-  
-  // Relationships
-  leaseId     String
-  lease       Lease    @relation("LeaseMaintenance", fields: [leaseId], references: [id], onDelete: Cascade)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@map("maintenance_requests")
-  @@index([leaseId, status])
-  @@index([priority])
-}
-
-// Enums for new models
 enum LeaseStatus {
   ACTIVE
   EXPIRED
@@ -683,4 +589,23 @@ enum MaintenanceStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
-} 
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+  PROPERTY
+}
+
+enum ParticipantRole {
+  ADMIN
+  MEMBER
+  READONLY
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  DOCUMENT
+  SYSTEM
+}
