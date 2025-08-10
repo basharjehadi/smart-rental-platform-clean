@@ -160,6 +160,7 @@ const getAllActiveRequests = async (req, res) => {
         matchScore: match.matchScore,
         matchReason: match.matchReason,
         tenant: match.rentalRequest.tenant,
+        matchedProperty: bestProperty, // Add this for frontend compatibility
         propertyMatch: bestProperty ? {
           id: bestProperty.id,
           name: bestProperty.name,
@@ -237,6 +238,13 @@ const createOffer = async (req, res) => {
       });
     }
 
+    // Validate that landlord has a property to offer
+    if (!propertyId) {
+      return res.status(400).json({
+        error: 'You must have a property to send an offer. Please create a property listing first.'
+      });
+    }
+
     // Validate lease duration for Polish digital signature compliance
     const leaseDurationMonths = parseInt(leaseDuration);
     if (leaseDurationMonths < 1 || leaseDurationMonths > 12) {
@@ -300,9 +308,31 @@ const createOffer = async (req, res) => {
     let finalPropertySize = propertySize || '';
     let finalPropertyAmenities = propertyAmenities || '';
 
+    // Validate that the property belongs to the landlord
+    if (propertyId) {
+      const propertyOwnership = await prisma.property.findFirst({
+        where: {
+          id: propertyId,
+          landlordId: req.user.id
+        }
+      });
+
+      if (!propertyOwnership) {
+        return res.status(403).json({
+          error: 'You can only send offers for properties that you own.'
+        });
+      }
+    }
+
     // 🏠 Priority 1: Use property data if available
     if (propertyData) {
-      finalPropertyAddress = propertyData.address + ', ' + propertyData.zipCode + ', ' + propertyData.city;
+      // Construct complete address: street + house + apartment, district, zipCode, city
+      let completeAddress = propertyData.address;
+      if (propertyData.district) {
+        completeAddress += ', ' + propertyData.district;
+      }
+      completeAddress += ', ' + propertyData.zipCode + ', ' + propertyData.city;
+      finalPropertyAddress = completeAddress;
       finalPropertyType = propertyData.propertyType;
       finalPropertySize = propertyData.size?.toString() || propertyData.bedrooms?.toString() || '';
       finalPropertyDescription = propertyData.name || propertyData.description || '';
@@ -388,6 +418,30 @@ const createOffer = async (req, res) => {
       });
     }
 
+    // 💰 BUDGET VALIDATION: Ensure offered rent is reasonable for tenant's budget
+    const tenantMaxBudget = rentalRequest.budgetTo || rentalRequest.budget;
+    const tenantMinBudget = rentalRequest.budgetFrom || rentalRequest.budget;
+    const offeredRent = parseFloat(rentAmount);
+    
+    // Check if offered rent is significantly above tenant's max budget
+    const budgetFlexibility = 1.2; // 20% above max budget
+    const maxAllowedRent = tenantMaxBudget * budgetFlexibility;
+    
+    if (offeredRent > maxAllowedRent) {
+      return res.status(400).json({
+        error: `Your offered rent (${offeredRent} PLN) is significantly above the tenant's maximum budget (${tenantMaxBudget} PLN). Please adjust your price to within ${Math.round(maxAllowedRent)} PLN or provide a compelling justification for the higher price.`,
+        code: 'BUDGET_EXCEEDED',
+        tenantMaxBudget,
+        offeredRent,
+        maxAllowedRent: Math.round(maxAllowedRent)
+      });
+    }
+    
+    // Warn if rent is above tenant's max budget but within flexibility
+    if (offeredRent > tenantMaxBudget) {
+      console.log(`⚠️ Landlord offering rent ${offeredRent} PLN above tenant's max budget ${tenantMaxBudget} PLN (within ${Math.round(maxAllowedRent)} PLN flexibility)`);
+    }
+
     // 🚀 SCALABILITY: Create offer with transaction
     const result = await prisma.$transaction(async (tx) => {
       // Create offer
@@ -454,6 +508,25 @@ const createOffer = async (req, res) => {
         );
       } catch (error) {
         console.error('❌ Error sending offer notification:', error);
+      }
+    });
+
+    // 🔔 Create notification for tenant about new offer
+    setImmediate(async () => {
+      try {
+        const { NotificationService } = await import('../services/notificationService.js');
+        
+        await NotificationService.createOfferNotification(
+          result.rentalRequest.tenant.id,
+          result.id,
+          result.propertyAddress || 'Property',
+          req.user.name || 'A landlord'
+        );
+        
+        console.log(`🔔 Created notification for tenant ${result.rentalRequest.tenant.id} about new offer ${result.id}`);
+      } catch (notificationError) {
+        console.error('❌ Error creating offer notification:', notificationError);
+        // Don't fail the main operation if notifications fail
       }
     });
 
@@ -944,7 +1017,28 @@ const getMyOffers = async (req, res) => {
         return {
           ...offer,
           propertyTitle: offer.property.name || offer.property.description || 'Property Offer',
-          propertyAddress: `${offer.property.address}, ${offer.property.zipCode}, ${offer.property.city}`,
+          // For paid offers, show full address; for others, show masked address
+          propertyAddress: (() => {
+            const isPaid = offer.isPaid || (offer.status === 'ACCEPTED' && offer.paymentIntentId);
+            
+            if (isPaid) {
+              // Show full address for paid offers
+              let completeAddress = offer.property.address;
+              if (offer.property.district) {
+                completeAddress += ', ' + offer.property.district;
+              }
+              completeAddress += ', ' + offer.property.zipCode + ', ' + offer.property.city;
+              return completeAddress;
+            } else {
+              // Show masked address for unpaid offers
+              const addressParts = offer.property.address.split(' ');
+              // Remove the last part if it contains numbers (house/apartment number)
+              const streetParts = addressParts.filter(part => !/\d/.test(part));
+              const streetName = streetParts.join(' ');
+              const maskedAddress = `${streetName}, ${offer.property.district || ''}, ${offer.property.city}`;
+              return maskedAddress;
+            }
+          })(),
           propertyImages: offer.property.images || offer.propertyImages || null,
           propertyVideo: offer.property.videos || offer.propertyVideo || null,
           propertyAmenities: offer.propertyAmenities || JSON.stringify([
@@ -964,9 +1058,10 @@ const getMyOffers = async (req, res) => {
             size: offer.property.size,
             furnished: offer.property.furnished,
             parking: offer.property.parking,
-            petsAllowed: offer.property.petsAllowed
+            petsAllowed: offer.property.petsAllowed,
+            smokingAllowed: offer.property.smokingAllowed
           },
-          isPaid: offer.status === 'ACCEPTED' && offer.paymentIntentId ? true : false
+          isPaid: offer.isPaid || (offer.status === 'PAID') || (offer.status === 'ACCEPTED' && offer.paymentIntentId)
         };
       }
       
@@ -980,7 +1075,7 @@ const getMyOffers = async (req, res) => {
         propertyAmenities: offer.propertyAmenities ? (typeof offer.propertyAmenities === 'string' && offer.propertyAmenities.startsWith('[') ? offer.propertyAmenities : JSON.stringify([offer.propertyAmenities])) : null,
         propertyType: offer.propertyType || 'Apartment',
         propertySize: offer.propertySize || offer.rentalRequest?.bedrooms?.toString() || '1',
-        isPaid: offer.status === 'ACCEPTED' && offer.paymentIntentId ? true : false
+        isPaid: offer.isPaid || (offer.status === 'PAID') || (offer.status === 'ACCEPTED' && offer.paymentIntentId)
       };
     });
 
@@ -1064,12 +1159,16 @@ const getOfferDetails = async (req, res) => {
             bedrooms: true,
             bathrooms: true,
             size: true,
+            floor: true,
+            totalFloors: true,
             furnished: true,
             parking: true,
             petsAllowed: true,
+            smokingAllowed: true,
             description: true,
             images: true,
-            videos: true
+            videos: true,
+            houseRules: true
           }
         }
       }
@@ -1415,7 +1514,11 @@ const getAllRentalRequests = async (req, res) => {
             firstName: true,
             lastName: true,
             email: true,
-            profileImage: true
+            profileImage: true,
+            profession: true,
+            dateOfBirth: true,
+            phoneNumber: true,
+            pesel: true
           }
         },
         offers: {

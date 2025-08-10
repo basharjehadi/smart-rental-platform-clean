@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowLeft, Play, Star, Shield, Calendar, MapPin, Home, Users, Clock, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Play, Star, Shield, Calendar, MapPin, Home, Users, Clock, X, ChevronLeft, ChevronRight, Sofa, Car, Bath, Building2, Square, Bed } from 'lucide-react';
+import PropertyMapCard from '../components/PropertyMapCard';
 
 const PropertyDetailsView = () => {
   const { offerId } = useParams();
@@ -23,6 +24,10 @@ const PropertyDetailsView = () => {
     try {
       setLoading(true);
       const response = await api.get(`/tenant/offer/${offerId}`);
+      console.log('🔍 Offer details received:', response.data.offer);
+      console.log('🔍 Property data:', response.data.offer?.property);
+      console.log('🔍 Property images:', response.data.offer?.property?.images);
+      console.log('🔍 Property videos:', response.data.offer?.property?.videos);
       setOffer(response.data.offer);
     } catch (error) {
       console.error('Error fetching offer details:', error);
@@ -80,43 +85,177 @@ const PropertyDetailsView = () => {
     navigate('/login');
   };
 
+  // Use real property data instead of fallbacks
+  const propertyData = offer?.property || {};
+  console.log('🔍 Property data in component:', propertyData);
+  console.log('🔍 Offer propertyId:', offer?.propertyId);
+  console.log('🔍 Property has ID:', propertyData?.id);
+  console.log('🔍 Property has images:', !!propertyData?.images);
+  console.log('🔍 Property has videos:', !!propertyData?.videos);
+  
   // Parse data early to avoid undefined errors
-  const propertyImages = offer?.propertyImages ? 
+  const propertyImages = propertyData.images ? 
     (() => {
       try {
-        return typeof offer.propertyImages === 'string' ? JSON.parse(offer.propertyImages) : offer.propertyImages;
+        const parsed = typeof propertyData.images === 'string' ? JSON.parse(propertyData.images) : propertyData.images;
+        console.log('🖼️ Parsed property images:', parsed);
+        return parsed;
       } catch (error) {
-        console.warn('Failed to parse propertyImages:', offer.propertyImages, error);
+        console.warn('Failed to parse property images:', propertyData.images, error);
         return [];
       }
     })() : 
     [];
 
-  const propertyVideo = offer?.propertyVideo ? 
+  const propertyVideo = propertyData.videos ? 
     (() => {
       try {
-        return typeof offer.propertyVideo === 'string' ? JSON.parse(offer.propertyVideo) : offer.propertyVideo;
+        const parsed = typeof propertyData.videos === 'string' ? JSON.parse(propertyData.videos) : propertyData.videos;
+        console.log('🎥 Property video data:', parsed);
+        console.log('🎥 Property video type:', typeof propertyData.videos);
+        console.log('🎥 Property video raw:', propertyData.videos);
+        return parsed;
       } catch (error) {
-        console.warn('Failed to parse propertyVideo:', offer.propertyVideo, error);
+        console.warn('Failed to parse property videos:', propertyData.videos, error);
         return null;
       }
     })() : 
     null;
-
-  const amenities = offer?.propertyAmenities ? 
-                    (() => {
-                  try {
-                    return typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities) : offer.propertyAmenities;
-                  } catch (error) {
-                    console.warn('Failed to parse propertyAmenities:', offer.propertyAmenities, error);
-                    return [];
-                  }
-                })() : 
+  
+  // Parse amenities from property data or use empty array
+  const amenities = propertyData.houseRules ? 
+    (() => {
+      try {
+        return typeof propertyData.houseRules === 'string' ? JSON.parse(propertyData.houseRules) : propertyData.houseRules;
+      } catch (error) {
+        console.warn('Failed to parse property houseRules:', propertyData.houseRules, error);
+        return [];
+      }
+    })() : 
     [];
 
-  // Add some default amenities that are commonly shown in the screenshots
-  const defaultAmenities = ['Balcony', 'Elevator', 'Internet (separate with roommates)', 'Intercom', 'Parking Space'];
-  const allAmenities = amenities.length > 0 ? amenities : defaultAmenities;
+  // Use real amenities or show "No amenities listed"
+  const allAmenities = amenities.length > 0 ? amenities : [];
+
+  // Helper function to get ordinal suffix
+  const getOrdinalSuffix = (num) => {
+    if (num >= 11 && num <= 13) return 'th';
+    switch (num % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
+  };
+
+  // Mask landlord's last name for privacy
+  const maskLandlordName = (fullName) => {
+    if (!fullName) return 'Landlord';
+    
+    // If offer is paid, show full name
+    if (offer?.status === 'PAID' || offer?.isPaid === true) {
+      return fullName;
+    }
+    
+    const nameParts = fullName.trim().split(' ');
+    
+    if (nameParts.length >= 2) {
+      const firstName = nameParts[0];
+      const lastName = nameParts[nameParts.length - 1];
+      
+      // Mask the last name (show first letter, rest as asterisks)
+      const maskedLastName = lastName.charAt(0) + '*'.repeat(lastName.length - 1);
+      
+      return `${firstName} ${maskedLastName}`;
+    } else {
+      // If only one name, mask it partially
+      const name = nameParts[0];
+      if (name.length > 2) {
+        return name.charAt(0) + '*'.repeat(name.length - 1);
+      }
+      return name;
+    }
+  };
+
+  // Format address to show only street, district, and city (privacy)
+  const formatAddress = (fullAddress) => {
+    if (!fullAddress) return 'Location not specified';
+    
+    // If offer is paid, show full address
+    if (offer?.status === 'PAID' || offer?.isPaid === true) {
+      return fullAddress;
+    }
+    
+    // Split the address by commas and filter out empty parts
+    const parts = fullAddress.split(',').map(part => part.trim()).filter(part => part.length > 0);
+    
+    if (parts.length >= 3) {
+      // Extract street name (remove house number), postcode, and city
+      let street = parts[0];
+      const postcode = parts[1];
+      const city = parts[2];
+      
+      // Remove house number from street (e.g., "Jarochowskiego 97/19" -> "Jarochowskiego")
+      street = street.replace(/\s+\d+.*$/, '');
+      
+      // Try to get district from property data if available
+      const district = propertyData.district || '';
+      
+      return district ? `${street}, ${district}, ${city}` : `${street}, ${city}`;
+    } else if (parts.length === 2) {
+      // If only 2 parts, assume it's street and city
+      let street = parts[0];
+      const city = parts[1];
+      
+      // Remove house number from street
+      street = street.replace(/\s+\d+.*$/, '');
+      
+      // Try to get district from property data if available
+      const district = propertyData.district || '';
+      
+      return district ? `${street}, ${district}, ${city}` : `${street}, ${city}`;
+    } else {
+      // If only 1 part, remove house number and return
+      let street = parts[0];
+      street = street.replace(/\s+\d+.*$/, '');
+      
+      // Try to get district from property data if available
+      const district = propertyData.district || '';
+      const city = propertyData.city || '';
+      
+      if (district && city) {
+        return `${street}, ${district}, ${city}`;
+      } else {
+        return street;
+      }
+    }
+  };
+
+  // Get real property specifications
+  const propertySpecs = {
+    bedrooms: propertyData.bedrooms || offer?.propertyType || 'Not specified',
+    bathrooms: propertyData.bathrooms || 'Not specified',
+    size: propertyData.size ? `${propertyData.size} m²` : 'Not specified',
+    floor: propertyData.floor && propertyData.totalFloors ? 
+      `${propertyData.floor}${getOrdinalSuffix(propertyData.floor)} floor of ${propertyData.totalFloors}` :
+      propertyData.floor ? `${propertyData.floor}${getOrdinalSuffix(propertyData.floor)} floor` :
+      'Floor not specified',
+    furnished: propertyData.furnished ? 'Furnished' : 'Unfurnished',
+    parking: propertyData.parking ? 'Available' : 'Not Available',
+    petsAllowed: propertyData.petsAllowed || false,
+    smokingAllowed: propertyData.smokingAllowed || false
+  };
+
+  // Get real landlord data
+  const landlordData = {
+    name: offer?.landlord?.name || 'Landlord information not available',
+    email: offer?.landlord?.email || 'Email not available',
+    phone: offer?.landlord?.phoneNumber || 'Phone not available',
+    rating: offer?.landlord?.rating || 'No rating available',
+    reviews: offer?.landlord?.reviewCount || 0,
+    memberSince: offer?.landlord?.createdAt ? new Date(offer.landlord.createdAt).getFullYear() : 'Not available',
+    responseTime: offer?.landlord?.responseTime || 'Response time not available'
+  };
 
   const openPhotoGallery = (index) => {
     setCurrentPhotoIndex(index);
@@ -172,6 +311,19 @@ const PropertyDetailsView = () => {
     });
   };
 
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return '';
+    
+    // If it's already a full URL, return as is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    
+    // If it's a relative path, construct full URL
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    return `${baseUrl}${imagePath}`;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-primary flex items-center justify-center">
@@ -222,8 +374,10 @@ const PropertyDetailsView = () => {
               </button>
               <div className="h-6 w-px bg-gray-300"></div>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900 line-clamp-1">{offer.propertyTitle}</h1>
-                <p className="text-sm text-gray-600 line-clamp-1">{offer.propertyAddress}</p>
+                <h1 className="text-xl font-semibold text-gray-900 line-clamp-1">
+                  {offer.propertyTitle || propertyData.name || `${offer.propertyType || 'Apartment'} in ${offer.propertyAddress?.split(',')[2]?.trim() || 'the city'}`}
+                </h1>
+                <p className="text-sm text-gray-600 line-clamp-1">{formatAddress(offer.propertyAddress)}</p>
               </div>
             </div>
             
@@ -266,16 +420,29 @@ const PropertyDetailsView = () => {
         {/* Main Content Area */}
         <main className="flex-1 p-6 pb-24">
           <div className="max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Column - Property Media and Details */}
-              <div className="lg:col-span-3 space-y-6">
+              <div className="lg:col-span-2 space-y-6">
                 {/* Property Description and Specifications */}
                 <div className="card-modern">
                   <div className="p-6">
+                    {!propertyData.id && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                        <div className="flex items-center">
+                          <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                          </svg>
+                          <div>
+                            <div className="text-sm font-medium text-yellow-800">Property Information Pending</div>
+                            <div className="text-xs text-yellow-600">This offer is based on your rental request. The landlord will provide detailed property information and photos after you accept this offer.</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Property Description</h2>
                     <p className="text-gray-700 leading-relaxed mb-6">
-                      {offer.propertyDescription || offer.description || 
-                        `Modern ${offer.property?.bedrooms || 2}-bedroom apartment in the heart of ${offer.propertyAddress?.split(',')[2]?.trim() || 'the city'}. 
+                      {propertyData.description || offer.propertyDescription || offer.description || 
+                        `Modern ${propertySpecs.bedrooms} bedroom ${offer.propertyType || 'apartment'} in the heart of ${offer.propertyAddress?.split(',')[2]?.trim() || 'the city'}. 
                         This beautiful property features hardwood floors, large windows with natural light, fully equipped kitchen with modern appliances, and a spacious living area. 
                         Building amenities include elevator, parking garage, and 24/7 security.`}
                     </p>
@@ -284,51 +451,106 @@ const PropertyDetailsView = () => {
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                       <div className="text-center">
                         <div className="flex items-center justify-center mb-2">
-                          <Home className="w-6 h-6 text-gray-400" />
+                          <Bed className="w-6 h-6 text-gray-400" />
                         </div>
-                        <div className="text-lg font-semibold text-gray-900">{offer.property?.bedrooms || offer.propertySize || 2} rooms</div>
+                        <div className="text-lg font-semibold text-gray-900">{propertySpecs.bedrooms}</div>
                         <div className="text-xs text-gray-500">Rooms</div>
                       </div>
 
                       <div className="text-center">
                         <div className="flex items-center justify-center mb-2">
-                          <div className="w-6 h-6 border-2 border-dashed border-gray-400 rounded"></div>
+                          <Square className="w-6 h-6 text-gray-400" />
                         </div>
-                        <div className="text-lg font-semibold text-gray-900">{offer.property?.size || 65} m²</div>
+                        <div className="text-lg font-semibold text-gray-900">{propertySpecs.size}</div>
                         <div className="text-xs text-gray-500">Area</div>
                       </div>
 
                       <div className="text-center">
                         <div className="flex items-center justify-center mb-2">
-                          <div className="w-6 h-6 bg-gray-400 rounded"></div>
+                          <Sofa className="w-6 h-6 text-gray-400" />
                         </div>
-                        <div className="text-lg font-semibold text-gray-900">{offer.property?.furnished ? 'Furnished' : 'Unfurnished'}</div>
+                        <div className="text-lg font-semibold text-gray-900">{propertySpecs.furnished}</div>
                         <div className="text-xs text-gray-500">Furnishing</div>
                       </div>
 
                       <div className="text-center">
                         <div className="flex items-center justify-center mb-2">
-                          <div className="w-6 h-6 bg-gray-400 rounded-full"></div>
+                          <Bath className="w-6 h-6 text-gray-400" />
                         </div>
-                        <div className="text-lg font-semibold text-gray-900">{offer.property?.bathrooms || 1} bathrooms</div>
+                        <div className="text-lg font-semibold text-gray-900">{propertySpecs.bathrooms}</div>
                         <div className="text-xs text-gray-500">Bathrooms</div>
                       </div>
 
                       <div className="text-center">
                         <div className="flex items-center justify-center mb-2">
-                          <Home className="w-6 h-6 text-gray-400" />
+                          <Building2 className="w-6 h-6 text-gray-400" />
                         </div>
-                        <div className="text-lg font-semibold text-gray-900">4th floor of 8</div>
+                        <div className="text-lg font-semibold text-gray-900">{propertySpecs.floor}</div>
                         <div className="text-xs text-gray-500">Floor</div>
                       </div>
 
                       <div className="text-center">
                         <div className="flex items-center justify-center mb-2">
-                          <div className="w-6 h-6 bg-gray-400 rounded"></div>
+                          <Car className="w-6 h-6 text-gray-400" />
                         </div>
-                        <div className="text-lg font-semibold text-gray-900">{offer.property?.parking ? 'Available' : 'Not Available'}</div>
+                        <div className="text-lg font-semibold text-gray-900">{propertySpecs.parking}</div>
                         <div className="text-xs text-gray-500">Parking</div>
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Property Policies */}
+                {(propertySpecs.petsAllowed || propertySpecs.smokingAllowed) && (
+                  <div className="card-modern">
+                    <div className="p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Property Policies</h3>
+                      <div className="space-y-3">
+                        {propertySpecs.petsAllowed && (
+                          <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
+                            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                            </svg>
+                            <div>
+                              <div className="text-sm font-medium text-green-800">Pets Allowed</div>
+                              <div className="text-xs text-green-600">This property welcomes pets</div>
+                            </div>
+                          </div>
+                        )}
+                        {propertySpecs.smokingAllowed && (
+                          <div className="flex items-center space-x-3 p-3 bg-orange-50 rounded-lg">
+                            <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+                            </svg>
+                            <div>
+                              <div className="text-sm font-medium text-orange-800">Smoking Allowed</div>
+                              <div className="text-xs text-orange-600">Smoking is permitted in this property</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Available Amenities */}
+                <div className="card-modern">
+                  <div className="p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Available Amenities</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {allAmenities.length > 0 ? (
+                        allAmenities.map((amenity, index) => (
+                          <div key={index} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                            <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                            <span className="text-sm text-gray-700 font-medium">{amenity}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-sm text-gray-500 italic col-span-full text-center py-4">
+                          {!propertyData.id ? 'Amenities will be provided after property details are available' : 'No amenities listed for this property'}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -343,18 +565,25 @@ const PropertyDetailsView = () => {
                     <p className="text-gray-600 mb-4">Take a virtual walk-through of this property.</p>
                     <div className="relative bg-gray-100 rounded-lg overflow-hidden aspect-video">
                       {propertyVideo ? (
-                        <iframe
-                          src={Array.isArray(propertyVideo) ? propertyVideo[0] : propertyVideo}
-                          className="w-full h-full"
-                          title="Property Virtual Tour"
-                          frameBorder="0"
-                          allowFullScreen
-                        />
+                        <video
+                          src={getImageUrl(Array.isArray(propertyVideo) ? propertyVideo[0] : propertyVideo)}
+                          className="w-full h-full object-cover"
+                          controls
+                          preload="metadata"
+                          poster={propertyImages.length > 0 ? getImageUrl(propertyImages[0]) : undefined}
+                        >
+                          <source src={getImageUrl(Array.isArray(propertyVideo) ? propertyVideo[0] : propertyVideo)} type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-gray-200">
                           <div className="text-center">
-                            <div className="text-2xl font-bold text-gray-400 mb-2">No Video Available</div>
-                            <div className="text-sm text-gray-500">Property tour video not uploaded</div>
+                            <div className="text-2xl font-bold text-gray-400 mb-2">
+                              {!propertyData.id ? 'Property Video Pending' : 'No Video Available'}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {!propertyData.id ? 'Virtual tour will be available after property details are provided' : 'Property tour video not uploaded'}
+                            </div>
                             <div className="mt-4">
                               <button className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
                                 <Play className="w-4 h-4 inline mr-2" />
@@ -367,6 +596,8 @@ const PropertyDetailsView = () => {
                     </div>
                   </div>
                 </div>
+
+
 
                 {/* Property Photos */}
                 {propertyImages.length > 0 && (
@@ -383,7 +614,7 @@ const PropertyDetailsView = () => {
                             onClick={() => openPhotoGallery(index)}
                           >
                             <img
-                              src={image}
+                              src={getImageUrl(image)}
                               alt={`Property image ${index + 1}`}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                             />
@@ -404,45 +635,36 @@ const PropertyDetailsView = () => {
                 )}
               </div>
 
-              {/* Right Column - Summary and Actions */}
+              {/* Right Column - Actions and Key Information */}
               <div className="space-y-6">
-                {/* Property Summary */}
-                <div className="card-modern">
-                  <div className="p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Property Summary</h3>
-                    <div className="space-y-4">
-                      <div className="flex items-center space-x-3">
-                        <MapPin className="w-5 h-5 text-gray-400" />
-                        <div>
-                          <div className="text-sm text-gray-600">{offer.propertyAddress}</div>
-                          <div className="text-xs text-blue-600">Full address after payment</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <Home className="w-5 h-5 text-gray-400" />
-                        <div className="text-sm text-gray-600">
-                          {offer.propertyType}, {offer.property?.bedrooms || offer.propertySize || 2} rooms
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <Calendar className="w-5 h-5 text-gray-400" />
-                        <div className="text-sm text-gray-600">{formatDate(offer.availableFrom)}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Available Amenities */}
+                {/* Location Map */}
                 <div className="card-modern">
                   <div className="p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Available Amenities</h3>
-                    <div className="space-y-3">
-                      {allAmenities.map((amenity, index) => (
-                        <div key={index} className="flex items-center space-x-3">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <span className="text-sm text-gray-700">{amenity}</span>
-                        </div>
-                      ))}
+                    <div className="flex items-center space-x-2 mb-4">
+                      <MapPin className="w-5 h-5 text-blue-600" />
+                      <h3 className="text-lg font-semibold text-gray-900">Location</h3>
+                    </div>
+                    
+                    <PropertyMapCard address={
+                      (() => {
+                        // For map, always use the actual property location, not the masked address
+                        const mapAddress = `${propertyData.address}, ${propertyData.district}, ${propertyData.zipCode}, ${propertyData.city}`;
+                        console.log('🗺️ Map address being passed:', mapAddress);
+                        console.log('🗺️ propertyData:', propertyData);
+                        return mapAddress;
+                      })()
+                    } />
+                    
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center text-sm text-gray-600">
+                        <MapPin className="w-4 h-4 mr-2" />
+                        <span>{formatAddress(offer.propertyAddress || `${propertyData.address}, ${propertyData.district}, ${propertyData.zipCode}, ${propertyData.city}`)}</span>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Clock className="w-4 h-4 mr-2" />
+                        <span>5 min walk to tram stop</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -460,10 +682,31 @@ const PropertyDetailsView = () => {
                         <span className="text-sm text-gray-600">Preferred Move-in</span>
                         <span className="text-sm font-semibold">{formatDate(offer.rentalRequest?.moveInDate || offer.availableFrom)}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Property Type</span>
-                        <span className="text-sm font-semibold">{offer.propertyType}, {offer.property?.bedrooms || offer.propertySize || 2} rooms</span>
-                      </div>
+                                              <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Property Type</span>
+                          <span className="text-sm font-semibold">
+                            {(() => {
+                              const getPropertyTypeDisplay = (type) => {
+                                if (!type) return 'Apartment';
+                                
+                                const typeMap = {
+                                  'apartment': 'Apartment',
+                                  'house': 'House',
+                                  'studio': 'Studio',
+                                  'room': 'Room',
+                                  'shared room': 'Shared Room',
+                                  'APARTMENT': 'Apartment',
+                                  'HOUSE': 'House',
+                                  'STUDIO': 'Studio',
+                                  'ROOM': 'Room',
+                                  'SHARED_ROOM': 'Shared Room'
+                                };
+                                return typeMap[type.toLowerCase()] || type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+                              };
+                              return `${getPropertyTypeDisplay(propertyData.propertyType || offer.propertyType)}, ${propertySpecs.bedrooms} rooms`;
+                            })()}
+                          </span>
+                        </div>
                     </div>
                   </div>
                 </div>
@@ -571,18 +814,18 @@ const PropertyDetailsView = () => {
                         <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
                           <Users className="w-6 h-6 text-gray-400" />
                         </div>
-                        <div>
-                          <div className="font-semibold text-gray-900">{offer.landlord?.name || 'Landlord'}</div>
-                          <div className="text-sm text-gray-600">Contact details available after payment</div>
-                        </div>
+                                                  <div>
+                            <div className="font-semibold text-gray-900">{maskLandlordName(landlordData.name)}</div>
+                            <div className="text-sm text-gray-600">Contact details available after payment</div>
+                          </div>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center space-x-2">
                           <Star className="w-4 h-4 text-yellow-400" />
-                          <span className="text-sm">4.8 (127 reviews)</span>
+                          <span className="text-sm">{landlordData.rating} ({landlordData.reviews} reviews)</span>
                         </div>
-                        <div className="text-sm text-gray-600">Since 2019</div>
-                        <div className="text-sm text-gray-600">Within 2 hours</div>
+                        <div className="text-sm text-gray-600">Since {landlordData.memberSince}</div>
+                        <div className="text-sm text-gray-600">{landlordData.responseTime}</div>
                       </div>
                       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                         <p className="text-sm text-blue-800">
@@ -616,18 +859,18 @@ const PropertyDetailsView = () => {
                         <div className="w-12 h-12 bg-blue-200 rounded-full flex items-center justify-center">
                           <Users className="w-6 h-6 text-blue-600" />
                         </div>
-                        <div>
-                          <div className="font-semibold text-blue-900">{offer.landlord?.name || 'Landlord'}</div>
-                          <div className="text-sm text-blue-700">Your landlord</div>
-                        </div>
+                                                  <div>
+                            <div className="font-semibold text-blue-900">{maskLandlordName(landlordData.name)}</div>
+                            <div className="text-sm text-blue-700">Your landlord</div>
+                          </div>
                       </div>
                       <div className="space-y-3">
                         <div className="flex items-center space-x-2">
                           <Star className="w-4 h-4 text-yellow-400" />
-                          <span className="text-sm text-blue-800">4.8 (127 reviews)</span>
+                          <span className="text-sm text-blue-800">{landlordData.rating} ({landlordData.reviews} reviews)</span>
                         </div>
-                        <div className="text-sm text-blue-700">Since 2019</div>
-                        <div className="text-sm text-blue-700">Response time: Within 2 hours</div>
+                        <div className="text-sm text-blue-700">Since {landlordData.memberSince}</div>
+                        <div className="text-sm text-blue-700">Response time: {landlordData.responseTime}</div>
                       </div>
                       <div className="mt-4 p-3 bg-white border border-blue-200 rounded-lg">
                         <div className="space-y-2">
@@ -636,13 +879,13 @@ const PropertyDetailsView = () => {
                               <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
                               <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
                             </svg>
-                            <span className="text-sm text-blue-800">{offer.landlord?.email || 'landlord@example.com'}</span>
+                            <span className="text-sm text-blue-800">{landlordData.email}</span>
                           </div>
                           <div className="flex items-center space-x-2">
                             <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
                             </svg>
-                            <span className="text-sm text-blue-800">{offer.landlord?.phoneNumber || '+48 123 456 789'}</span>
+                            <span className="text-sm text-blue-800">{landlordData.phone}</span>
                           </div>
                         </div>
                       </div>
@@ -737,7 +980,7 @@ const PropertyDetailsView = () => {
             {/* Main Image */}
             <div className="relative max-w-4xl max-h-full p-4">
               <img
-                src={propertyImages[currentPhotoIndex]}
+                src={getImageUrl(propertyImages[currentPhotoIndex])}
                 alt={`Property image ${currentPhotoIndex + 1}`}
                 className="max-w-full max-h-full object-contain rounded-lg"
               />

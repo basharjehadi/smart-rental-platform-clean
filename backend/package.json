@@ -21,7 +21,11 @@
     "db:reset": "prisma migrate reset",
     "db:seed": "node scripts/seed.js",
     "logs": "tail -f logs/all.log",
-    "logs:error": "tail -f logs/error.log"
+    "logs:error": "tail -f logs/error.log",
+    "translate:start": "docker-compose -f ../docker-compose.translate.yml up -d",
+    "translate:stop": "docker-compose -f ../docker-compose.translate.yml down",
+    "translate:logs": "docker-compose -f ../docker-compose.translate.yml logs -f",
+    "translate:test": "node test-libretranslate.js"
   },
   "keywords": [
     "rental",

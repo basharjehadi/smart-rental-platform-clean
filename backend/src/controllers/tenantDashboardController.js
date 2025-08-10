@@ -108,7 +108,8 @@ export const getTenantDashboardData = async (req, res) => {
             tenant: true
           }
         },
-        landlord: true
+        landlord: true,
+        property: true
       }
     });
 
@@ -145,20 +146,48 @@ export const getTenantDashboardData = async (req, res) => {
       hasActiveLease: true,
       offerId: activeLease.id,
       property: {
-        address: activeLease.rentalRequest.location,
-        propertyType: activeLease.propertyType || activeLease.rentalRequest.propertyType || 'Apartment',
-        rooms: activeLease.rentalRequest.bedrooms || 2,
-        bathrooms: activeLease.rentalRequest.bathrooms || 1,
-        area: activeLease.propertySize || '65 m²',
-        leaseTerm: activeLease.leaseDuration || 12,
-        amenities: activeLease.propertyAmenities ? (() => {
-          try {
-            return typeof activeLease.propertyAmenities === 'string' ? JSON.parse(activeLease.propertyAmenities) : activeLease.propertyAmenities;
-          } catch (error) {
-            console.warn('Failed to parse propertyAmenities:', activeLease.propertyAmenities, error);
-            return ['No amenities listed'];
+        address: (() => {
+          // Use the actual property address if available, otherwise fallback to rental request location
+          if (activeLease.property && activeLease.property.address) {
+            let completeAddress = activeLease.property.address;
+            if (activeLease.property.district) {
+              completeAddress += ', ' + activeLease.property.district;
+            }
+            completeAddress += ', ' + activeLease.property.zipCode + ', ' + activeLease.property.city;
+            return completeAddress;
           }
-        })() : ['No amenities listed']
+          return activeLease.rentalRequest.location || 'Address not specified';
+        })(),
+        propertyType: activeLease.property?.propertyType || activeLease.propertyType || activeLease.rentalRequest.propertyType || 'Apartment',
+        rooms: activeLease.property?.bedrooms || activeLease.rentalRequest.bedrooms || 2,
+        bathrooms: activeLease.property?.bathrooms || activeLease.rentalRequest.bathrooms || 1,
+        area: activeLease.property?.size ? `${activeLease.property.size} m²` : activeLease.propertySize || '65 m²',
+        leaseTerm: activeLease.leaseDuration || 12,
+        amenities: (() => {
+          // Use the actual property houseRules (amenities) if available
+          if (activeLease.property && activeLease.property.houseRules) {
+            try {
+              const propertyAmenities = JSON.parse(activeLease.property.houseRules);
+              if (Array.isArray(propertyAmenities) && propertyAmenities.length > 0) {
+                return propertyAmenities;
+              }
+            } catch (error) {
+              console.warn('Failed to parse property houseRules:', activeLease.property.houseRules, error);
+            }
+          }
+          
+          // Fallback to offer amenities if property houseRules not available
+          if (activeLease.propertyAmenities) {
+            try {
+              return typeof activeLease.propertyAmenities === 'string' ? JSON.parse(activeLease.propertyAmenities) : activeLease.propertyAmenities;
+            } catch (error) {
+              console.warn('Failed to parse offer propertyAmenities:', activeLease.propertyAmenities, error);
+              return ['No amenities listed'];
+            }
+          }
+          
+          return ['No amenities listed'];
+        })(),
       },
       landlord: {
         name: activeLease.landlord.firstName && activeLease.landlord.lastName ? 
@@ -249,7 +278,8 @@ export const getTenantActiveLease = async (req, res) => {
           include: {
             properties: true
           }
-        }
+        },
+        property: true
       }
     });
 
@@ -263,19 +293,47 @@ export const getTenantActiveLease = async (req, res) => {
 
     // Format the response
     const propertyDetails = {
-      address: activeLease.rentalRequest.location,
-      rooms: activeLease.rentalRequest.bedrooms || 2,
-      bathrooms: activeLease.rentalRequest.bathrooms || 1,
-      area: activeLease.propertySize || '65 m²',
-      leaseTerm: activeLease.leaseDuration || 12,
-              amenities: activeLease.propertyAmenities ? (() => {
-          try {
-            return typeof activeLease.propertyAmenities === 'string' ? JSON.parse(activeLease.propertyAmenities) : activeLease.propertyAmenities;
-          } catch (error) {
-            console.warn('Failed to parse propertyAmenities:', activeLease.propertyAmenities, error);
-            return ['Parking Space', 'Washing Machine', 'Air Conditioning', 'Balcony', 'Internet', 'Elevator'];
+      address: (() => {
+        // Use the actual property address if available, otherwise fallback to rental request location
+        if (activeLease.property && activeLease.property.address) {
+          let completeAddress = activeLease.property.address;
+          if (activeLease.property.district) {
+            completeAddress += ', ' + activeLease.property.district;
           }
-        })() : ['Parking Space', 'Washing Machine', 'Air Conditioning', 'Balcony', 'Internet', 'Elevator']
+          completeAddress += ', ' + activeLease.property.zipCode + ', ' + activeLease.property.city;
+          return completeAddress;
+        }
+        return activeLease.rentalRequest.location || 'Address not specified';
+      })(),
+      rooms: activeLease.property?.bedrooms || activeLease.rentalRequest.bedrooms || 2,
+      bathrooms: activeLease.property?.bathrooms || activeLease.rentalRequest.bathrooms || 1,
+      area: activeLease.property?.size ? `${activeLease.property.size} m²` : activeLease.propertySize || '65 m²',
+      leaseTerm: activeLease.leaseDuration || 12,
+              amenities: (() => {
+                // Use the actual property houseRules (amenities) if available
+                if (activeLease.property && activeLease.property.houseRules) {
+                  try {
+                    const propertyAmenities = JSON.parse(activeLease.property.houseRules);
+                    if (Array.isArray(propertyAmenities) && propertyAmenities.length > 0) {
+                      return propertyAmenities;
+                    }
+                  } catch (error) {
+                    console.warn('Failed to parse property houseRules:', activeLease.property.houseRules, error);
+                  }
+                }
+                
+                // Fallback to offer amenities if property houseRules not available
+                if (activeLease.propertyAmenities) {
+                  try {
+                    return typeof activeLease.propertyAmenities === 'string' ? JSON.parse(activeLease.propertyAmenities) : activeLease.propertyAmenities;
+                  } catch (error) {
+                    console.warn('Failed to parse offer propertyAmenities:', activeLease.propertyAmenities, error);
+                    return ['No amenities listed'];
+                  }
+                }
+                
+                return ['No amenities listed'];
+              })(),
     };
 
     const landlordInfo = {

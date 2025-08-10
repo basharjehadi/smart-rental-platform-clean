@@ -165,6 +165,38 @@ const PaymentPage = () => {
     });
   };
 
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return '';
+    
+    // If it's already a full URL, return as is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    
+    // If it's a relative path, construct full URL
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    return `${baseUrl}${imagePath}`;
+  };
+
+  // Get property type display name
+  const getPropertyTypeDisplay = (type) => {
+    if (!type) return 'Apartment';
+    
+    const typeMap = {
+      'apartment': 'Apartment',
+      'house': 'House',
+      'studio': 'Studio',
+      'room': 'Room',
+      'shared room': 'Shared Room',
+      'APARTMENT': 'Apartment',
+      'HOUSE': 'House',
+      'STUDIO': 'Studio',
+      'ROOM': 'Room',
+      'SHARED_ROOM': 'Shared Room'
+    };
+    return typeMap[type.toLowerCase()] || type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-primary flex items-center justify-center">
@@ -198,20 +230,35 @@ const PaymentPage = () => {
     );
   }
 
-  // Calculate prorated first month based on move-in date
-  const calculateProratedFirstMonth = () => {
+  // Calculate first month rent (prorated only if not moving in on the 1st)
+  const calculateFirstMonthRent = () => {
     if (!offer.availableFrom || !offer.rentAmount) return 0;
     
     const moveInDate = new Date(offer.availableFrom);
+    const moveInDay = moveInDate.getDate();
+    
+    // If moving in on the 1st of the month, it's a full month
+    if (moveInDay === 1) {
+      return offer.rentAmount;
+    }
+    
+    // Otherwise, calculate prorated amount
     const daysInMonth = new Date(moveInDate.getFullYear(), moveInDate.getMonth() + 1, 0).getDate();
-    const daysFromMoveIn = daysInMonth - moveInDate.getDate() + 1; // Days from move-in to end of month
+    const daysFromMoveIn = daysInMonth - moveInDay + 1; // Days from move-in to end of month
     
     return Math.round((offer.rentAmount * daysFromMoveIn) / daysInMonth);
   };
 
-  const proratedFirstMonth = calculateProratedFirstMonth();
+  // Check if first month is prorated
+  const isFirstMonthProrated = () => {
+    if (!offer.availableFrom) return false;
+    const moveInDate = new Date(offer.availableFrom);
+    return moveInDate.getDate() !== 1;
+  };
+
+  const firstMonthRent = calculateFirstMonthRent();
   const securityDeposit = offer.depositAmount || offer.rentAmount || 0;
-  const totalAmount = proratedFirstMonth + securityDeposit;
+  const totalAmount = firstMonthRent + securityDeposit;
   const serviceFee = Math.round(totalAmount * 0.03); // 3% service fee
   const finalTotal = totalAmount + serviceFee;
 
@@ -495,14 +542,33 @@ const PaymentPage = () => {
             {/* Property Details */}
             <div className="card-modern">
               <div className="p-6">
-                <div className="w-full h-32 bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
-                  <Home className="w-8 h-8 text-gray-400" />
+                <div className="w-full h-32 bg-gray-200 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                  {offer?.property?.images ? (
+                    (() => {
+                      try {
+                        const images = typeof offer.property.images === 'string' ? JSON.parse(offer.property.images) : offer.property.images;
+                        return images && images.length > 0 ? (
+                          <img 
+                            src={getImageUrl(images[0])} 
+                            alt="Property" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Home className="w-8 h-8 text-gray-400" />
+                        );
+                      } catch (error) {
+                        return <Home className="w-8 h-8 text-gray-400" />;
+                      }
+                    })()
+                  ) : (
+                    <Home className="w-8 h-8 text-gray-400" />
+                  )}
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {offer.propertyTitle || 'Modern apartment in central Warsaw'}
+                  {offer.propertyTitle || offer.property?.name || 'Modern apartment in central Warsaw'}
                 </h3>
                 <p className="text-sm text-gray-600 mb-3">
-                  {offer.propertyType || 'Apartment'}, {offer.property?.bedrooms || 2} rooms
+                  {getPropertyTypeDisplay(offer.property?.propertyType || offer.propertyType)}, {offer.property?.bedrooms || 2} rooms
                 </p>
                 <div className="inline-block bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium mb-4">
                   Accepted
@@ -510,7 +576,42 @@ const PaymentPage = () => {
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <MapPin className="w-4 h-4" />
-                    <span>{offer.propertyAddress || 'ul. Krakowska ***, Warszawa'}</span>
+                    <span>
+                      {(() => {
+                        if (!offer.propertyAddress) return 'ul. Krakowska ***, Warszawa';
+                        
+                        // Format address to show only street, district, and city (privacy)
+                        const parts = offer.propertyAddress.split(',').map(part => part.trim()).filter(part => part.length > 0);
+                        
+                        if (parts.length >= 3) {
+                          // Extract street name (remove house number), postcode, and city
+                          let street = parts[0];
+                          const city = parts[2];
+                          
+                          // Remove house number from street (e.g., "Jarochowskiego 97/19" -> "Jarochowskiego")
+                          street = street.replace(/\s+\d+.*$/, '');
+                          
+                          // Try to get district from property data if available
+                          const district = offer.property?.district || '';
+                          
+                          return district ? `${street}, ${district}, ${city}` : `${street}, ${city}`;
+                        } else if (parts.length === 2) {
+                          // If only 2 parts, assume it's street and city
+                          let street = parts[0];
+                          const city = parts[1];
+                          
+                          // Remove house number from street
+                          street = street.replace(/\s+\d+.*$/, '');
+                          
+                          return `${street}, ${city}`;
+                        } else {
+                          // If only 1 part, remove house number and return
+                          let street = parts[0];
+                          street = street.replace(/\s+\d+.*$/, '');
+                          return street;
+                        }
+                      })()}
+                    </span>
                     <span className="text-blue-600 text-xs">Protected</span>
                   </div>
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
@@ -531,8 +632,10 @@ const PaymentPage = () => {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Breakdown</h3>
           <div className="space-y-3">
             <div className="flex justify-between">
-                    <span className="text-gray-600">First month (prorated)</span>
-                    <span className="font-semibold">{formatCurrency(proratedFirstMonth)}</span>
+                    <span className="text-gray-600">
+                      {isFirstMonthProrated() ? 'First month (prorated)' : 'First month rent'}
+                    </span>
+                    <span className="font-semibold">{formatCurrency(firstMonthRent)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Security deposit</span>

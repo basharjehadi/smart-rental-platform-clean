@@ -61,6 +61,11 @@ const startServer = async () => {
     const io = initializeSocket(server);
     logger.info('🔌 Socket.io initialized');
 
+    // Connect Socket.io to notification service
+    const { setSocketIO } = await import('./services/notificationService.js');
+    setSocketIO(io);
+    logger.info('🔔 Socket.io connected to notification service');
+
     // Start server
     server.listen(PORT, () => {
       logger.info(`🚀 Server running on port ${PORT}`);

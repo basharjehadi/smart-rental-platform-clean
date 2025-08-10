@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import { prisma } from '../utils/prisma.js';
 import { sendPaymentSuccess } from '../utils/emailService.js';
+import { activateConversationAfterPayment } from '../utils/chatGuard.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -191,6 +192,16 @@ const handlePaymentSucceeded = async (paymentIntent) => {
       metadata
     });
 
+    // ✅ IDEMPOTENT CHECK: Check if this payment was already processed
+    const existingPayment = await prisma.payment.findFirst({
+      where: { stripePaymentIntentId }
+    });
+
+    if (existingPayment) {
+      console.log('ℹ️ Payment already processed, skipping duplicate processing:', stripePaymentIntentId);
+      return; // Exit early - idempotent behavior
+    }
+
     // BULLETPROOF PAYMENT LINKING - Multiple fallback methods
     let rentalRequestId = null;
     let offerId = metadata.offerId;
@@ -292,14 +303,20 @@ const handlePaymentSucceeded = async (paymentIntent) => {
       amount: payment.amount
     });
 
-    // Update offer status to PAID if we have an offer ID
+    // Update offer status to PAID and set isPaid to true if we have an offer ID
     if (offerId) {
       await prisma.offer.update({
         where: { id: offerId },
-        data: { status: 'PAID' }
+        data: { 
+          status: 'PAID',
+          isPaid: true
+        }
       });
 
       console.log('✅ Offer status updated to PAID:', offerId);
+
+      // ✅ NEW: Activate conversations after payment
+      await activateConversationAfterPayment(offerId);
 
       // Update property status to OCCUPIED when offer is paid
       try {

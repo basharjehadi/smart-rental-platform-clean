@@ -245,6 +245,8 @@ const LandlordEditProperty = () => {
           buildingFloors: property.totalFloors || '',
           furnishing: property.furnished ? 'furnished' : 'unfurnished',
           parkingAvailable: property.parking || false,
+          petsAllowed: property.petsAllowed || false,
+          smokingAllowed: property.smokingAllowed || false,
           availableFrom: property.availableFrom ? new Date(property.availableFrom).toISOString().split('T')[0] : '',
           description: property.description || '',
           amenities: existingAmenities,
@@ -434,8 +436,8 @@ const LandlordEditProperty = () => {
       submitData.append('availableFrom', formData.availableFrom); // When property is available
       submitData.append('furnished', formData.furnishing === 'furnished'); // Convert to boolean
       submitData.append('parking', formData.parkingAvailable); // Convert to boolean
-      submitData.append('petsAllowed', false); // Default value
-      submitData.append('smokingAllowed', false); // Default value
+      submitData.append('petsAllowed', formData.petsAllowed); // Convert to boolean
+      submitData.append('smokingAllowed', formData.smokingAllowed); // Convert to boolean
       submitData.append('utilitiesIncluded', false); // Default value
       submitData.append('description', formData.description || '');
       

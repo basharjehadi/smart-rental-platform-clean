@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    container_name: smart-rental-libretranslate
+    ports:
+      - "5000:5000"
+    environment:
+      - LOAD_ONLY=en,pl
+      - THREADS=4
+    volumes:
+      - libretranslate_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/translate", "-X", "POST", "-H", "Content-Type: application/json", "-d", '{"q":"test","source":"en","target":"pl"}']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  libretranslate_data:
+    driver: local

@@ -111,6 +111,18 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
   return (
     <div className="border-t border-gray-200 p-4 bg-white">
+      {/* Chat locked banner */}
+      {disabled && (
+        <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center space-x-2 text-yellow-800">
+            <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span className="text-sm font-medium">Chat is locked until payment is completed</span>
+          </div>
+        </div>
+      )}
+
       {/* Selected file preview */}
       {selectedFile && (
         <div className="mb-3 p-3 bg-gray-50 rounded-lg border">

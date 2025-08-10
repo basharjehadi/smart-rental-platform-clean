@@ -527,8 +527,26 @@
             </div>
         </div>
 
+        {{#if additionalTerms}}
+        <div class="section">
+            <div class="section-title">§12. Additional Terms & Conditions / Dodatkowe Warunki i Postanowienia</div>
+            <div class="bilingual-content">
+                <div class="english-content">
+                    <div class="content">
+                        {{additionalTerms}}
+                    </div>
+                </div>
+                <div class="polish-content">
+                    <div class="content">
+                        {{additionalTermsPolish}}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {{/if}}
+
         <div class="signatures-section">
-            <div class="section-title">§12. Signatures / Podpisy</div>
+            <div class="section-title">§13. Signatures / Podpisy</div>
             <div class="signature-container">
                 <div class="signature-box">
                     <div class="signature-name">{{landlordName}}</div>

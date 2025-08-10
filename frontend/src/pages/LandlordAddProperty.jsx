@@ -22,6 +22,8 @@ const LandlordAddProperty = () => {
     buildingFloors: '',
     furnishing: '',
     parkingAvailable: false,
+    petsAllowed: false,
+    smokingAllowed: false,
     availableFrom: '', // When property is available for rent
     description: '',
     amenities: [],
@@ -237,10 +239,17 @@ const LandlordAddProperty = () => {
         submitData.append('availableFrom', formData.availableFrom); // When property is available
         submitData.append('furnished', formData.furnishing === 'furnished'); // Convert to boolean
         submitData.append('parking', formData.parkingAvailable); // Convert to boolean
-        submitData.append('petsAllowed', false); // Default value
-        submitData.append('smokingAllowed', false); // Default value
+        submitData.append('petsAllowed', formData.petsAllowed); // Convert to boolean
+        submitData.append('smokingAllowed', formData.smokingAllowed); // Convert to boolean
         submitData.append('utilitiesIncluded', false); // Default value
         submitData.append('description', formData.description || '');
+        
+        // Handle amenities (send as houseRules)
+        if (formData.amenities && formData.amenities.length > 0) {
+          submitData.append('houseRules', JSON.stringify(formData.amenities));
+        } else {
+          submitData.append('houseRules', '[]'); // Send empty array if no amenities selected
+        }
         
         // Handle files
         if (formData.virtualTourVideo) {
@@ -269,6 +278,8 @@ const LandlordAddProperty = () => {
           availableFrom: formData.availableFrom,
           furnished: formData.furnishing === 'furnished',
           parking: formData.parkingAvailable,
+          petsAllowed: formData.petsAllowed,
+          smokingAllowed: formData.smokingAllowed,
           description: formData.description,
           hasVideo: !!formData.virtualTourVideo,
           photoCount: formData.propertyPhotos?.length || 0

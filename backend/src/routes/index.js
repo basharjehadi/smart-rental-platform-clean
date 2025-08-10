@@ -15,6 +15,7 @@ import tenantDashboardRoutes from './tenantDashboardRoutes.js';
 import landlordDashboardRoutes from './landlordDashboardRoutes.js';
 import landlordTenantRoutes from './landlordTenantRoutes.js';
 import messagingRoutes from './messaging.js';
+import notificationRoutes from './notifications.js';
 
 const router = Router();
 
@@ -61,5 +62,8 @@ router.use('/landlord', landlordTenantRoutes);
 
 // Messaging routes
 router.use('/messaging', messagingRoutes);
+
+// Notification routes
+router.use('/notifications', notificationRoutes);
 
 export default router; 

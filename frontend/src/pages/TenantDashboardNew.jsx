@@ -598,7 +598,7 @@ const TenantDashboardNew = () => {
                       <p className="text-sm text-gray-600">{dashboardData.landlord?.address}</p>
                     </div>
                     <button 
-                      onClick={() => navigate('/tenant-profile')}
+                      onClick={() => navigate(`/messaging?conversationId=new&propertyId=${dashboardData.property?.id}`)}
                       className="w-full mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       Contact Landlord

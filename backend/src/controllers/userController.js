@@ -852,4 +852,57 @@ export const reviewKYC = async (req, res) => {
       message: 'An error occurred while reviewing KYC'
     });
   }
+};
+
+// Find user by email for messaging
+export const findUserByEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        error: 'Email is required',
+        message: 'Please provide an email address'
+      });
+    }
+
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        profileImage: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+        message: 'No user found with that email address'
+      });
+    }
+
+    // Don't allow users to find themselves
+    if (user.id === req.user.id) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        message: 'You cannot start a conversation with yourself'
+      });
+    }
+
+    res.json({
+      success: true,
+      user
+    });
+
+  } catch (error) {
+    console.error('Find user by email error:', error);
+    res.status(500).json({
+      error: 'Failed to find user',
+      message: 'An error occurred while searching for the user'
+    });
+  }
 }; 

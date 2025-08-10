@@ -5,16 +5,30 @@ import TypingIndicator from './TypingIndicator';
 interface Message {
   id: string;
   content: string;
-  type: 'TEXT' | 'IMAGE' | 'DOCUMENT';
-  createdAt: string;
+  messageType: 'TEXT' | 'IMAGE' | 'DOCUMENT' | 'SYSTEM';
+  attachmentUrl?: string;
+  attachmentName?: string;
+  attachmentSize?: number;
+  attachmentType?: string;
+  isRead: boolean;
+  readAt?: string;
+  senderId: string;
   sender: {
     id: string;
     name: string;
+    email: string;
     profileImage?: string;
   };
-  isRead: boolean;
-  attachmentUrl?: string;
-  attachmentName?: string;
+  replyTo?: {
+    id: string;
+    content: string;
+    sender: {
+      id: string;
+      name: string;
+    };
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ChatWindowProps {

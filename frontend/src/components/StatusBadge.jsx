@@ -32,6 +32,12 @@ const StatusBadge = ({ status, size = 'default' }) => {
         color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
         icon: '⏳',
         iconColor: 'text-yellow-600'
+      },
+      PAID: {
+        text: 'Paid',
+        color: 'bg-green-100 text-green-800 border-green-200',
+        icon: '✅',
+        iconColor: 'text-green-600'
       }
     };
     

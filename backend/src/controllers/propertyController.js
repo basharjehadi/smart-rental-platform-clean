@@ -197,6 +197,9 @@ export const createProperty = async (req, res) => {
       videos: videoUrls.length > 0 ? JSON.stringify(videoUrls) : null
     });
 
+    console.log('🏠 Amenities/houseRules being saved:', houseRules);
+    console.log('🏠 Amenities type:', typeof houseRules);
+
     const property = await prisma.property.create({
       data: {
         landlordId,
@@ -489,4 +492,4 @@ export const updatePropertyStatus = async (req, res) => {
       error: 'Failed to update property status'
     });
   }
-}; 
+};

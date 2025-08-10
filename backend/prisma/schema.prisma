@@ -61,11 +61,13 @@ model User {
   leases                   Lease[]                   @relation("TenantLeases")
   sentMessages             Message[]                 @relation("SentMessages")
   offers                   Offer[]                   @relation("LandlordOffers")
+  tenantOffers             Offer[]                   @relation("TenantOffers")
   payments                 Payment[]                 @relation("UserPayments")
   properties               Property[]                @relation("LandlordProperties")
   rentPayments             RentPayment[]             @relation("TenantRentPayments")
   rentalRequests           RentalRequest[]           @relation("TenantRequests")
   reviews                  Review[]                  @relation("TenantReviews")
+  notifications            Notification[]            @relation("UserNotifications")
 
   @@index([role, availability, autoAvailability, currentTenants])
   @@index([email])
@@ -228,12 +230,15 @@ model Offer {
   createdAt               DateTime        @default(now())
   updatedAt               DateTime        @updatedAt
   rentalRequestId         Int
+  tenantId                String
   landlordId              String
   propertyId              String?
+  tenant                  User            @relation("TenantOffers", fields: [tenantId], references: [id], onDelete: Cascade)
   landlord                User            @relation("LandlordOffers", fields: [landlordId], references: [id], onDelete: Cascade)
   property                Property?       @relation("PropertyOffers", fields: [propertyId], references: [id])
   rentalRequest           RentalRequest   @relation("RequestOffer", fields: [rentalRequestId], references: [id], onDelete: Cascade)
   payments                Payment[]       @relation("OfferPayments")
+  conversations           Conversation[]  @relation("ConversationOffer")
 
   @@index([landlordId, status])
   @@index([rentalRequestId, status])
@@ -443,14 +448,20 @@ model Conversation {
   title        String?
   type         ConversationType          @default(DIRECT)
   propertyId   String?
+  offerId      String?
+  status       ConversationStatus        @default(PENDING)
   createdAt    DateTime                  @default(now())
   updatedAt    DateTime                  @updatedAt
   participants ConversationParticipant[] @relation("ConversationParticipants")
   property     Property?                 @relation("PropertyConversations", fields: [propertyId], references: [id])
+  offer        Offer?                    @relation("ConversationOffer", fields: [offerId], references: [id])
   messages     Message[]                 @relation("ConversationMessages")
 
   @@index([propertyId])
   @@index([type])
+  @@index([status])
+  @@index([offerId])
+  @@index([status, offerId])
   @@map("conversations")
 }
 
@@ -494,6 +505,20 @@ model Message {
   @@index([senderId])
   @@index([isRead])
   @@map("messages")
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  type        NotificationType
+  entityId    String
+  title       String
+  body        String
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  user        User             @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
 }
 
 enum UserRole {
@@ -608,4 +633,15 @@ enum MessageType {
   IMAGE
   DOCUMENT
   SYSTEM
+}
+
+enum ConversationStatus {
+  PENDING
+  ACTIVE
+  ARCHIVED
+}
+
+enum NotificationType {
+  NEW_RENTAL_REQUEST
+  NEW_OFFER
 }

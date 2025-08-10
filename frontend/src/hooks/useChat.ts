@@ -73,6 +73,7 @@ interface UseChatReturn {
   isConnected: boolean;
   isLoading: boolean;
   error: string | null;
+  chatError: ChatError | null; // ✅ NEW: Structured chat errors
   joinConversation: (conversationId: string) => void;
   leaveConversation: (conversationId: string) => void;
   sendMessage: (content: string, replyToId?: string) => void;
@@ -84,6 +85,12 @@ interface UseChatReturn {
   loadMessages: (conversationId: string, page?: number) => Promise<void>;
   loadConversations: () => Promise<void>;
   loadUnreadCount: () => Promise<void>;
+  clearChatError: () => void; // ✅ NEW: Clear chat errors
+}
+
+interface ChatError {
+  error: string;
+  errorCode: string;
 }
 
 export const useChat = (): UseChatReturn => {
@@ -97,6 +104,7 @@ export const useChat = (): UseChatReturn => {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [chatError, setChatError] = useState<ChatError | null>(null); // ✅ NEW: Chat error state
   
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -124,6 +132,12 @@ export const useChat = (): UseChatReturn => {
     newSocket.on('connect_error', (err) => {
       setError('Failed to connect to chat server');
       console.error('Socket connection error:', err);
+    });
+
+    // ✅ NEW: Handle chat errors from socket
+    newSocket.on('chat-error', (error: ChatError) => {
+      setChatError(error);
+      console.error('Chat error:', error);
     });
 
     newSocket.on('conversations-loaded', (conversations: Conversation[]) => {
@@ -406,6 +420,7 @@ export const useChat = (): UseChatReturn => {
     isConnected,
     isLoading,
     error,
+    chatError, // ✅ NEW: Expose chat errors
     joinConversation,
     leaveConversation,
     sendMessage,
@@ -416,6 +431,7 @@ export const useChat = (): UseChatReturn => {
     createConversation,
     loadMessages,
     loadConversations,
-    loadUnreadCount
+    loadUnreadCount,
+    clearChatError: () => setChatError(null) // ✅ NEW: Clear chat errors
   };
 };

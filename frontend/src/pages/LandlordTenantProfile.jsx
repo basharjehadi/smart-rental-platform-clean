@@ -181,7 +181,12 @@ const LandlordTenantProfile = () => {
   };
 
   const handleSendMessage = () => {
-    navigate(`/landlord-tenant-messages/${tenantId}`);
+    // Navigate to messaging page with property-based chat
+    if (tenant?.propertyId) {
+      navigate(`/messaging?conversationId=new&propertyId=${tenant.propertyId}`);
+    } else {
+      alert('Property information not available');
+    }
   };
 
   const handleDownloadContract = async () => {

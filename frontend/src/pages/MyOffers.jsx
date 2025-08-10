@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import api from '../utils/api';
 import OfferCard from '../components/OfferCard';
 import TenantSidebar from '../components/TenantSidebar';
@@ -8,6 +9,7 @@ import { LogOut, CheckCircle, X } from 'lucide-react';
 
 const MyOffers = () => {
   const { user, logout } = useAuth();
+  const { markByTypeAsRead } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -78,6 +80,8 @@ const MyOffers = () => {
 
   useEffect(() => {
     fetchOffers();
+    // Mark offer notifications as read when visiting the page
+    markByTypeAsRead('NEW_OFFER');
   }, []);
 
   useEffect(() => {
@@ -110,7 +114,7 @@ const MyOffers = () => {
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="h-4 w-4" />
                 <span>Logout</span>
               </button>
             </div>
@@ -184,14 +188,16 @@ const MyOffers = () => {
                 <div className="card-modern p-8 text-center">
                   <div className="text-gray-400 text-4xl mb-4">📋</div>
                   <p className="text-gray-600 text-lg mb-4">
-                    {activeTab === 'ACTIVE' && 'No active offers at the moment.'}
+                    {activeTab === 'PENDING' && 'No pending offers at the moment.'}
                     {activeTab === 'ACCEPTED' && 'No accepted offers yet.'}
+                    {activeTab === 'PAID' && 'No paid offers yet.'}
                     {activeTab === 'DECLINED' && 'No declined offers yet.'}
                     {activeTab === 'EXPIRED' && 'No expired offers yet.'}
                   </p>
                   <p className="text-gray-500">
-                    {activeTab === 'ACTIVE' && 'Landlords will send you offers when they respond to your rental requests.'}
+                    {activeTab === 'PENDING' && 'Landlords will send you offers when they respond to your rental requests.'}
                     {activeTab === 'ACCEPTED' && 'Accepted offers will appear here once you accept them.'}
+                    {activeTab === 'PAID' && 'Paid offers will appear here once you complete payment.'}
                     {activeTab === 'DECLINED' && 'Declined offers will appear here once you decline them.'}
                     {activeTab === 'EXPIRED' && 'Expired offers will appear here when offers expire.'}
                   </p>
@@ -233,7 +239,7 @@ const MyOffers = () => {
                       landlordPhone={offer.landlord?.phoneNumber}
                       propertyType={offer.propertyType || 'Apartment'}
                       rooms={offer.property?.bedrooms || offer.propertySize || offer.rentalRequest?.bedrooms || 1}
-                      area={offer.property?.size || offer.rentalRequest?.bedrooms || 1}
+                      area={offer.property?.size || offer.propertySize || offer.rentalRequest?.bedrooms || 1}
                       bathrooms={offer.property?.bathrooms || (offer.propertyAmenities ? (() => {
                         try {
                           const amenities = typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities) : offer.propertyAmenities;
@@ -276,4 +282,4 @@ const MyOffers = () => {
   );
 };
 
-export default MyOffers; 
+export default MyOffers;

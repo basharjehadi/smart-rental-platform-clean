@@ -29,9 +29,26 @@ const PaymentSuccessPage = () => {
     });
   };
 
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return '';
+    
+    // If it's already a full URL, return as is
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    
+    // If it's a relative path, construct full URL
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    return `${baseUrl}${imagePath}`;
+  };
+
   const handleMessageLandlord = () => {
-    // TODO: Implement messaging functionality
-    alert('Messaging feature coming soon!');
+    // Navigate to messaging page with property-based chat
+    if (offer?.propertyId) {
+      navigate(`/messaging?conversationId=new&propertyId=${offer.propertyId}`);
+    } else {
+      alert('Property information not available');
+    }
   };
 
   const handleCallLandlord = () => {
@@ -494,15 +511,53 @@ const PaymentSuccessPage = () => {
                 <div className="inline-block bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium mb-4">
                   Payment Complete
                 </div>
-                <div className="w-full h-32 bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
-                  <Home className="w-8 h-8 text-gray-400" />
+                <div className="w-full h-32 bg-gray-200 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                  {offer?.property?.images ? (
+                    (() => {
+                      try {
+                        const images = typeof offer.property.images === 'string' ? JSON.parse(offer.property.images) : offer.property.images;
+                        return images && images.length > 0 ? (
+                          <img 
+                            src={getImageUrl(images[0])} 
+                            alt="Property" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Home className="w-8 h-8 text-gray-400" />
+                        );
+                      } catch (error) {
+                        return <Home className="w-8 h-8 text-gray-400" />;
+                      }
+                    })()
+                  ) : (
+                    <Home className="w-8 h-8 text-gray-400" />
+                  )}
                 </div>
                 <div className="space-y-2">
                   <div className="font-semibold text-green-900">
-                    {offer.propertyTitle || 'Modern apartment in central Warsaw'}
+                    {offer.propertyTitle || offer.property?.name || 'Modern apartment in central Warsaw'}
                   </div>
                   <div className="text-sm text-green-800">
-                    {offer.propertyType || 'Apartment'}, {offer.property?.bedrooms || 2} rooms
+                    {(() => {
+                      const getPropertyTypeDisplay = (type) => {
+                        if (!type) return 'Apartment';
+                        
+                        const typeMap = {
+                          'apartment': 'Apartment',
+                          'house': 'House',
+                          'studio': 'Studio',
+                          'room': 'Room',
+                          'shared room': 'Shared Room',
+                          'APARTMENT': 'Apartment',
+                          'HOUSE': 'House',
+                          'STUDIO': 'Studio',
+                          'ROOM': 'Room',
+                          'SHARED_ROOM': 'Shared Room'
+                        };
+                        return typeMap[type.toLowerCase()] || type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+                      };
+                      return `${getPropertyTypeDisplay(offer.property?.propertyType || offer.propertyType)}, ${offer.property?.bedrooms || 2} rooms`;
+                    })()}
                   </div>
                   <div className="flex items-center space-x-2 text-sm text-green-800">
                     <MapPin className="w-4 h-4" />
@@ -536,6 +591,9 @@ const PaymentSuccessPage = () => {
                     </div>
                     <div className="text-sm text-gray-600">
                       {offer.landlord?.email || 'jan.kowalczyk@email.com'}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {offer.landlord?.phoneNumber || '+48 123 456 789'}
                     </div>
                   </div>
                 </div>

@@ -3,7 +3,7 @@ import {
   getUserIdentity, getUserProfile, updateUserProfile,
   updateUserIdentity, saveUserSignature, saveContractSignatures, getContractSignatures,
   uploadIdentityDocument, getProfileStatus, uploadProfilePhoto, deleteProfilePhoto,
-  getPendingKYC, reviewKYC
+  getPendingKYC, reviewKYC, findUserByEmail
 } from '../controllers/userController.js';
 import { validateProfileData } from '../middlewares/profileValidationMiddleware.js';
 import verifyToken from '../middlewares/verifyToken.js';
@@ -34,5 +34,8 @@ router.post('/contracts/:rentalRequestId/signatures', saveContractSignatures);
 // Admin KYC management routes
 router.get('/admin/kyc/pending', getPendingKYC);
 router.post('/admin/kyc/review', reviewKYC);
+
+// User search routes
+router.post('/find-by-email', findUserByEmail);
 
 export default router; 

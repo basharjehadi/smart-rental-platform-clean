@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { optimizeSignatureImage, optimizePropertyImage, getOptimizedImageDimensions } from './imageOptimizer.js';
 import { compressPDFWithFallback, checkGhostscriptAvailability } from './pdfCompressor.js';
+import { translateAdditionalTerms } from './translationService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -102,6 +103,11 @@ const generateContractData = async (offer, user = null) => {
   const leaseEndDate = new Date(offer.leaseEndDate);
   const leaseMonths = Math.ceil((leaseEndDate - leaseStartDate) / (1000 * 60 * 60 * 24 * 30.44));
   
+  // Debug additional terms
+  console.log('🔍 Debug additional terms:');
+  console.log('Offer description:', offer.description);
+  console.log('Offer additionalTerms:', offer.additionalTerms);
+  
   // Debug signature data
   console.log('🔍 Debug signature data:');
   console.log('Landlord signature exists:', !!offer.landlord?.signatureBase64);
@@ -112,6 +118,10 @@ const generateContractData = async (offer, user = null) => {
   // Use original signatures - check if they already have data URL prefix
   const landlordSignature = offer.landlord?.signatureBase64 ? 
     (offer.landlord.signatureBase64.startsWith('data:') ? offer.landlord.signatureBase64 : `data:image/png;base64,${offer.landlord.signatureBase64}`) : null;
+
+  // Translate additional terms with automatic language detection
+  const additionalTermsText = offer.description || offer.additionalTerms || '';
+  const translatedTerms = await translateAdditionalTerms(additionalTermsText);
   const tenantSignature = tenantData?.signatureBase64 ? 
     (tenantData.signatureBase64.startsWith('data:') ? tenantData.signatureBase64 : `data:image/png;base64,${tenantData.signatureBase64}`) : null;
   
@@ -179,6 +189,8 @@ const generateContractData = async (offer, user = null) => {
       month: 'long',
       day: 'numeric'
     }),
+    additionalTerms: translatedTerms.english,
+    additionalTermsPolish: translatedTerms.polish,
     paymentSchedule: generatePaymentSchedule(offer)
   };
 };

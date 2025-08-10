@@ -10,15 +10,24 @@ interface ChatProps {
   conversationStatus?: 'ACTIVE' | 'INACTIVE';
   paymentStatus?: 'PAID' | 'UNPAID';
   className?: string;
+  selectedConversationId?: string;
+  onConversationSelect?: (conversationId: string) => void;
 }
 
 const Chat: React.FC<ChatProps> = ({
-  conversationStatus = 'ACTIVE',
-  paymentStatus = 'PAID',
-  className = ''
+  conversationStatus: initialConversationStatus = 'ACTIVE',
+  paymentStatus: initialPaymentStatus = 'PAID',
+  className = '',
+  selectedConversationId: externalSelectedConversationId,
+  onConversationSelect
 }) => {
-  const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
+  const [internalSelectedConversationId, setInternalSelectedConversationId] = useState<string | undefined>();
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationStatus, setConversationStatus] = useState<'PENDING' | 'ACTIVE' | 'ARCHIVED'>('PENDING');
+  const [offerStatus, setOfferStatus] = useState<'PENDING' | 'ACCEPTED' | 'REJECTED' | 'PAID'>('PENDING');
+  
+  // Use external selected conversation ID if provided, otherwise use internal state
+  const selectedConversationId = externalSelectedConversationId || internalSelectedConversationId;
   const { user } = useAuth();
 
   const {
@@ -36,15 +45,60 @@ const Chat: React.FC<ChatProps> = ({
     activeConversation,
     isConnected,
     isLoading,
-    error
+    error,
+    chatError,
+    clearChatError
   } = useChat();
+
+  // Fetch conversation and offer status when conversation is selected
+  useEffect(() => {
+    const fetchConversationStatus = async () => {
+      if (!selectedConversationId) return;
+
+      try {
+        const response = await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:3001'}/api/messaging/conversations/${selectedConversationId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (response.ok) {
+          const conversation = await response.json();
+          setConversationStatus(conversation.status);
+          
+          // If conversation has an offer, fetch its status
+          if (conversation.offerId) {
+            const offerResponse = await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:3001'}/api/tenant/offer/${conversation.offerId}`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+            });
+            
+            if (offerResponse.ok) {
+              const offer = await offerResponse.json();
+              setOfferStatus(offer.status);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching conversation status:', error);
+      }
+    };
+
+    fetchConversationStatus();
+  }, [selectedConversationId]);
 
   // Auto-select first conversation if none selected
   useEffect(() => {
     if (!selectedConversationId && conversations.length > 0) {
-      setSelectedConversationId(conversations[0].id);
+      const firstConversationId = conversations[0].id;
+      if (onConversationSelect) {
+        onConversationSelect(firstConversationId);
+      } else {
+        setInternalSelectedConversationId(firstConversationId);
+      }
     }
-  }, [conversations, selectedConversationId]);
+  }, [conversations, selectedConversationId, onConversationSelect]);
 
   // Join conversation when selected
   useEffect(() => {
@@ -52,6 +106,13 @@ const Chat: React.FC<ChatProps> = ({
       joinConversation(selectedConversationId);
     }
   }, [selectedConversationId, joinConversation]);
+
+  // Handle external conversation ID changes
+  useEffect(() => {
+    if (externalSelectedConversationId && externalSelectedConversationId !== internalSelectedConversationId) {
+      setInternalSelectedConversationId(externalSelectedConversationId);
+    }
+  }, [externalSelectedConversationId, internalSelectedConversationId]);
 
   const handleSendMessage = async (content: string, file?: File) => {
     if (!activeConversation) return;
@@ -78,7 +139,11 @@ const Chat: React.FC<ChatProps> = ({
   };
 
   const handleSelectConversation = (conversationId: string) => {
-    setSelectedConversationId(conversationId);
+    if (onConversationSelect) {
+      onConversationSelect(conversationId);
+    } else {
+      setInternalSelectedConversationId(conversationId);
+    }
   };
 
   const getConversationTitle = () => {
@@ -102,10 +167,10 @@ const Chat: React.FC<ChatProps> = ({
     return 'Unknown';
   };
 
-  const isChatDisabled = conversationStatus !== 'ACTIVE' || paymentStatus !== 'PAID';
+  const isChatDisabled = conversationStatus !== 'ACTIVE' || offerStatus !== 'PAID';
 
   return (
-    <div className={`flex h-[600px] bg-white rounded-lg shadow-lg overflow-hidden ${className}`}>
+    <div className={`flex bg-white rounded-lg shadow-lg overflow-hidden ${className}`}>
       {/* Conversation List */}
       <div className="w-80 border-r border-gray-200">
         <ConversationList
@@ -123,11 +188,11 @@ const Chat: React.FC<ChatProps> = ({
             <div className="text-center p-6">
               <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Chat Unavailable
+                Chat Locked
               </h3>
               <p className="text-gray-600 mb-4">
                 {conversationStatus !== 'ACTIVE' 
@@ -136,48 +201,72 @@ const Chat: React.FC<ChatProps> = ({
                 }
               </p>
               <p className="text-sm text-gray-500">
-                Please contact support if you believe this is an error.
+                Chat will unlock automatically once payment is completed.
               </p>
             </div>
           </div>
-        ) : selectedConversationId ? (
+        ) : (
           <>
+            {/* Chat Header */}
+            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {getConversationTitle()}
+                  </h2>
+                  {isChatDisabled && (
+                    <div className="flex items-center space-x-1 text-yellow-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      <span className="text-xs font-medium">Locked</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm text-gray-500">
+                    {isConnected ? 'Connected' : 'Connecting...'}
+                  </p>
+                  <UnreadBadge />
+                </div>
+              </div>
+            </div>
+
+            {/* Chat Messages */}
             <ChatWindow
               messages={messages}
-              typingUsers={typingUsers.map(u => u.userId)}
+              typingUsers={typingUsers.map(user => user.userName)}
               currentUserId={user?.id || ''}
-              conversationTitle={getConversationTitle()}
             />
+
+            {/* Message Input */}
             <MessageInput
               onSendMessage={handleSendMessage}
               onTyping={handleTyping}
-              disabled={isTyping}
+              disabled={!isConnected || isChatDisabled}
             />
           </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center p-6">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Select a conversation
-              </h3>
-              <p className="text-gray-600">
-                Choose a conversation from the list to start messaging.
-              </p>
-            </div>
-          </div>
         )}
       </div>
 
-      {/* Unread Badge */}
-      <UnreadBadge 
-        conversationId={selectedConversationId}
-        className="absolute top-4 right-4"
-      />
+      {/* Chat Error Display */}
+      {chatError && (
+        <div className="fixed bottom-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <strong className="font-bold">Chat Error:</strong>
+              <span className="ml-2">{chatError.error}</span>
+              <div className="text-sm text-red-600">Code: {chatError.errorCode}</div>
+            </div>
+            <button
+              onClick={clearChatError}
+              className="ml-4 text-red-700 hover:text-red-900"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -4,16 +4,30 @@ import { Check, CheckCheck, Download, Image as ImageIcon, FileText } from 'lucid
 interface Message {
   id: string;
   content: string;
-  type: 'TEXT' | 'IMAGE' | 'DOCUMENT';
-  createdAt: string;
+  messageType: 'TEXT' | 'IMAGE' | 'DOCUMENT' | 'SYSTEM';
+  attachmentUrl?: string;
+  attachmentName?: string;
+  attachmentSize?: number;
+  attachmentType?: string;
+  isRead: boolean;
+  readAt?: string;
+  senderId: string;
   sender: {
     id: string;
     name: string;
+    email: string;
     profileImage?: string;
   };
-  isRead: boolean;
-  attachmentUrl?: string;
-  attachmentName?: string;
+  replyTo?: {
+    id: string;
+    content: string;
+    sender: {
+      id: string;
+      name: string;
+    };
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface MessageBubbleProps {
@@ -36,7 +50,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const renderMessageContent = () => {
-    switch (message.type) {
+    switch (message.messageType) {
       case 'TEXT':
         return (
           <p className="text-sm whitespace-pre-wrap break-words">

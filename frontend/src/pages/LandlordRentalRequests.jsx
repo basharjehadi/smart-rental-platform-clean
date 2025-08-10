@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { useTranslation } from 'react-i18next';
 import LandlordSidebar from '../components/LandlordSidebar';
+import TenantRequestCard from '../components/TenantRequestCard';
 import { 
-  Search, 
-  Filter, 
   MapPin, 
   Calendar, 
   DollarSign, 
@@ -13,9 +13,6 @@ import {
   Eye,
   MessageSquare,
   Plus,
-  Clock,
-  CheckCircle,
-  XCircle,
   Star,
   Mail,
   Phone,
@@ -24,20 +21,19 @@ import {
   Send,
   X,
   LogOut,
-  FileText
+  FileText,
+  CheckCircle
 } from 'lucide-react';
 
 const LandlordRentalRequests = () => {
   const { user, logout } = useAuth();
+  const { markByTypeAsRead } = useNotifications();
   const navigate = useNavigate();
-  const [requests, setRequests] = useState([]);
+  const [rentalRequests, setRentalRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeFilter, setActiveFilter] = useState('active');
-  const [profileData, setProfileData] = useState(null);
-  const [profileLoading, setProfileLoading] = useState(true);
-  const [showOfferModal, setShowOfferModal] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState(null);
+  const [showOfferModal, setShowOfferModal] = useState(false);
   const [offerData, setOfferData] = useState({
     monthlyRent: '',
     securityDeposit: '',
@@ -46,9 +42,11 @@ const LandlordRentalRequests = () => {
     additionalTerms: ''
   });
   const [sendingOffer, setSendingOffer] = useState(false);
+  const [decliningRequest, setDecliningRequest] = useState(null);
+  const [profileData, setProfileData] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [offerSent, setOfferSent] = useState(false);
   const [declineSuccess, setDeclineSuccess] = useState('');
-  const [decliningRequest, setDecliningRequest] = useState(null);
   
   const { api } = useAuth();
   const { t } = useTranslation();
@@ -56,6 +54,8 @@ const LandlordRentalRequests = () => {
   useEffect(() => {
     fetchRentalRequests();
     fetchProfileData();
+    // Mark rental request notifications as read when visiting the page
+    markByTypeAsRead('NEW_RENTAL_REQUEST');
   }, []);
 
   // Calculate total initial cost and pro-rated amounts when rent, deposit, or available date changes
@@ -107,68 +107,129 @@ const LandlordRentalRequests = () => {
   const fetchRentalRequests = async () => {
     try {
       setLoading(true);
-             const response = await api.get('/rental-requests');
-       console.log('Rental requests response:', response.data);
-       console.log('First rental request:', response.data.rentalRequests?.[0]);
-       console.log('Matched property data:', response.data.rentalRequests?.[0]?.matchedProperty);
+      const response = await api.get('/rental-requests');
       
-      // Check if landlord has no properties
-      if (response.data.message && response.data.message.includes('No properties found')) {
-        setRequests([]);
-        setError('No properties found. Add properties to see matching rental requests.');
-        return;
-      }
-      
-      // If we have real data, transform it to match our frontend structure
-      if (response.data.rentalRequests && response.data.rentalRequests.length > 0) {
-        const transformedRequests = response.data.rentalRequests.map(request => ({
-          id: request.id,
-                     name: request.tenant ? `${request.tenant.firstName || ''} ${request.tenant.lastName || ''}`.trim() || 'Unknown Tenant' : 'Unknown Tenant',
-           initials: request.tenant ? `${request.tenant.firstName?.charAt(0) || ''}${request.tenant.lastName?.charAt(0) || ''}` || 'UT' : 'UT',
-          rating: 4.5, // Mock rating
-          reviews: 12, // Mock reviews
-          quote: request.description || 'No description provided.',
-          email: request.tenant?.email || '......@email.com',
-          phone: request.tenant?.phoneNumber || '+48 ...... 789',
-          age: '25-34 years', // Mock data
-          occupation: 'Technology', // Mock data
-          budgetRange: `${request.budgetFrom || 0} zł - ${request.budgetTo || request.budget || 0} zł`,
-          moveInDate: new Date(request.moveInDate).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-          }),
-          location: request.location,
-          requirements: request.description || 'No specific requirements.',
-                     propertyMatch: {
-             name: request.matchedProperty?.name || 'Unknown Property',
-             address: request.matchedProperty ? `${request.matchedProperty.address}, ${request.matchedProperty.zipCode || ''}, ${request.matchedProperty.city}` : `ul. ${request.location} 123, ${request.location}`,
-             rent: `${request.matchedProperty?.monthlyRent || request.budget || request.budgetTo || 3000} zł`,
-             available: new Date(request.matchedProperty?.availableFrom || request.moveInDate).toLocaleDateString('en-US', {
-               year: 'numeric',
-               month: 'short',
-               day: 'numeric'
-             })
-           },
-          interestCount: request.viewCount || 0,
-          status: request.offers && request.offers.length > 0 ? 'offered' : (request.poolStatus === 'ACTIVE' ? 'active' : 'inactive')
-        }));
-        setRequests(transformedRequests);
-        setError(''); // Clear any existing errors
-      } else {
-        // No matching rental requests found
-        setRequests([]);
-        setError('No matching rental requests found for your properties.');
+      if (response.data.success) {
+        console.log('Raw rental requests data:', response.data.rentalRequests); // Debug log
+        
+        const requests = response.data.rentalRequests.map(request => {
+          // Extract tenant information
+          const tenant = request.tenant;
+          
+          // Calculate budget range
+          const budgetFrom = request.budgetFrom || request.budget;
+          const budgetTo = request.budgetTo || request.budget;
+          const budgetRange = budgetFrom === budgetTo 
+            ? `${formatCurrencyDisplay(budgetFrom)}`
+            : `${formatCurrencyDisplay(budgetFrom)} - ${formatCurrencyDisplay(budgetTo)}`;
+          
+          // Generate initials for avatar
+          const initials = tenant?.firstName && tenant?.lastName 
+            ? `${tenant.firstName.charAt(0)}${tenant.lastName.charAt(0)}`
+            : tenant?.firstName?.charAt(0) || 'T';
+          
+          // Get property match details - backend sends 'matchedProperty'
+          const propertyMatch = request.matchedProperty || {};
+          
+          // Debug: log property data
+          console.log('🏠 Property data for request', request.id, ':', {
+            matchedProperty: request.matchedProperty,
+            propertyName: propertyMatch.name,
+            propertyAddress: propertyMatch.address,
+            propertyRent: propertyMatch.monthlyRent,
+            propertyAvailable: propertyMatch.availableFrom,
+            propertyType: propertyMatch.propertyType
+          });
+          
+          // Get property details from the matchedProperty
+          const propertyName = propertyMatch.name || 'Your Property';
+          const propertyAddress = propertyMatch.address || 'Address not specified';
+          const propertyRent = propertyMatch.monthlyRent ? `${formatCurrencyDisplay(propertyMatch.monthlyRent)} zł` : 'Rent not specified';
+          const propertyAvailable = propertyMatch.availableFrom || null;
+          const propertyType = propertyMatch.propertyType || 'Apartment';
+          
+          // Calculate age from dateOfBirth or PESEL
+          let age = null;
+          if (tenant?.dateOfBirth) {
+            const birthDate = new Date(tenant.dateOfBirth);
+            const today = new Date();
+            age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+              age--;
+            }
+          } else if (tenant?.pesel) {
+            // Calculate age from PESEL (Polish format: YYMMDD)
+            const pesel = tenant.pesel;
+            if (pesel && pesel.length === 11) {
+              const year = parseInt(pesel.substring(0, 2));
+              const month = parseInt(pesel.substring(2, 4));
+              const day = parseInt(pesel.substring(4, 6));
+              
+              // Determine century based on month
+              let fullYear;
+              if (month > 20) fullYear = 2000 + year;
+              else if (month > 12) fullYear = 1900 + year;
+              else fullYear = 1900 + year;
+              
+              const birthDate = new Date(fullYear, month - 1, day);
+              const today = new Date();
+              age = today.getFullYear() - birthDate.getFullYear();
+              const monthDiff = today.getMonth() - birthDate.getMonth();
+              if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+              }
+            }
+          }
+
+          // Debug: log tenant data
+          console.log('🔍 Tenant data for request', request.id, ':', {
+            firstName: tenant?.firstName,
+            lastName: tenant?.lastName,
+            phoneNumber: tenant?.phoneNumber,
+            email: tenant?.email,
+            profession: tenant?.profession,
+            dateOfBirth: tenant?.dateOfBirth,
+            pesel: tenant?.pesel
+          });
+
+          return {
+            id: request.id,
+            name: `${tenant?.firstName || 'Tenant'} ${tenant?.lastName || ''}`.trim(),
+            initials: initials,
+            email: tenant?.email || null,
+            phone: tenant?.phoneNumber || null,
+            age: age,
+            occupation: tenant?.profession || null, // Backend sends 'profession', not 'occupation'
+            verified: tenant?.isVerified || false, // Backend sends 'isVerified', not 'verified'
+            budgetRange: budgetRange,
+            budgetFrom: budgetFrom,
+            budgetTo: budgetTo,
+            budget: request.budget,
+            moveInDate: request.moveInDate ? formatDate(request.moveInDate) : null, // Backend sends 'moveInDate', not 'preferredMoveIn'
+            location: request.location,
+            requirements: request.additionalRequirements || 'No specific requirements mentioned.', // Backend sends 'additionalRequirements'
+            rating: null, // Not available in current backend response
+            reviews: null, // Not available in current backend response
+            interestCount: request.responseCount || 0, // Backend sends 'responseCount'
+            status: request.status || 'active',
+            propertyMatch: {
+              name: propertyName,
+              address: propertyAddress,
+              rent: propertyRent,
+              available: propertyAvailable ? formatDate(propertyAvailable) : 'Date not specified',
+              propertyType: propertyType
+            },
+            propertyType: request.propertyType
+          };
+        });
+        
+        console.log('Mapped rental requests:', requests); // Debug log
+        setRentalRequests(requests);
       }
     } catch (error) {
       console.error('Error fetching rental requests:', error);
-      setError('Failed to load rental requests');
-      // Fallback to mock data only if it's not a "no properties" error
-      if (!error.response?.data?.message?.includes('No properties found')) {
-        setRequests(mockTenants);
-      } else {
-        setRequests([]);
-      }
+      setError('Failed to fetch rental requests');
     } finally {
       setLoading(false);
     }
@@ -177,7 +238,7 @@ const LandlordRentalRequests = () => {
   const fetchProfileData = async () => {
     try {
       setProfileLoading(true);
-      const response = await api.get('/users/profile');
+      const response = await api.get('/landlord-profile/profile');
       console.log('Profile response:', response.data); // Debug log
       setProfileData(response.data.user); // Fix: access the user object from response
     } catch (error) {
@@ -207,6 +268,18 @@ const LandlordRentalRequests = () => {
     }).format(amount);
   };
 
+  const formatCurrencyDisplay = (amount) => {
+    return new Intl.NumberFormat('pl-PL', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
+  };
+
+  const formatCurrencyWithDecimals = (amount) => {
+    if (!amount || amount === 0) return '0.00';
+    return parseFloat(amount).toFixed(2);
+  };
+
   const getProfilePhotoUrl = (photoPath) => {
     if (!photoPath) return null;
     
@@ -222,8 +295,8 @@ const LandlordRentalRequests = () => {
 
      const handleSendOffer = (tenant) => {
      setSelectedTenant(tenant);
-     // Extract rent amount from property match (remove "zł" and convert to number)
-     const rentAmount = parseInt(tenant.propertyMatch.rent.replace(' zł', '').replace(/\s/g, ''));
+     // Don't auto-populate rent amount - landlord must manually enter a price that fits tenant's budget
+     // const rentAmount = parseInt(tenant.propertyMatch.rent.replace(' zł', '').replace(/\s/g, ''));
      
      // Get the property's actual available date from the database
      let availableFromDate = '';
@@ -289,8 +362,8 @@ const LandlordRentalRequests = () => {
      console.log('Final available from date for offer:', availableFromDate);
      
      setOfferData({
-       monthlyRent: rentAmount.toString(),
-       securityDeposit: rentAmount.toString(),
+       monthlyRent: '', // Empty - landlord must enter price manually
+       securityDeposit: '', // Empty - landlord must enter deposit manually
        availableFrom: availableFromDate,
        leaseDuration: '12 months',
        additionalTerms: ''
@@ -299,9 +372,84 @@ const LandlordRentalRequests = () => {
      setOfferSent(false);
    };
 
+  const handlePriceAdjustment = (tenant) => {
+    setSelectedTenant(tenant);
+    setError(''); // Clear any previous errors
+    
+    // Calculate the adjusted price to match tenant's budget EXACTLY
+    const tenantMaxBudget = tenant.budgetTo || tenant.budget;
+    const adjustedRent = tenantMaxBudget; // Set to exactly their max budget
+    
+    // Get the property's actual available date from the database
+    let availableFromDate = '';
+    console.log('Property available date from database:', tenant.propertyMatch.available);
+    
+    if (tenant.propertyMatch.available) {
+      try {
+        const date = new Date(tenant.propertyMatch.available);
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          availableFromDate = `${year}-${month}-${day}`;
+          console.log('Successfully parsed property available date (local):', availableFromDate);
+        } else {
+          throw new Error('Invalid date from database');
+        }
+      } catch (error) {
+        console.error('Error parsing property available date:', error);
+        // Fallback to tenant's expected move-in date
+        if (tenant.moveInDate) {
+          const tenantDate = new Date(tenant.moveInDate);
+          const year = tenantDate.getFullYear();
+          const month = String(tenantDate.getMonth() + 1).padStart(2, '0');
+          const day = String(tenantDate.getDate()).padStart(2, '0');
+          availableFromDate = `${year}-${month}-${day}`;
+        } else {
+          // Last fallback to today's date
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const day = String(today.getDate()).padStart(2, '0');
+          availableFromDate = `${year}-${month}-${day}`;
+        }
+      }
+    } else {
+      // If no property date available, use tenant's expected move-in date
+      if (tenant.moveInDate) {
+        const tenantDate = new Date(tenant.moveInDate);
+        const year = tenantDate.getFullYear();
+        const month = String(tenantDate.getMonth() + 1).padStart(2, '0');
+        const day = String(tenantDate.getDate()).padStart(2, '0');
+        availableFromDate = `${year}-${month}-${day}`;
+      } else {
+        // Last fallback to today's date
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        availableFromDate = `${year}-${month}-${day}`;
+      }
+    }
+    
+    console.log('Price adjusted from', tenant.propertyMatch.rent, 'to', adjustedRent, 'PLN (exactly tenant max budget)');
+    console.log('Final available from date for offer:', availableFromDate);
+    
+    setOfferData({
+      monthlyRent: adjustedRent.toString(), // Auto-populated with tenant's exact max budget
+      securityDeposit: Math.floor(adjustedRent * 0.5).toString(), // Auto-calculate deposit as 50% of rent
+      availableFrom: availableFromDate,
+      leaseDuration: '12 months',
+      additionalTerms: `Price adjusted to exactly match your maximum budget of ${adjustedRent} PLN.`
+    });
+    setShowOfferModal(true);
+    setOfferSent(false);
+  };
+
   const handleCloseModal = () => {
     setShowOfferModal(false);
     setSelectedTenant(null);
+    setError(''); // Clear any errors
     setOfferData({
       monthlyRent: '',
       securityDeposit: '',
@@ -314,10 +462,35 @@ const LandlordRentalRequests = () => {
 
   const handleSubmitOffer = async () => {
     try {
+      console.log('🔍 Starting handleSubmitOffer...');
+      console.log('🔍 Selected tenant:', selectedTenant);
+      console.log('🔍 Offer data:', offerData);
+      
       setSendingOffer(true);
+      setError(''); // Clear any previous errors
+      
+      // 💰 CLIENT-SIDE BUDGET VALIDATION
+      const offeredRent = parseFloat(offerData.monthlyRent);
+      const tenantMaxBudget = selectedTenant.budgetTo || selectedTenant.budget;
+      const maxAllowedRent = tenantMaxBudget * 1.2; // 20% flexibility
+      
+      console.log('🔍 Budget validation:', { offeredRent, tenantMaxBudget, maxAllowedRent });
+      
+      if (offeredRent > maxAllowedRent) {
+        const errorMsg = `Your offered rent (${offeredRent} PLN) is significantly above the tenant's maximum budget (${tenantMaxBudget} PLN). Please adjust your price to within ${Math.round(maxAllowedRent)} PLN.`;
+        console.log('🔍 Budget validation failed:', errorMsg);
+        setError(errorMsg);
+        setSendingOffer(false);
+        return;
+      }
+      
+      if (offeredRent > tenantMaxBudget) {
+        // Warn but allow if within flexibility
+        console.log(`⚠️ Offering rent ${offeredRent} PLN above tenant's max budget ${tenantMaxBudget} PLN (within flexibility)`);
+      }
       
       // Make the actual API call
-      const response = await api.post(`/rental-request/${selectedTenant.id}/offer`, {
+      const requestPayload = {
         rentAmount: parseFloat(offerData.monthlyRent),
         depositAmount: parseFloat(offerData.securityDeposit),
         leaseDuration: parseInt(offerData.leaseDuration.split(' ')[0]), // Extract number from "12 months"
@@ -326,7 +499,14 @@ const LandlordRentalRequests = () => {
         propertyAddress: selectedTenant.propertyMatch.address,
         propertyType: 'Apartment', // Default type
         utilitiesIncluded: false // Default value
-      });
+      };
+      
+      console.log('🔍 Making API call to:', `/rental-request/${selectedTenant.id}/offer`);
+      console.log('🔍 Request payload:', requestPayload);
+      
+      const response = await api.post(`/rental-request/${selectedTenant.id}/offer`, requestPayload);
+      
+      console.log('🔍 API response:', response);
       
       setOfferSent(true);
       
@@ -338,44 +518,48 @@ const LandlordRentalRequests = () => {
       }, 3000);
       
     } catch (error) {
-      console.error('Error sending offer:', error);
-      setError('Failed to send offer. Please try again.');
+      console.error('🔍 Error in handleSubmitOffer:', error);
+      console.error('🔍 Error response:', error.response);
+      
+      // Handle specific budget error from backend
+      if (error.response?.data?.code === 'BUDGET_EXCEEDED') {
+        setError(error.response.data.error);
+      } else {
+        setError(`Failed to send offer: ${error.message || 'Unknown error occurred'}`);
+      }
     } finally {
       setSendingOffer(false);
     }
   };
 
   const handleDeclineRequest = async (tenant) => {
-    try {
+    if (window.confirm('Are you sure you want to decline this rental request?')) {
       setDecliningRequest(tenant.id);
-      const response = await api.post(`/rental-request/${tenant.id}/decline`, {
-        reason: 'Not a good match for our property'
-      });
-      
-      // Show success message
-      setDeclineSuccess('Request declined successfully!');
-      
-      // Refresh the rental requests list
-      fetchRentalRequests();
-      
-    } catch (error) {
-      console.error('Error declining request:', error);
-      setError('Failed to decline request. Please try again.');
-    } finally {
-      setDecliningRequest(null);
+      try {
+        const response = await api.post(`/rental-request/${tenant.id}/decline`, {
+          reason: 'Not a good match for our property'
+        });
+
+        if (response.status === 200) {
+          // Update the local state to reflect the declined status
+          setRentalRequests(prev => 
+            prev.map(req => 
+              req.id === tenant.id 
+                ? { ...req, status: 'declined' }
+                : req
+            )
+          );
+          
+          setDeclineSuccess(`Successfully declined rental request from ${tenant.name}`);
+          setTimeout(() => setDeclineSuccess(''), 5000);
+        }
+      } catch (error) {
+        console.error('Error declining request:', error);
+        alert('Failed to decline request. Please try again.');
+      } finally {
+        setDecliningRequest(null);
+      }
     }
-  };
-
-  const formatCurrencyDisplay = (amount) => {
-    return new Intl.NumberFormat('pl-PL', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(amount);
-  };
-
-  const formatCurrencyWithDecimals = (amount) => {
-    if (!amount || amount === 0) return '0.00';
-    return parseFloat(amount).toFixed(2);
   };
 
   // Mock data for demonstration - replace with real data
@@ -429,30 +613,6 @@ const LandlordRentalRequests = () => {
        status: 'declined'
     }
   ];
-
-  const getFilteredTenants = () => {
-    switch (activeFilter) {
-      case 'active':
-        return requests.filter(tenant => tenant.status === 'active');
-      case 'offered':
-        return requests.filter(tenant => tenant.status === 'offered');
-      case 'declined':
-        return requests.filter(tenant => tenant.status === 'declined');
-      default:
-        return requests;
-    }
-  };
-
-  const getStatusCounts = () => {
-    return {
-      active: requests.filter(t => t.status === 'active').length,
-      offered: requests.filter(t => t.status === 'offered').length,
-      declined: requests.filter(t => t.status === 'declined').length
-    };
-  };
-
-  const statusCounts = getStatusCounts();
-  const filteredTenants = getFilteredTenants();
 
   if (loading) {
     return (
@@ -619,248 +779,49 @@ const LandlordRentalRequests = () => {
               </div>
             )}
 
-            {/* Status Cards */}
-            {!error || !error.includes('No properties found') ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <button
-                  onClick={() => setActiveFilter('active')}
-                  className={`card-modern transition-all duration-200 ${
-                    activeFilter === 'active'
-                      ? 'ring-2 ring-blue-500 shadow-lg'
-                      : 'hover:shadow-md'
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Active Requests</p>
-                      <p className="text-2xl font-bold text-blue-600">{statusCounts.active}</p>
-                    </div>
-                    <Clock className="h-5 w-5 text-gray-400" />
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setActiveFilter('offered')}
-                  className={`card-modern transition-all duration-200 ${
-                    activeFilter === 'offered'
-                      ? 'ring-2 ring-green-500 shadow-lg'
-                      : 'hover:shadow-md'
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Offered</p>
-                      <p className="text-2xl font-bold text-green-600">{statusCounts.offered}</p>
-                    </div>
-                    <CheckCircle className="h-5 w-5 text-gray-400" />
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setActiveFilter('declined')}
-                  className={`card-modern transition-all duration-200 ${
-                    activeFilter === 'declined'
-                      ? 'ring-2 ring-red-500 shadow-lg'
-                      : 'hover:shadow-md'
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Declined</p>
-                      <p className="text-2xl font-bold text-red-600">{statusCounts.declined}</p>
-                    </div>
-                    <XCircle className="h-5 w-5 text-gray-400" />
-                  </div>
-                </button>
-              </div>
-            ) : null}
-
             {/* Section Header */}
             {!error || !error.includes('No properties found') ? (
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold text-gray-900">
-                  {filteredTenants.length} pending requests
+                  {rentalRequests.length} pending requests
                 </h2>
                 <span className="text-sm text-gray-500">
-                  Showing: {activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)} Requests
+                  Showing: All Requests
                 </span>
               </div>
             ) : null}
 
             {/* Tenant Profile Cards */}
             <div className="space-y-6">
-              {filteredTenants.map((tenant) => (
-                <div key={tenant.id} className="card-modern overflow-hidden">
-                  {/* Interest Indicator */}
-                  <div className="bg-gray-50 px-6 py-3 border-b border-gray-100">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Eye className="h-4 w-4 mr-2" />
-                      {tenant.interestCount} other landlords have shown interest.
-                    </div>
-                  </div>
-
-                  {/* Privacy Banner */}
-                  <div className="bg-blue-50 px-6 py-3 border-b border-blue-100">
-                    <div className="flex items-center text-sm text-blue-800">
-                      <Lock className="h-4 w-4 mr-2" />
-                      Privacy Protected. Full contact details will be revealed after tenant accepts your offer and completes payment.
-                    </div>
-                  </div>
-
-                  {/* Tenant Information */}
-                  <div className="p-6">
-                    <div className="flex items-start space-x-4 mb-6">
-                      {/* Avatar */}
-                      <div className="flex-shrink-0">
-                        <div className="h-12 w-12 bg-blue-600 rounded-full flex items-center justify-center">
-                          <span className="text-white font-semibold text-lg">{tenant.initials}</span>
-                        </div>
-                      </div>
-
-                      {/* Tenant Details */}
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <h3 className="text-lg font-semibold text-gray-900">{tenant.name}</h3>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Verified
-                          </span>
-                        </div>
-
-                        {/* Rating */}
-                        <div className="flex items-center space-x-2 mb-3">
-                          <div className="flex items-center">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className={`h-4 w-4 ${
-                                  star <= Math.floor(tenant.rating)
-                                    ? 'text-yellow-400 fill-current'
-                                    : star === Math.ceil(tenant.rating) && tenant.rating % 1 !== 0
-                                    ? 'text-yellow-400 fill-current'
-                                    : 'text-gray-300'
-                                }`}
-                              />
-                            ))}
-                          </div>
-                          <span className="text-sm text-gray-600">
-                            {tenant.rating} ({tenant.reviews} reviews)
-                          </span>
-                        </div>
-
-                                                 {/* Contact Details */}
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                           <div className="flex items-center text-sm text-gray-600">
-                             <Mail className="h-4 w-4 mr-2" />
-                             Email: {tenant.email}
-                           </div>
-                           <div className="flex items-center text-sm text-gray-600">
-                             <Phone className="h-4 w-4 mr-2" />
-                             Phone: {tenant.phone}
-                           </div>
-                         </div>
-
-                        {/* Demographics and Preferences */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                          <div>
-                            <p className="text-xs text-gray-500 uppercase tracking-wide">Age & Occupation</p>
-                            <p className="text-sm font-medium text-gray-900">{tenant.age}, {tenant.occupation}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 uppercase tracking-wide">Budget Range</p>
-                            <p className="text-sm font-medium text-gray-900">{tenant.budgetRange}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 uppercase tracking-wide">Preferred Move-in</p>
-                            <p className="text-sm font-medium text-gray-900">{tenant.moveInDate}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 uppercase tracking-wide">Location</p>
-                            <p className="text-sm font-medium text-gray-900">{tenant.location}</p>
-                          </div>
-                        </div>
-
-                                                 {/* Property Match */}
-                         <div className="bg-green-50 border border-green-100 rounded-lg p-4 mb-6">
-                           <div className="flex items-center space-x-2 mb-2">
-                             <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-                             <span className="text-sm font-medium text-green-800">Matched with your property</span>
-                           </div>
-                           <p className="text-sm text-green-700 font-semibold mb-1">{tenant.propertyMatch.name}</p>
-                           <p className="text-sm text-green-700 font-medium">{tenant.propertyMatch.address}</p>
-                           <p className="text-sm text-green-700">
-                             Rent: {tenant.propertyMatch.rent} Available: {tenant.propertyMatch.available}
-                           </p>
-                         </div>
-
-                        {/* Tenant Requirements */}
-                        <div className="mb-6">
-                          <h4 className="text-sm font-medium text-gray-900 mb-2">Tenant Requirements</h4>
-                          <p className="text-sm text-gray-600">{tenant.requirements}</p>
-                        </div>
-
-                                                 {/* Action Buttons or Status */}
-                         {tenant.status === 'active' ? (
-                           <div className="flex space-x-4">
-                             <button 
-                               onClick={() => handleSendOffer(tenant)}
-                               className="btn-primary flex-1 inline-flex items-center justify-center"
-                             >
-                               <Send className="h-4 w-4 mr-2" />
-                               Send Offer
-                             </button>
-                             <button 
-                               onClick={() => handleDeclineRequest(tenant)}
-                               className="btn-danger inline-flex items-center justify-center"
-                               disabled={decliningRequest === tenant.id}
-                             >
-                               {decliningRequest === tenant.id ? (
-                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                               ) : (
-                                 <X className="h-4 w-4 mr-2" />
-                               )}
-                               Decline
-                             </button>
-                           </div>
-                         ) : tenant.status === 'offered' ? (
-                           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                             <div className="flex items-center justify-center space-x-2">
-                               <CheckCircle className="h-5 w-5 text-green-600" />
-                               <span className="text-green-800 font-medium">Offer Sent</span>
-                             </div>
-                             <p className="text-sm text-green-700 text-center mt-1">
-                               Waiting for tenant response
-                             </p>
-                           </div>
-                         ) : tenant.status === 'declined' ? (
-                           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                             <div className="flex items-center justify-center space-x-2">
-                               <XCircle className="h-5 w-5 text-red-600" />
-                               <span className="text-red-800 font-medium">Request Declined</span>
-                             </div>
-                             <p className="text-sm text-red-700 text-center mt-1">
-                               This request has been declined
-                             </p>
-                           </div>
-                         ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              {rentalRequests.map((tenant) => (
+                <TenantRequestCard
+                  key={tenant.id}
+                  tenant={tenant}
+                  onSendOffer={handleSendOffer}
+                  onDeclineRequest={handleDeclineRequest}
+                  onPriceAdjustment={handlePriceAdjustment}
+                  decliningRequest={decliningRequest === tenant.id}
+                  offerSent={offerSent}
+                  formatCurrencyDisplay={formatCurrencyDisplay}
+                  formatCurrencyWithDecimals={formatCurrencyWithDecimals}
+                  formatDate={formatDate}
+                  getProfilePhotoUrl={getProfilePhotoUrl}
+                  t={t}
+                />
               ))}
             </div>
 
             {/* Empty State */}
-            {filteredTenants.length === 0 && !error.includes('No properties found') && (
+            {rentalRequests.length === 0 && !error.includes('No properties found') && (
               <div className="card-modern p-12 text-center">
                 <div className="mx-auto h-24 w-24 text-gray-400 mb-4">
                   <svg fill="currentColor" viewBox="0 0 24 24">
                     <path d="M19 7h-3V6a4 4 0 0 0-8 0v1H5a1 1 0 0 0-1 1v11a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8a1 1 0 0 0-1-1zM10 6a2 2 0 0 1 4 0v1h-4V6zm8 13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V9h2v1a1 1 0 0 0 2 0V9h4v1a1 1 0 0 0 2 0V9h2v10z"/>
                   </svg>
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No {activeFilter} requests found</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No requests found</h3>
                 <p className="text-gray-500 mb-6">
-                  There are currently no {activeFilter} rental requests matching your properties. Check back later for new requests.
+                  There are currently no rental requests matching your properties. Check back later for new requests.
                 </p>
               </div>
             )}
@@ -910,6 +871,25 @@ const LandlordRentalRequests = () => {
 
             {/* Modal Content */}
             <div className="p-6 space-y-6">
+              {/* Error Display */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <h4 className="text-sm font-medium text-red-800">Error</h4>
+                      <div className="mt-2 text-sm text-red-700">
+                        <p>{error}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Financial Terms */}
               <div>
                 <h3 className="text-lg font-medium text-gray-900 mb-3">Financial Terms</h3>
@@ -917,6 +897,48 @@ const LandlordRentalRequests = () => {
                   Tenant's budget: {selectedTenant.budgetRange} • You can adjust your offer within reasonable range.
                 </p>
                 
+                {/* Budget guidance */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <h4 className="text-sm font-medium text-blue-800">Budget Guidelines</h4>
+                      <div className="mt-2 text-sm text-blue-700">
+                        <p>• Tenant's budget range: <strong>{selectedTenant.budgetRange}</strong></p>
+                        <p>• Your property is currently listed at: <strong>{selectedTenant.propertyMatch.rent}</strong></p>
+                        <p>• To send an offer, adjust your price to fit within the tenant's budget</p>
+                        <p>• You can offer up to 20% above their max budget if justified</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Price Adjustment Notification */}
+                {offerData.additionalTerms && offerData.additionalTerms.includes('Price adjusted') && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <h4 className="text-sm font-medium text-green-800">Price Automatically Adjusted!</h4>
+                        <div className="mt-2 text-sm text-green-700">
+                          <p>• Your price has been adjusted from <strong>{selectedTenant.propertyMatch.rent}</strong> to <strong>{offerData.monthlyRent} PLN</strong></p>
+                          <p>• This matches the tenant's budget requirements</p>
+                          <p>• Security deposit has been calculated as 50% of the adjusted rent</p>
+                          <p>• You can still modify these values if needed</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -927,8 +949,13 @@ const LandlordRentalRequests = () => {
                       value={offerData.monthlyRent}
                       onChange={(e) => setOfferData(prev => ({ ...prev, monthlyRent: e.target.value }))}
                       className="input-modern"
-                      placeholder="3200"
+                      placeholder={`Enter rent within ${selectedTenant?.budgetTo || selectedTenant?.budget} PLN budget`}
+                      min="0"
+                      step="0.01"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Tenant's max budget: {selectedTenant?.budgetTo || selectedTenant?.budget} PLN
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -939,7 +966,9 @@ const LandlordRentalRequests = () => {
                       value={offerData.securityDeposit}
                       onChange={(e) => setOfferData(prev => ({ ...prev, securityDeposit: e.target.value }))}
                       className="input-modern"
-                      placeholder="3200"
+                      placeholder="Enter security deposit amount"
+                      min="0"
+                      step="0.01"
                     />
                   </div>
                 </div>

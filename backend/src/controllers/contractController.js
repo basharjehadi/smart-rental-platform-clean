@@ -552,9 +552,8 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
         rentalRequestId: parseInt(rentalRequestId),
         contractNumber,
         pdfUrl: pdfResult.url,
-        status: 'GENERATED',
-        createdAt: new Date(),
-        paymentDate: new Date()
+        status: 'SIGNED',
+        signedAt: new Date()
       }
     });
 

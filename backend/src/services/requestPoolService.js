@@ -59,8 +59,14 @@ class RequestPoolService {
   async findMatchingLandlordsByProperties(rentalRequest) {
     try {
       console.log(`🔍 Finding landlords with matching properties for request ${rentalRequest.id}`);
-      console.log(`   📍 Request Location: ${rentalRequest.location} (City: ${rentalRequest.city})`);
-      console.log(`   💰 Request Budget: ${rentalRequest.budgetFrom}-${rentalRequest.budgetTo} PLN`);
+      
+      // Extract city from location (e.g., "Grunwald, Poznan" -> "Poznan")
+      const extractedCity = rentalRequest.location ? 
+        rentalRequest.location.split(',').pop()?.trim() || rentalRequest.location.trim() : 
+        null;
+      
+      console.log(`   📍 Request Location: ${rentalRequest.location} (Extracted City: ${extractedCity})`);
+      console.log(`   💰 Request Budget: ${rentalRequest.budgetFrom || rentalRequest.budget}-${rentalRequest.budgetTo || rentalRequest.budget} PLN`);
       console.log(`   🏠 Request Bedrooms: ${rentalRequest.bedrooms}`);
       console.log(`   🏠 Request Property Type: ${rentalRequest.propertyType}`);
       console.log(`   🛋️ Request Furnished: ${rentalRequest.furnished}`);
@@ -70,43 +76,38 @@ class RequestPoolService {
       console.log(`   📅 Request Move-in Date Object: ${new Date(rentalRequest.moveInDate)}`);
 
       // Get all landlords who have properties that match the rental request criteria
+      // Use more flexible matching to ensure landlords get notified
       const matchingLandlords = await prisma.user.findMany({
         where: {
           role: 'LANDLORD',
           properties: {
             some: {
-              // Location matching (improved - check city, district, and address)
-              OR: [
-                { city: { contains: rentalRequest.city || rentalRequest.location.split(',')[1]?.trim() || rentalRequest.location.trim() } },
-                { city: { contains: rentalRequest.location.split(',')[0]?.trim() || rentalRequest.location.trim() } },
-                { address: { contains: rentalRequest.location.split(',')[0]?.trim() || rentalRequest.location.trim() } }
-              ],
-              // Budget matching
-              monthlyRent: {
-                gte: rentalRequest.budgetFrom || rentalRequest.budget * 0.8,
-                lte: rentalRequest.budgetTo || rentalRequest.budget * 1.2
+              // Location matching (must match city)
+              city: {
+                equals: extractedCity,
+                mode: 'insensitive'
               },
-              // Property type matching (if specified)
+              // Budget matching (reasonable flexibility - allow landlords to see requests they can adjust to)
+              monthlyRent: {
+                lte: (rentalRequest.budgetTo || rentalRequest.budget) * 1.2 // Allow up to 20% above max budget
+              },
+              // Property type matching (if specified, but be flexible)
               ...(rentalRequest.propertyType && {
-                propertyType: { contains: rentalRequest.propertyType }
+                propertyType: { 
+                  contains: rentalRequest.propertyType,
+                  mode: 'insensitive'
+                }
               }),
-              // Bedrooms matching (if specified)
+              // Bedrooms matching (if specified, but be flexible)
               ...(rentalRequest.bedrooms && {
-                bedrooms: rentalRequest.bedrooms
+                bedrooms: {
+                  gte: Math.max(1, rentalRequest.bedrooms - 1), // Allow 1 less bedroom
+                  lte: rentalRequest.bedrooms + 1 // Allow 1 more bedroom
+                }
               }),
-              // Property features matching (if specified)
-              ...(rentalRequest.furnished !== undefined && {
-                furnished: rentalRequest.furnished
-              }),
-              ...(rentalRequest.parking !== undefined && {
-                parking: rentalRequest.parking
-              }),
-              ...(rentalRequest.petsAllowed !== undefined && {
-                petsAllowed: rentalRequest.petsAllowed
-              }),
-              // Property is available
+              // Property is available (flexible with dates)
               availableFrom: {
-                lte: new Date(rentalRequest.moveInDate)
+                lte: new Date(new Date(rentalRequest.moveInDate).getTime() + 30 * 24 * 60 * 60 * 1000) // Allow 30 days flexibility
               }
             }
           }
@@ -114,24 +115,25 @@ class RequestPoolService {
         include: {
           properties: {
             where: {
-              // Location matching (improved - check both city and full location)
-              OR: [
-                { city: { contains: rentalRequest.location.includes(',') ? rentalRequest.location.split(',')[1].trim() : rentalRequest.location.trim() } },
-                { city: { contains: rentalRequest.location.includes(',') ? rentalRequest.location.split(',')[0].trim() : rentalRequest.location.trim() } },
-                { address: { contains: rentalRequest.location.includes(',') ? rentalRequest.location.split(',')[0].trim() : rentalRequest.location.trim() } }
-              ],
-              // Budget matching
-              monthlyRent: {
-                gte: rentalRequest.budgetFrom || rentalRequest.budget * 0.8,
-                lte: rentalRequest.budgetTo || rentalRequest.budget * 1.2
+              // Location matching (must match city)
+              city: {
+                equals: extractedCity,
+                mode: 'insensitive'
               },
-              // Bedrooms matching (if specified)
+              // Budget matching (reasonable flexibility)
+              monthlyRent: {
+                lte: (rentalRequest.budgetTo || rentalRequest.budget) * 1.2
+              },
+              // Bedrooms matching (flexible)
               ...(rentalRequest.bedrooms && {
-                bedrooms: rentalRequest.bedrooms
+                bedrooms: {
+                  gte: Math.max(1, rentalRequest.bedrooms - 1),
+                  lte: rentalRequest.bedrooms + 1
+                }
               }),
-              // Property is available
+              // Property is available (flexible)
               availableFrom: {
-                lte: new Date(rentalRequest.moveInDate)
+                lte: new Date(new Date(rentalRequest.moveInDate).getTime() + 30 * 24 * 60 * 60 * 1000)
               }
             },
             select: {
@@ -157,13 +159,24 @@ class RequestPoolService {
       matchingLandlords.forEach(landlord => {
         console.log(`   👤 Landlord ${landlord.id} (${landlord.email}):`);
         landlord.properties.forEach(property => {
-          console.log(`      🏢 Property: ${property.name} - ${property.city}, ${property.monthlyRent} PLN, ${property.bedrooms} bedrooms`);
+          console.log(`      🏢 Property: ${property.name} - ${property.city}, ${property.monthlyRent} PLN, ${property.propertyType}, ${property.bedrooms} bedrooms`);
         });
       });
+      
+      // Debug: Log matching criteria for clarity
+      console.log(`📋 Matching Criteria:`);
+      console.log(`   📍 Required City: ${extractedCity}`);
+      console.log(`   💰 Budget Range: ${rentalRequest.budgetFrom || rentalRequest.budget * 0.8} - ${(rentalRequest.budgetTo || rentalRequest.budget) * 2.0} PLN`);
+      console.log(`   🏠 Property Type: ${rentalRequest.propertyType || 'Any'}`);
+      console.log(`   🛏️ Bedrooms: ${rentalRequest.bedrooms ? `${Math.max(1, rentalRequest.bedrooms - 1)}-${rentalRequest.bedrooms + 1}` : 'Any'}`);
+      console.log(`   📅 Move-in Date: ${rentalRequest.moveInDate} (with 30 days flexibility)`);
 
-      // Debug: If no matches found, let's check what properties exist
+      // If no matches found, let's check what properties exist
       if (matchingLandlords.length === 0) {
-        console.log(`🔍 No matches found. Checking all available properties...`);
+        console.log(`❌ NO MATCHES FOUND!`);
+        console.log(`   The rental request does not match any landlord's properties.`);
+        console.log(`   This means landlords will NOT see this request.`);
+        console.log(`🔍 Checking all available properties to understand why...`);
         const allProperties = await prisma.property.findMany({
           where: { status: 'AVAILABLE' },
           select: {
@@ -253,18 +266,25 @@ class RequestPoolService {
     console.log(`   🧮 Scoring landlord ${landlord.id} with property ${bestProperty.name}:`);
 
     // 📍 Location match (40 points)
-    const locationMatch = bestProperty.city.includes(rentalRequest.location.split(',')[0].trim()) ||
-                         bestProperty.address.includes(rentalRequest.location.split(',')[0].trim());
+    const extractedCity = rentalRequest.location ? 
+      rentalRequest.location.split(',').pop()?.trim() || rentalRequest.location.trim() : 
+      null;
+    const locationMatch = extractedCity && (
+      bestProperty.city.toLowerCase().includes(extractedCity.toLowerCase()) ||
+      extractedCity.toLowerCase().includes(bestProperty.city.toLowerCase()) ||
+      bestProperty.address.toLowerCase().includes(extractedCity.toLowerCase())
+    );
     if (locationMatch) {
       score += 40;
-      console.log(`      ✅ Location match: +40 points (${bestProperty.city} contains ${rentalRequest.location.split(',')[0].trim()})`);
+      console.log(`      ✅ Location match: +40 points (Property city: ${bestProperty.city}, Extracted city: ${extractedCity})`);
     } else {
-      console.log(`      ❌ Location mismatch: ${bestProperty.city} vs ${rentalRequest.location.split(',')[0].trim()}`);
+      console.log(`      ❌ Location mismatch: Property city "${bestProperty.city}" vs extracted city "${extractedCity}"`);
     }
 
     // 💰 Budget match (30 points)
     const budgetRange = rentalRequest.budgetTo - rentalRequest.budgetFrom;
     const budgetTolerance = budgetRange * 0.1; // 10% tolerance
+    const maxAllowedRent = rentalRequest.budgetTo * 1.2; // 20% above max budget
     
     if (bestProperty.monthlyRent >= (rentalRequest.budgetFrom - budgetTolerance) && 
         bestProperty.monthlyRent <= (rentalRequest.budgetTo + budgetTolerance)) {
@@ -277,8 +297,11 @@ class RequestPoolService {
     } else if (bestProperty.monthlyRent <= rentalRequest.budgetTo) {
       score += 15; // Within max budget
       console.log(`      ✅ Budget within max: +15 points (${bestProperty.monthlyRent} PLN <= ${rentalRequest.budgetTo})`);
+    } else if (bestProperty.monthlyRent <= maxAllowedRent) {
+      score += 5; // Within 20% flexibility (minimal points)
+      console.log(`      ⚠️ Budget within flexibility: +5 points (${bestProperty.monthlyRent} PLN <= ${maxAllowedRent} PLN)`);
     } else {
-      console.log(`      ❌ Budget mismatch: ${bestProperty.monthlyRent} PLN vs range ${rentalRequest.budgetFrom}-${rentalRequest.budgetTo}`);
+      console.log(`      ❌ Budget mismatch: ${bestProperty.monthlyRent} PLN vs range ${rentalRequest.budgetFrom}-${rentalRequest.budgetTo} (max allowed: ${maxAllowedRent} PLN)`);
     }
 
     // 🏠 Bedrooms match (20 points)
@@ -359,8 +382,14 @@ class RequestPoolService {
     const bestProperty = landlord.properties[0];
 
     // Location reasons
-    if (bestProperty.city.includes(rentalRequest.location.split(',')[0].trim()) ||
-        bestProperty.address.includes(rentalRequest.location.split(',')[0].trim())) {
+    const extractedCity = rentalRequest.location ? 
+      rentalRequest.location.split(',').pop()?.trim() || rentalRequest.location.trim() : 
+      null;
+    if (extractedCity && (
+      bestProperty.city.toLowerCase().includes(extractedCity.toLowerCase()) ||
+      extractedCity.toLowerCase().includes(bestProperty.city.toLowerCase()) ||
+      bestProperty.address.toLowerCase().includes(extractedCity.toLowerCase())
+    )) {
       reasons.push('Location match');
     }
 
@@ -370,6 +399,8 @@ class RequestPoolService {
       reasons.push('Budget match');
     } else if (bestProperty.monthlyRent <= rentalRequest.budgetTo) {
       reasons.push('Within budget');
+    } else if (bestProperty.monthlyRent <= (rentalRequest.budgetTo * 1.2)) {
+      reasons.push('Slightly above budget (negotiable)');
     }
 
     // Property type reasons
@@ -428,6 +459,25 @@ class RequestPoolService {
         console.log(`   📍 Match: Landlord ${match.landlordId} -> Request ${match.rentalRequestId} (Score: ${match.matchScore})`);
       });
 
+      // Create notifications for landlords about new rental requests
+      try {
+        const { NotificationService } = await import('../services/notificationService.js');
+        
+        for (const match of matches) {
+          await NotificationService.createRentalRequestNotification(
+            match.landlordId,
+            rentalRequestId,
+            rentalRequest.title,
+            rentalRequest.tenant?.name || 'A tenant'
+          );
+        }
+        
+        console.log(`🔔 Created notifications for ${matches.length} landlords about new rental request`);
+      } catch (notificationError) {
+        console.error('❌ Error creating notifications:', notificationError);
+        // Don't fail the main operation if notifications fail
+      }
+
     } catch (error) {
       console.error('❌ Error creating matches:', error);
     }
@@ -442,21 +492,22 @@ class RequestPoolService {
         where: {
           landlordId: landlordId,
           status: 'AVAILABLE',
-          // Location matching
-          OR: [
-            { city: { contains: rentalRequest.city || rentalRequest.location.split(',')[1]?.trim() || rentalRequest.location.trim() } },
-            { city: { contains: rentalRequest.location.split(',')[0]?.trim() || rentalRequest.location.trim() } },
-            { address: { contains: rentalRequest.location.split(',')[0]?.trim() || rentalRequest.location.trim() } }
-          ],
-          // Budget matching
-          monthlyRent: {
-            gte: rentalRequest.budgetFrom || rentalRequest.budget * 0.8,
-            lte: rentalRequest.budgetTo || rentalRequest.budget * 1.2
+          // Location matching (strict - must match city exactly)
+          city: {
+            equals: rentalRequest.city || rentalRequest.location.split(',')[1]?.trim() || rentalRequest.location.trim(),
+            mode: 'insensitive'
           },
-          // Property type matching (if specified)
-          ...(rentalRequest.propertyType && {
-            propertyType: { contains: rentalRequest.propertyType }
-          }),
+                        // Budget matching (flexible - allow landlords to see requests they can adjust to)
+              monthlyRent: {
+                lte: rentalRequest.budgetTo * 1.5 || rentalRequest.budget * 1.5
+              },
+              // Property type matching (strict - must match exactly)
+              ...(rentalRequest.propertyType && {
+                propertyType: {
+                  equals: rentalRequest.propertyType,
+                  mode: 'insensitive'
+                }
+              }),
           // Bedrooms matching (if specified)
           ...(rentalRequest.bedrooms && {
             bedrooms: rentalRequest.bedrooms
@@ -633,6 +684,12 @@ class RequestPoolService {
    */
   async updatePoolAnalytics(location) {
     try {
+      // If location is undefined, use a default or skip analytics
+      if (!location) {
+        console.log('⚠️ Skipping pool analytics update - no location provided');
+        return;
+      }
+
       const [totalRequests, activeRequests, matchedRequests, expiredRequests] = await Promise.all([
         prisma.rentalRequest.count({ where: { location } }),
         prisma.rentalRequest.count({ where: { location, poolStatus: 'ACTIVE' } }),
@@ -653,6 +710,8 @@ class RequestPoolService {
           date: new Date()
         }
       });
+
+      console.log(`📊 Updated pool analytics for location: ${location}`);
 
     } catch (error) {
       console.error('❌ Error updating pool analytics:', error);

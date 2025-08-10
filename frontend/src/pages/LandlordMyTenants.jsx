@@ -138,8 +138,20 @@ const LandlordMyTenants = () => {
   };
 
   const handleSendMessage = (tenantId) => {
-    // TODO: Implement messaging functionality
-    alert('Messaging feature coming soon!');
+    // Navigate to messaging page with tenant info
+    const tenant = tenants.find(t => t.id === tenantId);
+    if (tenant) {
+      navigate('/messaging', { 
+        state: { 
+          newConversation: true, 
+          participantIds: [tenant.id],
+          propertyId: tenant.propertyId,
+          title: `Chat with ${tenant.name || 'Tenant'}`
+        } 
+      });
+    } else {
+      alert('Tenant information not available');
+    }
   };
 
   const filteredTenants = filterAndSortTenants();

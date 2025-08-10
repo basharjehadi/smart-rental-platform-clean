@@ -195,21 +195,21 @@ const SendOfferModal = ({ request, offerForm, setOfferForm, onClose, onSubmit })
             </div>
           </div>
 
-                                {/* Tenant's Expected Move-in Date */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900">Tenant's Expected Move-in Date</h3>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-700">
-                    {request.moveInDate ? new Date(request.moveInDate).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    }) : 'Not specified'}
-                  </div>
+          {/* Tenant's Expected Move-in Date */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900">Tenant's Expected Move-in Date</h3>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-700">
+                  {request.moveInDate ? new Date(request.moveInDate).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  }) : 'Not specified'}
                 </div>
               </div>
             </div>
+          </div>
 
           {/* Lease Terms Section */}
           <div className="space-y-4">
@@ -290,7 +290,17 @@ const SendOfferModal = ({ request, offerForm, setOfferForm, onClose, onSubmit })
               />
               <p className="text-sm text-gray-600 mt-2">
                 Include any specific conditions, allowed pets, utility inclusions, or property rules.
+                <br />
+                <span className="text-blue-600 font-medium">💡 You can write in English or Polish - the system will automatically translate to the other language!</span>
               </p>
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800 font-medium">
+                  📋 <strong>Important:</strong> These Additional Terms & Conditions will become <strong>Clause 12</strong> in the rental contract.
+                </p>
+                <p className="text-xs text-blue-700 mt-1">
+                  Make sure to include all important conditions, rules, and agreements that should be legally binding.
+                </p>
+              </div>
             </div>
 
                          

@@ -75,7 +75,7 @@ async function createTestUsers() {
     console.log('   Password: password123');
     console.log('   Role: ADMIN');
     console.log('');
-    console.log('🌐 You can now login at: http://localhost:3000');
+    console.log('🌐 You can now login at: http://localhost:3002');
     
   } catch (error) {
     console.error('❌ Error creating test users:', error);

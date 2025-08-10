@@ -6,6 +6,7 @@ import {
   Handshake, 
   HelpCircle, 
   User, 
+  MessageCircle,
   Menu,
   X,
   Building,
@@ -13,8 +14,10 @@ import {
   Settings,
   Users
 } from 'lucide-react';
+import { useNotifications } from '../contexts/NotificationContext';
+import NotificationBadge from './common/NotificationBadge';
 
-const SidebarItem = ({ to, icon: Icon, children, isActive, isCollapsed }) => {
+const SidebarItem = ({ to, icon: Icon, children, isActive, isCollapsed, badge }) => {
   return (
     <Link
       to={to}
@@ -35,6 +38,13 @@ const SidebarItem = ({ to, icon: Icon, children, isActive, isCollapsed }) => {
       <Icon className={`${isCollapsed ? 'w-5 h-5' : 'w-4 h-4 mr-3'} transition-colors duration-200`} />
       {!isCollapsed && <span className="font-medium">{children}</span>}
       
+      {/* Notification Badge */}
+      {badge && (
+        <div className={`${isCollapsed ? 'absolute -top-1 -right-1' : 'ml-auto'}`}>
+          <NotificationBadge count={badge} />
+        </div>
+      )}
+      
       {/* Tooltip for collapsed state */}
       {isCollapsed && (
         <div className="absolute left-full ml-2 px-3 py-2 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg">
@@ -54,6 +64,7 @@ const SidebarItem = ({ to, icon: Icon, children, isActive, isCollapsed }) => {
 const LandlordSidebar = () => {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { counts } = useNotifications();
 
   const menuItems = [
     {
@@ -69,12 +80,18 @@ const LandlordSidebar = () => {
     {
       to: '/tenant-rental-requests',
       icon: FileText,
-      label: 'Rental Requests'
+      label: 'Rental Requests',
+      badge: counts.rentalRequests
     },
     {
       to: '/landlord-my-property',
       icon: Building,
       label: 'My Properties'
+    },
+    {
+      to: '/messaging',
+      icon: MessageCircle,
+      label: 'Messages'
     },
     {
       to: '/landlord-help-center',
@@ -140,6 +157,7 @@ const LandlordSidebar = () => {
                 icon={item.icon}
                 isActive={location.pathname === item.to}
                 isCollapsed={isCollapsed}
+                badge={item.badge}
               >
                 {item.label}
               </SidebarItem>

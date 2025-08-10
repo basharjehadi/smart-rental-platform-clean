@@ -1,5 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { SocketProvider } from './contexts/SocketContext';
+import { NotificationProvider } from './contexts/NotificationContext';
+import ToastContainer from './components/common/ToastContainer';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProfileCompletionGuard from './components/ProfileCompletionGuard';
@@ -41,6 +44,7 @@ import ProfilePage from './pages/ProfilePage';
 import PropertyMediaUpload from './components/PropertyMediaUpload';
 import ContractManagementPage from './pages/ContractManagementPage';
 import PaymentManagementPage from './pages/PaymentManagementPage';
+import MessagingPage from './pages/MessagingPage';
 import TenantDashboardRedirect from './components/TenantDashboardRedirect';
 // import PaymentDemo from './pages/PaymentDemo';
 // import PaymentExample from './pages/PaymentExample';
@@ -48,7 +52,7 @@ import TenantDashboardRedirect from './components/TenantDashboardRedirect';
 // Component to conditionally render Navbar
 const AppContent = () => {
   const location = useLocation();
-  const hideNavbarRoutes = ['/', '/login', '/register', '/dashboard', '/tenant-dashboard', '/tenant-help-center', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/property', '/contracts', '/payments', '/payment', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details', '/landlord-help-center', '/landlord-my-tenants', '/landlord-tenant-profile', '/admin', '/payment-success', '/payment-history'];
+  const hideNavbarRoutes = ['/', '/login', '/register', '/dashboard', '/tenant-dashboard', '/tenant-help-center', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/property', '/contracts', '/payments', '/payment', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details', '/landlord-help-center', '/landlord-my-tenants', '/landlord-tenant-profile', '/admin', '/payment-success', '/payment-history', '/messaging'];
   
   // Check if current path should hide navbar (including parameterized routes)
   const shouldHideNavbar = hideNavbarRoutes.some(route => {
@@ -315,6 +319,14 @@ const AppContent = () => {
             </ProtectedRoute>
           } 
         />
+        <Route 
+          path="/messaging" 
+          element={
+            <ProtectedRoute>
+              <MessagingPage />
+            </ProtectedRoute>
+          } 
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
@@ -326,9 +338,14 @@ function App() {
   
   return (
     <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
+      <SocketProvider>
+        <NotificationProvider>
+          <Router>
+            <AppContent />
+            <ToastContainer />
+          </Router>
+        </NotificationProvider>
+      </SocketProvider>
     </AuthProvider>
   );
 }

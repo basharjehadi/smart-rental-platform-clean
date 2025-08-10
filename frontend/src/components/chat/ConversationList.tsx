@@ -4,23 +4,42 @@ import { MessageCircle, Clock } from 'lucide-react';
 interface Conversation {
   id: string;
   title?: string;
-  type: 'DIRECT' | 'GROUP';
-  participants: Array<{
+  type: 'DIRECT' | 'GROUP' | 'PROPERTY';
+  propertyId?: string;
+  offerId?: string;
+  status: 'PENDING' | 'ACTIVE' | 'ARCHIVED';
+  property?: {
     id: string;
     name: string;
-    email: string;
-    profileImage?: string;
-  }>;
-  lastMessage?: {
+    address: string;
+  };
+  offer?: {
+    id: string;
+    status: 'PENDING' | 'ACCEPTED' | 'PAID' | 'REJECTED';
+  };
+  participants: {
+    id: string;
+    userId: string;
+    role: 'ADMIN' | 'MEMBER' | 'READONLY';
+    user: {
+      id: string;
+      name: string;
+      email: string;
+      profileImage?: string;
+      role: string;
+    };
+  }[];
+  messages: Array<{
+    id: string;
     content: string;
-    type: 'TEXT' | 'IMAGE' | 'DOCUMENT';
+    messageType: 'TEXT' | 'IMAGE' | 'DOCUMENT' | 'SYSTEM';
     createdAt: string;
     sender: {
       id: string;
       name: string;
     };
-  };
-  unreadCount: number;
+  }>;
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -62,26 +81,27 @@ const ConversationList: React.FC<ConversationListProps> = ({
     if (conversation.title) return conversation.title;
     
     const otherParticipants = conversation.participants.filter(
-      p => p.id !== currentUserId
+      p => p.user.id !== currentUserId
     );
     
     if (otherParticipants.length === 1) {
-      return otherParticipants[0].name;
+      return otherParticipants[0].user.name;
     } else if (otherParticipants.length > 1) {
-      return `${otherParticipants[0].name} +${otherParticipants.length - 1}`;
+      return `${otherParticipants[0].user.name} +${otherParticipants.length - 1}`;
     }
     
     return 'Unknown';
   };
 
   const getLastMessagePreview = (conversation: Conversation) => {
-    if (!conversation.lastMessage) return 'No messages yet';
+    if (!conversation.messages || conversation.messages.length === 0) return 'No messages yet';
     
-    const { content, type, sender } = conversation.lastMessage;
+    const lastMessage = conversation.messages[conversation.messages.length - 1];
+    const { content, messageType, sender } = lastMessage;
     const isOwnMessage = sender.id === currentUserId;
     
     let preview = '';
-    switch (type) {
+    switch (messageType) {
       case 'TEXT':
         preview = content.length > 50 ? `${content.substring(0, 50)}...` : content;
         break;
@@ -96,6 +116,12 @@ const ConversationList: React.FC<ConversationListProps> = ({
     }
     
     return isOwnMessage ? `You: ${preview}` : preview;
+  };
+
+  const isConversationLocked = (conversation: Conversation) => {
+    if (conversation.status !== 'ACTIVE') return true;
+    if (conversation.offer && conversation.offer.status !== 'PAID') return true;
+    return false;
   };
 
   return (
@@ -131,19 +157,21 @@ const ConversationList: React.FC<ConversationListProps> = ({
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-gray-900 truncate">
-                      {getConversationTitle(conversation)}
-                    </h3>
                     <div className="flex items-center space-x-2">
-                      {conversation.lastMessage && (
+                      <h3 className="text-sm font-medium text-gray-900 truncate">
+                        {getConversationTitle(conversation)}
+                      </h3>
+                      {isConversationLocked(conversation) && (
+                        <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Chat locked until payment">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      {conversation.messages && conversation.messages.length > 0 && (
                         <span className="text-xs text-gray-500 flex items-center">
                           <Clock className="w-3 h-3 mr-1" />
-                          {formatTime(conversation.lastMessage.createdAt)}
-                        </span>
-                      )}
-                      {conversation.unreadCount > 0 && (
-                        <span className="bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center min-w-[20px]">
-                          {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
+                          {formatTime(conversation.messages[conversation.messages.length - 1].createdAt)}
                         </span>
                       )}
                     </div>
