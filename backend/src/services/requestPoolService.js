@@ -18,34 +18,37 @@ class RequestPoolService {
   }
 
   /**
-   * 🚀 SCALABILITY: Add rental request to pool with simple matching
+   * 🚀 SCALABILITY: Add rental request to pool with delayed matching
    */
   async addToPool(rentalRequest) {
     try {
-      console.log(`🏊 Adding request ${rentalRequest.id} to pool`);
+      console.log(`🏊 Adding request ${rentalRequest.id} to pool (matching will start in 5 minutes)`);
 
-      // Update request status
+      // 🚀 SCALABILITY: Calculate expiration based on move-in date (3 days before)
+      const moveInDate = new Date(rentalRequest.moveInDate);
+      const expirationDate = new Date(moveInDate.getTime() - (3 * 24 * 60 * 60 * 1000)); // 3 days before move-in
+      
+      // Update request status with dynamic expiration
       await prisma.rentalRequest.update({
         where: { id: rentalRequest.id },
         data: {
           poolStatus: 'ACTIVE',
-          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+          expiresAt: expirationDate
         }
       });
 
-      // 🚀 SCALABILITY: Find matching landlords based on their properties
-      const matchingLandlords = await this.findMatchingLandlordsByProperties(rentalRequest);
-      
-      // Create matches in batch
-      if (matchingLandlords.length > 0) {
-        await this.createMatches(rentalRequest.id, matchingLandlords, rentalRequest);
-      }
+      // 🚀 SCALABILITY: NO IMMEDIATE MATCHING - wait for 5-minute cron job
+      // The cron job will handle finding matching landlords and creating matches
+      // This allows for the 5-minute delay and continuous matching as requested
 
       // 🚀 SCALABILITY: Update analytics
       await this.updatePoolAnalytics(rentalRequest.location);
 
-      console.log(`✅ Request ${rentalRequest.id} added to pool with ${matchingLandlords.length} matches`);
-      return matchingLandlords.length;
+      // 🚀 SCALABILITY: Cache the request for quick access
+      await this.cacheRequest(rentalRequest);
+
+      console.log(`✅ Request ${rentalRequest.id} added to pool, will start matching in 5 minutes, expires ${expirationDate.toISOString()}`);
+      return 0; // Return 0 matches since matching is delayed
 
     } catch (error) {
       console.error('❌ Error adding request to pool:', error);
@@ -80,6 +83,7 @@ class RequestPoolService {
       const matchingLandlords = await prisma.user.findMany({
         where: {
           role: 'LANDLORD',
+          availability: true, // Manual availability toggle
           properties: {
             some: {
               // Location matching (must match city)
@@ -108,7 +112,10 @@ class RequestPoolService {
               // Property is available (flexible with dates)
               availableFrom: {
                 lte: new Date(new Date(rentalRequest.moveInDate).getTime() + 30 * 24 * 60 * 60 * 1000) // Allow 30 days flexibility
-              }
+              },
+              // Property status and availability
+              status: 'AVAILABLE',
+              availability: true
             }
           }
         },
@@ -134,7 +141,10 @@ class RequestPoolService {
               // Property is available (flexible)
               availableFrom: {
                 lte: new Date(new Date(rentalRequest.moveInDate).getTime() + 30 * 24 * 60 * 60 * 1000)
-              }
+              },
+              // Property status and availability
+              status: 'AVAILABLE',
+              availability: true
             },
             select: {
               id: true,
@@ -147,7 +157,9 @@ class RequestPoolService {
               furnished: true,
               parking: true,
               petsAllowed: true,
-              availableFrom: true
+              availableFrom: true,
+              status: true,
+              availability: true
             }
           }
         }
@@ -723,6 +735,9 @@ class RequestPoolService {
    */
   async cleanupExpiredRequests() {
     try {
+      console.log('🧹 Starting expired requests cleanup...');
+      
+      // 🚀 SCALABILITY: Find requests that are 3 days before move-in date
       const expiredRequests = await prisma.rentalRequest.findMany({
         where: {
           poolStatus: 'ACTIVE',
@@ -730,17 +745,50 @@ class RequestPoolService {
             lt: new Date()
           }
         },
-        select: { id: true }
+        select: { 
+          id: true,
+          title: true,
+          tenantId: true,
+          moveInDate: true,
+          expiresAt: true
+        }
       });
 
-      for (const request of expiredRequests) {
-        await this.removeFromPool(request.id, 'EXPIRED');
+      if (expiredRequests.length === 0) {
+        console.log('✅ No expired requests found');
+        return;
       }
 
-      console.log(`🧹 Cleaned up ${expiredRequests.length} expired requests`);
+      console.log(`📅 Found ${expiredRequests.length} expired requests`);
+
+      // 🚀 SCALABILITY: Update all expired requests
+      await prisma.rentalRequest.updateMany({
+        where: {
+          poolStatus: 'ACTIVE',
+          expiresAt: {
+            lt: new Date()
+          }
+        },
+        data: {
+          poolStatus: 'EXPIRED',
+          updatedAt: new Date()
+        }
+      });
+
+      // 🚀 SCALABILITY: Update analytics
+      for (const request of expiredRequests) {
+        await this.updatePoolAnalytics(request.location);
+      }
+
+      console.log(`✅ Cleaned up ${expiredRequests.length} expired requests`);
+      
+      // 🚀 SCALABILITY: Log details for monitoring
+      expiredRequests.forEach(request => {
+        console.log(`   📅 Request ${request.id}: "${request.title}" expired on ${request.expiresAt}, move-in was ${request.moveInDate}`);
+      });
 
     } catch (error) {
-      console.error('❌ Error cleaning up expired requests:', error);
+      console.error('❌ Error in cleanup expired requests:', error);
     }
   }
 
@@ -771,6 +819,53 @@ class RequestPoolService {
     } catch (error) {
       console.error('❌ Error getting pool stats:', error);
       return null;
+    }
+  }
+
+  /**
+   * 🚀 SCALABILITY: Get detailed pool analytics
+   */
+  async getPoolAnalytics() {
+    try {
+      const analytics = {};
+
+      // Total counts by status
+      const statusCounts = await prisma.rentalRequest.groupBy({
+        by: ['poolStatus'],
+        _count: { id: true }
+      });
+
+      analytics.statusBreakdown = {};
+      statusCounts.forEach(stat => {
+        analytics.statusBreakdown[stat.poolStatus] = stat._count.id;
+      });
+
+      // Recent activity (last 7 days)
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const recentRequests = await prisma.rentalRequest.count({
+        where: { createdAt: { gte: weekAgo } }
+      });
+
+      analytics.recentActivity = {
+        requestsLast7Days: recentRequests
+      };
+
+      // Matching efficiency
+      const totalMatches = await prisma.landlordRequestMatch.count();
+      const activeMatches = await prisma.landlordRequestMatch.count({
+        where: { status: 'ACTIVE' }
+      });
+
+      analytics.matchingEfficiency = {
+        totalMatches,
+        activeMatches,
+        responseRate: totalMatches > 0 ? ((activeMatches / totalMatches) * 100).toFixed(2) : 0
+      };
+
+      return analytics;
+    } catch (error) {
+      console.error('❌ Error getting pool analytics:', error);
+      throw error;
     }
   }
 }

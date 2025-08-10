@@ -1,15 +1,33 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: smart-rental-postgres
+    environment:
+      POSTGRES_DB: smart_rental_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - smart-rental-network
+    restart: unless-stopped
+
   # Backend API
   backend:
+    depends_on:
+      - postgres
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
     container_name: smart-rental-backend
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=file:./dev.db
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/smart_rental_dev
       - JWT_SECRET=your_jwt_secret_here_change_in_production
       - SESSION_SECRET=your_session_secret_here_change_in_production
       - FRONTEND_URL=http://localhost:5173
@@ -36,7 +54,7 @@ services:
       - VITE_API_URL=http://localhost:3001/api
       - VITE_DEV_SERVER_HOST=0.0.0.0
     ports:
-      - "5173:5173"
+      - "3002:3002"
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -79,6 +97,8 @@ services:
     restart: unless-stopped
 
 volumes:
+  postgres_data:
+    driver: local
   backend_data:
     driver: local
   redis_data:

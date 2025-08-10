@@ -133,6 +133,7 @@ model Property {
   petsAllowed       Boolean        @default(false)
   smokingAllowed    Boolean        @default(false)
   status            PropertyStatus @default(AVAILABLE)
+  availability      Boolean        @default(true)
   maxTenants        Int            @default(1)
   currentTenants    Int            @default(0)
   description       String?
@@ -352,6 +353,7 @@ model LandlordRequestMatch {
   id              String        @id @default(cuid())
   matchScore      Float
   matchReason     String?
+  status          String        @default("ACTIVE")
   isViewed        Boolean       @default(false)
   isResponded     Boolean       @default(false)
   landlordId      String

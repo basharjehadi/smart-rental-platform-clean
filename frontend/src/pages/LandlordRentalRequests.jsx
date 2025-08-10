@@ -30,6 +30,7 @@ const LandlordRentalRequests = () => {
   const { markByTypeAsRead } = useNotifications();
   const navigate = useNavigate();
   const [rentalRequests, setRentalRequests] = useState([]);
+  const [totalRequests, setTotalRequests] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedTenant, setSelectedTenant] = useState(null);
@@ -111,6 +112,13 @@ const LandlordRentalRequests = () => {
       
       if (response.data.success) {
         console.log('Raw rental requests data:', response.data.rentalRequests); // Debug log
+        
+        // Store total count for informational purposes
+        setTotalRequests(response.data.rentalRequests.length);
+        
+        // 🚀 SCALABILITY: Allow multiple offers per property - no filtering needed
+        // Landlords can now see ALL matching requests and send offers to multiple tenants
+        // The system will handle competition and first-to-pay wins automatically
         
         const requests = response.data.rentalRequests.map(request => {
           // Extract tenant information
@@ -214,6 +222,7 @@ const LandlordRentalRequests = () => {
             interestCount: request.responseCount || 0, // Backend sends 'responseCount'
             status: request.status || 'active',
             propertyMatch: {
+              id: propertyMatch.id, // Include property ID for offer creation
               name: propertyName,
               address: propertyAddress,
               rent: propertyRent,
@@ -372,33 +381,73 @@ const LandlordRentalRequests = () => {
      setOfferSent(false);
    };
 
-  const handlePriceAdjustment = (tenant) => {
-    setSelectedTenant(tenant);
-    setError(''); // Clear any previous errors
-    
-    // Calculate the adjusted price to match tenant's budget EXACTLY
-    const tenantMaxBudget = tenant.budgetTo || tenant.budget;
-    const adjustedRent = tenantMaxBudget; // Set to exactly their max budget
-    
-    // Get the property's actual available date from the database
-    let availableFromDate = '';
-    console.log('Property available date from database:', tenant.propertyMatch.available);
-    
-    if (tenant.propertyMatch.available) {
-      try {
-        const date = new Date(tenant.propertyMatch.available);
-        if (!isNaN(date.getTime())) {
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const day = String(date.getDate()).padStart(2, '0');
-          availableFromDate = `${year}-${month}-${day}`;
-          console.log('Successfully parsed property available date (local):', availableFromDate);
-        } else {
-          throw new Error('Invalid date from database');
+  const handlePriceAdjustment = async (tenant) => {
+    try {
+      setError(''); // Clear any previous errors
+      
+      console.log('🔍 handlePriceAdjustment called with tenant:', tenant);
+      console.log('🔍 tenant.propertyMatch:', tenant.propertyMatch);
+      console.log('🔍 tenant.propertyMatch.id:', tenant.propertyMatch?.id);
+      console.log('🔍 tenant.propertyMatch.rent:', tenant.propertyMatch?.rent);
+      
+      // Validate property match exists
+      if (!tenant.propertyMatch || !tenant.propertyMatch.id) {
+        const errorMsg = 'Property match not found. Cannot adjust price without a linked property.';
+        console.error('❌ Property match validation failed:', errorMsg);
+        setError(errorMsg);
+        return;
+      }
+      
+      // Calculate the adjusted price to match tenant's budget EXACTLY
+      const tenantMaxBudget = tenant.budgetTo || tenant.budget;
+      const adjustedRent = tenantMaxBudget; // Set to exactly their max budget
+      
+      console.log('🔍 Starting price adjustment for property:', tenant.propertyMatch.id);
+      console.log('🔍 Adjusting price from', tenant.propertyMatch.rent, 'to', adjustedRent, 'PLN');
+      
+      // First, update the property price in the database
+      const updateResponse = await api.put(`/properties/${tenant.propertyMatch.id}`, {
+        monthlyRent: adjustedRent
+      });
+      
+      console.log('🔍 Property price update response:', updateResponse.data);
+      
+      // Get the property's actual available date from the database
+      let availableFromDate = '';
+      console.log('Property available date from database:', tenant.propertyMatch.available);
+      
+      if (tenant.propertyMatch.available) {
+        try {
+          const date = new Date(tenant.propertyMatch.available);
+          if (!isNaN(date.getTime())) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            availableFromDate = `${year}-${month}-${day}`;
+            console.log('Successfully parsed property available date (local):', availableFromDate);
+          } else {
+            throw new Error('Invalid date from database');
+          }
+        } catch (error) {
+          console.error('Error parsing property available date:', error);
+          // Fallback to tenant's expected move-in date
+          if (tenant.moveInDate) {
+            const tenantDate = new Date(tenant.moveInDate);
+            const year = tenantDate.getFullYear();
+            const month = String(tenantDate.getMonth() + 1).padStart(2, '0');
+            const day = String(tenantDate.getDate()).padStart(2, '0');
+            availableFromDate = `${year}-${month}-${day}`;
+          } else {
+            // Last fallback to today's date
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            availableFromDate = `${year}-${month}-${day}`;
+          }
         }
-      } catch (error) {
-        console.error('Error parsing property available date:', error);
-        // Fallback to tenant's expected move-in date
+      } else {
+        // If no property date available, use tenant's expected move-in date
         if (tenant.moveInDate) {
           const tenantDate = new Date(tenant.moveInDate);
           const year = tenantDate.getFullYear();
@@ -414,36 +463,41 @@ const LandlordRentalRequests = () => {
           availableFromDate = `${year}-${month}-${day}`;
         }
       }
-    } else {
-      // If no property date available, use tenant's expected move-in date
-      if (tenant.moveInDate) {
-        const tenantDate = new Date(tenant.moveInDate);
-        const year = tenantDate.getFullYear();
-        const month = String(tenantDate.getMonth() + 1).padStart(2, '0');
-        const day = String(tenantDate.getDate()).padStart(2, '0');
-        availableFromDate = `${year}-${month}-${day}`;
-      } else {
-        // Last fallback to today's date
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        availableFromDate = `${year}-${month}-${day}`;
-      }
+      
+      console.log('Price adjusted from', tenant.propertyMatch.rent, 'to', adjustedRent, 'PLN (exactly tenant max budget)');
+      console.log('Final available from date for offer:', availableFromDate);
+      
+      // Update the local state to reflect the new price
+      setRentalRequests(prev => 
+        prev.map(req => 
+          req.id === tenant.id 
+            ? {
+                ...req,
+                propertyMatch: {
+                  ...req.propertyMatch,
+                  rent: `${adjustedRent} zł`
+                }
+              }
+            : req
+        )
+      );
+      
+      setOfferData({
+        monthlyRent: adjustedRent.toString(), // Auto-populated with tenant's exact max budget
+        securityDeposit: Math.floor(adjustedRent * 0.5).toString(), // Auto-calculate deposit as 50% of rent
+        availableFrom: availableFromDate,
+        leaseDuration: '12 months',
+        additionalTerms: `Price adjusted to exactly match your maximum budget of ${adjustedRent} PLN.`
+      });
+      
+      setSelectedTenant(tenant);
+      setShowOfferModal(true);
+      setOfferSent(false);
+      
+    } catch (error) {
+      console.error('❌ Error adjusting property price:', error);
+      setError(`Failed to adjust property price: ${error.message || 'Unknown error occurred'}`);
     }
-    
-    console.log('Price adjusted from', tenant.propertyMatch.rent, 'to', adjustedRent, 'PLN (exactly tenant max budget)');
-    console.log('Final available from date for offer:', availableFromDate);
-    
-    setOfferData({
-      monthlyRent: adjustedRent.toString(), // Auto-populated with tenant's exact max budget
-      securityDeposit: Math.floor(adjustedRent * 0.5).toString(), // Auto-calculate deposit as 50% of rent
-      availableFrom: availableFromDate,
-      leaseDuration: '12 months',
-      additionalTerms: `Price adjusted to exactly match your maximum budget of ${adjustedRent} PLN.`
-    });
-    setShowOfferModal(true);
-    setOfferSent(false);
   };
 
   const handleCloseModal = () => {
@@ -474,6 +528,15 @@ const LandlordRentalRequests = () => {
       const tenantMaxBudget = selectedTenant.budgetTo || selectedTenant.budget;
       const maxAllowedRent = tenantMaxBudget * 1.2; // 20% flexibility
       
+      // Validate property ID exists
+      if (!selectedTenant.propertyMatch?.id) {
+        const errorMsg = 'Property ID is missing. Cannot create offer without linking to a property.';
+        console.log('🔍 Property ID validation failed:', errorMsg);
+        setError(errorMsg);
+        setSendingOffer(false);
+        return;
+      }
+      
       console.log('🔍 Budget validation:', { offeredRent, tenantMaxBudget, maxAllowedRent });
       
       if (offeredRent > maxAllowedRent) {
@@ -496,12 +559,14 @@ const LandlordRentalRequests = () => {
         leaseDuration: parseInt(offerData.leaseDuration.split(' ')[0]), // Extract number from "12 months"
         availableFrom: offerData.availableFrom,
         description: offerData.additionalTerms,
+        propertyId: selectedTenant.propertyMatch.id, // Include property ID for backend validation
         propertyAddress: selectedTenant.propertyMatch.address,
-        propertyType: 'Apartment', // Default type
+        propertyType: selectedTenant.propertyMatch.propertyType || 'Apartment', // Use actual property type
         utilitiesIncluded: false // Default value
       };
       
       console.log('🔍 Making API call to:', `/rental-request/${selectedTenant.id}/offer`);
+      console.log('🔍 Property ID being sent:', selectedTenant.propertyMatch.id);
       console.log('🔍 Request payload:', requestPayload);
       
       const response = await api.post(`/rental-request/${selectedTenant.id}/offer`, requestPayload);
@@ -510,12 +575,14 @@ const LandlordRentalRequests = () => {
       
       setOfferSent(true);
       
-      // Close modal after 3 seconds
+      // Immediately remove the request from the local state
+      setRentalRequests(prev => prev.filter(req => req.id !== selectedTenant.id));
+      
+      // Close modal after 2 seconds
       setTimeout(() => {
         handleCloseModal();
-        // Refresh the rental requests list
-        fetchRentalRequests();
-      }, 3000);
+        setOfferSent(false); // Reset the success message
+      }, 2000);
       
     } catch (error) {
       console.error('🔍 Error in handleSubmitOffer:', error);
@@ -763,7 +830,7 @@ const LandlordRentalRequests = () => {
               </div>
             )}
 
-            {/* Success Message */}
+            {/* Success Messages */}
             {declineSuccess && (
               <div className="mb-6 bg-green-50 border border-green-100 rounded-lg p-4">
                 <div className="flex">
@@ -779,6 +846,28 @@ const LandlordRentalRequests = () => {
               </div>
             )}
 
+            {offerSent && (
+              <div className="mb-6 bg-blue-50 border border-blue-100 rounded-lg p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-blue-800">
+                      Offer sent successfully! The rental request has been removed from your list.
+                      {totalRequests > rentalRequests.length && (
+                        <span className="block mt-1 text-xs text-blue-600">
+                          You have {totalRequests - rentalRequests.length} other requests with existing offers.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Section Header */}
             {!error || !error.includes('No properties found') ? (
               <div className="flex justify-between items-center mb-6">
@@ -786,7 +875,10 @@ const LandlordRentalRequests = () => {
                   {rentalRequests.length} pending requests
                 </h2>
                 <span className="text-sm text-gray-500">
-                  Showing: All Requests
+                  {totalRequests > rentalRequests.length 
+                    ? `Showing: ${rentalRequests.length} of ${totalRequests} requests (${totalRequests - rentalRequests.length} with offers)`
+                    : 'Showing: All requests'
+                  }
                 </span>
               </div>
             ) : null}

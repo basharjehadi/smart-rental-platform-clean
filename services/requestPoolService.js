@@ -18,28 +18,28 @@ class RequestPoolService {
   }
 
   /**
-   * 🚀 SCALABILITY: Add rental request to pool with efficient matching
+   * 🚀 SCALABILITY: Add rental request to pool with delayed matching
    */
   async addToPool(rentalRequest) {
     try {
-      console.log(`🏊 Adding request ${rentalRequest.id} to pool`);
+      console.log(`🏊 Adding request ${rentalRequest.id} to pool (matching will start in 5 minutes)`);
 
-      // Update request status
+      // 🚀 SCALABILITY: Calculate expiration based on move-in date (3 days before)
+      const moveInDate = new Date(rentalRequest.moveInDate);
+      const expirationDate = new Date(moveInDate.getTime() - (3 * 24 * 60 * 60 * 1000)); // 3 days before move-in
+      
+      // Update request status with dynamic expiration
       await prisma.rentalRequest.update({
         where: { id: rentalRequest.id },
         data: {
           poolStatus: 'ACTIVE',
-          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+          expiresAt: expirationDate
         }
       });
 
-      // 🚀 SCALABILITY: Find matching landlords efficiently
-      const matchingLandlords = await this.findMatchingLandlords(rentalRequest);
-      
-      // Create matches in batch
-      if (matchingLandlords.length > 0) {
-        await this.createMatches(rentalRequest.id, matchingLandlords);
-      }
+      // 🚀 SCALABILITY: NO IMMEDIATE MATCHING - wait for 5-minute cron job
+      // The cron job will handle finding matching landlords and creating matches
+      // This allows for the 5-minute delay and continuous matching as requested
 
       // 🚀 SCALABILITY: Update analytics
       await this.updatePoolAnalytics(rentalRequest.location);
@@ -47,8 +47,8 @@ class RequestPoolService {
       // 🚀 SCALABILITY: Cache the request for quick access
       await this.cacheRequest(rentalRequest);
 
-      console.log(`✅ Request ${rentalRequest.id} added to pool with ${matchingLandlords.length} matches`);
-      return matchingLandlords.length;
+      console.log(`✅ Request ${rentalRequest.id} added to pool, will start matching in 5 minutes, expires ${expirationDate.toISOString()}`);
+      return 0; // Return 0 matches since matching is delayed
 
     } catch (error) {
       console.error('❌ Error adding request to pool:', error);
@@ -73,14 +73,16 @@ class RequestPoolService {
         }
       }
 
-      // 🚀 SCALABILITY: Get all available landlords first, then filter
+      // 🚀 SCALABILITY: Get all available landlords based on property availability
       const allLandlords = await prisma.user.findMany({
         where: {
           role: 'LANDLORD',
           availability: true, // Manual availability toggle
-          autoAvailability: true, // Auto-manage based on capacity
-          currentTenants: {
-            lt: prisma.user.fields.maxTenants // Check capacity
+          properties: {
+            some: {
+              status: 'AVAILABLE',
+              availability: true // Individual property availability
+            }
           }
         },
         include: {
@@ -93,6 +95,21 @@ class RequestPoolService {
               amenities: true,
               averageResponseTime: true,
               acceptanceRate: true
+            }
+          },
+          properties: {
+            where: {
+              status: 'AVAILABLE',
+              availability: true
+            },
+            select: {
+              id: true,
+              name: true,
+              city: true,
+              monthlyRent: true,
+              propertyType: true,
+              bedrooms: true,
+              availableFrom: true
             }
           }
         },
@@ -186,9 +203,9 @@ class RequestPoolService {
   calculateMatchScore(landlord, rentalRequest) {
     let score = 50; // Base score
 
-    // 🏠 Capacity factor (less busy = higher score)
-    const capacityRatio = landlord.currentTenants / landlord.maxTenants;
-    score += (1 - capacityRatio) * 20;
+    // 🏠 Property availability factor (more available properties = higher score)
+    const availableProperties = landlord.properties?.length || 0;
+    score += Math.min(availableProperties * 5, 20); // Up to 20 points for property availability
 
     // 📍 Location preference factor
     if (landlord.landlordProfile?.preferredLocations && rentalRequest?.location) {
@@ -226,38 +243,41 @@ class RequestPoolService {
       }
     }
 
-    // 🛠️ Amenities compatibility
-    if (landlord.landlordProfile?.amenities && rentalRequest) {
-      try {
-        const amenities = JSON.parse(landlord.landlordProfile.amenities);
-        let amenityMatches = 0;
-        
-        if (rentalRequest.furnished && amenities.includes('Furnished')) amenityMatches++;
-        if (rentalRequest.parking && amenities.includes('Parking')) amenityMatches++;
-        if (rentalRequest.petsAllowed && amenities.includes('Pets Allowed')) amenityMatches++;
-        
-        score += amenityMatches * 3; // 3 points per amenity match
-      } catch (error) {
-        console.error('Error parsing amenities:', error);
+    // 🚀 Performance factors
+    if (landlord.landlordProfile?.acceptanceRate && landlord.landlordProfile.acceptanceRate > 0.8) {
+      score += 7; // High acceptance rate
+    }
+
+    if (landlord.responseTime && landlord.responseTime < 3600000) { // Less than 1 hour
+      score += 5; // Fast response time
+    }
+
+    // 🏠 Property feature matching
+    if (landlord.properties && landlord.properties.length > 0) {
+      const property = landlord.properties[0]; // Use first available property for scoring
+      
+      // Bedroom matching
+      if (rentalRequest.bedrooms && property.bedrooms) {
+        if (property.bedrooms === rentalRequest.bedrooms) {
+          score += 5; // Exact bedroom match
+        } else if (Math.abs(property.bedrooms - rentalRequest.bedrooms) === 1) {
+          score += 2; // Close bedroom match
+        }
+      }
+
+      // Availability date matching
+      if (rentalRequest.moveInDate && property.availableFrom) {
+        const daysDiff = Math.abs(new Date(property.availableFrom) - new Date(rentalRequest.moveInDate)) / (1000 * 60 * 60 * 24);
+        if (daysDiff <= 7) {
+          score += 5; // Available within a week
+        } else if (daysDiff <= 30) {
+          score += 2; // Available within a month
+        }
       }
     }
 
-    // ⏰ Activity factor (more recent activity = higher score)
-    if (landlord.lastActiveAt) {
-      const daysSinceActive = (Date.now() - new Date(landlord.lastActiveAt).getTime()) / (1000 * 60 * 60 * 24);
-      if (daysSinceActive < 1) score += 10;
-      else if (daysSinceActive < 7) score += 7;
-      else if (daysSinceActive < 30) score += 3;
-    }
-
-    // 📊 Performance factors
-    if (landlord.landlordProfile?.acceptanceRate > 0.8) score += 8;
-    if (landlord.landlordProfile?.acceptanceRate > 0.6) score += 4;
-    
-    if (landlord.landlordProfile?.averageResponseTime < 3600000) score += 5; // < 1 hour
-    if (landlord.landlordProfile?.averageResponseTime < 7200000) score += 3; // < 2 hours
-
-    return Math.min(100, Math.max(0, score));
+    // Ensure score is within 0-100 range
+    return Math.max(0, Math.min(100, score));
   }
 
   /**
@@ -266,9 +286,10 @@ class RequestPoolService {
   generateMatchReason(landlord, rentalRequest) {
     const reasons = [];
     
-    // Capacity reasons
-    if (landlord.currentTenants < landlord.maxTenants * 0.5) {
-      reasons.push('Available capacity');
+    // Property availability reasons
+    const availableProperties = landlord.properties?.length || 0;
+    if (availableProperties > 0) {
+      reasons.push(`${availableProperties} available property${availableProperties > 1 ? 's' : ''}`);
     }
     
     // Location reasons
@@ -305,8 +326,24 @@ class RequestPoolService {
       reasons.push('High acceptance rate');
     }
     
-    if (landlord.landlordProfile?.averageResponseTime < 3600000) {
+    if (landlord.responseTime < 3600000) {
       reasons.push('Fast response time');
+    }
+
+    // Property feature reasons
+    if (landlord.properties && landlord.properties.length > 0) {
+      const property = landlord.properties[0];
+      
+      if (rentalRequest.bedrooms && property.bedrooms && property.bedrooms === rentalRequest.bedrooms) {
+        reasons.push('Exact bedroom match');
+      }
+      
+      if (rentalRequest.moveInDate && property.availableFrom) {
+        const daysDiff = Math.abs(new Date(property.availableFrom) - new Date(rentalRequest.moveInDate)) / (1000 * 60 * 60 * 24);
+        if (daysDiff <= 7) {
+          reasons.push('Available within a week');
+        }
+      }
     }
 
     return reasons.join(', ') || 'Location and budget match';
@@ -461,44 +498,26 @@ class RequestPoolService {
   }
 
   /**
-   * 🚀 SCALABILITY: Update landlord capacity after contract
+   * 🚀 SCALABILITY: Update landlord availability after property changes
    */
-  async updateLandlordCapacity(landlordId, increment = true) {
+  async updateLandlordAvailability(landlordId, hasAvailableProperties = true) {
     try {
-      const updateData = {
-        activeContracts: {
-          increment: increment ? 1 : -1
-        },
-        lastActiveAt: new Date()
-      };
-
-      // Check if landlord should be marked as unavailable
-      if (increment) {
-        const landlord = await prisma.user.findUnique({
-          where: { id: landlordId },
-          select: { activeContracts: true, totalCapacity: true }
-        });
-
-        if (landlord && landlord.activeContracts + 1 >= landlord.totalCapacity) {
-          updateData.availability = false;
-        }
-      } else {
-        // If decreasing, always make available
-        updateData.availability = true;
-      }
-
+      // Update landlord availability based on whether they have available properties
       await prisma.user.update({
         where: { id: landlordId },
-        data: updateData
+        data: {
+          availability: hasAvailableProperties,
+          lastActiveAt: new Date()
+        }
       });
 
       // 🚀 SCALABILITY: Clear landlord-related caches
       await this.clearLandlordCache(landlordId);
 
-      console.log(`📊 Updated landlord ${landlordId} capacity (${increment ? '+' : '-'}1)`);
+      console.log(`📊 Updated landlord ${landlordId} availability to ${hasAvailableProperties}`);
 
     } catch (error) {
-      console.error('❌ Error updating landlord capacity:', error);
+      console.error('❌ Error updating landlord availability:', error);
     }
   }
 
@@ -581,6 +600,9 @@ class RequestPoolService {
    */
   async cleanupExpiredRequests() {
     try {
+      console.log('🧹 Starting expired requests cleanup...');
+      
+      // 🚀 SCALABILITY: Find requests that are 3 days before move-in date
       const expiredRequests = await prisma.rentalRequest.findMany({
         where: {
           poolStatus: 'ACTIVE',
@@ -588,17 +610,55 @@ class RequestPoolService {
             lt: new Date()
           }
         },
-        select: { id: true }
+        select: { 
+          id: true,
+          title: true,
+          tenantId: true,
+          moveInDate: true,
+          expiresAt: true
+        }
       });
 
-      for (const request of expiredRequests) {
-        await this.removeFromPool(request.id, 'EXPIRED');
+      if (expiredRequests.length === 0) {
+        console.log('✅ No expired requests found');
+        return;
       }
 
-      console.log(`🧹 Cleaned up ${expiredRequests.length} expired requests`);
+      console.log(`📅 Found ${expiredRequests.length} expired requests`);
+
+      // 🚀 SCALABILITY: Update all expired requests
+      await prisma.rentalRequest.updateMany({
+        where: {
+          poolStatus: 'ACTIVE',
+          expiresAt: {
+            lt: new Date()
+          }
+        },
+        data: {
+          poolStatus: 'EXPIRED',
+          updatedAt: new Date()
+        }
+      });
+
+      // 🚀 SCALABILITY: Remove expired requests from cache
+      for (const request of expiredRequests) {
+        await this.clearRequestCache(request.id);
+      }
+
+      // 🚀 SCALABILITY: Update analytics
+      for (const request of expiredRequests) {
+        await this.updatePoolAnalytics(request.location);
+      }
+
+      console.log(`✅ Cleaned up ${expiredRequests.length} expired requests`);
+      
+      // 🚀 SCALABILITY: Log details for monitoring
+      expiredRequests.forEach(request => {
+        console.log(`   📅 Request ${request.id}: "${request.title}" expired on ${request.expiresAt}, move-in was ${request.moveInDate}`);
+      });
 
     } catch (error) {
-      console.error('❌ Error cleaning up expired requests:', error);
+      console.error('❌ Error in cleanup expired requests:', error);
     }
   }
 

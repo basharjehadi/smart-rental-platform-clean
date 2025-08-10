@@ -187,84 +187,56 @@ const createOffer = async (req, res) => {
       });
     }
 
-    // 🚀 SCALABILITY: Check landlord capacity before creating offer
+    // 🚀 SCALABILITY: Check landlord availability and property status before creating offer
+    console.log('🔍 Checking landlord availability for user:', req.user.id);
     const landlord = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: { 
-        currentTenants: true, 
-        maxTenants: true, 
         availability: true,
-        autoAvailability: true
-      }
-    });
-
-    if (!landlord.availability) {
-      return res.status(400).json({
-        error: 'You are currently not accepting new requests due to capacity limits.'
-      });
-    }
-
-    if (landlord.currentTenants >= landlord.maxTenants && landlord.autoAvailability) {
-      return res.status(400).json({
-        error: 'You have reached your maximum capacity for managing properties.'
-      });
-    }
-
-    // 🏠 Get landlord profile for auto-fill templates
-    const landlordProfile = await prisma.landlordProfile.findUnique({
-      where: { userId: req.user.id }
-    });
-
-    // 🚀 SCALABILITY: Auto-fill from profile templates
-    let finalPropertyImages = propertyImages || [];
-    let finalPropertyVideo = propertyVideo || null;
-    let finalPropertyDescription = propertyDescription || '';
-    let finalRulesText = rulesText || '';
-
-    if (landlordProfile) {
-      // Auto-fill media if enabled
-      if (landlordProfile.autoFillMedia) {
-        if (landlordProfile.propertyImages && (!propertyImages || propertyImages.length === 0)) {
-          try {
-            const profileImages = JSON.parse(landlordProfile.propertyImages);
-            finalPropertyImages = profileImages.slice(0, 5); // Limit to 5 images
-          } catch (error) {
-            console.error('Error parsing property images from profile:', error);
-          }
-        }
-        
-        if (landlordProfile.propertyVideos && !propertyVideo) {
-          try {
-            const profileVideos = JSON.parse(landlordProfile.propertyVideos);
-            finalPropertyVideo = profileVideos[0]; // Use first video
-          } catch (error) {
-            console.error('Error parsing property videos from profile:', error);
-          }
-        }
-      }
-
-      // Auto-fill description if enabled
-      if (landlordProfile.autoFillDescription && landlordProfile.propertyDescription && !propertyDescription) {
-        finalPropertyDescription = landlordProfile.propertyDescription;
-      }
-
-      // Auto-fill rules if enabled
-      if (landlordProfile.autoFillRules && landlordProfile.propertyRules && !rulesText) {
-        finalRulesText = landlordProfile.propertyRules;
-      }
-    }
-
-    // Validate rental request exists and is active
-    const rentalRequest = await prisma.rentalRequest.findUnique({
-      where: { id: parseInt(requestId) },
-      include: {
-        tenant: {
+        properties: {
+          where: {
+            status: 'AVAILABLE',
+            availability: true
+          },
           select: {
             id: true,
             name: true,
-            email: true
+            status: true,
+            availability: true
           }
         }
+      }
+    });
+
+    if (!landlord || !landlord.availability || landlord.properties.length === 0) {
+      return res.status(400).json({
+        error: 'You are not available to accept new requests or have no available properties.'
+      });
+    }
+
+    // 🚀 SCALABILITY: Check if this landlord already sent an offer for this request
+    const existingOffer = await prisma.offer.findFirst({
+      where: {
+        landlordId: req.user.id,
+        rentalRequestId: parseInt(requestId)
+      }
+    });
+
+    if (existingOffer) {
+      return res.status(400).json({
+        error: 'You have already sent an offer for this rental request.'
+      });
+    }
+
+    // 🚀 SCALABILITY: Check if the rental request is still active and not expired
+    const rentalRequest = await prisma.rentalRequest.findUnique({
+      where: { id: parseInt(requestId) },
+      select: {
+        id: true,
+        status: true,
+        poolStatus: true,
+        expiresAt: true,
+        tenantId: true
       }
     });
 
@@ -274,77 +246,88 @@ const createOffer = async (req, res) => {
       });
     }
 
-    if (rentalRequest.poolStatus !== 'ACTIVE') {
+    if (rentalRequest.status !== 'ACTIVE' || rentalRequest.poolStatus !== 'ACTIVE') {
       return res.status(400).json({
         error: 'This rental request is no longer active.'
       });
     }
 
-    // 🚀 SCALABILITY: Create offer with transaction
-    const result = await prisma.$transaction(async (tx) => {
-      // Create offer
-      const offer = await tx.offer.create({
-        data: {
-          rentAmount: parseFloat(rentAmount),
-          depositAmount: depositAmount ? parseFloat(depositAmount) : null,
-          leaseDuration: parseInt(leaseDuration),
-          description: description || null,
-          utilitiesIncluded: utilitiesIncluded || false,
-          availableFrom: new Date(availableFrom),
-          propertyAddress: propertyAddress || null,
-          propertyImages: JSON.stringify(finalPropertyImages),
-          propertyVideo: finalPropertyVideo || null,
-          propertyType: propertyType || null,
-          propertySize: propertySize || null,
-          propertyAmenities: propertyAmenities || null,
-          propertyDescription: finalPropertyDescription || null,
-          rulesText: finalRulesText || null,
-          rulesPdf: rulesPdf || null,
-          rentalRequestId: parseInt(requestId),
-          landlordId: req.user.id,
-          responseTime: Date.now() - new Date(rentalRequest.createdAt).getTime()
-        },
-        include: {
-          rentalRequest: {
-            include: {
-              tenant: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          }
-        }
+    if (rentalRequest.expiresAt && new Date() > rentalRequest.expiresAt) {
+      return res.status(400).json({
+        error: 'This rental request has expired.'
       });
+    }
 
-      // Update request response count
-      await tx.rentalRequest.update({
-        where: { id: parseInt(requestId) },
-        data: {
-          responseCount: {
-            increment: 1
-          }
-        }
-      });
-
-      return offer;
-    });
-
-    // 🚀 SCALABILITY: Send notification asynchronously
-    setImmediate(async () => {
-      try {
-        await sendOfferNotification(result);
-      } catch (error) {
-        console.error('❌ Error sending offer notification:', error);
+    // 🚀 SCALABILITY: Check if the tenant already accepted/paid for another offer
+    const acceptedOffer = await prisma.offer.findFirst({
+      where: {
+        rentalRequestId: parseInt(requestId),
+        status: { in: ['ACCEPTED', 'PAID'] }
       }
     });
 
-    res.status(201).json({
-      message: 'Offer created successfully.',
-      offer: result
+    if (acceptedOffer) {
+      return res.status(400).json({
+        error: 'This rental request has already been accepted by the tenant.'
+      });
+    }
+
+    // 🚀 SCALABILITY: Create the offer - multiple landlords can offer on the same request
+    const offer = await prisma.offer.create({
+      data: {
+        landlordId: req.user.id,
+        rentalRequestId: parseInt(requestId),
+        rentAmount: parseFloat(rentAmount),
+        depositAmount: parseFloat(depositAmount || 0),
+        leaseDuration: parseInt(leaseDuration),
+        description: description || '',
+        utilitiesIncluded: utilitiesIncluded || false,
+        availableFrom: new Date(availableFrom),
+        propertyAddress: propertyAddress || '',
+        propertyImages: propertyImages || [],
+        propertyVideo: propertyVideo || '',
+        propertyType: propertyType || '',
+        propertySize: propertySize || '',
+        propertyAmenities: propertyAmenities || [],
+        propertyDescription: propertyDescription || '',
+        rulesText: rulesText || '',
+        rulesPdf: rulesPdf || '',
+        status: 'PENDING'
+      }
     });
+
+    // 🚀 SCALABILITY: Update the match status to show landlord has responded
+    await prisma.landlordRequestMatch.updateMany({
+      where: {
+        landlordId: req.user.id,
+        rentalRequestId: parseInt(requestId)
+      },
+      data: {
+        isResponded: true,
+        updatedAt: new Date()
+      }
+    });
+
+    console.log(`✅ Offer created successfully for request ${requestId} by landlord ${req.user.id}`);
+    console.log(`🏆 Competition: This request now has multiple offers from different landlords`);
+
+    res.json({
+      success: true,
+      message: 'Offer sent successfully! The tenant will be notified.',
+      offer: {
+        id: offer.id,
+        rentAmount: offer.rentAmount,
+        depositAmount: offer.depositAmount,
+        leaseDuration: offer.leaseDuration,
+        status: offer.status,
+        createdAt: offer.createdAt
+      },
+      competition: {
+        message: 'Multiple landlords are competing for this request. First to get accepted and paid wins!',
+        tip: 'Consider making your offer more attractive to increase chances of acceptance.'
+      }
+    });
+
   } catch (error) {
     console.error('Create offer error:', error);
     res.status(500).json({
@@ -667,6 +650,200 @@ const deleteRentalRequest = async (req, res) => {
   }
 };
 
+// 🚀 SCALABILITY: Decline rental request - request stays in pool for other landlords
+const declineRentalRequest = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { reason } = req.body;
+
+    console.log(`🚫 Landlord ${req.user.id} declining request ${requestId}`);
+
+    // Validate rental request exists and is active
+    const rentalRequest = await prisma.rentalRequest.findUnique({
+      where: { id: parseInt(requestId) },
+      include: {
+        landlordRequestMatches: {
+          where: { landlordId: req.user.id }
+        }
+      }
+    });
+
+    if (!rentalRequest) {
+      return res.status(404).json({
+        error: 'Rental request not found.'
+      });
+    }
+
+    if (rentalRequest.poolStatus !== 'ACTIVE') {
+      return res.status(400).json({
+        error: 'This rental request is no longer active.'
+      });
+    }
+
+    // 🚀 SCALABILITY: Check if this landlord was matched with this request
+    const match = rentalRequest.landlordRequestMatches[0];
+    if (!match) {
+      return res.status(400).json({
+        error: 'You are not matched with this rental request.'
+      });
+    }
+
+    // 🚀 SCALABILITY: Update the match status to declined but keep request in pool
+    await prisma.landlordRequestMatch.update({
+      where: { id: match.id },
+      data: {
+        status: 'DECLINED',
+        declineReason: reason || 'No reason provided',
+        declinedAt: new Date(),
+        updatedAt: new Date()
+      }
+    });
+
+    // 🚀 SCALABILITY: Update request analytics
+    await prisma.rentalRequest.update({
+      where: { id: parseInt(requestId) },
+      data: {
+        responseCount: {
+          increment: 1
+        },
+        updatedAt: new Date()
+      }
+    });
+
+    console.log(`✅ Request ${requestId} declined by landlord ${req.user.id}`);
+    console.log(`🔄 Request remains in pool for other landlords to consider`);
+
+    res.json({
+      success: true,
+      message: 'Request declined successfully. The request remains active for other landlords.',
+      note: 'This rental request will continue searching for other matching properties until expiration.',
+      requestStatus: {
+        id: rentalRequest.id,
+        poolStatus: rentalRequest.poolStatus,
+        expiresAt: rentalRequest.expiresAt,
+        remainingTime: rentalRequest.expiresAt ? 
+          Math.ceil((new Date(rentalRequest.expiresAt) - new Date()) / (1000 * 60 * 60 * 24)) : null
+      }
+    });
+
+  } catch (error) {
+    console.error('Decline rental request error:', error);
+    res.status(500).json({
+      error: 'Internal server error.'
+    });
+  }
+};
+
+// 🚀 SCALABILITY: Update tenant offer status (Accept/Decline)
+const updateTenantOfferStatus = async (req, res) => {
+  try {
+    const { offerId } = req.params;
+    const { status } = req.body;
+
+    console.log(`🔄 Tenant updating offer ${offerId} status to ${status}`);
+
+    // Validate offer exists and belongs to the tenant
+    const offer = await prisma.offer.findUnique({
+      where: { id: parseInt(offerId) },
+      include: {
+        rentalRequest: {
+          select: {
+            id: true,
+            tenantId: true,
+            poolStatus: true,
+            expiresAt: true
+          }
+        }
+      }
+    });
+
+    if (!offer) {
+      return res.status(404).json({
+        error: 'Offer not found.'
+      });
+    }
+
+    if (offer.rentalRequest.tenantId !== req.user.id) {
+      return res.status(403).json({
+        error: 'You can only update your own offers.'
+      });
+    }
+
+    // 🚀 SCALABILITY: Handle different status updates
+    if (status === 'ACCEPTED') {
+      // 🚀 SCALABILITY: When tenant accepts an offer, reject ALL other offers for the same request
+      const result = await prisma.$transaction(async (tx) => {
+        // Update the accepted offer
+        const updatedOffer = await tx.offer.update({
+          where: { id: parseInt(offerId) },
+          data: {
+            status: 'ACCEPTED',
+            acceptedAt: new Date(),
+            updatedAt: new Date()
+          }
+        });
+
+        // 🚀 SCALABILITY: Reject all other offers for the same rental request
+        const otherOffers = await tx.offer.updateMany({
+          where: {
+            rentalRequestId: offer.rentalRequest.id,
+            id: { not: parseInt(offerId) },
+            status: { in: ['PENDING', 'ACCEPTED'] }
+          },
+          data: {
+            status: 'REJECTED',
+            updatedAt: new Date()
+          }
+        });
+
+        console.log(`✅ Accepted offer ${offerId}, rejected ${otherOffers.count} other offers`);
+        return { updatedOffer, rejectedCount: otherOffers.count };
+      });
+
+      res.json({
+        success: true,
+        message: 'Offer accepted successfully! Other offers for this request have been automatically rejected.',
+        offer: result.updatedOffer,
+        competition: {
+          message: 'You have exclusive rights to this property. Other tenants can no longer accept offers for this request.',
+          nextStep: 'Complete payment to secure the property and unlock communication with the landlord.'
+        }
+      });
+
+    } else if (status === 'REJECTED') {
+      // 🚀 SCALABILITY: When tenant rejects an offer, it stays rejected but request remains in pool
+      const updatedOffer = await prisma.offer.update({
+        where: { id: parseInt(offerId) },
+        data: {
+          status: 'REJECTED',
+          rejectedAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+
+      console.log(`✅ Offer ${offerId} rejected by tenant`);
+
+      res.json({
+        success: true,
+        message: 'Offer rejected successfully. You can still receive other offers for your request.',
+        offer: updatedOffer,
+        note: 'Your rental request remains active in the pool for other landlords to consider.'
+      });
+
+    } else {
+      return res.status(400).json({
+        error: 'Invalid status. Only ACCEPTED or REJECTED are allowed.'
+      });
+    }
+
+  } catch (error) {
+    console.error('Update tenant offer status error:', error);
+    res.status(500).json({
+      error: 'Internal server error.'
+    });
+  }
+};
+
 // Export all functions
 export {
   createRentalRequest,
@@ -679,5 +856,7 @@ export {
   cleanupExpiredRequests,
   getMyRequests,
   updateRentalRequest,
-  deleteRentalRequest
+  deleteRentalRequest,
+  declineRentalRequest,
+  updateTenantOfferStatus
 }; 

@@ -36,11 +36,8 @@ model User {
   identityDocument String? // Identity document filename
   isVerified Boolean @default(false) // KYC verification status
   
-  // 🚀 SCALABILITY: Landlord capacity management
+  // 🚀 SCALABILITY: Landlord availability management (simplified)
   availability Boolean @default(true) // Whether landlord is accepting new requests (manual override)
-  autoAvailability Boolean @default(true) // Auto-manage availability based on capacity
-  maxTenants Int @default(5) // Maximum number of tenants landlord can handle
-  currentTenants Int @default(0) // Current number of active tenants
   
   // 🚀 SCALABILITY: Performance tracking
   lastActiveAt DateTime @default(now())
@@ -60,7 +57,7 @@ model User {
   properties     Property[]      @relation("LandlordProperties")
 
   @@map("users")
-  @@index([role, availability, autoAvailability, currentTenants]) // 🚀 SCALABILITY: Composite index for landlord queries
+  @@index([role, availability]) // 🚀 SCALABILITY: Simplified landlord queries
   @@index([email]) // 🚀 SCALABILITY: Email lookup optimization
   @@index([lastActiveAt]) // 🚀 SCALABILITY: Activity tracking
 }
@@ -74,13 +71,8 @@ model LandlordProfile {
   maxBudget Float? // Maximum budget landlord typically works with
   minBudget Float? // Minimum budget landlord typically works with
   
-  // 🏠 NEW: Capacity management
-  maxTenants Int @default(5) // Maximum number of tenants landlord can handle
-  currentTenants Int @default(0) // Current number of active tenants
-  
-  // 🎛️ NEW: Availability control
+  // 🎛️ NEW: Availability control (simplified)
   manualAvailability Boolean @default(true) // Manual override for availability
-  autoAvailability Boolean @default(true) // Auto-manage based on capacity
   
   // Property types and preferences
   propertyTypes String? // JSON string of property types ["apartment", "house", "studio"]
@@ -117,8 +109,7 @@ model LandlordProfile {
   @@map("landlord_profiles")
   @@index([preferredLocations]) // 🚀 SCALABILITY: Location-based queries
   @@index([maxBudget, minBudget]) // 🚀 SCALABILITY: Budget range queries
-  @@index([maxTenants, currentTenants]) // 🚀 SCALABILITY: Capacity-based queries
-  @@index([manualAvailability, autoAvailability]) // 🚀 SCALABILITY: Availability queries
+  @@index([manualAvailability]) // 🚀 SCALABILITY: Availability queries
 }
 
 // 🏠 NEW: Property model for landlord property management
@@ -155,8 +146,7 @@ model Property {
   
   // Property status
   status PropertyStatus @default(AVAILABLE)
-  maxTenants Int @default(1)
-  currentTenants Int @default(0)
+  availability Boolean @default(true) // Individual property availability
   
   // Property description and rules
   description String?
@@ -179,10 +169,10 @@ model Property {
   updatedAt DateTime @updatedAt
 
   @@map("properties")
-  @@index([landlordId, status]) // 🚀 SCALABILITY: Landlord's properties
-  @@index([city, status]) // 🚀 SCALABILITY: Location-based queries
-  @@index([propertyType, status]) // 🚀 SCALABILITY: Type-based queries
-  @@index([monthlyRent, status]) // 🚀 SCALABILITY: Price-based queries
+  @@index([landlordId, status, availability]) // 🚀 SCALABILITY: Landlord's available properties
+  @@index([city, status, availability]) // 🚀 SCALABILITY: Location-based queries for available properties
+  @@index([propertyType, status, availability]) // 🚀 SCALABILITY: Type-based queries for available properties
+  @@index([monthlyRent, status, availability]) // 🚀 SCALABILITY: Price-based queries for available properties
 }
 
 model RentalRequest {

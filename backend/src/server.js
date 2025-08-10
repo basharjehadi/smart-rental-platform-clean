@@ -37,8 +37,24 @@ const initializeCronJobs = () => {
     timezone: "Europe/Warsaw"
   });
 
+  // 🚀 SCALABILITY: Continuous request matching - runs every 5 minutes
+  cron.schedule('*/5 * * * *', async () => {
+    logger.info('🔄 Running continuous request matching cron job...');
+    try {
+      const { continuousRequestMatching } = await import('./controllers/cronController.js');
+      await continuousRequestMatching();
+      logger.info('✅ Continuous request matching completed successfully');
+    } catch (error) {
+      logger.error('❌ Continuous request matching failed:', error);
+    }
+  }, {
+    scheduled: true,
+    timezone: "Europe/Warsaw"
+  });
+
   logger.info('⏰ Cron jobs initialized:');
   logger.info('   Daily rent check: 9:00 AM (Europe/Warsaw)');
+  logger.info('   Continuous request matching: Every 5 minutes');
 };
 
 // Start server

@@ -56,6 +56,7 @@ async function main() {
       offer = await prisma.offer.create({
         data: {
           rentalRequestId: rentalRequest.id,
+          tenantId: tenant.id,
           landlordId: landlord.id,
           rentAmount: 3200,
           depositAmount: 3200,

@@ -301,6 +301,82 @@ const handlePaymentSucceeded = async (paymentIntent) => {
 
       console.log('✅ Offer status updated to PAID:', offerId);
 
+      // 🚀 SCALABILITY: Automatically invalidate ALL other offers for the same property
+      // This implements the "first to pay wins" competition system
+      try {
+        const offer = await prisma.offer.findUnique({
+          where: { id: offerId },
+          select: { 
+            propertyId: true,
+            rentalRequestId: true 
+          }
+        });
+
+        if (offer && offer.propertyId) {
+          console.log(`🏆 First tenant paid for property ${offer.propertyId} - invalidating other offers`);
+          
+          // Find and reject all other PENDING or ACCEPTED offers for the same property
+          const otherOffers = await prisma.offer.findMany({
+            where: {
+              propertyId: offer.propertyId,
+              id: { not: offerId },
+              status: { in: ['PENDING', 'ACCEPTED'] }
+            }
+          });
+
+          if (otherOffers.length > 0) {
+            await prisma.offer.updateMany({
+              where: {
+                propertyId: offer.propertyId,
+                id: { not: offerId },
+                status: { in: ['PENDING', 'ACCEPTED'] }
+              },
+              data: {
+                status: 'REJECTED',
+                updatedAt: new Date()
+              }
+            });
+
+            console.log(`✅ Invalidated ${otherOffers.length} other offers for property ${offer.propertyId}`);
+            
+            // Send notifications to other tenants that their offers were rejected
+            for (const rejectedOffer of otherOffers) {
+              try {
+                const tenantRequest = await prisma.rentalRequest.findUnique({
+                  where: { id: rejectedOffer.rentalRequestId },
+                  include: {
+                    tenant: {
+                      select: { email: true, name: true }
+                    }
+                  }
+                });
+
+                if (tenantRequest?.tenant?.email) {
+                  console.log(`📧 Sending rejection notification to ${tenantRequest.tenant.email}`);
+                  // You can implement email notification here
+                  // await sendOfferRejectedNotification(tenantRequest.tenant.email, tenantRequest.tenant.name);
+                }
+              } catch (notificationError) {
+                console.error(`❌ Error sending rejection notification for offer ${rejectedOffer.id}:`, notificationError);
+              }
+            }
+          }
+
+          // 🚀 SCALABILITY: Remove the rental request from the pool since it's now matched
+          // Import and use the request pool service
+          try {
+            const requestPoolService = await import('../services/requestPoolService.js');
+            await requestPoolService.default.removeFromPool(offer.rentalRequestId, 'MATCHED');
+            console.log(`✅ Removed request ${offer.rentalRequestId} from pool after payment`);
+          } catch (poolError) {
+            console.error(`❌ Error removing request from pool:`, poolError);
+          }
+        }
+      } catch (invalidationError) {
+        console.error('❌ Error invalidating other offers:', invalidationError);
+        // Don't fail the payment if offer invalidation fails
+      }
+
       // Create RentPayment record for DEPOSIT_AND_FIRST_MONTH payments
       if (metadata.purpose === 'DEPOSIT_AND_FIRST_MONTH') {
         const currentMonth = new Date().getMonth() + 1;

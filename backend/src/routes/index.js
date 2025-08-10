@@ -16,6 +16,7 @@ import landlordDashboardRoutes from './landlordDashboardRoutes.js';
 import landlordTenantRoutes from './landlordTenantRoutes.js';
 import messagingRoutes from './messaging.js';
 import notificationRoutes from './notifications.js';
+import systemRoutes from './systemRoutes.js';
 
 const router = Router();
 
@@ -65,5 +66,8 @@ router.use('/messaging', messagingRoutes);
 
 // Notification routes
 router.use('/notifications', notificationRoutes);
+
+// System status and health routes
+router.use('/system', systemRoutes);
 
 export default router; 

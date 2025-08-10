@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { prisma } from '../utils/prisma.js';
 import { sendPaymentSuccess } from '../utils/emailService.js';
 import { activateConversationAfterPayment } from '../utils/chatGuard.js';
+import propertyAvailabilityService from '../services/propertyAvailabilityService.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -303,20 +304,114 @@ const handlePaymentSucceeded = async (paymentIntent) => {
       amount: payment.amount
     });
 
-    // Update offer status to PAID and set isPaid to true if we have an offer ID
+    // Update offer status to PAID if we have an offer ID
     if (offerId) {
       await prisma.offer.update({
         where: { id: offerId },
-        data: { 
-          status: 'PAID',
-          isPaid: true
-        }
+        data: { status: 'PAID' }
       });
 
       console.log('✅ Offer status updated to PAID:', offerId);
 
-      // ✅ NEW: Activate conversations after payment
-      await activateConversationAfterPayment(offerId);
+      // 🚀 SCALABILITY: Automatically invalidate ALL other offers for the same property
+      // This implements the "first to pay wins" competition system
+      try {
+        const offer = await prisma.offer.findUnique({
+          where: { id: offerId },
+          select: { 
+            propertyId: true,
+            rentalRequestId: true 
+          }
+        });
+
+        if (offer && offer.propertyId) {
+          console.log(`🏆 First tenant paid for property ${offer.propertyId} - invalidating other offers`);
+          
+          // Find and reject all other PENDING or ACCEPTED offers for the same property
+          const otherOffers = await prisma.offer.findMany({
+            where: {
+              propertyId: offer.propertyId,
+              id: { not: offerId },
+              status: { in: ['PENDING', 'ACCEPTED'] }
+            }
+          });
+
+          if (otherOffers.length > 0) {
+            await prisma.offer.updateMany({
+              where: {
+                propertyId: offer.propertyId,
+                id: { not: offerId },
+                status: { in: ['PENDING', 'ACCEPTED'] }
+              },
+              data: {
+                status: 'REJECTED',
+                updatedAt: new Date()
+              }
+            });
+
+            console.log(`✅ Invalidated ${otherOffers.length} other offers for property ${offer.propertyId}`);
+            
+            // Send notifications to other tenants that their offers were rejected
+            for (const rejectedOffer of otherOffers) {
+              try {
+                const tenantRequest = await prisma.rentalRequest.findUnique({
+                  where: { id: rejectedOffer.rentalRequestId },
+                  include: {
+                    tenant: {
+                      select: { email: true, name: true }
+                    }
+                  }
+                });
+
+                if (tenantRequest?.tenant?.email) {
+                  console.log(`📧 Sending rejection notification to ${tenantRequest.tenant.email}`);
+                  // You can implement email notification here
+                  // await sendOfferRejectedNotification(tenantRequest.tenant.email, tenantRequest.tenant.name);
+                }
+              } catch (notificationError) {
+                console.error(`❌ Error sending rejection notification for offer ${rejectedOffer.id}:`, notificationError);
+              }
+            }
+          }
+
+          // 🚀 SCALABILITY: Remove the rental request from the pool since it's now matched
+          // Import and use the request pool service
+          try {
+            const requestPoolService = await import('../services/requestPoolService.js');
+            await requestPoolService.default.removeFromPool(offer.rentalRequestId, 'MATCHED');
+            console.log(`✅ Removed request ${offer.rentalRequestId} from pool after payment`);
+          } catch (poolError) {
+            console.error(`❌ Error removing request from pool:`, poolError);
+          }
+        }
+      } catch (invalidationError) {
+        console.error('❌ Error invalidating other offers:', invalidationError);
+        // Don't fail the payment if offer invalidation fails
+      }
+
+      // Create RentPayment record for DEPOSIT_AND_FIRST_MONTH payments
+      if (metadata.purpose === 'DEPOSIT_AND_FIRST_MONTH') {
+        try {
+          console.log('🔧 Auto-generating contract after payment...');
+          
+          // Check if contract already exists
+          const existingContract = await prisma.contract.findUnique({
+            where: { rentalRequestId: rentalRequestId }
+          });
+
+          if (!existingContract) {
+            // Import contract generation function
+            const { generateContractForRentalRequest } = await import('./contractController.js');
+            await generateContractForRentalRequest(rentalRequestId);
+            console.log('✅ Contract auto-generated successfully');
+          } else {
+            console.log('ℹ️ Contract already exists, skipping generation');
+          }
+        } catch (contractError) {
+          console.error('❌ Error auto-generating contract:', contractError);
+          // Don't fail the payment if contract generation fails
+        }
+      }
 
       // Update property status to OCCUPIED when offer is paid
       try {
@@ -326,10 +421,12 @@ const handlePaymentSucceeded = async (paymentIntent) => {
         });
 
         if (offer && offer.propertyId) {
-          await prisma.property.update({
-            where: { id: offer.propertyId },
-            data: { status: 'OCCUPIED' }
-          });
+          // Use property availability service to update property status and availability
+          await propertyAvailabilityService.updatePropertyAvailability(
+            offer.propertyId, 
+            false, // availability = false when occupied
+            'OCCUPIED' // status = OCCUPIED
+          );
           console.log('✅ Property status updated to OCCUPIED:', offer.propertyId);
         }
       } catch (propertyUpdateError) {

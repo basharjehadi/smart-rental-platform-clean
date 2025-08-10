@@ -1,6 +1,5 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../utils/prisma.js';
+import propertyAvailabilityService from '../services/propertyAvailabilityService.js';
 
 // Get all properties for a landlord
 export const getLandlordProperties = async (req, res) => {
@@ -106,7 +105,6 @@ export const createProperty = async (req, res) => {
       parking = false,
       petsAllowed = false,
       smokingAllowed = false,
-      maxTenants = 1,
       description,
       houseRules
     } = req.body;
@@ -190,7 +188,7 @@ export const createProperty = async (req, res) => {
       parking: parking === 'true' || parking === true,
       petsAllowed: petsAllowed === 'true' || petsAllowed === true,
       smokingAllowed: smokingAllowed === 'true' || smokingAllowed === true,
-      maxTenants: parseInt(maxTenants),
+      availability: true, // New property is available by default
       description,
       houseRules,
       images: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
@@ -224,7 +222,7 @@ export const createProperty = async (req, res) => {
         parking: parking === 'true' || parking === true,
         petsAllowed: petsAllowed === 'true' || petsAllowed === true,
         smokingAllowed: smokingAllowed === 'true' || smokingAllowed === true,
-        maxTenants: parseInt(maxTenants),
+        availability: true, // New property is available by default
         description,
         houseRules,
         images: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
@@ -233,6 +231,9 @@ export const createProperty = async (req, res) => {
     });
 
     console.log('✅ Property created successfully:', property.id);
+
+    // Update landlord availability based on new property
+    await propertyAvailabilityService.updateLandlordAvailability(landlordId);
 
     res.status(201).json({
       success: true,
@@ -338,7 +339,6 @@ export const updateProperty = async (req, res) => {
     if (updateData.totalFloors) updateData.totalFloors = parseInt(updateData.totalFloors);
     if (updateData.monthlyRent) updateData.monthlyRent = parseFloat(updateData.monthlyRent);
     if (updateData.depositAmount) updateData.depositAmount = parseFloat(updateData.depositAmount);
-    if (updateData.maxTenants) updateData.maxTenants = parseInt(updateData.maxTenants);
 
     // Parse boolean fields
     if (updateData.furnished !== undefined) updateData.furnished = updateData.furnished === 'true';
@@ -373,6 +373,9 @@ export const updateProperty = async (req, res) => {
     });
 
     console.log('✅ Property updated successfully:', property.id);
+
+    // Update landlord availability based on property changes
+    await propertyAvailabilityService.updateLandlordAvailability(landlordId);
 
     res.json({
       success: true,
@@ -470,14 +473,12 @@ export const updatePropertyStatus = async (req, res) => {
       });
     }
 
-    const property = await prisma.property.update({
-      where: {
-        id: id
-      },
-      data: {
-        status: status
-      }
-    });
+    // Update property status and availability
+    const property = await propertyAvailabilityService.updatePropertyAvailability(
+      id, 
+      status === 'AVAILABLE', // availability is true only if status is AVAILABLE
+      status
+    );
 
     res.json({
       success: true,
@@ -490,6 +491,79 @@ export const updatePropertyStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to update property status'
+    });
+  }
+};
+
+// NEW: Update property availability
+export const updatePropertyAvailability = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { availability } = req.body;
+    const landlordId = req.user.id;
+
+    // Validate availability
+    if (typeof availability !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: 'Availability must be a boolean value'
+      });
+    }
+
+    // Check if property exists and belongs to landlord
+    const existingProperty = await prisma.property.findFirst({
+      where: {
+        id: id,
+        landlordId: landlordId
+      }
+    });
+
+    if (!existingProperty) {
+      return res.status(404).json({
+        success: false,
+        error: 'Property not found'
+      });
+    }
+
+    // Update property availability
+    const property = await propertyAvailabilityService.updatePropertyAvailability(id, availability);
+
+    res.json({
+      success: true,
+      property: property,
+      message: 'Property availability updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Update property availability error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update property availability'
+    });
+  }
+};
+
+// NEW: Get property availability summary
+export const getPropertyAvailabilitySummary = async (req, res) => {
+  try {
+    const landlordId = req.user.id;
+
+    const summary = await propertyAvailabilityService.getPropertyAvailabilitySummary(landlordId);
+    const availableProperties = await propertyAvailabilityService.getAvailableProperties(landlordId);
+    const canAcceptRequests = await propertyAvailabilityService.canLandlordAcceptRequests(landlordId);
+
+    res.json({
+      success: true,
+      summary,
+      availableProperties,
+      canAcceptRequests
+    });
+
+  } catch (error) {
+    console.error('Get property availability summary error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get property availability summary'
     });
   }
 };

@@ -84,11 +84,12 @@ describe('Messaging System Security & Payment Gating', () => {
     offer = await prisma.offer.create({
       data: {
         rentalRequestId: rentalRequest.id,
+        tenantId: tenant.id,
         landlordId: landlord.id,
         rentAmount: 2500,
         depositAmount: 2500,
-        leaseDuration: '12 months',
-        additionalTerms: 'Test terms',
+        leaseDuration: 12,
+        availableFrom: new Date(),
         status: 'PENDING'
       }
     });
@@ -252,11 +253,12 @@ describe('Messaging System Security & Payment Gating', () => {
       const testOffer = await prisma.offer.create({
         data: {
           rentalRequestId: rentalRequest.id,
+          tenantId: tenant.id,
           landlordId: landlord.id,
           rentAmount: 3000,
           depositAmount: 3000,
-          leaseDuration: '12 months',
-          additionalTerms: 'Test terms for idempotency',
+          leaseDuration: 12,
+          availableFrom: new Date(),
           status: 'PENDING'
         }
       });
