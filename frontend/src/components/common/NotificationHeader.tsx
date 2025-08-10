@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, X, Check, MessageSquare, FileText, ExternalLink } from 'lucide-react';
+import { Bell, X, Check, MessageSquare, FileText, ExternalLink, CheckCircle, XCircle, Home, Megaphone, User } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import NotificationBadge from './NotificationBadge';
@@ -32,12 +32,40 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({ className = '' 
     }
     
     // Handle navigation based on notification type
-    if (notification.type === 'NEW_RENTAL_REQUEST') {
-      // Navigate to rental requests page for landlords
-      window.location.href = '/tenant-rental-requests';
-    } else if (notification.type === 'NEW_OFFER') {
-      // Navigate to offers page for tenants
-      window.location.href = '/my-offers';
+    switch (notification.type) {
+      case 'NEW_RENTAL_REQUEST':
+        // Business notification - handled by sidebar
+        break;
+      case 'NEW_OFFER':
+        // Business notification - handled by sidebar
+        break;
+      case 'PAYMENT_CONFIRMED':
+      case 'PAYMENT_FAILED':
+        // Navigate to payment history
+        window.location.href = '/payment-history';
+        break;
+      case 'CONTRACT_UPDATED':
+      case 'CONTRACT_SIGNED':
+        // Navigate to contract management
+        window.location.href = '/contract-management';
+        break;
+      case 'KYC_APPROVED':
+      case 'KYC_REJECTED':
+        // Navigate to profile page
+        window.location.href = user?.role === 'LANDLORD' ? '/landlord-profile' : '/tenant-profile';
+        break;
+      case 'PROPERTY_STATUS_CHANGED':
+        // Navigate to property details or properties list
+        if (user?.role === 'LANDLORD') {
+          window.location.href = '/landlord-my-property';
+        }
+        break;
+      case 'SYSTEM_ANNOUNCEMENT':
+      case 'ACCOUNT_UPDATED':
+        // System notifications - no specific navigation needed
+        break;
+      default:
+        break;
     }
     
     setIsOpen(false);
@@ -49,6 +77,23 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({ className = '' 
         return <FileText className="w-4 h-4 text-blue-600" />;
       case 'NEW_OFFER':
         return <MessageSquare className="w-4 h-4 text-green-600" />;
+      case 'PAYMENT_CONFIRMED':
+        return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case 'PAYMENT_FAILED':
+        return <XCircle className="w-4 h-4 text-red-600" />;
+      case 'CONTRACT_UPDATED':
+      case 'CONTRACT_SIGNED':
+        return <FileText className="w-4 h-4 text-blue-600" />;
+      case 'KYC_APPROVED':
+        return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case 'KYC_REJECTED':
+        return <XCircle className="w-4 h-4 text-red-600" />;
+      case 'PROPERTY_STATUS_CHANGED':
+        return <Home className="w-4 h-4 text-orange-600" />;
+      case 'SYSTEM_ANNOUNCEMENT':
+        return <Megaphone className="w-4 h-4 text-purple-600" />;
+      case 'ACCOUNT_UPDATED':
+        return <User className="w-4 h-4 text-gray-600" />;
       default:
         return <Bell className="w-4 h-4 text-gray-600" />;
     }
@@ -59,7 +104,24 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({ className = '' 
       case 'NEW_RENTAL_REQUEST':
         return 'bg-blue-50 border-blue-200';
       case 'NEW_OFFER':
+        return 'bg-green-50 border-blue-200';
+      case 'PAYMENT_CONFIRMED':
         return 'bg-green-50 border-green-200';
+      case 'PAYMENT_FAILED':
+        return 'bg-red-50 border-red-200';
+      case 'CONTRACT_UPDATED':
+      case 'CONTRACT_SIGNED':
+        return 'bg-blue-50 border-blue-200';
+      case 'KYC_APPROVED':
+        return 'bg-green-50 border-green-200';
+      case 'KYC_REJECTED':
+        return 'bg-red-50 border-red-200';
+      case 'PROPERTY_STATUS_CHANGED':
+        return 'bg-orange-50 border-orange-200';
+      case 'SYSTEM_ANNOUNCEMENT':
+        return 'bg-purple-50 border-purple-200';
+      case 'ACCOUNT_UPDATED':
+        return 'bg-gray-50 border-gray-200';
       default:
         return 'bg-gray-50 border-gray-200';
     }
@@ -90,19 +152,18 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({ className = '' 
       >
         <Bell className="w-5 h-5" />
         
-        {/* Total Notification Badge - Exclude rental requests for landlords */}
-                        {(() => {
-                  const { user } = useAuth();
-                  const displayCount = user?.role === 'LANDLORD'
-                    ? counts.offers // Only show offers count for landlords
-                    : counts.rentalRequests; // Only show rental requests for tenants (no offers in header)
+        {/* Total Notification Badge - Show system notifications count */}
+        {(() => {
+          // Calculate system notifications count (total - business notifications)
+          const businessNotificationsCount = counts.rentalRequests + counts.offers;
+          const systemNotificationsCount = counts.total - businessNotificationsCount;
 
-                  return displayCount > 0 ? (
-                    <div className="absolute -top-1 -right-1">
-                      <NotificationBadge count={displayCount} />
-                    </div>
-                  ) : null;
-                })()}
+          return systemNotificationsCount > 0 ? (
+            <div className="absolute -top-1 -right-1">
+              <NotificationBadge count={systemNotificationsCount} />
+            </div>
+          ) : null;
+        })()}
       </button>
 
       {/* Notification Dropdown */}
@@ -114,11 +175,11 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({ className = '' 
               <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
               <div className="flex items-center space-x-2">
                 {(() => {
-                  const displayCount = user?.role === 'LANDLORD' 
-                    ? counts.offers // Only show for offers count for landlords
-                    : counts.rentalRequests; // Only show for rental requests for tenants (no offers)
+                  // Calculate system notifications count (total - business notifications)
+                  const businessNotificationsCount = counts.rentalRequests + counts.offers;
+                  const systemNotificationsCount = counts.total - businessNotificationsCount;
                   
-                  return displayCount > 0 ? (
+                  return systemNotificationsCount > 0 ? (
                     <button
                       onClick={markAllAsRead}
                       className="text-xs text-blue-600 hover:text-blue-700 font-medium"
@@ -136,30 +197,29 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({ className = '' 
               </div>
             </div>
             
-            {/* Notification Type Counts */}
+            {/* System Notification Type Counts */}
             <div className="flex items-center space-x-4 mt-2 text-xs text-gray-600">
-              {user?.role !== 'LANDLORD' && counts.rentalRequests > 0 && (
-                <span className="flex items-center space-x-1">
-                  <FileText className="w-3 h-3 text-blue-600" />
-                  <span>{counts.rentalRequests} requests</span>
-                </span>
-              )}
-              {user?.role === 'LANDLORD' && counts.offers > 0 && (
-                <span className="flex items-center space-x-1">
-                  <MessageSquare className="w-3 h-3 text-green-600" />
-                  <span>{counts.offers} offers</span>
-                </span>
-              )}
+              {(() => {
+                // Calculate system notifications count (total - business notifications)
+                const businessNotificationsCount = counts.rentalRequests + counts.offers;
+                const systemNotificationsCount = counts.total - businessNotificationsCount;
+                
+                return systemNotificationsCount > 0 ? (
+                  <span className="flex items-center space-x-1">
+                    <Bell className="w-3 h-3 text-purple-600" />
+                    <span>{systemNotificationsCount} system notifications</span>
+                  </span>
+                ) : null;
+              })()}
             </div>
           </div>
 
           {/* Notification List */}
           <div className="max-h-64 overflow-y-auto">
             {(() => {
-              // Filter notifications based on user role
-              const filteredNotifications = user?.role === 'LANDLORD' 
-                ? notifications.filter(n => n.type !== 'NEW_RENTAL_REQUEST')
-                : notifications.filter(n => n.type !== 'NEW_OFFER'); // Exclude offers for tenants
+              // Filter notifications to show only system notifications (exclude business notifications)
+              const businessNotificationTypes = ['NEW_RENTAL_REQUEST', 'NEW_OFFER'];
+              const filteredNotifications = notifications.filter(n => !businessNotificationTypes.includes(n.type));
               
               if (filteredNotifications.length === 0) {
                 return (
@@ -230,14 +290,15 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({ className = '' 
                     </div>
                   ))}
                 </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* Footer */}
           {(() => {
-            const filteredNotifications = user?.role === 'LANDLORD' 
-              ? notifications.filter(n => n.type !== 'NEW_RENTAL_REQUEST')
-              : notifications.filter(n => n.type !== 'NEW_OFFER'); // Exclude offers for tenants
+            // Filter notifications to show only system notifications (exclude business notifications)
+            const businessNotificationTypes = ['NEW_RENTAL_REQUEST', 'NEW_OFFER'];
+            const filteredNotifications = notifications.filter(n => !businessNotificationTypes.includes(n.type));
             
             return filteredNotifications.length > 10 ? (
               <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">

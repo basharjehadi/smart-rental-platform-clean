@@ -7,6 +7,7 @@ const TenantRequestCard = ({
   onPriceAdjustment,
   decliningRequest = false,
   offerSent = false,
+  priceAdjusted = false, // New prop to track if price was adjusted
   formatCurrencyDisplay,
   formatCurrencyWithDecimals,
   formatDate,
@@ -433,24 +434,26 @@ const TenantRequestCard = ({
             {/* Action Buttons or Status */}
             {tenant.status?.toLowerCase() === 'active' ? (
               <div className="flex space-x-4">
-                {matchInfo.needsPriceAdjustment ? (
+                {matchInfo.needsPriceAdjustment && !priceAdjusted ? (
                   <>
-                    {/* Price Adjustment Button */}
+                    {/* Quick Price Action Button - Shows when budget doesn't match and price hasn't been adjusted yet */}
                     <button 
                       onClick={() => onPriceAdjustment(tenant)}
-                      className="btn-secondary flex-1 inline-flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white"
+                      className="btn-secondary flex-1 inline-flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white"
                     >
                       <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                       </svg>
-                      Adjust Price & Send Offer
+                      Quick Price Action
                     </button>
                   </>
                 ) : (
-                  /* Perfect Match - Just Send Offer */
+                  /* Send Offer Button - Shows after price adjustment or for perfect matches */
                   <button 
                     onClick={() => onSendOffer(tenant)}
-                    className="btn-primary flex-1 inline-flex items-center justify-center bg-green-500 hover:bg-green-600 text-white"
+                    className={`btn-primary flex-1 inline-flex items-center justify-center ${
+                      priceAdjusted ? 'bg-blue-500 hover:bg-blue-600' : 'bg-green-500 hover:bg-green-600'
+                    } text-white`}
                   >
                     <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

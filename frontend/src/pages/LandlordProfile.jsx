@@ -71,6 +71,7 @@ const LandlordProfile = () => {
   const [selectedProfession, setSelectedProfession] = useState(null);
   const [showOtherProfession, setShowOtherProfession] = useState(false);
   const [otherProfession, setOtherProfession] = useState('');
+  const [originalFile, setOriginalFile] = useState(null);
 
   const formRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -573,6 +574,9 @@ const LandlordProfile = () => {
       return;
     }
     
+    // Store the original file for upload
+    setOriginalFile(file);
+    
     // Create preview
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -583,16 +587,13 @@ const LandlordProfile = () => {
   };
 
   const handlePhotoSave = async () => {
-    if (!photoPreview) return;
+    if (!photoPreview || !originalFile) return;
     
     setIsPhotoUploading(true);
     try {
-      // Convert base64 to blob
-      const response = await fetch(photoPreview);
-      const blob = await response.blob();
-      
+      // Use the original file instead of converting base64 to blob
       const formData = new FormData();
-      formData.append('profileImage', blob, 'profile-photo.jpg');
+      formData.append('profileImage', originalFile);
       
       const uploadResponse = await api.post('/users/profile/photo', formData, {
         headers: {
@@ -602,6 +603,7 @@ const LandlordProfile = () => {
       
       setProfilePhoto(uploadResponse.data.photoUrl);
       setPhotoPreview(null);
+      setOriginalFile(null);
       setShowPhotoActions(false);
       setShowPhotoOverlay(false);
       
@@ -620,6 +622,7 @@ const LandlordProfile = () => {
 
   const handlePhotoCancel = () => {
     setPhotoPreview(null);
+    setOriginalFile(null);
     setShowPhotoActions(false);
     setShowPhotoOverlay(false);
   };
@@ -630,6 +633,7 @@ const LandlordProfile = () => {
       await api.delete('/users/profile/photo');
       setProfilePhoto(null);
       setPhotoPreview(null);
+      setOriginalFile(null);
       setShowPhotoActions(false);
       setShowPhotoOverlay(false);
       
@@ -1005,8 +1009,20 @@ const LandlordProfile = () => {
       return photoPath;
     }
     
+    // If it's just a filename, construct full URL to profile_images directory
+    if (!photoPath.startsWith('/')) {
+      const baseUrl = 'http://localhost:3001';
+      return `${baseUrl}/uploads/profile_images/${photoPath}`;
+    }
+    
+    // If it's a relative path starting with /uploads/, construct full URL
+    if (photoPath.startsWith('/uploads/')) {
+      const baseUrl = 'http://localhost:3001';
+      return `${baseUrl}${photoPath}`;
+    }
+    
     // If it's a relative path, construct full URL
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const baseUrl = 'http://localhost:3001';
     return `${baseUrl}${photoPath}`;
   };
 

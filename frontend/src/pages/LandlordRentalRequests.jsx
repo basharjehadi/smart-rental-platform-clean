@@ -49,6 +49,7 @@ const LandlordRentalRequests = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const [offerSent, setOfferSent] = useState(false);
   const [declineSuccess, setDeclineSuccess] = useState('');
+  const [priceAdjustedTenants, setPriceAdjustedTenants] = useState(new Set()); // Track which tenants have had prices adjusted
   
   const { api } = useAuth();
   const { t } = useTranslation();
@@ -298,8 +299,20 @@ const LandlordRentalRequests = () => {
       return photoPath;
     }
     
+    // If it's just a filename, construct full URL to profile_images directory
+    if (!photoPath.startsWith('/')) {
+      const baseUrl = 'http://localhost:3001';
+      return `${baseUrl}/uploads/profile_images/${photoPath}`;
+    }
+    
+    // If it's a relative path starting with /uploads/, construct full URL
+    if (photoPath.startsWith('/uploads/')) {
+      const baseUrl = 'http://localhost:3001';
+      return `${baseUrl}${photoPath}`;
+    }
+    
     // If it's a relative path, construct full URL
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const baseUrl = 'http://localhost:3001';
     return `${baseUrl}${photoPath}`;
   };
 
@@ -485,11 +498,14 @@ const LandlordRentalRequests = () => {
       
       setOfferData({
         monthlyRent: adjustedRent.toString(), // Auto-populated with tenant's exact max budget
-        securityDeposit: Math.floor(adjustedRent * 0.5).toString(), // Auto-calculate deposit as 50% of rent
+        securityDeposit: adjustedRent.toString(), // Security deposit equals monthly rent
         availableFrom: availableFromDate,
         leaseDuration: '12 months',
         additionalTerms: `Price adjusted to exactly match your maximum budget of ${adjustedRent} PLN.`
       });
+      
+      // Mark this tenant as having their price adjusted
+      setPriceAdjustedTenants(prev => new Set([...prev, tenant.id]));
       
       setSelectedTenant(tenant);
       setShowOfferModal(true);
@@ -898,6 +914,7 @@ const LandlordRentalRequests = () => {
                   onPriceAdjustment={handlePriceAdjustment}
                   decliningRequest={decliningRequest === tenant.id}
                   offerSent={offerSent}
+                  priceAdjusted={priceAdjustedTenants.has(tenant.id)} // Pass whether price was adjusted
                   formatCurrencyDisplay={formatCurrencyDisplay}
                   formatCurrencyWithDecimals={formatCurrencyWithDecimals}
                   formatDate={formatDate}

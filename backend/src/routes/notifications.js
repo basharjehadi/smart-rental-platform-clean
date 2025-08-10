@@ -141,7 +141,13 @@ router.put('/read-by-type/:type', verifyToken, async (req, res) => {
     const { prisma } = await import('../utils/prisma.js');
 
     // Validate notification type
-    if (!['NEW_RENTAL_REQUEST', 'NEW_OFFER'].includes(type)) {
+    const validTypes = [
+      'NEW_RENTAL_REQUEST', 'NEW_OFFER', 'PAYMENT_CONFIRMED', 'PAYMENT_FAILED',
+      'CONTRACT_UPDATED', 'CONTRACT_SIGNED', 'KYC_APPROVED', 'KYC_REJECTED',
+      'PROPERTY_STATUS_CHANGED', 'SYSTEM_ANNOUNCEMENT', 'ACCOUNT_UPDATED'
+    ];
+    
+    if (!validTypes.includes(type)) {
       return res.status(400).json({
         success: false,
         error: 'Invalid notification type'

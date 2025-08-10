@@ -11,6 +11,7 @@ import {
   X
 } from 'lucide-react';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useChat } from '../hooks/useChat';
 import NotificationBadge from './common/NotificationBadge';
 
 const SidebarItem = ({ to, icon: Icon, children, isActive, isCollapsed, badge }) => {
@@ -61,6 +62,7 @@ const TenantSidebar = () => {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { counts } = useNotifications();
+  const { unreadCount } = useChat();
 
   const menuItems = [
     {
@@ -77,12 +79,13 @@ const TenantSidebar = () => {
       to: '/my-offers',
       icon: Handshake,
       label: 'View Offers',
-      badge: counts.offers
+      badge: counts.offers > 0 ? counts.offers : null
     },
     {
       to: '/messaging',
       icon: MessageCircle,
-      label: 'Messages'
+      label: 'Messages',
+      badge: unreadCount > 0 ? unreadCount : null
     },
     {
       to: '/tenant-help-center',
@@ -153,6 +156,7 @@ const TenantSidebar = () => {
                 icon={item.icon}
                 isActive={location.pathname === item.to}
                 isCollapsed={isCollapsed}
+                badge={item.badge}
               >
                 {item.label}
               </SidebarItem>

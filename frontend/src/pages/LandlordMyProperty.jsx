@@ -47,7 +47,7 @@ const LandlordMyProperty = () => {
   const fetchProperties = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/properties/landlord-properties');
+      const response = await api.get('/properties');
       setProperties(response.data.properties || []);
     } catch (error) {
       console.error('Error fetching properties:', error);

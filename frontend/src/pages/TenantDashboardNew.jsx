@@ -422,8 +422,20 @@ const TenantDashboardNew = () => {
       return photoPath;
     }
     
+    // If it's just a filename, construct full URL to profile_images directory
+    if (!photoPath.startsWith('/')) {
+      const baseUrl = 'http://localhost:3001';
+      return `${baseUrl}/uploads/profile_images/${photoPath}`;
+    }
+    
+    // If it's a relative path starting with /uploads/, construct full URL
+    if (photoPath.startsWith('/uploads/')) {
+      const baseUrl = 'http://localhost:3001';
+      return `${baseUrl}${photoPath}`;
+    }
+    
     // If it's a relative path, construct full URL
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const baseUrl = 'http://localhost:3001';
     return `${baseUrl}${photoPath}`;
   };
 

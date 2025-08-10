@@ -11,7 +11,7 @@ interface NotificationCounts {
 
 interface Notification {
   id: string;
-  type: 'NEW_RENTAL_REQUEST' | 'NEW_OFFER';
+  type: 'NEW_RENTAL_REQUEST' | 'NEW_OFFER' | 'PAYMENT_CONFIRMED' | 'PAYMENT_FAILED' | 'CONTRACT_UPDATED' | 'CONTRACT_SIGNED' | 'KYC_APPROVED' | 'KYC_REJECTED' | 'PROPERTY_STATUS_CHANGED' | 'SYSTEM_ANNOUNCEMENT' | 'ACCOUNT_UPDATED';
   entityId: string;
   title: string;
   body: string;
@@ -24,7 +24,7 @@ interface NotificationContextType {
   notifications: Notification[];
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
-  markByTypeAsRead: (type: 'NEW_RENTAL_REQUEST' | 'NEW_OFFER') => Promise<void>;
+  markByTypeAsRead: (type: 'NEW_RENTAL_REQUEST' | 'NEW_OFFER' | 'PAYMENT_CONFIRMED' | 'PAYMENT_FAILED' | 'CONTRACT_UPDATED' | 'CONTRACT_SIGNED' | 'KYC_APPROVED' | 'KYC_REJECTED' | 'PROPERTY_STATUS_CHANGED' | 'SYSTEM_ANNOUNCEMENT' | 'ACCOUNT_UPDATED') => Promise<void>;
   refreshCounts: () => Promise<void>;
 }
 
@@ -113,7 +113,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   };
 
   // Mark notifications by type as read
-  const markByTypeAsRead = async (type: 'NEW_RENTAL_REQUEST' | 'NEW_OFFER') => {
+  const markByTypeAsRead = async (type: 'NEW_RENTAL_REQUEST' | 'NEW_OFFER' | 'PAYMENT_CONFIRMED' | 'PAYMENT_FAILED' | 'CONTRACT_UPDATED' | 'CONTRACT_SIGNED' | 'KYC_APPROVED' | 'KYC_REJECTED' | 'PROPERTY_STATUS_CHANGED' | 'SYSTEM_ANNOUNCEMENT' | 'ACCOUNT_UPDATED') => {
     try {
       await api.put(`/notifications/read-by-type/${type}`);
       // Update local state

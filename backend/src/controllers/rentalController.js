@@ -2,6 +2,7 @@ import { prisma } from '../utils/prisma.js';
 import { initializeLeaseDates } from './cronController.js';
 import { sendOfferNotification } from '../utils/emailService.js';
 import requestPoolService from '../services/requestPoolService.js';
+import { NotificationService } from '../services/notificationService.js';
 
 // 🚀 SCALABILITY: Create rental request with pool integration
 const createRentalRequest = async (req, res) => {
@@ -375,8 +376,40 @@ const createOffer = async (req, res) => {
       }
     });
 
+    // 🚀 NOTIFICATION: Create notification for the tenant about the new offer
+    try {
+      const tenant = await prisma.user.findUnique({
+        where: { id: rentalRequest.tenantId },
+        select: { name: true, email: true }
+      });
+
+      if (tenant) {
+        // Send email notification
+        await sendOfferNotification(
+          tenant.email,
+          tenant.name,
+          req.user.name || 'Landlord',
+          property.name || 'Property',
+          rentAmount,
+          offer.id
+        );
+
+        // Create database notification for real-time updates
+        await NotificationService.createOfferNotification(
+          rentalRequest.tenantId,
+          offer.id,
+          req.user.name || 'Landlord',
+          property.address || 'Property'
+        );
+      }
+    } catch (notificationError) {
+      console.error('Warning: Failed to send offer notification:', notificationError);
+      // Don't fail the offer creation if notification fails
+    }
+
     console.log(`✅ Offer created successfully for request ${requestId} by landlord ${req.user.id}`);
     console.log(`🏆 Competition: This request now has multiple offers from different landlords`);
+    console.log(`🔔 Tenant notification sent for offer ${offer.id}`);
 
     res.json({
       success: true,

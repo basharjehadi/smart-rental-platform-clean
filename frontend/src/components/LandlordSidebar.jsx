@@ -10,11 +10,11 @@ import {
   Menu,
   X,
   Building,
-  Plus,
   Settings,
   Users
 } from 'lucide-react';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useChat } from '../hooks/useChat';
 import NotificationBadge from './common/NotificationBadge';
 
 const SidebarItem = ({ to, icon: Icon, children, isActive, isCollapsed, badge }) => {
@@ -65,6 +65,7 @@ const LandlordSidebar = () => {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { counts } = useNotifications();
+  const { unreadCount } = useChat();
 
   const menuItems = [
     {
@@ -81,7 +82,7 @@ const LandlordSidebar = () => {
       to: '/tenant-rental-requests',
       icon: FileText,
       label: 'Rental Requests',
-      badge: counts.rentalRequests
+      badge: counts.rentalRequests > 0 ? counts.rentalRequests : null
     },
     {
       to: '/landlord-my-property',
@@ -91,7 +92,8 @@ const LandlordSidebar = () => {
     {
       to: '/messaging',
       icon: MessageCircle,
-      label: 'Messages'
+      label: 'Messages',
+      badge: unreadCount > 0 ? unreadCount : null
     },
     {
       to: '/landlord-help-center',
@@ -165,21 +167,7 @@ const LandlordSidebar = () => {
           ))}
         </div>
         
-        {/* Quick Actions Section */}
-        {!isCollapsed && (
-          <div className="mt-8 pt-6 border-t border-gray-100 animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-2">
-              Quick Actions
-            </h3>
-            <Link
-              to="/landlord-add-property"
-              className="flex items-center px-4 py-3 text-sm font-medium text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition-all duration-200 group"
-            >
-              <Plus className="w-5 h-5 mr-3 group-hover:scale-110 transition-transform duration-200" />
-              <span>Add Property</span>
-            </Link>
-          </div>
-        )}
+
       </nav>
 
       {/* Footer */}

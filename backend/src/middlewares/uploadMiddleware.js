@@ -2,14 +2,15 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
-// Ensure upload directories exist
+// Ensure upload directories exist with absolute paths
 const createUploadDirs = () => {
+  const baseDir = process.cwd();
   const dirs = [
-    'uploads/profile_images',
-    'uploads/property_images',
-    'uploads/property_videos',
-    'uploads/identity_documents',
-    'uploads/rules'
+    path.join(baseDir, 'uploads', 'profile_images'),
+    path.join(baseDir, 'uploads', 'property_images'),
+    path.join(baseDir, 'uploads', 'property_videos'),
+    path.join(baseDir, 'uploads', 'identity_documents'),
+    path.join(baseDir, 'uploads', 'rules')
   ];
   
   dirs.forEach(dir => {
@@ -24,18 +25,18 @@ createUploadDirs();
 // Configure storage for different file types
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    let uploadPath = 'uploads/';
+    let uploadPath = path.join(process.cwd(), 'uploads');
     
     if (file.fieldname === 'profileImage') {
-      uploadPath += 'profile_images/';
+      uploadPath = path.join(uploadPath, 'profile_images');
     } else if (file.fieldname === 'propertyImages') {
-      uploadPath += 'property_images/';
+      uploadPath = path.join(uploadPath, 'property_images');
     } else if (file.fieldname === 'propertyVideo') {
-      uploadPath += 'property_videos/';
+      uploadPath = path.join(uploadPath, 'property_videos');
     } else if (file.fieldname === 'identityDocument') {
-      uploadPath += 'identity_documents/';
+      uploadPath = path.join(uploadPath, 'identity_documents');
     } else if (file.fieldname === 'rulesPdf') {
-      uploadPath += 'rules/';
+      uploadPath = path.join(uploadPath, 'rules');
     }
     
     cb(null, uploadPath);

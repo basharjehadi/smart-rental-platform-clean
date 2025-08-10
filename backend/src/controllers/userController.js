@@ -655,8 +655,8 @@ export const uploadProfilePhoto = async (req, res) => {
     }
 
     // File is already saved by multer middleware
-    // Generate URL for the saved file
-    const photoUrl = `/${file.path.replace(/\\/g, '/')}`;
+    // Generate URL for the saved file - store just the filename for consistency
+    const photoUrl = file.filename;
 
     // Update user profile with photo URL
     await prisma.user.update({
@@ -692,8 +692,8 @@ export const deleteProfilePhoto = async (req, res) => {
       const fs = await import('fs');
       const path = await import('path');
       
-      // Remove leading slash and convert to absolute path
-      const photoPath = path.join(process.cwd(), user.profileImage.substring(1));
+      // Construct path to profile_images directory
+      const photoPath = path.join(process.cwd(), 'uploads', 'profile_images', user.profileImage);
       if (fs.existsSync(photoPath)) {
         fs.unlinkSync(photoPath);
       }
