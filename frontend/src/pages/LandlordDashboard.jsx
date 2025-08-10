@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import LandlordSidebar from '../components/LandlordSidebar';
+import NotificationHeader from '../components/common/NotificationHeader';
 import { 
   LogOut, 
   DollarSign, 
@@ -17,7 +18,6 @@ import {
   Calendar, 
   TrendingUp,
   Eye,
-  MessageCircle,
   CheckCircle,
   XCircle,
   ChevronRight
@@ -339,7 +339,7 @@ const LandlordDashboard = () => {
       </div>
 
       <button className="btn-secondary flex items-center space-x-2 w-full justify-center">
-        <MessageCircle className="w-4 h-4" />
+        <Eye className="w-4 h-4" />
         <span>View All Reviews</span>
       </button>
     </div>
@@ -423,13 +423,9 @@ const LandlordDashboard = () => {
             </div>
             
             <div className="flex items-center space-x-4">
-                          <button
-              onClick={() => navigate('/messaging')}
-              className="flex items-center space-x-2 text-sm bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>Messages</span>
-            </button>
+              {/* Notification Header */}
+              <NotificationHeader />
+              
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"

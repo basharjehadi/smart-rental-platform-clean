@@ -76,7 +76,8 @@ const TenantSidebar = () => {
     {
       to: '/my-offers',
       icon: Handshake,
-      label: 'View Offers'
+      label: 'View Offers',
+      badge: counts.offers
     },
     {
       to: '/messaging',

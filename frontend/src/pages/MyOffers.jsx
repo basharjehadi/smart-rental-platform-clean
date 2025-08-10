@@ -5,6 +5,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 import api from '../utils/api';
 import OfferCard from '../components/OfferCard';
 import TenantSidebar from '../components/TenantSidebar';
+import NotificationHeader from '../components/common/NotificationHeader';
 import { LogOut, CheckCircle, X } from 'lucide-react';
 
 const MyOffers = () => {
@@ -110,6 +111,9 @@ const MyOffers = () => {
             </div>
             
             <div className="flex items-center space-x-4">
+              {/* Notification Header */}
+              <NotificationHeader />
+              
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"

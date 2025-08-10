@@ -30,7 +30,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/smart_rental_dev
       - JWT_SECRET=your_jwt_secret_here_change_in_production
       - SESSION_SECRET=your_session_secret_here_change_in_production
-      - FRONTEND_URL=http://localhost:5173
+      - FRONTEND_URL=http://localhost:3002
       - PORT=3001
     ports:
       - "3001:3001"

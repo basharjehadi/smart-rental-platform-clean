@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
+import NotificationHeader from '../components/common/NotificationHeader';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
@@ -1244,6 +1245,9 @@ const AdminDashboard = () => {
             <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
             
             <div className="flex items-center space-x-4">
+              {/* Notification Header */}
+              <NotificationHeader />
+              
               <div className="flex items-center space-x-3">
                 <span className="text-sm font-medium text-gray-900">{user?.name || 'Admin'}</span>
                 <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">

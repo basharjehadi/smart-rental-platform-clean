@@ -5,7 +5,8 @@ import api from '../utils/api';
 import CreateRentalRequestModal from '../components/CreateRentalRequestModal';
 import TenantSidebar from '../components/TenantSidebar';
 import Chat from '../components/chat/Chat';
-import { LogOut, MessageCircle } from 'lucide-react';
+import { LogOut } from 'lucide-react';
+import NotificationHeader from '../components/common/NotificationHeader';
 
 const TenantDashboard = () => {
   const { user, logout } = useAuth();
@@ -246,13 +247,9 @@ const TenantDashboard = () => {
              <h1 className="text-xl font-semibold text-gray-900">My Requests</h1>
             
             <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setShowChat(!showChat)}
-                className="flex items-center space-x-2 text-sm bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors duration-200"
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span>Messages</span>
-              </button>
+              {/* Notification Header */}
+              <NotificationHeader />
+              
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"

@@ -5,6 +5,7 @@ import api from '../utils/api';
 import TenantSidebar from '../components/TenantSidebar';
 import { LogOut } from 'lucide-react';
 import { viewContract, downloadContract } from '../utils/contractGenerator.js';
+import NotificationHeader from '../components/common/NotificationHeader';
 
 const TenantDashboardNew = () => {
   const { user, logout } = useAuth();
@@ -477,6 +478,9 @@ const TenantDashboardNew = () => {
             <h1 className="text-xl font-semibold text-gray-900">Welcome back, {user?.name || 'Tenant'}</h1>
             
             <div className="flex items-center space-x-4">
+              {/* Notification Header */}
+              <NotificationHeader />
+              
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"

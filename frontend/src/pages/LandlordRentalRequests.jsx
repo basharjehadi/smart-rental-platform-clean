@@ -5,6 +5,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { useTranslation } from 'react-i18next';
 import LandlordSidebar from '../components/LandlordSidebar';
 import TenantRequestCard from '../components/TenantRequestCard';
+import NotificationHeader from '../components/common/NotificationHeader';
 import { 
   MapPin, 
   Calendar, 
@@ -720,6 +721,9 @@ const LandlordRentalRequests = () => {
             <h1 className="text-xl font-semibold text-gray-900">Rental Requests</h1>
             
             <div className="flex items-center space-x-4">
+              {/* Notification Header */}
+              <NotificationHeader />
+              
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"

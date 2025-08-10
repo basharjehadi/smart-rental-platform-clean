@@ -201,7 +201,10 @@ const Chat: React.FC<ChatProps> = ({
                 }
               </p>
               <p className="text-sm text-gray-500">
-                Chat will unlock automatically once payment is completed.
+                {user?.role === 'TENANT' 
+                  ? 'Chat will unlock automatically once You will have active Lease'
+                  : 'Chat will unlock automatically once You will have Tenant'
+                }
               </p>
             </div>
           </div>
