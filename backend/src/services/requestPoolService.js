@@ -1,21 +1,39 @@
 import { prisma } from '../utils/prisma.js';
 
-// 🚀 SCALABILITY: Redis client for caching (disabled for development)
-let redis = null;
-let redisConnected = false;
-
-// Initialize Redis only when needed (disabled for now)
-const initializeRedis = async () => {
-  // Redis disabled for development - will be enabled in production
-  console.log('📝 Redis disabled for development');
-  return;
+// ────────────────────────────────────────────────────────────
+// Helpers: tolerant text + safe parsing + int coercion
+// ────────────────────────────────────────────────────────────
+const normalizeASCII = (value) => {
+  if (!value) return '';
+  try { return value.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  catch { return value; }
+};
+const parseMoney = (v) => {
+  if (v == null) return null;
+  const s = String(v).trim(); if (!s) return null;
+  const n = parseFloat(s.replace(/[^\d,.\-]/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+};
+const asInt = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 };
 
 class RequestPoolService {
   constructor() {
     this.cacheExpiry = 300; // 5 minutes
     this.batchSize = 50; // Process requests in batches
+    // Scoring + thresholds
+    this.matchingConfig = {
+      weights: { location: 40, budget: 25, features: 20, timing: 10, performance: 5 },
+      thresholds: { highDemand: 30, lowDemand: 60, urgent: 20, normal: 40 },
+    };
   }
+
+  // Structured logging (compact)
+  logInfo(event, payload = {}) { console.log(JSON.stringify({ level: 'info', event, ...payload })); }
+  logWarn(event, payload = {}) { console.warn(JSON.stringify({ level: 'warn', event, ...payload })); }
+  logErr (event, payload = {}) { console.error(JSON.stringify({ level: 'error', event, ...payload })); }
 
   /**
    * 🚀 SCALABILITY: Add rental request to pool with delayed matching
@@ -57,203 +75,120 @@ class RequestPoolService {
   }
 
   /**
-   * 🚀 SCALABILITY: Find matching landlords based on their property listings
+   * 🚀 Property-centric candidate discovery with tolerant location & parsed budgets
    */
   async findMatchingLandlordsByProperties(rentalRequest) {
     try {
-      console.log(`🔍 Finding landlords with matching properties for request ${rentalRequest.id}`);
-      
-      // Extract city from location (e.g., "Grunwald, Poznan" -> "Poznan")
-      const extractedCity = rentalRequest.location ? 
-        rentalRequest.location.split(',').pop()?.trim() || rentalRequest.location.trim() : 
-        null;
-      
-      console.log(`   📍 Request Location: ${rentalRequest.location} (Extracted City: ${extractedCity})`);
-      console.log(`   💰 Request Budget: ${rentalRequest.budgetFrom || rentalRequest.budget}-${rentalRequest.budgetTo || rentalRequest.budget} PLN`);
-      console.log(`   🏠 Request Bedrooms: ${rentalRequest.bedrooms}`);
-      console.log(`   🏠 Request Property Type: ${rentalRequest.propertyType}`);
-      console.log(`   🛋️ Request Furnished: ${rentalRequest.furnished}`);
-      console.log(`   🚗 Request Parking: ${rentalRequest.parking}`);
-      console.log(`   🐾 Request Pets Allowed: ${rentalRequest.petsAllowed}`);
-      console.log(`   📅 Request Move-in: ${rentalRequest.moveInDate}`);
-      console.log(`   📅 Request Move-in Date Object: ${new Date(rentalRequest.moveInDate)}`);
+      this.logInfo('matching.start', { requestId: rentalRequest.id });
 
-      // Get all landlords who have properties that match the rental request criteria
-      // Use more flexible matching to ensure landlords get notified
-      const matchingLandlords = await prisma.user.findMany({
-        where: {
-          role: 'LANDLORD',
-          availability: true, // Manual availability toggle
-          properties: {
-            some: {
-              // Location matching (must match city)
-              city: {
-                equals: extractedCity,
-                mode: 'insensitive'
-              },
-              // Budget matching (reasonable flexibility - allow landlords to see requests they can adjust to)
-              monthlyRent: {
-                lte: (rentalRequest.budgetTo || rentalRequest.budget) * 1.2 // Allow up to 20% above max budget
-              },
-              // Property type matching (if specified, but be flexible)
-              ...(rentalRequest.propertyType && {
-                propertyType: { 
-                  contains: rentalRequest.propertyType,
-                  mode: 'insensitive'
-                }
-              }),
-              // Bedrooms matching (if specified, but be flexible)
-              ...(rentalRequest.bedrooms && {
-                bedrooms: {
-                  gte: Math.max(1, rentalRequest.bedrooms - 1), // Allow 1 less bedroom
-                  lte: rentalRequest.bedrooms + 1 // Allow 1 more bedroom
-                }
-              }),
-              // Property is available (flexible with dates)
-              availableFrom: {
-                lte: new Date(new Date(rentalRequest.moveInDate).getTime() + 30 * 24 * 60 * 60 * 1000) // Allow 30 days flexibility
-              },
-              // Property status and availability
-              status: 'AVAILABLE',
-              availability: true
+      // ── Location tokens (tolerant)
+      const rawLocation = rentalRequest.location || '';
+      const cityToken = rawLocation.split(',').pop()?.trim() || rawLocation;
+      const cityTokenNorm = normalizeASCII(cityToken);
+      const tokens = rawLocation.split(',').map(t => t.trim()).filter(Boolean);
+      const normTokens = tokens.map(normalizeASCII).filter(Boolean);
+      const tokenSet = Array.from(new Set([...tokens, ...normTokens]));
+
+      // ── Budgets (parsed)
+      const maxBudget = parseMoney(rentalRequest.budgetTo ?? rentalRequest.budget);
+      const minBudget = parseMoney(rentalRequest.budgetFrom);
+      this.logInfo('matching.budget_parsed', { requestId: rentalRequest.id, minBudget, maxBudget });
+
+      // ── Bedrooms (coerced)
+      const reqBeds = asInt(rentalRequest.bedrooms);
+
+      // ── Availability flexibility (urgency-aware lite)
+      const moveIn = rentalRequest.moveInDate ? new Date(rentalRequest.moveInDate) : null;
+      const hasMoveIn = moveIn && !Number.isNaN(moveIn.getTime());
+      const baseFlexDays = 30; // simple version
+      const availableCutoff = hasMoveIn ? new Date(moveIn.getTime() + baseFlexDays * 86400000) : null;
+
+      // ── Property-centric fetch
+      const where = {
+        status: 'AVAILABLE',
+        availability: true,
+        ...((cityToken || tokenSet.length > 0) ? {
+          OR: [
+            cityToken ? { city: { contains: cityToken, mode: 'insensitive' } } : undefined,
+            cityTokenNorm && cityTokenNorm !== cityToken ? { city: { contains: cityTokenNorm, mode: 'insensitive' } } : undefined,
+            tokenSet.length > 0 ? { city: { in: tokenSet } } : undefined
+          ].filter(Boolean)
+        } : {}),
+        monthlyRent: {
+          lte: maxBudget != null ? Math.round(maxBudget * 1.2) : 9999999,
+          ...(minBudget != null ? { gte: minBudget } : {})
+        },
+        ...(rentalRequest.propertyType ? { propertyType: { contains: rentalRequest.propertyType, mode: 'insensitive' } } : {}),
+        ...(reqBeds != null ? { bedrooms: { gte: Math.max(1, reqBeds - 1), lte: reqBeds + 1 } } : {}),
+        ...(hasMoveIn ? { availableFrom: { lte: availableCutoff } } : {})
+      };
+
+      let props = await prisma.property.findMany({
+        where,
+        select: {
+          id: true, landlordId: true, monthlyRent: true, propertyType: true, bedrooms: true,
+          city: true, address: true, availableFrom: true, furnished: true, parking: true, petsAllowed: true,
+          landlord: {
+            select: {
+              id: true, availability: true,
+              landlordProfile: { select: { acceptanceRate: true, averageResponseTime: true } },
             }
           }
         },
-        include: {
-          properties: {
-            where: {
-              // Location matching (must match city)
-              city: {
-                equals: extractedCity,
-                mode: 'insensitive'
-              },
-              // Budget matching (reasonable flexibility)
-              monthlyRent: {
-                lte: (rentalRequest.budgetTo || rentalRequest.budget) * 1.2
-              },
-              // Bedrooms matching (flexible)
-              ...(rentalRequest.bedrooms && {
-                bedrooms: {
-                  gte: Math.max(1, rentalRequest.bedrooms - 1),
-                  lte: rentalRequest.bedrooms + 1
-                }
-              }),
-              // Property is available (flexible)
-              availableFrom: {
-                lte: new Date(new Date(rentalRequest.moveInDate).getTime() + 30 * 24 * 60 * 60 * 1000)
-              },
-              // Property status and availability
-              status: 'AVAILABLE',
-              availability: true
-            },
-            select: {
-              id: true,
-              name: true,
-              city: true,
-              address: true,
-              monthlyRent: true,
-              bedrooms: true,
-              propertyType: true,
-              furnished: true,
-              parking: true,
-              petsAllowed: true,
-              availableFrom: true,
-              status: true,
-              availability: true
-            }
-          }
-        }
+        take: 200
       });
 
-      console.log(`🔍 Found ${matchingLandlords.length} landlords with matching properties`);
-      
-      // Debug: Log each matching landlord and their properties
-      matchingLandlords.forEach(landlord => {
-        console.log(`   👤 Landlord ${landlord.id} (${landlord.email}):`);
-        landlord.properties.forEach(property => {
-          console.log(`      🏢 Property: ${property.name} - ${property.city}, ${property.monthlyRent} PLN, ${property.propertyType}, ${property.bedrooms} bedrooms`);
-        });
-      });
-      
-      // Debug: Log matching criteria for clarity
-      console.log(`📋 Matching Criteria:`);
-      console.log(`   📍 Required City: ${extractedCity}`);
-      console.log(`   💰 Budget Range: ${rentalRequest.budgetFrom || rentalRequest.budget * 0.8} - ${(rentalRequest.budgetTo || rentalRequest.budget) * 2.0} PLN`);
-      console.log(`   🏠 Property Type: ${rentalRequest.propertyType || 'Any'}`);
-      console.log(`   🛏️ Bedrooms: ${rentalRequest.bedrooms ? `${Math.max(1, rentalRequest.bedrooms - 1)}-${rentalRequest.bedrooms + 1}` : 'Any'}`);
-      console.log(`   📅 Move-in Date: ${rentalRequest.moveInDate} (with 30 days flexibility)`);
-
-      // If no matches found, let's check what properties exist
-      if (matchingLandlords.length === 0) {
-        console.log(`❌ NO MATCHES FOUND!`);
-        console.log(`   The rental request does not match any landlord's properties.`);
-        console.log(`   This means landlords will NOT see this request.`);
-        console.log(`🔍 Checking all available properties to understand why...`);
-        const allProperties = await prisma.property.findMany({
-          where: { status: 'AVAILABLE' },
-          select: {
-            id: true,
-            name: true,
-            city: true,
-            address: true,
-            monthlyRent: true,
-            propertyType: true,
-            bedrooms: true,
-            furnished: true,
-            parking: true,
-            petsAllowed: true,
-            availableFrom: true,
-            landlordId: true
-          }
-        });
-        
-        console.log(`📊 Total available properties: ${allProperties.length}`);
-        allProperties.forEach(property => {
-          console.log(`   🏢 Property: ${property.name} - ${property.city}, ${property.monthlyRent} PLN, ${property.propertyType}, ${property.bedrooms} bedrooms, Available: ${property.availableFrom}`);
-        console.log(`      🏠 Features: Furnished: ${property.furnished}, Parking: ${property.parking}, Pets: ${property.petsAllowed}`);
-          
-          // Check why this property doesn't match
-          const locationMatch = property.city.toLowerCase().includes(rentalRequest.location.toLowerCase()) || 
-                               property.address.toLowerCase().includes(rentalRequest.location.toLowerCase());
-          const budgetMatch = property.monthlyRent >= (rentalRequest.budgetFrom || rentalRequest.budget * 0.8) && 
-                             property.monthlyRent <= (rentalRequest.budgetTo || rentalRequest.budget * 1.2);
-          const typeMatch = !rentalRequest.propertyType || property.propertyType.toLowerCase() === rentalRequest.propertyType.toLowerCase();
-          const dateMatch = new Date(property.availableFrom) <= new Date(rentalRequest.moveInDate);
-          const furnishedMatch = rentalRequest.furnished === undefined || property.furnished === rentalRequest.furnished;
-          const parkingMatch = rentalRequest.parking === undefined || property.parking === rentalRequest.parking;
-          const petsMatch = rentalRequest.petsAllowed === undefined || property.petsAllowed === rentalRequest.petsAllowed;
-          
-          console.log(`      🔍 Match Analysis:`);
-          console.log(`         📍 Location: ${locationMatch ? '✅' : '❌'} (Property: ${property.city}, Request: ${rentalRequest.location})`);
-          console.log(`         💰 Budget: ${budgetMatch ? '✅' : '❌'} (Property: ${property.monthlyRent}, Request: ${rentalRequest.budgetFrom}-${rentalRequest.budgetTo})`);
-          console.log(`         🏠 Type: ${typeMatch ? '✅' : '❌'} (Property: ${property.propertyType}, Request: ${rentalRequest.propertyType})`);
-          console.log(`         📅 Date: ${dateMatch ? '✅' : '❌'} (Property: ${property.availableFrom}, Request: ${rentalRequest.moveInDate})`);
-          console.log(`         🛋️ Furnished: ${furnishedMatch ? '✅' : '❌'} (Property: ${property.furnished}, Request: ${rentalRequest.furnished})`);
-          console.log(`         🚗 Parking: ${parkingMatch ? '✅' : '❌'} (Property: ${property.parking}, Request: ${rentalRequest.parking})`);
-          console.log(`         🐾 Pets: ${petsMatch ? '✅' : '❌'} (Property: ${property.petsAllowed}, Request: ${rentalRequest.petsAllowed})`);
-        });
+      if (!props || props.length === 0) {
+        this.logWarn('matching.relax_filters', { requestId: rentalRequest.id });
+        const relaxedWhere = {
+          status: 'AVAILABLE',
+          availability: true,
+          ...((cityToken || tokenSet.length > 0) ? {
+            OR: [
+              cityToken ? { city: { contains: cityToken, mode: 'insensitive' } } : undefined,
+              cityTokenNorm && cityTokenNorm !== cityToken ? { city: { contains: cityTokenNorm, mode: 'insensitive' } } : undefined,
+            ].filter(Boolean)
+          } : {}),
+          monthlyRent: { lte: maxBudget != null ? Math.round(maxBudget * 2.0) : 9999999, ...(minBudget != null ? { gte: minBudget } : {}) },
+          ...(hasMoveIn ? { availableFrom: { lte: availableCutoff } } : {})
+        };
+        props = await prisma.property.findMany({ where: relaxedWhere, select: whereSelect(), take: 200 });
       }
 
-      // 🚀 SCALABILITY: Score and filter matches
-      const scoredLandlords = matchingLandlords
-        .map(landlord => ({
-          ...landlord,
-          matchScore: this.calculateSimpleMatchScore(landlord, rentalRequest),
-          matchReason: this.generateSimpleMatchReason(landlord, rentalRequest),
-          matchingProperties: landlord.properties
-        }))
-        .filter(landlord => landlord.matchScore > 0.3) // Only good matches
-        .sort((a, b) => b.matchScore - a.matchScore)
-        .slice(0, 20); // Top 20 matches
+      // Group by landlord and carry a bounded property set
+      const map = new Map();
+      for (const p of props) {
+        const L = p.landlord;
+        if (!L || L.availability === false) continue;
+        if (!map.has(L.id)) map.set(L.id, { id: L.id, landlordProfile: L.landlordProfile, properties: [] });
+        const entry = map.get(L.id);
+        if (!entry.properties.some(x => x.id === p.id)) entry.properties.push(stripLandlord(p));
+        if (entry.properties.length > 20) entry.properties.length = 20;
+      }
+      const potentialLandlords = Array.from(map.values());
+      this.logInfo('matching.candidates', { count: potentialLandlords.length });
 
-      console.log(`🎯 After scoring: ${scoredLandlords.length} landlords with score > 0.3`);
-      
-      // Debug: Log scored landlords
-      scoredLandlords.forEach(landlord => {
-        console.log(`   🏆 Landlord ${landlord.id}: Score ${landlord.matchScore}, Reason: ${landlord.matchReason}`);
-      });
+      if (potentialLandlords.length === 0) return [];
 
-      return scoredLandlords;
+      // Score
+      const scored = potentialLandlords.map(l => {
+        const best = this.findBestMatchingProperty(l.properties, rentalRequest);
+        const matchScore = this.calculateWeightedScore(l, rentalRequest, best);
+        const matchReason = this.generateMatchReason(best, rentalRequest, l.landlordProfile);
+        return { ...l, matchScore, matchReason };
+      }).sort((a,b) => b.matchScore - a.matchScore);
+
+      // Thresholding (dynamic-lite)
+      let threshold = this.matchingConfig.thresholds.normal;
+      if (maxBudget == null && minBudget == null) threshold = Math.min(threshold, 30);
+      let filtered = scored.filter(x => x.matchScore >= threshold);
+      if (filtered.length === 0 && scored.length > 0) {
+        this.logWarn('matching.fallback_due_to_no_results', { threshold, scored: scored.length });
+        filtered = scored.slice(0, Math.min(3, scored.length));
+      }
+
+      this.logInfo('matching.filtered', { before: scored.length, after: filtered.length, threshold });
+      return filtered.slice(0, 20);
 
     } catch (error) {
       console.error('❌ Error finding matching landlords:', error);
@@ -261,190 +196,125 @@ class RequestPoolService {
     }
   }
 
-  /**
-   * 🚀 SCALABILITY: Calculate simple match score based on property criteria
-   */
-  calculateSimpleMatchScore(landlord, rentalRequest) {
-    let score = 50; // Base score
+  // Weighted score on best property
+  calculateWeightedScore(landlord, rentalRequest, property) {
+    if (!property) return 0;
+    const W = this.matchingConfig.weights;
+    let loc = 0, bud = 0, feat = 0, tim = 0, perf = 0;
 
-    if (!landlord.properties || landlord.properties.length === 0) {
-      console.log(`   ❌ Landlord ${landlord.id} has no properties`);
-      return 0;
+    // Location (tokens, tolerant)
+    const reqLoc = normalizeASCII(String(rentalRequest.location || '').toLowerCase());
+    const tokens = new Set(reqLoc.split(/[,\s]+/).filter(Boolean));
+    const cityNorm = normalizeASCII(String(property.city || '').toLowerCase());
+    const addrNorm = normalizeASCII(String(property.address || '').toLowerCase());
+    if (cityNorm && (reqLoc.includes(cityNorm) || tokens.has(cityNorm))) loc += 30;
+    if ([...tokens].some(t => t && addrNorm.includes(t))) loc += 10;
+    if (loc > 40) loc = 40;
+
+    // Budget
+    const maxBudget = parseMoney(rentalRequest.budgetTo ?? rentalRequest.budget);
+    const minBudget = parseMoney(rentalRequest.budgetFrom);
+    const rent = Number(property.monthlyRent);
+    if (Number.isFinite(rent)) {
+      if (maxBudget != null) {
+        const inRange = (minBudget == null || rent >= minBudget) && rent <= maxBudget;
+        if (inRange) bud = 25;
+        else if (rent <= maxBudget) bud = 20;
+        else if (rent <= maxBudget * 1.1) bud = 15;
+        else if (rent <= maxBudget * 1.2) bud = 10;
+      } else {
+        bud = 10; // partial credit if no max provided
+      }
     }
 
-    // Get the best matching property
-    const bestProperty = landlord.properties[0]; // Already sorted by match criteria
+    // Features
+    if (rentalRequest.propertyType && property.propertyType &&
+        property.propertyType.toLowerCase().includes(String(rentalRequest.propertyType).toLowerCase())) feat += 8;
+    const reqBeds = asInt(rentalRequest.bedrooms);
+    if (reqBeds != null && property.bedrooms != null) {
+      if (property.bedrooms === reqBeds) feat += 6;
+      else if (Math.abs(property.bedrooms - reqBeds) === 1) feat += 3;
+    }
+    if (rentalRequest.furnished !== undefined && property.furnished === rentalRequest.furnished) feat += 2;
+    if (rentalRequest.parking   !== undefined && property.parking   === rentalRequest.parking)   feat += 2;
+    if (rentalRequest.petsAllowed!==undefined && property.petsAllowed===rentalRequest.petsAllowed) feat += 2;
+    if (feat > 20) feat = 20;
 
-    console.log(`   🧮 Scoring landlord ${landlord.id} with property ${bestProperty.name}:`);
-
-    // 📍 Location match (40 points)
-    const extractedCity = rentalRequest.location ? 
-      rentalRequest.location.split(',').pop()?.trim() || rentalRequest.location.trim() : 
-      null;
-    const locationMatch = extractedCity && (
-      bestProperty.city.toLowerCase().includes(extractedCity.toLowerCase()) ||
-      extractedCity.toLowerCase().includes(bestProperty.city.toLowerCase()) ||
-      bestProperty.address.toLowerCase().includes(extractedCity.toLowerCase())
-    );
-    if (locationMatch) {
-      score += 40;
-      console.log(`      ✅ Location match: +40 points (Property city: ${bestProperty.city}, Extracted city: ${extractedCity})`);
-    } else {
-      console.log(`      ❌ Location mismatch: Property city "${bestProperty.city}" vs extracted city "${extractedCity}"`);
+    // Timing
+    const moveIn = rentalRequest.moveInDate ? new Date(rentalRequest.moveInDate) : null;
+    if (moveIn && !Number.isNaN(moveIn.getTime()) && property.availableFrom) {
+      const avail = new Date(property.availableFrom);
+      const daysDiff = Math.ceil((moveIn - avail) / 86400000);
+      if (daysDiff === 0) tim = 10;
+      else if (daysDiff > 0 && daysDiff <= 7)  tim = 8;
+      else if (daysDiff > 0 && daysDiff <= 30) tim = 5;
+      else if (daysDiff > 0 && daysDiff <= 90) tim = 3;
     }
 
-    // 💰 Budget match (30 points)
-    const budgetRange = rentalRequest.budgetTo - rentalRequest.budgetFrom;
-    const budgetTolerance = budgetRange * 0.1; // 10% tolerance
-    const maxAllowedRent = rentalRequest.budgetTo * 1.2; // 20% above max budget
-    
-    if (bestProperty.monthlyRent >= (rentalRequest.budgetFrom - budgetTolerance) && 
-        bestProperty.monthlyRent <= (rentalRequest.budgetTo + budgetTolerance)) {
-      score += 30;
-      console.log(`      ✅ Budget match with tolerance: +30 points (${bestProperty.monthlyRent} PLN in range ${rentalRequest.budgetFrom - budgetTolerance}-${rentalRequest.budgetTo + budgetTolerance})`);
-    } else if (bestProperty.monthlyRent >= rentalRequest.budgetFrom && 
-               bestProperty.monthlyRent <= rentalRequest.budgetTo) {
-      score += 25; // Within exact range
-      console.log(`      ✅ Budget exact match: +25 points (${bestProperty.monthlyRent} PLN in exact range ${rentalRequest.budgetFrom}-${rentalRequest.budgetTo})`);
-    } else if (bestProperty.monthlyRent <= rentalRequest.budgetTo) {
-      score += 15; // Within max budget
-      console.log(`      ✅ Budget within max: +15 points (${bestProperty.monthlyRent} PLN <= ${rentalRequest.budgetTo})`);
-    } else if (bestProperty.monthlyRent <= maxAllowedRent) {
-      score += 5; // Within 20% flexibility (minimal points)
-      console.log(`      ⚠️ Budget within flexibility: +5 points (${bestProperty.monthlyRent} PLN <= ${maxAllowedRent} PLN)`);
-    } else {
-      console.log(`      ❌ Budget mismatch: ${bestProperty.monthlyRent} PLN vs range ${rentalRequest.budgetFrom}-${rentalRequest.budgetTo} (max allowed: ${maxAllowedRent} PLN)`);
-    }
+    // Performance (acceptance rate + response)
+    const prof = landlord.landlordProfile || {};
+    if (prof.acceptanceRate > 0.8) perf += 3;
+    else if (prof.acceptanceRate > 0.6) perf += 2;
+    const rt = prof.averageResponseTime;
+    if (rt && rt < 3600000) perf += 2; else if (rt && rt < 86400000) perf += 1;
+    if (perf > 5) perf = 5;
 
-    // 🏠 Bedrooms match (20 points)
-    if (rentalRequest.bedrooms && bestProperty.bedrooms === rentalRequest.bedrooms) {
-      score += 20;
-      console.log(`      ✅ Bedrooms exact match: +20 points (${bestProperty.bedrooms} = ${rentalRequest.bedrooms})`);
-    } else if (rentalRequest.bedrooms && Math.abs(bestProperty.bedrooms - rentalRequest.bedrooms) <= 1) {
-      score += 10; // Close match
-      console.log(`      ✅ Bedrooms close match: +10 points (${bestProperty.bedrooms} ≈ ${rentalRequest.bedrooms})`);
-    } else if (rentalRequest.bedrooms) {
-      console.log(`      ❌ Bedrooms mismatch: ${bestProperty.bedrooms} vs ${rentalRequest.bedrooms}`);
-    }
-
-    // 🏠 Property type match (15 points)
-    if (rentalRequest.propertyType && bestProperty.propertyType && 
-        bestProperty.propertyType.toLowerCase().includes(rentalRequest.propertyType.toLowerCase())) {
-      score += 15;
-      console.log(`      ✅ Property type match: +15 points (${bestProperty.propertyType} includes ${rentalRequest.propertyType})`);
-    } else if (rentalRequest.propertyType) {
-      console.log(`      ❌ Property type mismatch: ${bestProperty.propertyType} vs ${rentalRequest.propertyType}`);
-    }
-
-    // 🛋️ Furnished match (5 points)
-    if (rentalRequest.furnished !== undefined && bestProperty.furnished === rentalRequest.furnished) {
-      score += 5;
-      console.log(`      ✅ Furnished match: +5 points (${bestProperty.furnished} = ${rentalRequest.furnished})`);
-    } else if (rentalRequest.furnished !== undefined) {
-      console.log(`      ❌ Furnished mismatch: ${bestProperty.furnished} vs ${rentalRequest.furnished}`);
-    }
-
-    // 🚗 Parking match (5 points)
-    if (rentalRequest.parking !== undefined && bestProperty.parking === rentalRequest.parking) {
-      score += 5;
-      console.log(`      ✅ Parking match: +5 points (${bestProperty.parking} = ${rentalRequest.parking})`);
-    } else if (rentalRequest.parking !== undefined) {
-      console.log(`      ❌ Parking mismatch: ${bestProperty.parking} vs ${rentalRequest.parking}`);
-    }
-
-    // 🐾 Pets match (5 points)
-    if (rentalRequest.petsAllowed !== undefined && bestProperty.petsAllowed === rentalRequest.petsAllowed) {
-      score += 5;
-      console.log(`      ✅ Pets match: +5 points (${bestProperty.petsAllowed} = ${rentalRequest.petsAllowed})`);
-    } else if (rentalRequest.petsAllowed !== undefined) {
-      console.log(`      ❌ Pets mismatch: ${bestProperty.petsAllowed} vs ${rentalRequest.petsAllowed}`);
-    }
-
-    // 📅 Availability match (10 points)
-    const moveInDate = new Date(rentalRequest.moveInDate);
-    const availableFrom = new Date(bestProperty.availableFrom);
-    const daysDiff = Math.abs((moveInDate - availableFrom) / (1000 * 60 * 60 * 24));
-    
-    if (daysDiff <= 7) {
-      score += 10; // Available within a week
-      console.log(`      ✅ Availability within week: +10 points (${daysDiff.toFixed(1)} days diff)`);
-    } else if (daysDiff <= 30) {
-      score += 5; // Available within a month
-      console.log(`      ✅ Availability within month: +5 points (${daysDiff.toFixed(1)} days diff)`);
-    } else {
-      console.log(`      ❌ Availability mismatch: ${daysDiff.toFixed(1)} days diff`);
-    }
-
-    const finalScore = Math.min(100, Math.max(0, score));
-    console.log(`      🎯 Final score: ${finalScore}/100`);
-    
-    return finalScore;
+    // Weighted sum (clip 0..100)
+    const sum =
+      (loc/40)*W.location +
+      (bud/25)*W.budget +
+      (feat/20)*W.features +
+      (tim/10)*W.timing +
+      (perf/5 )*W.performance;
+    return Math.min(100, Math.max(0, Math.round(sum)));
   }
 
-  /**
-   * 🚀 SCALABILITY: Generate simple match reason
-   */
-  generateSimpleMatchReason(landlord, rentalRequest) {
+  generateMatchReason(bestProperty, rentalRequest, landlordProfile) {
+    if (!bestProperty) return 'Property criteria match';
     const reasons = [];
-    
-    if (!landlord.properties || landlord.properties.length === 0) {
-      return 'No matching properties';
+    const reqLoc = normalizeASCII(String(rentalRequest.location || '').toLowerCase());
+    const cityNorm = normalizeASCII(String(bestProperty.city || '').toLowerCase());
+    if (cityNorm && reqLoc.includes(cityNorm)) reasons.push('Perfect location match');
+    const maxBudget = parseMoney(rentalRequest.budgetTo ?? rentalRequest.budget);
+    const minBudget = parseMoney(rentalRequest.budgetFrom);
+    const rent = Number(bestProperty.monthlyRent);
+    if (Number.isFinite(rent)) {
+      if (maxBudget != null && (minBudget == null || rent >= minBudget) && rent <= maxBudget) reasons.push('Within budget range');
+      else if (maxBudget != null && rent <= maxBudget * 1.1) reasons.push('Slightly above budget (negotiable)');
+      else if (minBudget != null && rent < minBudget) reasons.push('Below your stated range');
     }
-
-    const bestProperty = landlord.properties[0];
-
-    // Location reasons
-    const extractedCity = rentalRequest.location ? 
-      rentalRequest.location.split(',').pop()?.trim() || rentalRequest.location.trim() : 
-      null;
-    if (extractedCity && (
-      bestProperty.city.toLowerCase().includes(extractedCity.toLowerCase()) ||
-      extractedCity.toLowerCase().includes(bestProperty.city.toLowerCase()) ||
-      bestProperty.address.toLowerCase().includes(extractedCity.toLowerCase())
-    )) {
-      reasons.push('Location match');
-    }
-
-    // Budget reasons
-    if (bestProperty.monthlyRent >= rentalRequest.budgetFrom && 
-        bestProperty.monthlyRent <= rentalRequest.budgetTo) {
-      reasons.push('Budget match');
-    } else if (bestProperty.monthlyRent <= rentalRequest.budgetTo) {
-      reasons.push('Within budget');
-    } else if (bestProperty.monthlyRent <= (rentalRequest.budgetTo * 1.2)) {
-      reasons.push('Slightly above budget (negotiable)');
-    }
-
-    // Property type reasons
-    if (rentalRequest.propertyType && bestProperty.propertyType && 
-        bestProperty.propertyType.toLowerCase().includes(rentalRequest.propertyType.toLowerCase())) {
-      reasons.push('Property type match');
-    }
-
-    // Bedrooms reasons
-    if (rentalRequest.bedrooms && bestProperty.bedrooms === rentalRequest.bedrooms) {
-      reasons.push('Bedrooms match');
-    }
-
-    // Property features reasons
-    if (rentalRequest.furnished !== undefined && bestProperty.furnished === rentalRequest.furnished) {
-      reasons.push(rentalRequest.furnished ? 'Furnished' : 'Unfurnished');
-    }
-    if (rentalRequest.parking !== undefined && bestProperty.parking === rentalRequest.parking) {
-      reasons.push(rentalRequest.parking ? 'Parking available' : 'No parking');
-    }
-    if (rentalRequest.petsAllowed !== undefined && bestProperty.petsAllowed === rentalRequest.petsAllowed) {
-      reasons.push(rentalRequest.petsAllowed ? 'Pets allowed' : 'No pets');
-    }
-
-    // Availability reasons
-    const moveInDate = new Date(rentalRequest.moveInDate);
-    const availableFrom = new Date(bestProperty.availableFrom);
-    if (availableFrom <= moveInDate) {
-      reasons.push('Available on time');
-    }
-
+    if (rentalRequest.propertyType && bestProperty.propertyType &&
+        bestProperty.propertyType.toLowerCase().includes(String(rentalRequest.propertyType).toLowerCase())) reasons.push('Property type match');
+    const reqBeds = asInt(rentalRequest.bedrooms);
+    if (reqBeds != null && bestProperty.bedrooms === reqBeds) reasons.push('Bedrooms match');
+    if (landlordProfile?.acceptanceRate > 0.8) reasons.push('High success rate');
     return reasons.join(', ') || 'Property criteria match';
+  }
+
+  // Pick best property by sub-score
+  findBestMatchingProperty(properties, rentalRequest) {
+    if (!Array.isArray(properties) || properties.length === 0) return null;
+    const scored = properties.map(p => {
+      let s = 0;
+      const reqLoc = normalizeASCII(String(rentalRequest.location || '').toLowerCase());
+      const cityNorm = normalizeASCII(String(p.city || '').toLowerCase());
+      if (cityNorm && reqLoc.includes(cityNorm)) s += 30;
+      const maxBudget = parseMoney(rentalRequest.budgetTo ?? rentalRequest.budget);
+      const minBudget = parseMoney(rentalRequest.budgetFrom);
+      if (p.monthlyRent != null) {
+        const rent = Number(p.monthlyRent);
+        if (maxBudget != null) {
+          if ((minBudget == null || rent >= minBudget) && rent <= maxBudget) s += 25;
+          else if (rent <= maxBudget) s += 20;
+        } else s += 10;
+      }
+      if (rentalRequest.propertyType && p.propertyType &&
+          p.propertyType.toLowerCase().includes(String(rentalRequest.propertyType).toLowerCase())) s += 20;
+      const reqBeds = asInt(rentalRequest.bedrooms);
+      if (reqBeds != null && p.bedrooms === reqBeds) s += 15;
+      return { p, s };
+    }).sort((a,b) => b.s - a.s);
+    return scored[0]?.p || null;
   }
 
   /**
@@ -452,17 +322,11 @@ class RequestPoolService {
    */
   async createMatches(rentalRequestId, landlords, rentalRequest) {
     try {
-      // Anchor each match to a specific property when possible
+      // Anchor each match to a specific best property (guaranteed if available)
       const matches = [];
       for (const landlord of landlords) {
-        // Try to determine the best matching property for this landlord/request
-        let bestPropertyId = null;
-        try {
-          const bestProperty = await this.getBestMatchingProperty(landlord.id, rentalRequest);
-          bestPropertyId = bestProperty?.id || null;
-        } catch (err) {
-          console.warn(`⚠️ getBestMatchingProperty failed for landlord ${landlord.id} and request ${rentalRequestId}:`, err?.message || err);
-        }
+        const best = this.findBestMatchingProperty(landlord.properties, rentalRequest);
+        const bestPropertyId = best?.id || null;
 
         matches.push({
           landlordId: landlord.id,
@@ -480,15 +344,11 @@ class RequestPoolService {
 
       // 🚀 SCALABILITY: Batch insert for performance
       await prisma.landlordRequestMatch.createMany({
-        data: matches
+        data: matches,
+        skipDuplicates: true
       });
 
       console.log(`✅ Created ${matches.length} matches for request ${rentalRequestId}`);
-      
-      // Debug: Log each match
-      matches.forEach(match => {
-        console.log(`   📍 Match: Landlord ${match.landlordId} -> Request ${match.rentalRequestId} Property ${match.propertyId || 'N/A'} (Score: ${match.matchScore})`);
-      });
 
       // Create notifications for landlords about new rental requests
       try {
@@ -511,64 +371,6 @@ class RequestPoolService {
 
     } catch (error) {
       console.error('❌ Error creating matches:', error);
-    }
-  }
-
-  /**
-   * Get the best matching property for a landlord and rental request
-   */
-  async getBestMatchingProperty(landlordId, rentalRequest) {
-    try {
-      const properties = await prisma.property.findMany({
-        where: {
-          landlordId: landlordId,
-          status: 'AVAILABLE',
-          // Location matching (strict - must match city exactly)
-          city: {
-            equals: rentalRequest.city || rentalRequest.location.split(',')[1]?.trim() || rentalRequest.location.trim(),
-            mode: 'insensitive'
-          },
-                        // Budget matching (flexible - allow landlords to see requests they can adjust to)
-              monthlyRent: {
-                lte: rentalRequest.budgetTo * 1.5 || rentalRequest.budget * 1.5
-              },
-              // Property type matching (strict - must match exactly)
-              ...(rentalRequest.propertyType && {
-                propertyType: {
-                  equals: rentalRequest.propertyType,
-                  mode: 'insensitive'
-                }
-              }),
-          // Bedrooms matching (if specified)
-          ...(rentalRequest.bedrooms && {
-            bedrooms: rentalRequest.bedrooms
-          }),
-          // Property features matching (if specified)
-          ...(rentalRequest.furnished !== undefined && {
-            furnished: rentalRequest.furnished
-          }),
-          ...(rentalRequest.parking !== undefined && {
-            parking: rentalRequest.parking
-          }),
-          ...(rentalRequest.petsAllowed !== undefined && {
-            petsAllowed: rentalRequest.petsAllowed
-          }),
-          // Property is available
-          availableFrom: {
-            lte: new Date(rentalRequest.moveInDate)
-          }
-        },
-        orderBy: [
-          { monthlyRent: 'asc' }, // Prefer cheaper properties
-          { availableFrom: 'asc' } // Prefer earlier availability
-        ],
-        take: 1
-      });
-
-      return properties[0] || null;
-    } catch (error) {
-      console.error('Error getting best matching property:', error);
-      return null;
     }
   }
 
@@ -611,18 +413,6 @@ class RequestPoolService {
         take: limit
       });
 
-      // Get the best matching property for each request
-      const requestsWithProperties = await Promise.all(requests.map(async (match) => {
-        const bestProperty = await this.getBestMatchingProperty(landlordId, match.rentalRequest);
-        return {
-          ...match,
-          rentalRequest: {
-            ...match.rentalRequest,
-            bestMatchingProperty: bestProperty
-          }
-        };
-      }));
-
       const total = await prisma.landlordRequestMatch.count({
         where: {
           landlordId: landlordId,
@@ -637,7 +427,7 @@ class RequestPoolService {
       });
 
       const result = {
-        requests: requestsWithProperties,
+        requests,
         pagination: {
           page,
           limit,
@@ -711,16 +501,31 @@ class RequestPoolService {
   }
 
   /**
+   * 🚀 SCALABILITY: Update landlord availability after property changes
+   */
+  async updateLandlordAvailability(landlordId, hasAvailableProperties = true) {
+    try {
+      // Update landlord availability based on whether they have available properties
+      await prisma.user.update({
+        where: { id: landlordId },
+        data: {
+          availability: hasAvailableProperties,
+          lastActiveAt: new Date()
+        }
+      });
+
+      console.log(`📊 Updated landlord ${landlordId} availability to ${hasAvailableProperties}`);
+
+    } catch (error) {
+      console.error('❌ Error updating landlord availability:', error);
+    }
+  }
+
+  /**
    * 🚀 SCALABILITY: Update pool analytics
    */
   async updatePoolAnalytics(location) {
     try {
-      // If location is undefined, use a default or skip analytics
-      if (!location) {
-        console.log('⚠️ Skipping pool analytics update - no location provided');
-        return;
-      }
-
       const [totalRequests, activeRequests, matchedRequests, expiredRequests] = await Promise.all([
         prisma.rentalRequest.count({ where: { location } }),
         prisma.rentalRequest.count({ where: { location, poolStatus: 'ACTIVE' } }),
@@ -728,7 +533,8 @@ class RequestPoolService {
         prisma.rentalRequest.count({ where: { location, poolStatus: 'EXPIRED' } })
       ]);
 
-      const landlordCount = 0; // Skip for now
+      // Skip landlord count for now to avoid Prisma validation errors
+      const landlordCount = 0;
 
       await prisma.requestPoolAnalytics.create({
         data: {
@@ -742,10 +548,41 @@ class RequestPoolService {
         }
       });
 
-      console.log(`📊 Updated pool analytics for location: ${location}`);
-
     } catch (error) {
       console.error('❌ Error updating pool analytics:', error);
+    }
+  }
+
+  /**
+   * 🚀 SCALABILITY: Cache management methods
+   */
+  async cacheRequest(rentalRequest) {
+    try {
+      // Redis disabled for development - will be enabled in production
+      console.log('📝 Redis disabled for development');
+      return;
+    } catch (error) {
+      console.error('❌ Error caching request:', error);
+    }
+  }
+
+  async clearRequestCache(rentalRequestId) {
+    try {
+      // Redis disabled for development - will be enabled in production
+      console.log('📝 Redis disabled for development');
+      return;
+    } catch (error) {
+      console.error('❌ Error clearing request cache:', error);
+    }
+  }
+
+  async clearLandlordCache(landlordId) {
+    try {
+      // Redis disabled for development - will be enabled in production
+      console.log('📝 Redis disabled for development');
+      return;
+    } catch (error) {
+      console.error('❌ Error clearing landlord cache:', error);
     }
   }
 
@@ -769,7 +606,8 @@ class RequestPoolService {
           title: true,
           tenantId: true,
           moveInDate: true,
-          expiresAt: true
+          expiresAt: true,
+          location: true
         }
       });
 
@@ -818,7 +656,7 @@ class RequestPoolService {
     try {
       const [totalActive, totalLandlords, recentMatches] = await Promise.all([
         prisma.rentalRequest.count({ where: { poolStatus: 'ACTIVE' } }),
-        prisma.user.count({ where: { role: 'LANDLORD' } }),
+        prisma.user.count({ where: { role: 'LANDLORD', availability: true } }),
         prisma.landlordRequestMatch.count({
           where: {
             createdAt: {
@@ -840,53 +678,20 @@ class RequestPoolService {
       return null;
     }
   }
-
-  /**
-   * 🚀 SCALABILITY: Get detailed pool analytics
-   */
-  async getPoolAnalytics() {
-    try {
-      const analytics = {};
-
-      // Total counts by status
-      const statusCounts = await prisma.rentalRequest.groupBy({
-        by: ['poolStatus'],
-        _count: { id: true }
-      });
-
-      analytics.statusBreakdown = {};
-      statusCounts.forEach(stat => {
-        analytics.statusBreakdown[stat.poolStatus] = stat._count.id;
-      });
-
-      // Recent activity (last 7 days)
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const recentRequests = await prisma.rentalRequest.count({
-        where: { createdAt: { gte: weekAgo } }
-      });
-
-      analytics.recentActivity = {
-        requestsLast7Days: recentRequests
-      };
-
-      // Matching efficiency
-      const totalMatches = await prisma.landlordRequestMatch.count();
-      const activeMatches = await prisma.landlordRequestMatch.count({
-        where: { status: 'ACTIVE' }
-      });
-
-      analytics.matchingEfficiency = {
-        totalMatches,
-        activeMatches,
-        responseRate: totalMatches > 0 ? ((activeMatches / totalMatches) * 100).toFixed(2) : 0
-      };
-
-      return analytics;
-    } catch (error) {
-      console.error('❌ Error getting pool analytics:', error);
-      throw error;
-    }
-  }
 }
 
-export default new RequestPoolService(); 
+// helpers outside the class
+function whereSelect() {
+  return {
+    id: true, landlordId: true, monthlyRent: true, propertyType: true, bedrooms: true,
+    city: true, address: true, availableFrom: true, furnished: true, parking: true, petsAllowed: true,
+    landlord: { select: { id: true, availability: true, landlordProfile: { select: { acceptanceRate: true, averageResponseTime: true } } } }
+  };
+}
+
+function stripLandlord(property) {
+  const { landlord, ...rest } = property;
+  return rest;
+}
+
+export default new RequestPoolService();
