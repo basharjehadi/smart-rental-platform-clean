@@ -3,6 +3,7 @@ import { initializeLeaseDates } from './cronController.js';
 import { sendOfferNotification } from '../utils/emailService.js';
 import requestPoolService from '../services/requestPoolService.js';
 import { NotificationService } from '../services/notificationService.js';
+import propertyAvailabilityService from '../services/propertyAvailabilityService.js';
 
 // 🚀 SCALABILITY: Create rental request with pool integration
 const createRentalRequest = async (req, res) => {
@@ -1178,7 +1179,7 @@ const getOfferDetails = async (req, res) => {
   }
 };
 
-// 🚀 SCALABILITY: Update tenant offer status (Accept/Decline)
+// 🚀 SCALABILITY: Update tenant offer status (Accept/Decline/Mock Pay)
 const updateTenantOfferStatus = async (req, res) => {
   try {
     const { offerId } = req.params;
@@ -1273,11 +1274,93 @@ const updateTenantOfferStatus = async (req, res) => {
         offer: updatedOffer,
         note: 'Your rental request remains active in the pool for other landlords to consider.'
         });
-      } else {
-        return res.status(400).json({
-          error: 'Invalid status. Only ACCEPTED or REJECTED are allowed.'
+    } else if (status === 'PAID') {
+      // 🔧 DEV/Mock payment path: mark offer as PAID and perform all side effects
+      const result = await prisma.$transaction(async (tx) => {
+        // Update offer to PAID with payment timestamp
+        const paidAt = new Date();
+        const updatedOffer = await tx.offer.update({
+          where: { id: parseInt(offerId) },
+          data: {
+            status: 'PAID',
+            isPaid: true,
+            paymentDate: paidAt,
+            updatedAt: paidAt
+          },
+          select: {
+            id: true,
+            rentAmount: true,
+            depositAmount: true,
+            rentalRequestId: true,
+            propertyId: true,
+            landlordId: true
+          }
         });
+
+        // Create a successful payment record (combined deposit + first month)
+        const amountTotal = (updatedOffer.rentAmount || 0) + (updatedOffer.depositAmount || 0);
+        await tx.payment.create({
+          data: {
+            amount: amountTotal,
+            status: 'SUCCEEDED',
+            purpose: 'DEPOSIT_AND_FIRST_MONTH',
+            userId: req.user.id,
+            rentalRequestId: updatedOffer.rentalRequestId,
+            stripePaymentIntentId: `mock_${Date.now()}_${updatedOffer.id}`,
+            createdAt: paidAt
+          }
+        });
+
+        // Invalidate all other offers for the same property (first-to-pay wins)
+        if (updatedOffer.propertyId) {
+          await tx.offer.updateMany({
+            where: {
+              propertyId: updatedOffer.propertyId,
+              id: { not: parseInt(offerId) },
+              status: { in: ['PENDING', 'ACCEPTED'] }
+            },
+            data: { status: 'REJECTED', updatedAt: new Date() }
+          });
+        }
+
+        return updatedOffer;
+      });
+
+      // Remove the rental request from the pool
+      try {
+        await requestPoolService.removeFromPool(result.rentalRequestId, 'MATCHED');
+      } catch (poolError) {
+        console.error('❌ Error removing request from pool:', poolError);
       }
+
+      // Update property availability to OCCUPIED
+      try {
+        if (result.propertyId) {
+          await propertyAvailabilityService.updatePropertyAvailability(result.propertyId, false, 'OCCUPIED');
+        }
+      } catch (availabilityError) {
+        console.error('❌ Error updating property availability:', availabilityError);
+      }
+
+      // Generate contract (idempotent if already exists)
+      try {
+        const { generateContractForRentalRequest } = await import('./contractController.js');
+        await generateContractForRentalRequest(result.rentalRequestId);
+      } catch (contractError) {
+        console.error('❌ Error generating contract after mock payment:', contractError);
+      }
+
+      return res.json({
+        success: true,
+        message: 'Payment completed. Offer marked as PAID and contract generated.',
+        offer: { id: result.id, status: 'PAID', paymentDate: new Date() }
+      });
+
+    } else {
+      return res.status(400).json({
+        error: 'Invalid status. Only ACCEPTED, REJECTED, or PAID are allowed.'
+      });
+    }
 
   } catch (error) {
     console.error('Update tenant offer status error:', error);
