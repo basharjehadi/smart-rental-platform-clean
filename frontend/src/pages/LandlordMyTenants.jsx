@@ -301,7 +301,7 @@ const LandlordMyTenants = () => {
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  <option value="all">All Status</option>
+                  <option value="all">Payment Status</option>
                   <option value="paid">Paid</option>
                   <option value="pending">Pending</option>
                   <option value="overdue">Overdue</option>
@@ -320,15 +320,8 @@ const LandlordMyTenants = () => {
                   <option value="rent-low">Rent Low-High</option>
                 </select>
 
-                {/* Quick Actions */}
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => navigate('/landlord-dashboard')}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200"
-                  >
-                    Back to Dashboard
-                  </button>
-                </div>
+                {/* Quick Actions (removed Back to Dashboard per request) */}
+                <div className="flex space-x-2"></div>
               </div>
             </div>
 
@@ -342,8 +335,16 @@ const LandlordMyTenants = () => {
                         {/* Tenant Info */}
                         <div className="flex-1">
                           <div className="flex items-center space-x-4 mb-4">
-                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                              <User className="w-6 h-6 text-blue-600" />
+                            <div className="w-12 h-12 rounded-full overflow-hidden bg-blue-100 flex items-center justify-center">
+                              {tenant.profileImage ? (
+                                <img
+                                  src={tenant.profileImage.startsWith('/') ? `http://localhost:3001${tenant.profileImage}` : `http://localhost:3001/uploads/profile_images/${tenant.profileImage}`}
+                                  alt={tenant.name || 'Tenant'}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <User className="w-6 h-6 text-blue-600" />
+                              )}
                             </div>
                             <div>
                               <h3 className="text-lg font-semibold text-gray-900">{tenant.name || 'Tenant'}</h3>
@@ -358,7 +359,12 @@ const LandlordMyTenants = () => {
                               <Building className="w-4 h-4 text-gray-400" />
                               <div>
                                 <p className="text-sm font-medium text-gray-900">{tenant.property?.title || 'Property'}</p>
-                                <p className="text-xs text-gray-600">{tenant.property?.address}, {tenant.property?.city}</p>
+                                <p className="text-xs text-gray-600">
+                                  {tenant.property?.address}
+                                  {tenant.property?.district ? `, ${tenant.property.district}` : ''}
+                                  {tenant.property?.zipCode ? `, ${tenant.property.zipCode}` : ''}
+                                  {tenant.property?.city ? `, ${tenant.property.city}` : ''}
+                                </p>
                               </div>
                             </div>
 

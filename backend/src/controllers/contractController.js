@@ -343,10 +343,9 @@ export const getContractStatus = async (req, res) => {
         rentalRequest: {
           include: {
             tenant: true,
-            offer: {
-              include: {
-                landlord: true
-              }
+            offers: {
+              where: { status: 'PAID' },
+              include: { landlord: true }
             }
           }
         }
@@ -358,8 +357,9 @@ export const getContractStatus = async (req, res) => {
     }
 
     // Check authorization
-    const { tenant, offer } = contract.rentalRequest;
-    if (tenant.id !== userId && offer.landlord.id !== userId) {
+    const { tenant, offers } = contract.rentalRequest;
+    const paidOffer = offers?.[0];
+    if (tenant.id !== userId && paidOffer?.landlord.id !== userId) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
@@ -372,7 +372,7 @@ export const getContractStatus = async (req, res) => {
       landlordSignedAt: contract.landlordSignedAt,
       canSign: contract.status === 'GENERATED',
       isTenant: tenant.id === userId,
-      isLandlord: offer.landlord.id === userId
+      isLandlord: paidOffer?.landlord.id === userId
     });
 
   } catch (error) {
@@ -1145,8 +1145,8 @@ export const downloadGeneratedContract = async (req, res) => {
 
     // Verify the user is authorized (either tenant or landlord)
     const { tenant, offers } = contract.rentalRequest;
-    const paidOffer = offers[0];
-    if (tenant.id !== userId && paidOffer.landlord.id !== userId) {
+    const paidOffer = offers?.[0];
+    if (tenant.id !== userId && paidOffer?.landlord.id !== userId) {
       return res.status(403).json({ error: 'Access denied. You can only download contracts you are involved in.' });
     }
 
@@ -1212,7 +1212,8 @@ export const downloadSignedContract = async (req, res) => {
                 lastName: true
               }
             },
-            offer: {
+            offers: {
+              where: { status: 'PAID' },
               include: {
                 landlord: {
                   select: {
@@ -1239,8 +1240,9 @@ export const downloadSignedContract = async (req, res) => {
     }
 
     // Verify the user is authorized (either tenant or landlord)
-    const { tenant, offer } = contract.rentalRequest;
-    if (tenant.id !== userId && offer.landlord.id !== userId) {
+    const { tenant, offers } = contract.rentalRequest;
+    const paidOffer = offers?.[0];
+    if (tenant.id !== userId && paidOffer?.landlord.id !== userId) {
       return res.status(403).json({ error: 'Access denied. You can only download contracts you are involved in.' });
     }
 

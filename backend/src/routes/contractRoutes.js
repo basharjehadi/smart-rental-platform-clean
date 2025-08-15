@@ -144,7 +144,8 @@ router.get('/:contractId', verifyToken, async (req, res) => {
                 lastName: true
               }
             },
-            offer: {
+            offers: {
+              where: { status: 'PAID' },
               include: {
                 landlord: {
                   select: {
@@ -169,8 +170,9 @@ router.get('/:contractId', verifyToken, async (req, res) => {
     }
 
     // Verify the user is authorized (either tenant or landlord)
-    const { tenant, offer } = contract.rentalRequest;
-    if (tenant.id !== userId && offer.landlord.id !== userId) {
+    const { tenant, offers } = contract.rentalRequest;
+    const paidOffer = offers?.[0];
+    if (tenant.id !== userId && paidOffer?.landlord.id !== userId) {
       return res.status(403).json({ 
         success: false,
         error: 'Access denied. You can only view contracts you are involved in.' 

@@ -538,7 +538,8 @@ export const continuousRequestMatching = async () => {
       include: {
         landlordRequestMatches: {
           select: {
-            landlordId: true
+            landlordId: true,
+            propertyId: true
           }
         }
       }
@@ -557,9 +558,9 @@ export const continuousRequestMatching = async () => {
           const newMatchingLandlords = await findNewMatchingLandlords(request, matchedLandlordIds);
           
           if (newMatchingLandlords.length > 0) {
-            // Create new matches for newly available landlords
+            // Create new matches for newly available landlords (one per property)
             await createNewMatches(request.id, newMatchingLandlords);
-            console.log(`✅ Created ${newMatchingLandlords.length} new matches for request ${request.id}`);
+            console.log(`✅ Created ${newMatchingLandlords.length} new landlord entries (property-anchored) for request ${request.id}`);
           }
         } catch (error) {
           console.error(`❌ Error processing request ${request.id}:`, error);
@@ -580,6 +581,11 @@ export const continuousRequestMatching = async () => {
 const findNewMatchingLandlords = async (request, existingMatchedLandlordIds) => {
   try {
     // Find landlords with available properties that match the request criteria
+    // Extract city from request.location if available (e.g., "Grunwald, Poznan" -> "Poznan")
+    const extractedCity = request.location
+      ? (request.location.split(',').pop()?.trim() || request.location.trim())
+      : null;
+
     const matchingLandlords = await prisma.user.findMany({
       where: {
         role: 'LANDLORD',
@@ -591,9 +597,9 @@ const findNewMatchingLandlords = async (request, existingMatchedLandlordIds) => 
             availability: true,
             // 🚀 SCALABILITY: Property-specific matching criteria for accurate matches
             // Location matching (city/district)
-            ...(request.city && {
+            ...(extractedCity && {
               city: {
-                contains: request.city,
+                contains: extractedCity,
                 mode: 'insensitive'
               }
             }),
@@ -746,7 +752,7 @@ const calculateMatchScore = async (requestId, landlordId, propertyId) => {
           budget: true,
           budgetFrom: true,
           budgetTo: true,
-          city: true,
+          location: true,
           propertyType: true,
           moveInDate: true,
           bedrooms: true,
@@ -818,11 +824,17 @@ const calculateBudgetScore = (request, property) => {
 };
 
 const calculateLocationScore = (request, property) => {
-  if (!request.city || !property.city) return 70;
-  
-  const requestCity = request.city.toLowerCase();
+  if (!request.location || !property.city) return 70;
+
+  const extractedCity = request.location
+    ? (request.location.split(',').pop()?.trim() || request.location.trim())
+    : '';
+
+  if (!extractedCity) return 70;
+
+  const requestCity = extractedCity.toLowerCase();
   const propertyCity = property.city.toLowerCase();
-  
+
   if (requestCity === propertyCity) {
     return 100; // Exact match
   } else if (propertyCity.includes(requestCity) || requestCity.includes(propertyCity)) {
@@ -894,7 +906,7 @@ const generateMatchReason = async (requestId, landlordId, propertyId) => {
           budget: true,
           budgetFrom: true,
           budgetTo: true,
-          city: true,
+          location: true,
           propertyType: true,
           moveInDate: true,
           bedrooms: true,
@@ -934,10 +946,13 @@ const generateMatchReason = async (requestId, landlordId, propertyId) => {
     }
 
     // Location reason
-    if (request.city && property.city && request.city.toLowerCase() === property.city.toLowerCase()) {
+    const extractedCity = request.location
+      ? (request.location.split(',').pop()?.trim() || request.location.trim())
+      : '';
+    if (extractedCity && property.city && extractedCity.toLowerCase() === property.city.toLowerCase()) {
       reasons.push(`Perfect location match: ${property.city}`);
-    } else if (request.city && property.city && (request.city.toLowerCase().includes(property.city.toLowerCase()) || property.city.toLowerCase().includes(request.city.toLowerCase()))) {
-      reasons.push(`Location compatible: ${property.city} matches ${request.city}`);
+    } else if (extractedCity && property.city && (extractedCity.toLowerCase().includes(property.city.toLowerCase()) || property.city.toLowerCase().includes(extractedCity.toLowerCase()))) {
+      reasons.push(`Location compatible: ${property.city} matches ${extractedCity}`);
     }
 
     // Property type reason

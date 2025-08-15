@@ -1,3 +1,10 @@
+FROM node:20
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+EXPOSE 3002
+CMD ["npm","run","dev","--","--host","0.0.0.0","--port","3002"]
 # Build stage
 FROM node:20-alpine AS builder
 
@@ -18,8 +25,9 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine AS production
 
-# Copy built application from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
+# Use custom nginx config for SPA routing
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy custom nginx config if needed
 # COPY nginx.conf /etc/nginx/nginx.conf

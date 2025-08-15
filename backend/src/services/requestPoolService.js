@@ -452,12 +452,31 @@ class RequestPoolService {
    */
   async createMatches(rentalRequestId, landlords, rentalRequest) {
     try {
-      const matches = landlords.map(landlord => ({
-        landlordId: landlord.id,
-        rentalRequestId: rentalRequestId,
-        matchScore: landlord.matchScore,
-        matchReason: landlord.matchReason
-      }));
+      // Anchor each match to a specific property when possible
+      const matches = [];
+      for (const landlord of landlords) {
+        // Try to determine the best matching property for this landlord/request
+        let bestPropertyId = null;
+        try {
+          const bestProperty = await this.getBestMatchingProperty(landlord.id, rentalRequest);
+          bestPropertyId = bestProperty?.id || null;
+        } catch (err) {
+          console.warn(`⚠️ getBestMatchingProperty failed for landlord ${landlord.id} and request ${rentalRequestId}:`, err?.message || err);
+        }
+
+        matches.push({
+          landlordId: landlord.id,
+          rentalRequestId: rentalRequestId,
+          propertyId: bestPropertyId,
+          matchScore: landlord.matchScore,
+          matchReason: landlord.matchReason,
+          status: 'ACTIVE',
+          isViewed: false,
+          isResponded: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }
 
       // 🚀 SCALABILITY: Batch insert for performance
       await prisma.landlordRequestMatch.createMany({
@@ -468,7 +487,7 @@ class RequestPoolService {
       
       // Debug: Log each match
       matches.forEach(match => {
-        console.log(`   📍 Match: Landlord ${match.landlordId} -> Request ${match.rentalRequestId} (Score: ${match.matchScore})`);
+        console.log(`   📍 Match: Landlord ${match.landlordId} -> Request ${match.rentalRequestId} Property ${match.propertyId || 'N/A'} (Score: ${match.matchScore})`);
       });
 
       // Create notifications for landlords about new rental requests

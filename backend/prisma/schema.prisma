@@ -150,6 +150,7 @@ model Property {
   updatedAt         DateTime       @updatedAt
   conversations     Conversation[] @relation("PropertyConversations")
   offers            Offer[]        @relation("PropertyOffers")
+  matches           LandlordRequestMatch[]
   landlord          User           @relation("LandlordProperties", fields: [landlordId], references: [id], onDelete: Cascade)
   units             Unit[]         @relation("PropertyUnits")
 
@@ -361,15 +362,20 @@ model LandlordRequestMatch {
   isResponded     Boolean       @default(false)
   landlordId      String
   rentalRequestId Int
+  /// Property anchoring: optional specific property this match refers to
+  propertyId      String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   landlord        User          @relation("LandlordMatches", fields: [landlordId], references: [id], onDelete: Cascade)
   rentalRequest   RentalRequest @relation("RequestMatches", fields: [rentalRequestId], references: [id], onDelete: Cascade)
+  property        Property?     @relation(fields: [propertyId], references: [id])
 
-  @@unique([landlordId, rentalRequestId])
+  // Allow multiple matches per landlord/request by property
+  @@unique([landlordId, rentalRequestId, propertyId])
   @@index([landlordId, matchScore])
   @@index([rentalRequestId, matchScore])
   @@index([isViewed, isResponded])
+  @@index([propertyId])
   @@map("landlord_request_matches")
 }
 

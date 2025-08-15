@@ -75,8 +75,7 @@ const MyOffers = () => {
     { key: 'PENDING', label: 'Pending', count: getStatusCount('PENDING') },
     { key: 'ACCEPTED', label: 'Accepted', count: getStatusCount('ACCEPTED') },
     { key: 'PAID', label: 'Paid', count: getStatusCount('PAID') },
-    { key: 'DECLINED', label: 'Declined', count: getStatusCount('DECLINED') },
-    { key: 'EXPIRED', label: 'Expired', count: getStatusCount('EXPIRED') }
+    { key: 'DECLINED', label: 'Declined', count: getStatusCount('DECLINED') }
   ];
 
   useEffect(() => {
@@ -180,7 +179,7 @@ const MyOffers = () => {
                 {activeTab === 'ACCEPTED' && `${getStatusCount('ACCEPTED')} Accepted Offers`}
                 {activeTab === 'PAID' && `${getStatusCount('PAID')} Paid Offers`}
                 {activeTab === 'DECLINED' && `${getStatusCount('DECLINED')} Declined Offers`}
-                {activeTab === 'EXPIRED' && `${getStatusCount('EXPIRED')} Expired Offers`}
+                {/* EXPIRED tab removed */}
               </h2>
 
               {loading ? (
@@ -196,14 +195,14 @@ const MyOffers = () => {
                     {activeTab === 'ACCEPTED' && 'No accepted offers yet.'}
                     {activeTab === 'PAID' && 'No paid offers yet.'}
                     {activeTab === 'DECLINED' && 'No declined offers yet.'}
-                    {activeTab === 'EXPIRED' && 'No expired offers yet.'}
+                    {/* EXPIRED state removed */}
                   </p>
                   <p className="text-gray-500">
                     {activeTab === 'PENDING' && 'Landlords will send you offers when they respond to your rental requests.'}
                     {activeTab === 'ACCEPTED' && 'Accepted offers will appear here once you accept them.'}
                     {activeTab === 'PAID' && 'Paid offers will appear here once you complete payment.'}
                     {activeTab === 'DECLINED' && 'Declined offers will appear here once you decline them.'}
-                    {activeTab === 'EXPIRED' && 'Expired offers will appear here when offers expire.'}
+                    {/* EXPIRED helper text removed */}
                   </p>
                 </div>
               ) : (

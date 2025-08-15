@@ -34,6 +34,7 @@ const TenantDashboardNew = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [focusedOfferId, setFocusedOfferId] = useState(null);
 
   useEffect(() => {
     console.log('🔍 Frontend: User state changed:', user);
@@ -107,6 +108,12 @@ const TenantDashboardNew = () => {
       
       // Set the dashboard data
       setDashboardData(dashboardResponse.data);
+      // Initialize focus to the first lease if multiple leases are present
+      if (dashboardResponse.data?.leases && dashboardResponse.data.leases.length > 0) {
+        setFocusedOfferId(dashboardResponse.data.leases[0].offerId);
+      } else if (dashboardResponse.data?.offerId) {
+        setFocusedOfferId(dashboardResponse.data.offerId);
+      }
       console.log('✅ Frontend: Dashboard data set successfully');
       console.log('🔍 Frontend: Dashboard data after set:', dashboardResponse.data);
       console.log('🔍 Frontend: Offer ID in dashboard data:', dashboardResponse.data.offerId);
@@ -120,6 +127,21 @@ const TenantDashboardNew = () => {
     }
   };
 
+  // Derived view data based on current focus
+  const leases = dashboardData?.leases || [];
+  const currentLease = focusedOfferId ? leases.find(l => l.offerId === focusedOfferId) : null;
+  const currentOfferId = currentLease?.offerId || dashboardData?.offerId;
+  const currentProperty = currentLease?.property || dashboardData?.property;
+  const currentLandlord = currentLease?.landlord || dashboardData?.landlord;
+  const currentLeaseInfo = currentLease?.lease || dashboardData?.lease;
+
+  const formatArea = (areaVal) => {
+    if (!areaVal && areaVal !== 0) return 'N/A';
+    const raw = String(areaVal).trim();
+    const stripped = raw.replace(/\s*m²\s*$/i, '');
+    return `${stripped} m²`;
+  };
+
 
 
   const handleLogout = () => {
@@ -131,19 +153,19 @@ const TenantDashboardNew = () => {
     try {
       console.log('🔍 Dashboard: Viewing contract...');
       console.log('🔍 Dashboard: hasActiveLease:', dashboardData.hasActiveLease);
-      console.log('🔍 Dashboard: offerId:', dashboardData.offerId);
+      console.log('🔍 Dashboard: offerId (current):', currentOfferId);
       console.log('🔍 Dashboard: Full dashboard data:', dashboardData);
       
       // Get the active lease data from dashboard
-      if (!dashboardData.hasActiveLease || !dashboardData.offerId) {
-        console.log('❌ Dashboard: Missing data - hasActiveLease:', dashboardData.hasActiveLease, 'offerId:', dashboardData.offerId);
+      if (!dashboardData.hasActiveLease || !currentOfferId) {
+        console.log('❌ Dashboard: Missing data - hasActiveLease:', dashboardData.hasActiveLease, 'offerId:', currentOfferId);
         alert('No active lease found to view contract.');
         return;
       }
 
       // Validate offer ID format
-      if (typeof dashboardData.offerId !== 'string' || dashboardData.offerId.length < 20) {
-        console.log('❌ Dashboard: Invalid offer ID format:', dashboardData.offerId);
+      if (typeof currentOfferId !== 'string' || currentOfferId.length < 20) {
+        console.log('❌ Dashboard: Invalid offer ID format:', currentOfferId);
         alert('Invalid offer ID format. Please refresh the page and try again.');
         return;
       }
@@ -159,9 +181,9 @@ const TenantDashboardNew = () => {
         console.log('🔍 Dashboard: Contract response:', contractResponse.data);
         
         if (contractResponse.data.contracts) {
-          console.log('🔍 Dashboard: Found contracts, searching for offer ID:', dashboardData.offerId);
+          console.log('🔍 Dashboard: Found contracts, searching for offer ID:', currentOfferId);
           existingContract = contractResponse.data.contracts.find(
-            contract => contract.rentalRequest.offers.some(offer => offer.id === dashboardData.offerId)
+            contract => contract.rentalRequest.offers.some(offer => offer.id === currentOfferId)
           );
           
           if (existingContract) {
@@ -191,7 +213,7 @@ const TenantDashboardNew = () => {
       
       try {
         // Call backend to generate contract by offer ID
-        const generateResponse = await api.post(`/contracts/generate-by-offer/${dashboardData.offerId}`);
+        const generateResponse = await api.post(`/contracts/generate-by-offer/${currentOfferId}`);
         
         if (generateResponse.data.success) {
           // Open the newly generated contract in a new tab
@@ -204,7 +226,7 @@ const TenantDashboardNew = () => {
         console.log('⚠️ Dashboard: Falling back to frontend generation');
         
         // Fallback to frontend generation
-        const response = await api.get(`/tenant/offer/${dashboardData.offerId}`);
+        const response = await api.get(`/tenant/offer/${currentOfferId}`);
         const offerData = response.data;
         
         // If we found an existing contract but with invalid PDF, use its data for consistency
@@ -235,17 +257,17 @@ const TenantDashboardNew = () => {
     try {
       console.log('🔍 Dashboard: Downloading contract...');
       console.log('🔍 Dashboard: hasActiveLease:', dashboardData.hasActiveLease);
-      console.log('🔍 Dashboard: offerId:', dashboardData.offerId);
+      console.log('🔍 Dashboard: offerId (current):', currentOfferId);
       
-      if (!dashboardData.hasActiveLease || !dashboardData.offerId) {
-        console.log('❌ Dashboard: Missing data - hasActiveLease:', dashboardData.hasActiveLease, 'offerId:', dashboardData.offerId);
+      if (!dashboardData.hasActiveLease || !currentOfferId) {
+        console.log('❌ Dashboard: Missing data - hasActiveLease:', dashboardData.hasActiveLease, 'offerId:', currentOfferId);
         alert('No active lease found to download contract.');
         return;
       }
 
       // Validate offer ID format
-      if (typeof dashboardData.offerId !== 'string' || dashboardData.offerId.length < 20) {
-        console.log('❌ Dashboard: Invalid offer ID format:', dashboardData.offerId);
+      if (typeof currentOfferId !== 'string' || currentOfferId.length < 20) {
+        console.log('❌ Dashboard: Invalid offer ID format:', currentOfferId);
         alert('Invalid offer ID format. Please refresh the page and try again.');
         return;
       }
@@ -258,9 +280,9 @@ const TenantDashboardNew = () => {
         console.log('🔍 Dashboard: Contract response:', contractResponse.data);
         
         if (contractResponse.data.contracts) {
-          console.log('🔍 Dashboard: Found contracts, searching for offer ID:', dashboardData.offerId);
+          console.log('🔍 Dashboard: Found contracts, searching for offer ID:', currentOfferId);
           existingContract = contractResponse.data.contracts.find(
-            contract => contract.rentalRequest.offers.some(offer => offer.id === dashboardData.offerId)
+            contract => contract.rentalRequest.offers.some(offer => offer.id === currentOfferId)
           );
           
           if (existingContract) {
@@ -308,7 +330,7 @@ const TenantDashboardNew = () => {
       
       try {
         // Call backend to generate contract by offer ID
-        const generateResponse = await api.post(`/contracts/generate-by-offer/${dashboardData.offerId}`);
+        const generateResponse = await api.post(`/contracts/generate-by-offer/${currentOfferId}`);
         
         if (generateResponse.data.success) {
           // Download the newly generated contract
@@ -337,7 +359,7 @@ const TenantDashboardNew = () => {
         console.log('⚠️ Dashboard: Falling back to frontend generation');
         
         // Fallback to frontend generation
-        const response = await api.get(`/tenant/offer/${dashboardData.offerId}`);
+        const response = await api.get(`/tenant/offer/${currentOfferId}`);
         const offerData = response.data;
         
         // If we found an existing contract but with invalid PDF, use its data for consistency
@@ -365,10 +387,10 @@ const TenantDashboardNew = () => {
   };
 
   const calculateDaysToRenewal = () => {
-    if (!dashboardData.hasActiveLease || !dashboardData.lease?.startDate || !dashboardData.lease?.endDate) return 'N/A';
-    
-    const startDate = new Date(dashboardData.lease.startDate);
-    const endDate = new Date(dashboardData.lease.endDate);
+    const leaseObj = currentLeaseInfo || dashboardData.lease;
+    if (!dashboardData.hasActiveLease || !leaseObj?.startDate || !leaseObj?.endDate) return 'N/A';
+    const startDate = new Date(leaseObj.startDate);
+    const endDate = new Date(leaseObj.endDate);
     const today = new Date();
     
     // If lease hasn't started yet
@@ -389,9 +411,10 @@ const TenantDashboardNew = () => {
   };
 
   const calculateLeaseProgress = () => {
-    if (!dashboardData.hasActiveLease || !dashboardData.lease?.startDate || !dashboardData.lease?.endDate) return 0;
-    const startDate = new Date(dashboardData.lease.startDate);
-    const endDate = new Date(dashboardData.lease.endDate);
+    const leaseObj = currentLeaseInfo || dashboardData.lease;
+    if (!dashboardData.hasActiveLease || !leaseObj?.startDate || !leaseObj?.endDate) return 0;
+    const startDate = new Date(leaseObj.startDate);
+    const endDate = new Date(leaseObj.endDate);
     const today = new Date();
     
     const totalDuration = endDate - startDate;
@@ -527,7 +550,7 @@ const TenantDashboardNew = () => {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-600">Monthly Rent</p>
                       <p className="text-xl font-bold text-gray-900 break-words">
-                        {formatCurrency(dashboardData.lease?.monthlyRent)}
+                        {formatCurrency(currentLeaseInfo?.monthlyRent)}
                       </p>
                     </div>
                   </div>
@@ -561,7 +584,7 @@ const TenantDashboardNew = () => {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-600">Property Type</p>
                       <p className="text-lg font-bold text-gray-900 break-words leading-tight">
-                        {formatPropertyType(dashboardData.property?.propertyType, dashboardData.property?.rooms)}
+                        {formatPropertyType((currentProperty?.propertyType || dashboardData.property?.propertyType), (currentProperty?.rooms || dashboardData.property?.rooms))}
                       </p>
                     </div>
                   </div>
@@ -597,9 +620,27 @@ const TenantDashboardNew = () => {
               </div>
             )}
 
-            {/* Detailed Information Cards */}
+            {/* Active Rentals & Detailed Information */}
             {dashboardData.hasActiveLease ? (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Active Rentals List */}
+                {leases.length > 1 && (
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 lg:col-span-3">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Active Rentals</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {leases.map((l) => (
+                        <button
+                          key={l.offerId}
+                          onClick={() => setFocusedOfferId(l.offerId)}
+                          className={`px-3 py-1 rounded-full text-sm border ${focusedOfferId === l.offerId ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                          title={l.property?.address}
+                        >
+                          {l.property?.address?.split(',')[0] || 'Rental'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {/* Landlord Information */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Landlord Information</h3>
@@ -609,12 +650,12 @@ const TenantDashboardNew = () => {
                       <p className="text-sm text-gray-600">{dashboardData.landlord?.company}</p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-sm text-gray-600">{dashboardData.landlord?.email}</p>
-                      <p className="text-sm text-gray-600">{dashboardData.landlord?.phone}</p>
-                      <p className="text-sm text-gray-600">{dashboardData.landlord?.address}</p>
+                      <p className="text-sm text-gray-600">{(currentLandlord?.email || dashboardData.landlord?.email)}</p>
+                      <p className="text-sm text-gray-600">{(currentLandlord?.phone || dashboardData.landlord?.phone)}</p>
+                      <p className="text-sm text-gray-600">{(currentLandlord?.address || dashboardData.landlord?.address)}</p>
                     </div>
                     <button 
-                      onClick={() => navigate(`/messaging?conversationId=new&propertyId=${dashboardData.property?.id}`)}
+                      onClick={() => navigate(`/messaging?conversationId=new&propertyId=${currentProperty?.id || dashboardData.property?.id}`)}
                       className="w-full mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       Contact Landlord
@@ -626,25 +667,25 @@ const TenantDashboardNew = () => {
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Property Details</h3>
                   <div className="space-y-3">
-                    <p className="text-sm text-gray-600">{dashboardData.property?.address}</p>
+                    <p className="text-sm text-gray-600">{(currentProperty?.address || dashboardData.property?.address)}</p>
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div>
-                        <span className="font-medium">Rooms:</span> {dashboardData.property?.rooms}
+                        <span className="font-medium">Rooms:</span> {(currentProperty?.rooms || dashboardData.property?.rooms)}
                       </div>
                       <div>
-                        <span className="font-medium">Bathrooms:</span> {dashboardData.property?.bathrooms}
+                        <span className="font-medium">Bathrooms:</span> {(currentProperty?.bathrooms || dashboardData.property?.bathrooms)}
                       </div>
                       <div>
-                        <span className="font-medium">Area:</span> {dashboardData.property?.area} m²
+                        <span className="font-medium">Area:</span> {formatArea(currentProperty?.area || dashboardData.property?.area)}
                       </div>
                       <div>
-                        <span className="font-medium">Lease Term:</span> {dashboardData.property?.leaseTerm} months
+                        <span className="font-medium">Lease Term:</span> {(currentProperty?.leaseTerm || dashboardData.property?.leaseTerm)} months
                       </div>
                     </div>
                     <div className="mt-4">
                       <p className="text-sm font-medium text-gray-900 mb-2">Amenities:</p>
                       <div className="flex flex-wrap gap-2">
-                        {dashboardData.property?.amenities?.map((amenity, index) => (
+                        {(currentProperty?.amenities || dashboardData.property?.amenities)?.map((amenity, index) => (
                           <span key={index} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                             {amenity}
                           </span>
@@ -660,7 +701,7 @@ const TenantDashboardNew = () => {
                   <div className="space-y-4">
                     <div>
                       <p className="text-sm text-gray-600">
-                        {formatDate(dashboardData.lease?.startDate)} - {formatDate(dashboardData.lease?.endDate)}
+                        {formatDate(currentLeaseInfo?.startDate)} - {formatDate(currentLeaseInfo?.endDate)}
                       </p>
                     </div>
                     <div>

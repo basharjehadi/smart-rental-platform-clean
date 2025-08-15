@@ -1,76 +1,48 @@
-version: '3.8'
-
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: smart-rental-postgres-dev
-    environment:
-      POSTGRES_DB: smart_rental_dev
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+  dev-backend:
+    image: node:20-alpine
+    container_name: smart-rental-backend-dev
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev"
     ports:
-      - "5432:5432"
+      - "3001:3001"
     volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
-    networks:
-      - smart-rental-dev-network
-    restart: unless-stopped
-
-  # Redis Cache
-  redis:
-    image: redis:7-alpine
-    container_name: smart-rental-redis-dev
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_dev_data:/data
-    networks:
-      - smart-rental-dev-network
-    restart: unless-stopped
-
-  # MinIO (Object Storage) - for file uploads
-  minio:
-    image: minio/minio:latest
-    container_name: smart-rental-minio-dev
+      - ./backend:/app
+      - /app/node_modules
+      - ./uploads:/app/uploads
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_dev_data:/data
-    networks:
-      - smart-rental-dev-network
-    command: server /data --console-address ":9001"
-    restart: unless-stopped
-
-  # Adminer (Database Management)
-  adminer:
-    image: adminer:latest
-    container_name: smart-rental-adminer-dev
-    ports:
-      - "8080:8080"
-    environment:
-      ADMINER_DEFAULT_SERVER: postgres
-      ADMINER_DESIGN: pepa-linha-dark
+      - NODE_ENV=development
+      - FRONTEND_URL=http://localhost:3002
+      - DATABASE_URL=postgresql://smart_rental:smart_rental_password@postgres:5432/smart_rental
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your_jwt_secret_here
+      - SESSION_SECRET=your_session_secret_here
     depends_on:
       - postgres
+      - redis
     networks:
-      - smart-rental-dev-network
-    profiles:
-      - tools
-    restart: unless-stopped
+      - smart-rental-network
 
-volumes:
-  postgres_dev_data:
-    driver: local
-  redis_dev_data:
-    driver: local
-  minio_dev_data:
-    driver: local
+  dev-frontend:
+    image: node:20-alpine
+    container_name: smart-rental-frontend-dev
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 3002"
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:3001/api
+      - CHOKIDAR_USEPOLLING=1
+      - WATCHPACK_POLLING=true
+    depends_on:
+      - dev-backend
+    networks:
+      - smart-rental-network
 
 networks:
-  smart-rental-dev-network:
-    driver: bridge
+  smart-rental-network:
+    name: smartrentalsystem_smart-rental-network

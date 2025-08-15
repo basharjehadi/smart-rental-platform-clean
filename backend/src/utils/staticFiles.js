@@ -26,7 +26,8 @@ export const setupStaticFiles = (app) => {
     'property_videos',
     'identity_documents',
     'rules',
-    'contracts'
+    'contracts',
+    'chat_attachments'
   ];
 
   uploadDirs.forEach(dir => {

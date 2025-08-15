@@ -31,7 +31,8 @@ export const getLandlordTenants = async (req, res) => {
                 email: true,
                 firstName: true,
                 lastName: true,
-                phoneNumber: true
+                phoneNumber: true,
+                profileImage: true
               }
             }
           }
@@ -41,6 +42,7 @@ export const getLandlordTenants = async (req, res) => {
             id: true,
             name: true,
             address: true,
+            district: true,
             city: true,
             zipCode: true,
             propertyType: true,
@@ -148,6 +150,7 @@ export const getLandlordTenants = async (req, res) => {
           : offer.rentalRequest.tenant.name,
         email: offer.rentalRequest.tenant.email,
         phone: offer.rentalRequest.tenant.phoneNumber,
+        profileImage: offer.rentalRequest.tenant.profileImage || null,
         moveInDate: offer.rentalRequest.moveInDate,
         monthlyRent: offer.rentAmount,
         securityDeposit: offer.depositAmount,
@@ -161,6 +164,7 @@ export const getLandlordTenants = async (req, res) => {
           id: offer.property.id,
           title: offer.property.name,
           address: offer.property.address,
+          district: offer.property.district || null,
           city: offer.property.city,
           zipCode: offer.property.zipCode,
           propertyType: offer.property.propertyType,

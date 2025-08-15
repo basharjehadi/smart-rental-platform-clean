@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, MessageCircle, User, Bot } from 'lucide-react';
+import { X, Send, MessageCircle, User, Bot, Paperclip } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const LiveChatModal = ({ isOpen, onClose }) => {
@@ -9,6 +9,7 @@ const LiveChatModal = ({ isOpen, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [chatSession, setChatSession] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [attachments, setAttachments] = useState([]);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -98,6 +99,42 @@ const LiveChatModal = ({ isOpen, onClose }) => {
     }
   };
 
+  const uploadAttachments = async (files) => {
+    if (!chatSession || !files?.length) return [];
+    const form = new FormData();
+    Array.from(files).forEach((f) => form.append('attachment', f));
+    const res = await api.post(`/support/chat/${chatSession.id}/attachments`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return res.data.attachments || [];
+  };
+
+  const handleSendWithAttachments = async (e) => {
+    e.preventDefault();
+    if (!chatSession) return;
+    try {
+      setIsTyping(true);
+      const uploaded = await uploadAttachments(attachments);
+      for (const file of uploaded) {
+        const fileMessage = {
+          id: Date.now().toString() + Math.random(),
+          message: file.originalName,
+          fileUrl: file.path,
+          fileType: file.mimeType,
+          senderId: 'user',
+          timestamp: new Date(),
+          isRead: true
+        };
+        setMessages((prev) => [...prev, fileMessage]);
+      }
+      setAttachments([]);
+    } catch (err) {
+      console.error('Attachment upload failed:', err);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
   const endChatSession = async () => {
     if (chatSession) {
       try {
@@ -180,7 +217,13 @@ const LiveChatModal = ({ isOpen, onClose }) => {
                         {msg.senderId === 'user' ? 'You' : msg.senderId === 'support' ? 'Support' : 'System'}
                       </span>
                     </div>
-                    <p className="text-sm">{msg.message}</p>
+                    {msg.fileUrl ? (
+                      <a href={msg.fileUrl} target="_blank" rel="noreferrer" className="text-sm underline break-all">
+                        {msg.message}
+                      </a>
+                    ) : (
+                      <p className="text-sm">{msg.message}</p>
+                    )}
                     <p className="text-xs opacity-75 mt-1">
                       {new Date(msg.timestamp).toLocaleTimeString()}
                     </p>
@@ -219,6 +262,18 @@ const LiveChatModal = ({ isOpen, onClose }) => {
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={!chatSession || isLoading}
             />
+            <label className="px-3 py-2 border border-gray-300 rounded-lg cursor-pointer bg-white hover:bg-gray-50">
+              <input type="file" multiple className="hidden" onChange={(e) => setAttachments(e.target.files)} />
+              <Paperclip className="w-4 h-4" />
+            </label>
+            <button
+              type="button"
+              onClick={handleSendWithAttachments}
+              disabled={!chatSession || !attachments?.length}
+              className="px-3 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 disabled:opacity-50"
+            >
+              Upload
+            </button>
             <button
               type="submit"
               disabled={!newMessage.trim() || !chatSession || isLoading}

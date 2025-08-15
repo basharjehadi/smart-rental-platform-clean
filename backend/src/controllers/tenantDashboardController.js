@@ -94,13 +94,13 @@ export const getTenantDashboardData = async (req, res) => {
     const tenantId = req.user.id;
     console.log('🔍 Fetching dashboard data for tenant:', tenantId);
 
-    // Get tenant's active lease (paid offers represent active leases)
-    const activeLease = await prisma.offer.findFirst({
+    // Get tenant's active leases (paid offers represent active leases)
+    const activeLeases = await prisma.offer.findMany({
       where: {
         rentalRequest: {
           tenantId: tenantId
         },
-        status: 'PAID' // Paid offers represent active leases
+        status: 'PAID'
       },
       include: {
         rentalRequest: {
@@ -108,13 +108,43 @@ export const getTenantDashboardData = async (req, res) => {
             tenant: true
           }
         },
-        landlord: true,
-        property: true
-      }
+        landlord: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phoneNumber: true,
+            street: true,
+            city: true,
+            zipCode: true,
+            country: true,
+            profileImage: true
+          }
+        },
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            district: true,
+            city: true,
+            zipCode: true,
+            propertyType: true,
+            bedrooms: true,
+            bathrooms: true,
+            size: true,
+            houseRules: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
     });
 
-    console.log('🔍 Active lease found:', activeLease ? 'Yes' : 'No');
-    console.log('🔍 Active lease ID:', activeLease?.id);
+    console.log('🔍 Active leases found:', activeLeases.length);
+    const activeLease = activeLeases[0] || null;
+    console.log('🔍 Primary active lease ID:', activeLease?.id);
     
     // If no active lease, return appropriate empty state data
     if (!activeLease) {
@@ -126,6 +156,7 @@ export const getTenantDashboardData = async (req, res) => {
         property: null,
         landlord: null,
         lease: null,
+        leases: [],
         payments: [],
         accountStatus: {
           paymentHistory: 'No Data',
@@ -140,7 +171,61 @@ export const getTenantDashboardData = async (req, res) => {
       });
     }
 
-    // Simplified response with basic data
+    // Build leases array
+    const leases = activeLeases.map((offer) => {
+      const propertyAddress = (() => {
+        if (offer.property && offer.property.address) {
+          let completeAddress = offer.property.address;
+          if (offer.property.district) completeAddress += `, ${offer.property.district}`;
+          completeAddress += `, ${offer.property.zipCode}, ${offer.property.city}`;
+          return completeAddress;
+        }
+        return offer.rentalRequest.location || 'Address not specified';
+      })();
+
+      const areaString = offer.property?.size ? `${offer.property.size} m²` : (offer.propertySize || '');
+
+      const leaseStartDate = offer.rentalRequest.moveInDate;
+      const leaseEndDate = offer.leaseEndDate || (() => { const start = new Date(leaseStartDate); const end = new Date(start); end.setMonth(end.getMonth() + (offer.leaseDuration || 12)); return end; })();
+
+      return {
+        offerId: offer.id,
+        rentalRequestId: offer.rentalRequest.id,
+        property: {
+          id: offer.property?.id,
+          address: propertyAddress,
+          propertyType: offer.property?.propertyType || offer.propertyType || offer.rentalRequest.propertyType || 'Apartment',
+          rooms: offer.property?.bedrooms || offer.rentalRequest.bedrooms || 2,
+          bathrooms: offer.property?.bathrooms || offer.rentalRequest.bathrooms || 1,
+          area: areaString,
+          leaseTerm: offer.leaseDuration || 12,
+          amenities: (() => {
+            if (offer.property?.houseRules) {
+              try { const parsed = JSON.parse(offer.property.houseRules); if (Array.isArray(parsed) && parsed.length > 0) return parsed; } catch {}
+            }
+            if (offer.propertyAmenities) {
+              try { return typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities) : offer.propertyAmenities; } catch { return ['No amenities listed']; }
+            }
+            return ['No amenities listed'];
+          })()
+        },
+        landlord: {
+          name: offer.landlord.firstName && offer.landlord.lastName ? `${offer.landlord.firstName} ${offer.landlord.lastName}` : (offer.landlord.name || 'Landlord'),
+          email: offer.landlord.email,
+          phone: offer.landlord.phoneNumber || 'Not provided',
+          address: offer.landlord.street && offer.landlord.city ? `${offer.landlord.street}, ${offer.landlord.city} ${offer.landlord.zipCode}, ${offer.landlord.country}` : 'Not provided',
+          profileImage: offer.landlord.profileImage || null
+        },
+        lease: {
+          startDate: leaseStartDate,
+          endDate: leaseEndDate,
+          monthlyRent: offer.rentAmount || offer.rentalRequest.budget || 0,
+          securityDeposit: offer.depositAmount || offer.rentalRequest.budget || 0
+        }
+      };
+    });
+
+    // Simplified response with primary lease and full leases list
     const responseData = {
       tenant: req.user,
       hasActiveLease: true,
@@ -161,7 +246,7 @@ export const getTenantDashboardData = async (req, res) => {
         propertyType: activeLease.property?.propertyType || activeLease.propertyType || activeLease.rentalRequest.propertyType || 'Apartment',
         rooms: activeLease.property?.bedrooms || activeLease.rentalRequest.bedrooms || 2,
         bathrooms: activeLease.property?.bathrooms || activeLease.rentalRequest.bathrooms || 1,
-        area: activeLease.property?.size ? `${activeLease.property.size} m²` : activeLease.propertySize || '65 m²',
+        area: activeLease.property?.size ? `${activeLease.property.size} m²` : (activeLease.propertySize || ''),
         leaseTerm: activeLease.leaseDuration || 12,
         amenities: (() => {
           // Use the actual property houseRules (amenities) if available
@@ -198,16 +283,16 @@ export const getTenantDashboardData = async (req, res) => {
         phone: activeLease.landlord.phoneNumber || 'Not provided',
         address: activeLease.landlord.street && activeLease.landlord.city ? 
           `${activeLease.landlord.street}, ${activeLease.landlord.city} ${activeLease.landlord.zipCode}, ${activeLease.landlord.country}` : 
-          'Not provided'
+          'Not provided',
+        profileImage: activeLease.landlord.profileImage || null
       },
       lease: {
         startDate: activeLease.rentalRequest.moveInDate,
-        endDate: activeLease.leaseEndDate || new Date(activeLease.rentalRequest.moveInDate).setFullYear(
-          new Date(activeLease.rentalRequest.moveInDate).getFullYear() + 1
-        ),
+        endDate: (() => { if (activeLease.leaseEndDate) return activeLease.leaseEndDate; const start = new Date(activeLease.rentalRequest.moveInDate); const end = new Date(start); end.setMonth(end.getMonth() + (activeLease.leaseDuration || 12)); return end; })(),
         monthlyRent: activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
         securityDeposit: activeLease.depositAmount || activeLease.rentalRequest.budget || 0
       },
+      leases,
       payments: await getTenantPaymentsData(tenantId),
       accountStatus: {
         paymentHistory: 'No Data',
@@ -398,9 +483,13 @@ export const getTenantPaymentHistory = async (req, res) => {
       upcomingPayments: upcomingPayments,
       lease: activeLease ? {
         startDate: activeLease.rentalRequest.moveInDate,
-        endDate: activeLease.leaseEndDate || new Date(activeLease.rentalRequest.moveInDate).setFullYear(
-          new Date(activeLease.rentalRequest.moveInDate).getFullYear() + 1
-        ),
+        endDate: (() => {
+          if (activeLease.leaseEndDate) return activeLease.leaseEndDate;
+          const start = new Date(activeLease.rentalRequest.moveInDate);
+          const end = new Date(start);
+          end.setMonth(end.getMonth() + (activeLease.leaseDuration || 12));
+          return end;
+        })(),
         monthlyRent: activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
         securityDeposit: activeLease.depositAmount || activeLease.rentalRequest.budget || 0
       } : null
