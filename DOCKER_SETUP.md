@@ -24,9 +24,14 @@ This guide will help you run the Smart Rental System using Docker, which elimina
    - Backend API: http://localhost:3001
    - Adminer (Database): http://localhost:8080 (optional)
 
-### Option 2: Using Docker Compose Directly
+### Option 2: Using Docker Compose Directly (PostgreSQL)
 
-1. **Build and start all services:**
+1. **Start database/cache only for hybrid dev:**
+   ```powershell
+   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis
+   ```
+
+2. **Build and start full stack:**
    ```bash
    docker-compose up --build -d
    ```
@@ -108,22 +113,22 @@ The Docker setup includes:
 
 - **Backend**: Node.js 20 with Express, Prisma, and Puppeteer
 - **Frontend**: React with Vite
-- **Database**: SQLite (for simplicity)
+- **Database**: PostgreSQL (development via Docker)
 - **Optional Services**: Redis (for caching), Adminer (database management)
 
 ## 🔧 Configuration
 
 ### Environment Variables
 
-The application uses the following environment variables (configured in `docker-compose.yml`):
+The application uses the following environment variables (configured in `docker-compose.yml` and `.env` files):
 
 ```yaml
 # Backend Environment
 NODE_ENV=development
-DATABASE_URL=file:./dev.db
+DATABASE_URL=postgresql://smart_rental:smart_rental_password@postgres:5432/smart_rental
 JWT_SECRET=your_jwt_secret_here_change_in_production
 SESSION_SECRET=your_session_secret_here_change_in_production
-FRONTEND_URL=http://localhost:5173
+FRONTEND_URL=http://localhost:3002
 PORT=3001
 
 # Frontend Environment
@@ -133,7 +138,7 @@ VITE_DEV_SERVER_HOST=0.0.0.0
 
 ### Ports
 
-- **Frontend**: http://localhost:5173
+- **Frontend**: http://localhost:3002 (dev server) or http://localhost:5173 (alt)
 - **Backend API**: http://localhost:3001
 - **Adminer**: http://localhost:8080 (optional)
 - **Redis**: localhost:6379 (optional)

@@ -115,7 +115,7 @@ cp env.development .env
 
 ```env
 # Database
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/smart_rental_dev"
+DATABASE_URL="postgresql://smart_rental:smart_rental_password@localhost:5432/smart_rental"
 
 # Redis
 REDIS_URL=redis://localhost:6379
@@ -128,7 +128,7 @@ MINIO_SECRET_KEY=minioadmin
 
 # Server
 PORT=3001
-FRONTEND_URL=http://localhost:5173
+FRONTEND_URL=http://localhost:3002
 ```
 
 ## VS Code Development

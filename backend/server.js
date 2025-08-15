@@ -36,8 +36,19 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // CORS configuration
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:3002',
+  'http://localhost:3002',
+  'http://localhost:5173'
+];
+
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -64,7 +75,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static files (uploads) with CORS headers
 app.use('/uploads', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
   res.header('Access-Control-Allow-Methods', 'GET');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   next();
@@ -72,7 +83,7 @@ app.use('/uploads', (req, res, next) => {
 
 // Serve profile images specifically
 app.use('/uploads/profile_images', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
   res.header('Access-Control-Allow-Methods', 'GET');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   next();
@@ -80,7 +91,7 @@ app.use('/uploads/profile_images', (req, res, next) => {
 
 // Serve property images specifically
 app.use('/uploads/property_images', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
   res.header('Access-Control-Allow-Methods', 'GET');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   next();
@@ -88,7 +99,7 @@ app.use('/uploads/property_images', (req, res, next) => {
 
 // Serve property videos specifically
 app.use('/uploads/property_videos', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
   res.header('Access-Control-Allow-Methods', 'GET');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   next();
@@ -96,7 +107,7 @@ app.use('/uploads/property_videos', (req, res, next) => {
 
 // Serve identity documents specifically
 app.use('/uploads/identity_documents', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
   res.header('Access-Control-Allow-Methods', 'GET');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   next();
@@ -104,7 +115,7 @@ app.use('/uploads/identity_documents', (req, res, next) => {
 
 // Serve rules files specifically
 app.use('/uploads/rules', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
   res.header('Access-Control-Allow-Methods', 'GET');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   next();
@@ -112,7 +123,7 @@ app.use('/uploads/rules', (req, res, next) => {
 
 // Serve contract PDFs specifically
 app.use('/uploads/contracts', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+  res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
   res.header('Access-Control-Allow-Methods', 'GET');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   next();

@@ -65,7 +65,7 @@ const LoginPage = () => {
   };
 
   const handleGoogleLogin = () => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
     console.log('Google OAuth URL:', `${API_URL}/auth/google`);
     window.location.href = `${API_URL}/auth/google`;
   };
