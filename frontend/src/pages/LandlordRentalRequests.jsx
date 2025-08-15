@@ -111,144 +111,70 @@ const LandlordRentalRequests = () => {
   const fetchRentalRequests = async () => {
     try {
       setLoading(true);
-      // Use pool endpoint that includes match context needed for decline and offer flows
       const response = await api.get('/pool/rental-requests');
-      
-      if (response.data.rentalRequests || response.data.requests) {
-        const source = response.data.rentalRequests || response.data.requests;
-        console.log('Raw rental requests data:', source); // Debug log
-        
-        // Store total count for informational purposes
-        setTotalRequests(source.length);
-        
-        // 🚀 SCALABILITY: Allow multiple offers per property - no filtering needed
-        // Landlords can now see ALL matching requests and send offers to multiple tenants
-        // The system will handle competition and first-to-pay wins automatically
-        
-        const requests = source.map(request => {
-          // Extract tenant information
-          const tenant = request.tenant;
-          
-          // Calculate budget range
-          const budgetFrom = request.budgetFrom || request.budget;
-          const budgetTo = request.budgetTo || request.budget;
-          const budgetRange = budgetFrom === budgetTo 
-            ? `${formatCurrencyDisplay(budgetFrom)}`
-            : `${formatCurrencyDisplay(budgetFrom)} - ${formatCurrencyDisplay(budgetTo)}`;
-          
-          // Generate initials for avatar
-          const initials = tenant?.firstName && tenant?.lastName 
-            ? `${tenant.firstName.charAt(0)}${tenant.lastName.charAt(0)}`
-            : tenant?.firstName?.charAt(0) || 'T';
-          
-          // Get property match details - backend may send 'matchedProperty' or 'propertyMatch'
-          const propertyMatch = request.matchedProperty || request.propertyMatch || {};
-          
-          // Debug: log property data
-          console.log('🏠 Property data for request', request.id, ':', {
-            matchedProperty: request.matchedProperty,
-            propertyName: propertyMatch.name,
-            propertyAddress: propertyMatch.address,
-            propertyRent: propertyMatch.monthlyRent,
-            propertyAvailable: propertyMatch.availableFrom,
-            propertyType: propertyMatch.propertyType
-          });
-          
-          // Get property details from the matchedProperty
-          const propertyName = propertyMatch.name || 'Your Property';
-          const propertyAddress = propertyMatch.address || 'Address not specified';
-          const propertyRent = propertyMatch.monthlyRent ? `${formatCurrencyDisplay(propertyMatch.monthlyRent)} zł` : 'Rent not specified';
-          const propertyAvailable = propertyMatch.availableFrom || null;
-          const propertyType = propertyMatch.propertyType || 'Apartment';
-          
-          // Calculate age from dateOfBirth or PESEL
-          let age = null;
-          if (tenant?.dateOfBirth) {
-            const birthDate = new Date(tenant.dateOfBirth);
-            const today = new Date();
-            age = today.getFullYear() - birthDate.getFullYear();
-            const monthDiff = today.getMonth() - birthDate.getMonth();
-            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-              age--;
-            }
-          } else if (tenant?.pesel) {
-            // Calculate age from PESEL (Polish format: YYMMDD)
-            const pesel = tenant.pesel;
-            if (pesel && pesel.length === 11) {
-              const year = parseInt(pesel.substring(0, 2));
-              const month = parseInt(pesel.substring(2, 4));
-              const day = parseInt(pesel.substring(4, 6));
-              
-              // Determine century based on month
-              let fullYear;
-              if (month > 20) fullYear = 2000 + year;
-              else if (month > 12) fullYear = 1900 + year;
-              else fullYear = 1900 + year;
-              
-              const birthDate = new Date(fullYear, month - 1, day);
-              const today = new Date();
-              age = today.getFullYear() - birthDate.getFullYear();
-              const monthDiff = today.getMonth() - birthDate.getMonth();
-              if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-                age--;
-              }
-            }
-          }
-
-          // Debug: log tenant data
-          console.log('🔍 Tenant data for request', request.id, ':', {
-            firstName: tenant?.firstName,
-            lastName: tenant?.lastName,
-            phoneNumber: tenant?.phoneNumber,
-            email: tenant?.email,
-            profession: tenant?.profession,
-            dateOfBirth: tenant?.dateOfBirth,
-            pesel: tenant?.pesel
-          });
-
-          return {
-            id: request.id,
-            name: `${tenant?.firstName || 'Tenant'} ${tenant?.lastName || ''}`.trim(),
-            initials: initials,
-            profileImage: tenant?.profileImage || null,
-            email: tenant?.email || null,
-            phone: tenant?.phoneNumber || null,
-            age: age,
-            occupation: tenant?.profession || null, // Backend sends 'profession', not 'occupation'
-            verified: tenant?.isVerified || false, // Backend sends 'isVerified', not 'verified'
-            budgetRange: budgetRange,
-            budgetFrom: budgetFrom,
-            budgetTo: budgetTo,
-            budget: request.budget,
-            moveInDate: request.moveInDate ? formatDate(request.moveInDate) : null, // Backend sends 'moveInDate', not 'preferredMoveIn'
-            location: request.location,
-            requirements: request.additionalRequirements || 'No specific requirements mentioned.', // Backend sends 'additionalRequirements'
-            rating: null, // Not available in current backend response
-            reviews: null, // Not available in current backend response
-            interestCount: request.responseCount || 0, // Backend sends 'responseCount'
-            status: request.status || 'active',
-            propertyMatch: {
-              id: propertyMatch.id, // Include property ID for offer creation
-              name: propertyName,
-              address: propertyAddress,
-              rent: propertyRent,
-              available: propertyAvailable ? formatDate(propertyAvailable) : 'Date not specified',
-              propertyType: propertyType
-            },
-            propertyType: request.propertyType
-          };
-        });
-        
-        console.log('Mapped rental requests:', requests); // Debug log
-        setRentalRequests(requests);
-      }
-    } catch (error) {
-      console.error('Error fetching rental requests:', error);
-      setError('Failed to fetch rental requests');
-    } finally {
-      setLoading(false);
-    }
-  };
+ 
+       // New API shape: { pending, offered, declined }
+       const { pending = [], offered = [], declined = [] } = response.data || {};
+ 
+       const mapOne = (request) => {
+         const tenant = request.tenant;
+         const budgetFrom = request.budgetFrom || request.budget;
+         const budgetTo = request.budgetTo || request.budget;
+         const budgetRange = budgetFrom === budgetTo 
+           ? `${formatCurrencyDisplay(budgetFrom)}`
+           : `${formatCurrencyDisplay(budgetFrom)} - ${formatCurrencyDisplay(budgetTo)}`;
+ 
+         const initials = tenant?.firstName && tenant?.lastName 
+           ? `${tenant.firstName.charAt(0)}${tenant.lastName.charAt(0)}`
+           : tenant?.firstName?.charAt(0) || 'T';
+ 
+         const propertyMatch = request.propertyMatch || request.matchedProperty || {};
+ 
+         return {
+           id: request.id,
+           name: `${tenant?.firstName || 'Tenant'} ${tenant?.lastName || ''}`.trim(),
+           initials,
+           profileImage: tenant?.profileImage || null,
+           email: tenant?.email || null,
+           phone: tenant?.phoneNumber || null,
+           age: null,
+           occupation: tenant?.profession || null,
+           verified: tenant?.isVerified || false,
+           budgetRange,
+           budgetFrom,
+           budgetTo,
+           budget: request.budget,
+           moveInDate: request.moveInDate ? formatDate(request.moveInDate) : null,
+           location: request.location,
+           requirements: request.additionalRequirements || 'No specific requirements mentioned.',
+           interestCount: request.responseCount || 0,
+           status: request.status || 'pending',
+           propertyMatch: {
+             id: propertyMatch.id,
+             name: propertyMatch.name || 'Your Property',
+             address: propertyMatch.address || 'Address not specified',
+             rent: propertyMatch.monthlyRent ? `${formatCurrencyDisplay(propertyMatch.monthlyRent)} zł` : (propertyMatch.rent || 'Rent not specified'),
+             available: propertyMatch.availableFrom ? formatDate(propertyMatch.availableFrom) : (propertyMatch.available || 'Date not specified'),
+             propertyType: propertyMatch.propertyType || 'Apartment'
+           },
+           propertyType: request.propertyType
+         };
+       };
+ 
+       const pendingMapped = pending.map(r => ({ ...mapOne(r), status: 'pending' }));
+       const offeredMapped  = offered.map(r => ({ ...mapOne(r), status: 'offered' }));
+       const declinedMapped = declined.map(r => ({ ...mapOne(r), status: 'declined' }));
+ 
+       const all = [...pendingMapped, ...offeredMapped, ...declinedMapped];
+       setTotalRequests(all.length);
+       setRentalRequests(all);
+     } catch (error) {
+       console.error('Error fetching rental requests:', error);
+       setError('Failed to fetch rental requests');
+     } finally {
+       setLoading(false);
+     }
+   };
 
   const fetchProfileData = async () => {
     try {
@@ -549,8 +475,9 @@ const LandlordRentalRequests = () => {
       const tenantMaxBudget = selectedTenant.budgetTo || selectedTenant.budget;
       const maxAllowedRent = tenantMaxBudget * 1.2; // 20% flexibility
       
-      // Validate property ID exists
-      if (!selectedTenant.propertyMatch?.id) {
+      // Validate property ID exists - check both propertyMatch and matchedProperty
+      const propertyId = selectedTenant.propertyMatch?.id || selectedTenant.matchedProperty?.id;
+      if (!propertyId) {
         const errorMsg = 'Property ID is missing. Cannot create offer without linking to a property.';
         console.log('🔍 Property ID validation failed:', errorMsg);
         setError(errorMsg);
@@ -580,14 +507,14 @@ const LandlordRentalRequests = () => {
         leaseDuration: parseInt(offerData.leaseDuration.split(' ')[0]), // Extract number from "12 months"
         availableFrom: offerData.availableFrom,
         description: offerData.additionalTerms,
-        propertyId: selectedTenant.propertyMatch.id, // Include property ID for backend validation
-        propertyAddress: selectedTenant.propertyMatch.address,
-        propertyType: selectedTenant.propertyMatch.propertyType || 'Apartment', // Use actual property type
+        propertyId: propertyId, // Use the validated property ID
+        propertyAddress: selectedTenant.propertyMatch?.address || selectedTenant.matchedProperty?.address,
+        propertyType: selectedTenant.propertyMatch?.propertyType || selectedTenant.matchedProperty?.propertyType || 'Apartment',
         utilitiesIncluded: false // Default value
       };
       
       console.log('🔍 Making API call to:', `/rental-request/${selectedTenant.id}/offer`);
-      console.log('🔍 Property ID being sent:', selectedTenant.propertyMatch.id);
+      console.log('🔍 Property ID being sent:', propertyId);
       console.log('🔍 Request payload:', requestPayload);
       
       const response = await api.post(`/rental-request/${selectedTenant.id}/offer`, requestPayload);

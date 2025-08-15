@@ -418,7 +418,7 @@ const TenantRequestCard = ({
             </div>
 
             {/* Action Buttons or Status */}
-            {tenant.status?.toLowerCase() === 'active' ? (
+            {(() => { const s = (tenant.status || 'active').toLowerCase(); return s === 'active' || s === 'pending'; })() ? (
               <div className="flex space-x-4">
                 <button 
                   onClick={() => onSendOffer(tenant)}

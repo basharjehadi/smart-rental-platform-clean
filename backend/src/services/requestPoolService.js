@@ -393,7 +393,9 @@ class RequestPoolService {
       const requests = await prisma.landlordRequestMatch.findMany({
         where: {
           landlordId: landlordId,
-          isViewed: false,
+          status: 'ACTIVE',              // only active matches
+          isResponded: false,            // exclude offered/declined
+          isViewed: false,               // pending = unseen (kept as before)
           rentalRequest: {
             poolStatus: 'ACTIVE',
             expiresAt: {
@@ -441,6 +443,8 @@ class RequestPoolService {
       const total = await prisma.landlordRequestMatch.count({
         where: {
           landlordId: landlordId,
+          status: 'ACTIVE',
+          isResponded: false,
           isViewed: false,
           rentalRequest: {
             poolStatus: 'ACTIVE',

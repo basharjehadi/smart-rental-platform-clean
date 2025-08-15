@@ -141,55 +141,117 @@ const createRentalRequest = async (req, res) => {
 // 🚀 SCALABILITY: Get all active requests for landlords with pool integration
 const getAllActiveRequests = async (req, res) => {
   try {
-    const { page = 1, limit = 20, location, minBudget, maxBudget } = req.query;
-    const offset = (page - 1) * limit;
-
-    // 🚀 SCALABILITY: Get requests from pool service for this landlord
-    const poolRequests = await requestPoolService.getRequestsForLandlord(
-      req.user.id, 
-      parseInt(page), 
-      parseInt(limit)
-    );
-
-    // Transform data for frontend compatibility
-    const requests = poolRequests.requests.map(match => {
-      // Prefer anchored property from match; fall back to bestMatchingProperty
-      const bestProperty = match.property || match.rentalRequest.bestMatchingProperty || null;
-      
-      return {
-        ...match.rentalRequest,
-        matchScore: match.matchScore,
-        matchReason: match.matchReason,
-        tenant: match.rentalRequest.tenant,
-        matchedProperty: bestProperty, // Add this for frontend compatibility
-        propertyMatch: bestProperty ? {
-          id: bestProperty.id,
-          name: bestProperty.name,
-          city: bestProperty.city,
-          address: bestProperty.address,
-          rent: `${bestProperty.monthlyRent.toLocaleString('pl-PL')} zł`,
-          available: bestProperty.availableFrom ? new Date(bestProperty.availableFrom).toISOString() : null,
-          bedrooms: bestProperty.bedrooms,
-          propertyType: bestProperty.propertyType,
-          furnished: bestProperty.furnished,
-          parking: bestProperty.parking,
-          petsAllowed: bestProperty.petsAllowed
-        } : null
-      };
-    });
-
-    res.json({
-      rentalRequests: requests,
-      pagination: poolRequests.pagination,
-      poolStats: await requestPoolService.getPoolStats()
-    });
-  } catch (error) {
-    console.error('Get all active requests error:', error);
-    res.status(500).json({
-      error: 'Internal server error.'
-    });
-  }
-};
+    const { page = 1, limit = 20 } = req.query;
+ 
+     // 1) Pending (unresponded, unseen) via pool service (already excludes declined)
+     const poolRequests = await requestPoolService.getRequestsForLandlord(
+       req.user.id,
+       parseInt(page),
+       parseInt(limit)
+     );
+ 
+     const mapBestProperty = (match) => {
+       const bestProperty = match.property || match.rentalRequest.bestMatchingProperty || null;
+       if (!bestProperty) return null;
+       return {
+         id: bestProperty.id,
+         name: bestProperty.name,
+         city: bestProperty.city,
+         address: bestProperty.address,
+         rent: `${bestProperty.monthlyRent.toLocaleString('pl-PL')} zł`,
+         available: bestProperty.availableFrom ? new Date(bestProperty.availableFrom).toISOString() : null,
+         bedrooms: bestProperty.bedrooms,
+         propertyType: bestProperty.propertyType,
+         furnished: bestProperty.furnished,
+         parking: bestProperty.parking,
+         petsAllowed: bestProperty.petsAllowed
+       };
+     };
+ 
+     const normalizePending = poolRequests.requests.map((match) => ({
+       ...match.rentalRequest,
+       matchScore: match.matchScore,
+       matchReason: match.matchReason,
+       tenant: match.rentalRequest.tenant,
+       propertyMatch: mapBestProperty(match),
+       status: 'pending'
+     }));
+ 
+     // 2) Offered (responded=true and an offer from this landlord exists)
+     const offeredMatchesRaw = await prisma.landlordRequestMatch.findMany({
+       where: {
+         landlordId: req.user.id,
+         isResponded: true,
+         status: 'ACTIVE',
+         rentalRequest: { poolStatus: 'ACTIVE', expiresAt: { gt: new Date() } }
+       },
+       include: {
+         rentalRequest: {
+           include: {
+             tenant: { select: { id: true, name: true, profileImage: true } },
+             offers: { where: { landlordId: req.user.id }, select: { id: true } }
+           }
+         },
+         property: {
+           select: { id: true, name: true, address: true, city: true, monthlyRent: true, propertyType: true, bedrooms: true, furnished: true, parking: true, petsAllowed: true, availableFrom: true }
+         }
+       },
+       orderBy: [{ matchScore: 'desc' }, { createdAt: 'desc' }],
+       take: parseInt(limit)
+     });
+ 
+     const offeredMatches = offeredMatchesRaw.filter(m => (m.rentalRequest.offers || []).length > 0);
+     const normalizeOffered = offeredMatches.map((match) => ({
+       ...match.rentalRequest,
+       matchScore: match.matchScore,
+       matchReason: match.matchReason,
+       tenant: match.rentalRequest.tenant,
+       propertyMatch: mapBestProperty(match),
+       status: 'offered'
+     }));
+ 
+     // 3) Declined (by this landlord)
+     const declinedMatches = await prisma.landlordRequestMatch.findMany({
+       where: {
+         landlordId: req.user.id,
+         status: 'DECLINED'
+       },
+       include: {
+         rentalRequest: {
+           include: {
+             tenant: { select: { id: true, name: true, profileImage: true } }
+           }
+         },
+         property: {
+           select: { id: true, name: true, address: true, city: true, monthlyRent: true, propertyType: true, bedrooms: true, furnished: true, parking: true, petsAllowed: true, availableFrom: true }
+         }
+       },
+       orderBy: [{ updatedAt: 'desc' }],
+       take: parseInt(limit)
+     });
+ 
+     const normalizeDeclined = declinedMatches.map((match) => ({
+       ...match.rentalRequest,
+       matchScore: match.matchScore,
+       matchReason: match.matchReason,
+       tenant: match.rentalRequest.tenant,
+       propertyMatch: mapBestProperty(match),
+       status: 'declined'
+     }));
+ 
+     return res.json({
+       pending: normalizePending,
+       offered: normalizeOffered,
+       declined: normalizeDeclined,
+       pagination: poolRequests.pagination
+     });
+   } catch (error) {
+     console.error('Get all active requests error:', error);
+     res.status(500).json({
+       error: 'Internal server error.'
+     });
+   }
+ };
 
 // 🚀 SCALABILITY: Mark request as viewed
 const markRequestAsViewed = async (req, res) => {
@@ -231,6 +293,9 @@ const createOffer = async (req, res) => {
       rulesText,
       rulesPdf
     } = req.body;
+
+    // Debug: log incoming identifiers and types
+    console.log('createOffer params:', { requestIdRaw: requestId, requestIdType: typeof requestId, propertyIdRaw: propertyId, propertyIdType: typeof propertyId });
 
     // Validate required fields
     if (!propertyId || !rentAmount || !leaseDuration || !availableFrom) {
@@ -343,25 +408,27 @@ const createOffer = async (req, res) => {
     // 🚀 SCALABILITY: Create the offer - multiple landlords can offer on the same request
     const offer = await prisma.offer.create({
       data: {
-        landlordId: req.user.id,
-        rentalRequestId: parseInt(requestId),
-        propertyId: propertyId, // 🚀 SCALABILITY: Link offer to specific property (string cuid)
+        // Connect required relations explicitly
+        landlord: { connect: { id: req.user.id } },
+        rentalRequest: { connect: { id: parseInt(requestId) } },
+        property: { connect: { id: propertyId } },
         rentAmount: parseFloat(rentAmount),
         depositAmount: parseFloat(depositAmount || 0),
         leaseDuration: parseInt(leaseDuration),
-        description: description || '',
-        utilitiesIncluded: utilitiesIncluded || false,
+        description: description || null,
+        utilitiesIncluded: Boolean(utilitiesIncluded),
         availableFrom: new Date(availableFrom),
-        propertyAddress: propertyAddress || property.address, // Use property address if not provided
-        propertyImages: propertyImages || [],
-        propertyVideo: propertyVideo || '',
-        propertyType: propertyType || property.propertyType, // Use property type if not provided
-        propertySize: propertySize || '',
-        propertyAmenities: propertyAmenities || [],
-        propertyDescription: propertyDescription || '',
-        rulesText: rulesText || '',
-        rulesPdf: rulesPdf || '',
-        status: 'PENDING'
+        propertyAddress: propertyAddress || null,
+        propertyImages: Array.isArray(propertyImages) ? JSON.stringify(propertyImages) : (propertyImages || null),
+        propertyVideo: propertyVideo || null,
+        propertyType: propertyType || null,
+        propertySize: propertySize || null,
+        propertyAmenities: Array.isArray(propertyAmenities) ? JSON.stringify(propertyAmenities) : (propertyAmenities || null),
+        propertyDescription: propertyDescription || null,
+        rulesText: rulesText || null,
+        rulesPdf: rulesPdf || null,
+        // Prisma strict relations: connect tenant by ID
+        tenant: { connect: { id: rentalRequest.tenantId } }
       }
     });
 
@@ -1522,6 +1589,9 @@ const declineRentalRequest = async (req, res) => {
     const { requestId } = req.params;
     const { reason } = req.body;
 
+    // Debug: log incoming requestId and its type
+    console.log('declineRentalRequest params:', { requestIdRaw: requestId, requestIdType: typeof requestId });
+
     console.log(`🚫 Landlord ${req.user.id} declining request ${requestId}`);
 
     // Validate rental request exists and is active
@@ -1559,8 +1629,7 @@ const declineRentalRequest = async (req, res) => {
       where: { id: match.id },
       data: {
         status: 'DECLINED',
-        declineReason: reason || 'No reason provided',
-        declinedAt: new Date(),
+        isResponded: true,
         updatedAt: new Date()
       }
     });
