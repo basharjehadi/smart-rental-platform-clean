@@ -32,6 +32,7 @@ const LandlordRentalRequests = () => {
   const navigate = useNavigate();
   const [rentalRequests, setRentalRequests] = useState([]);
   const [totalRequests, setTotalRequests] = useState(0);
+  const [activeTab, setActiveTab] = useState('Pending'); // Pending | Offered | Declined
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedTenant, setSelectedTenant] = useState(null);
@@ -110,19 +111,21 @@ const LandlordRentalRequests = () => {
   const fetchRentalRequests = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/rental-requests');
+      // Use pool endpoint that includes match context needed for decline and offer flows
+      const response = await api.get('/pool/rental-requests');
       
-      if (response.data.success) {
-        console.log('Raw rental requests data:', response.data.rentalRequests); // Debug log
+      if (response.data.rentalRequests || response.data.requests) {
+        const source = response.data.rentalRequests || response.data.requests;
+        console.log('Raw rental requests data:', source); // Debug log
         
         // Store total count for informational purposes
-        setTotalRequests(response.data.rentalRequests.length);
+        setTotalRequests(source.length);
         
         // 🚀 SCALABILITY: Allow multiple offers per property - no filtering needed
         // Landlords can now see ALL matching requests and send offers to multiple tenants
         // The system will handle competition and first-to-pay wins automatically
         
-        const requests = response.data.rentalRequests.map(request => {
+        const requests = source.map(request => {
           // Extract tenant information
           const tenant = request.tenant;
           
@@ -138,8 +141,8 @@ const LandlordRentalRequests = () => {
             ? `${tenant.firstName.charAt(0)}${tenant.lastName.charAt(0)}`
             : tenant?.firstName?.charAt(0) || 'T';
           
-          // Get property match details - backend sends 'matchedProperty'
-          const propertyMatch = request.matchedProperty || {};
+          // Get property match details - backend may send 'matchedProperty' or 'propertyMatch'
+          const propertyMatch = request.matchedProperty || request.propertyMatch || {};
           
           // Debug: log property data
           console.log('🏠 Property data for request', request.id, ':', {
@@ -207,6 +210,7 @@ const LandlordRentalRequests = () => {
             id: request.id,
             name: `${tenant?.firstName || 'Tenant'} ${tenant?.lastName || ''}`.trim(),
             initials: initials,
+            profileImage: tenant?.profileImage || null,
             email: tenant?.email || null,
             phone: tenant?.phoneNumber || null,
             age: age,
@@ -591,15 +595,15 @@ const LandlordRentalRequests = () => {
       console.log('🔍 API response:', response);
       
       setOfferSent(true);
-      
-      // Immediately remove the request from the local state
-      setRentalRequests(prev => prev.filter(req => req.id !== selectedTenant.id));
-      
-      // Close modal after 2 seconds
+      // Move card to Offered tab
+      setRentalRequests(prev => prev.map(req => (
+        req.id === selectedTenant.id ? { ...req, status: 'offered' } : req
+      )));
+      // Close modal shortly
       setTimeout(() => {
         handleCloseModal();
-        setOfferSent(false); // Reset the success message
-      }, 2000);
+        setOfferSent(false);
+      }, 1200);
       
     } catch (error) {
       console.error('🔍 Error in handleSubmitOffer:', error);
@@ -888,33 +892,64 @@ const LandlordRentalRequests = () => {
               </div>
             )}
 
+            {/* Tabs: Pending | Offered | Declined */}
+            <div className="mb-4">
+              <div className="flex space-x-2">
+                {['Pending','Offered','Declined'].map(tab => {
+                  const counts = {
+                    Pending: rentalRequests.filter(t => {
+                      const s = (t.status || 'active').toLowerCase();
+                      return s === 'active' || s === 'pending';
+                    }).length,
+                    Offered: rentalRequests.filter(t => (t.status || '').toLowerCase() === 'offered').length,
+                    Declined: rentalRequests.filter(t => (t.status || '').toLowerCase() === 'declined').length
+                  };
+                  const count = counts[tab];
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium border ${
+                        activeTab === tab ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {tab} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Section Header */}
             {!error || !error.includes('No properties found') ? (
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold text-gray-900">
-                  {rentalRequests.length} pending requests
+                  {activeTab} requests
                 </h2>
                 <span className="text-sm text-gray-500">
-                  {totalRequests > rentalRequests.length 
-                    ? `Showing: ${rentalRequests.length} of ${totalRequests} requests (${totalRequests - rentalRequests.length} with offers)`
-                    : 'Showing: All requests'
-                  }
+                  {`Total: ${totalRequests}`}
                 </span>
               </div>
             ) : null}
 
             {/* Tenant Profile Cards */}
             <div className="space-y-6">
-              {rentalRequests.map((tenant) => (
+              {rentalRequests
+                .filter(t => {
+                  const s = (t.status || 'active').toLowerCase();
+                  if (activeTab === 'Pending') return s === 'active' || s === 'pending';
+                  if (activeTab === 'Offered') return s === 'offered';
+                  if (activeTab === 'Declined') return s === 'declined';
+                  return true;
+                })
+                .map((tenant) => (
                 <TenantRequestCard
                   key={tenant.id}
                   tenant={tenant}
                   onSendOffer={handleSendOffer}
                   onDeclineRequest={handleDeclineRequest}
-                  onPriceAdjustment={handlePriceAdjustment}
                   decliningRequest={decliningRequest === tenant.id}
                   offerSent={offerSent}
-                  priceAdjusted={priceAdjustedTenants.has(tenant.id)} // Pass whether price was adjusted
                   formatCurrencyDisplay={formatCurrencyDisplay}
                   formatCurrencyWithDecimals={formatCurrencyWithDecimals}
                   formatDate={formatDate}
@@ -925,7 +960,13 @@ const LandlordRentalRequests = () => {
             </div>
 
             {/* Empty State */}
-            {rentalRequests.length === 0 && !error.includes('No properties found') && (
+            {rentalRequests.filter(t => {
+              const s = (t.status || 'active').toLowerCase();
+              if (activeTab === 'Pending') return s === 'active' || s === 'pending';
+              if (activeTab === 'Offered') return s === 'offered';
+              if (activeTab === 'Declined') return s === 'declined';
+              return true;
+            }).length === 0 && !error.includes('No properties found') && (
               <div className="card-modern p-12 text-center">
                 <div className="mx-auto h-24 w-24 text-gray-400 mb-4">
                   <svg fill="currentColor" viewBox="0 0 24 24">
@@ -934,7 +975,7 @@ const LandlordRentalRequests = () => {
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No requests found</h3>
                 <p className="text-gray-500 mb-6">
-                  There are currently no rental requests matching your properties. Check back later for new requests.
+                  There are currently no {activeTab.toLowerCase()} requests. Check back later for new requests.
                 </p>
               </div>
             )}

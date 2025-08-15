@@ -283,11 +283,8 @@ export const getSystemConfig = async (req, res) => {
         requestExpiration: 'Dynamic (move-in date - 3 days)'
       },
       cronJobs: {
-        continuousRequestMatching: '*/5 * * * *',
-        dailyCleanup: '0 2 * * *',
-        dailyRentCheck: '0 9 * * *',
-        weeklyAnalytics: '0 3 * * 0',
-        monthlyCleanup: '0 1 1 * *'
+        status: 'DISABLED',
+        message: 'Cron jobs removed - using immediate matching instead'
       }
     };
 

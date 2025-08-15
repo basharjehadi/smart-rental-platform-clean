@@ -36,11 +36,11 @@ class RequestPoolService {
   logErr (event, payload = {}) { console.error(JSON.stringify({ level: 'error', event, ...payload })); }
 
   /**
-   * 🚀 SCALABILITY: Add rental request to pool with delayed matching
+   * 🚀 SCALABILITY: Add rental request to pool with immediate matching
    */
   async addToPool(rentalRequest) {
     try {
-      console.log(`🏊 Adding request ${rentalRequest.id} to pool (matching will start in 5 minutes)`);
+      console.log(`🏊 Adding request ${rentalRequest.id} to pool with immediate matching`);
 
       // 🚀 SCALABILITY: Calculate expiration based on move-in date (3 days before)
       const moveInDate = new Date(rentalRequest.moveInDate);
@@ -55,18 +55,27 @@ class RequestPoolService {
         }
       });
 
-      // 🚀 SCALABILITY: NO IMMEDIATE MATCHING - wait for 5-minute cron job
-      // The cron job will handle finding matching landlords and creating matches
-      // This allows for the 5-minute delay and continuous matching as requested
-
       // 🚀 SCALABILITY: Update analytics
       await this.updatePoolAnalytics(rentalRequest.location);
 
       // 🚀 SCALABILITY: Cache the request for quick access
       await this.cacheRequest(rentalRequest);
 
-      console.log(`✅ Request ${rentalRequest.id} added to pool, will start matching in 5 minutes, expires ${expirationDate.toISOString()}`);
-      return 0; // Return 0 matches since matching is delayed
+      // 🚀 SCALABILITY: IMMEDIATE MATCHING - create matches right away for better UX
+      // Find matching landlords and create matches immediately
+      const matchingLandlords = await this.findMatchingLandlordsByProperties(rentalRequest);
+      
+      if (matchingLandlords.length > 0) {
+        // Create matches for all matching landlords
+        await this.createMatches(rentalRequest.id, matchingLandlords, rentalRequest);
+        console.log(`✅ Created ${matchingLandlords.length} immediate matches for request ${rentalRequest.id}`);
+        console.log(`✅ Request ${rentalRequest.id} added to pool with immediate matching, expires ${expirationDate.toISOString()}`);
+        return matchingLandlords.length;
+      } else {
+        console.log(`⚠️ No matching landlords found for request ${rentalRequest.id}`);
+        console.log(`✅ Request ${rentalRequest.id} added to pool with immediate matching, expires ${expirationDate.toISOString()}`);
+        return 0;
+      }
 
     } catch (error) {
       console.error('❌ Error adding request to pool:', error);
@@ -403,6 +412,22 @@ class RequestPoolService {
                 }
               }
             }
+          },
+          // Include anchored property details for this match so UI can show matched property
+          property: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              city: true,
+              monthlyRent: true,
+              propertyType: true,
+              bedrooms: true,
+              furnished: true,
+              parking: true,
+              petsAllowed: true,
+              availableFrom: true
+            }
           }
         },
         orderBy: [
@@ -587,7 +612,7 @@ class RequestPoolService {
   }
 
   /**
-   * 🚀 SCALABILITY: Cleanup expired requests (cron job)
+   * 🚀 SCALABILITY: Cleanup expired requests
    */
   async cleanupExpiredRequests() {
     try {

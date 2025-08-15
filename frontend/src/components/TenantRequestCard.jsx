@@ -3,11 +3,9 @@ import React from 'react';
 const TenantRequestCard = ({ 
   tenant, 
   onSendOffer, 
-  onDeclineRequest, 
-  onPriceAdjustment,
+  onDeclineRequest,
   decliningRequest = false,
   offerSent = false,
-  priceAdjusted = false, // New prop to track if price was adjusted
   formatCurrencyDisplay,
   formatCurrencyWithDecimals,
   formatDate,
@@ -132,6 +130,35 @@ const TenantRequestCard = ({
   };
 
   const matchInfo = calculateMatchScore();
+
+  // One-line budget analysis sentence (below / exact / slightly above / above)
+  const deriveBudgetSentence = () => {
+    // Parse rent
+    let propertyRent = 0;
+    try {
+      const rentString = (tenant.propertyMatch?.rent || '').toString();
+      propertyRent = parseFloat(rentString.replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+    } catch {}
+
+    const tenantMaxBudget = parseInt(tenant.budgetTo || tenant.budget) || 0;
+    if (!tenantMaxBudget || !propertyRent) return '';
+
+    if (propertyRent < tenantMaxBudget) {
+      return 'Your price is below their budget. You can offer your current price or adjust in the offer modal.';
+    }
+    if (propertyRent === tenantMaxBudget) {
+      return 'Perfect match: your price equals their max budget.';
+    }
+
+    const diff = propertyRent - tenantMaxBudget;
+    const suggested = Math.max(0, tenantMaxBudget);
+    if (propertyRent <= tenantMaxBudget * 1.1) {
+      return `Slightly above their budget by ${diff.toLocaleString('pl-PL')} PLN. Consider lowering to ${suggested.toLocaleString('pl-PL')} PLN.`;
+    }
+    return `Above their budget by ${diff.toLocaleString('pl-PL')} PLN. Lower to ${suggested.toLocaleString('pl-PL')} PLN to be eligible.`;
+  };
+
+  const budgetSentence = deriveBudgetSentence();
   
   // Mask contact information
   const maskEmail = (email) => {
@@ -218,21 +245,7 @@ const TenantRequestCard = ({
   const matchColor = getMatchColor(matchInfo.score);
 
   return (
-    <div className="card-modern overflow-hidden">
-      {/* Match Score Banner */}
-      <div className={`bg-${matchColor}-50 border-b border-${matchColor}-100 px-6 py-3`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className={`h-3 w-3 bg-${matchColor}-500 rounded-full`}></div>
-            <span className={`text-sm font-medium text-${matchColor}-800`}>
-              {matchInfo.matchType}
-            </span>
-          </div>
-          <div className={`text-lg font-bold text-${matchColor}-600`}>
-            {matchInfo.score}% Match
-          </div>
-        </div>
-      </div>
+    <div className="card-modern overflow-hidden p-4">
 
       {/* Interest Indicator */}
       <div className="bg-gray-50 px-6 py-3 border-b border-gray-100">
@@ -260,12 +273,30 @@ const TenantRequestCard = ({
 
       {/* Tenant Information */}
       <div className="p-6">
-        <div className="flex items-start space-x-4 mb-6">
-          {/* Avatar */}
+        <div className="flex items-start space-x-3 mb-4">
+          {/* Avatar (show profile photo if provided) */}
           <div className="flex-shrink-0">
-            <div className="h-12 w-12 bg-blue-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-semibold text-lg">{tenant.initials}</span>
-            </div>
+            {tenant.profileImage ? (
+              <img
+                src={(function () {
+                  const p = tenant.profileImage;
+                  if (!p) return '';
+                  if (p.startsWith('http://') || p.startsWith('https://')) return p;
+                  // If backend returns just a filename, build full URL
+                  if (!p.startsWith('/')) return `http://localhost:3001/uploads/profile_images/${p}`;
+                  // If it starts with /uploads/, prepend base
+                  if (p.startsWith('/uploads/')) return `http://localhost:3001${p}`;
+                  // Fallback
+                  return `http://localhost:3001${p}`;
+                })()}
+                alt="Tenant"
+                className="h-12 w-12 rounded-full object-cover"
+              />
+            ) : (
+              <div className="h-12 w-12 bg-blue-600 rounded-full flex items-center justify-center">
+                <span className="text-white font-semibold text-lg">{tenant.initials}</span>
+              </div>
+            )}
           </div>
 
           {/* Tenant Details */}
@@ -322,7 +353,7 @@ const TenantRequestCard = ({
             </div>
 
             {/* Demographics and Preferences */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-sm">
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Age & Occupation</p>
                 <p className="text-sm font-medium text-gray-900">
@@ -346,7 +377,7 @@ const TenantRequestCard = ({
             </div>
 
             {/* Property Match with Budget Analysis */}
-            <div className="bg-green-50 border border-green-100 rounded-lg p-4 mb-6">
+            <div className="bg-green-50 border border-green-100 rounded-lg p-3 mb-4 text-sm">
               <div className="flex items-center space-x-2 mb-3">
                 <div className="h-2 w-2 bg-green-500 rounded-full"></div>
                 <span className="text-sm font-medium text-green-800">Matched with your property</span>
@@ -361,66 +392,21 @@ const TenantRequestCard = ({
                 </p>
               </div>
               
-              {/* Budget Analysis - Actionable Information */}
-              <div className="bg-white bg-opacity-70 rounded-lg p-3 border border-green-200">
-                <div className="flex items-center space-x-2 mb-2">
-                  <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  <span className="text-sm font-semibold text-gray-800">Budget Analysis</span>
-                </div>
-                
-                {/* Budget Comparison */}
-                <div className="grid grid-cols-2 gap-4 mb-3">
+              {/* Budget Analysis - One-line guidance */}
+              <div className="bg-white bg-opacity-70 rounded-lg p-2 border border-green-200">
+                <div className="grid grid-cols-3 gap-2 items-center text-sm">
                   <div className="text-center">
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Your Price</p>
-                    <p className="text-lg font-bold text-red-600">{tenant.propertyMatch.rent}</p>
+                    <p className="text-lg font-bold text-gray-900">{tenant.propertyMatch.rent}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Analysis</p>
+                    <p className="text-sm font-medium text-gray-700">{budgetSentence}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Their Max Budget</p>
                     <p className="text-lg font-bold text-green-600">{tenant.budgetTo ? `${tenant.budgetTo} PLN` : `${tenant.budget} PLN`}</p>
                   </div>
-                </div>
-                
-                {/* Action Message */}
-                <div className="text-center">
-                  <p className="text-sm font-medium text-gray-700 mb-1">
-                    {matchInfo.actionMessage}
-                  </p>
-                  
-                  {/* Urgency Badge */}
-                  {matchInfo.urgencyLevel === 'high' && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      High Priority
-                    </span>
-                  )}
-                  {matchInfo.urgencyLevel === 'medium' && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                      <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      Good Opportunity
-                    </span>
-                  )}
-                  {matchInfo.urgencyLevel === 'low' && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                      <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      Fair Opportunity
-                    </span>
-                  )}
-                  {matchInfo.urgencyLevel === 'very-low' && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                      <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      Low Priority
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
@@ -434,33 +420,15 @@ const TenantRequestCard = ({
             {/* Action Buttons or Status */}
             {tenant.status?.toLowerCase() === 'active' ? (
               <div className="flex space-x-4">
-                {matchInfo.needsPriceAdjustment && !priceAdjusted ? (
-                  <>
-                    {/* Quick Price Action Button - Shows when budget doesn't match and price hasn't been adjusted yet */}
-                    <button 
-                      onClick={() => onPriceAdjustment(tenant)}
-                      className="btn-secondary flex-1 inline-flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white"
-                    >
-                      <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                      </svg>
-                      Quick Price Action
-                    </button>
-                  </>
-                ) : (
-                  /* Send Offer Button - Shows after price adjustment or for perfect matches */
-                  <button 
-                    onClick={() => onSendOffer(tenant)}
-                    className={`btn-primary flex-1 inline-flex items-center justify-center ${
-                      priceAdjusted ? 'bg-blue-500 hover:bg-blue-600' : 'bg-green-500 hover:bg-green-600'
-                    } text-white`}
-                  >
-                    <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
-                    Send Offer
-                  </button>
-                )}
+                <button 
+                  onClick={() => onSendOffer(tenant)}
+                  className="btn-primary flex-1 inline-flex items-center justify-center"
+                >
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                  Send Offer
+                </button>
                 
                 {/* Decline Button */}
                 <button 

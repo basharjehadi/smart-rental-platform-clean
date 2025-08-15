@@ -1,9 +1,7 @@
 import dotenv from 'dotenv';
-import cron from 'node-cron';
 import { createServer } from 'http';
 import app from './app.js';
 import { prisma } from './utils/prisma.js';
-import { dailyRentCheck } from './controllers/cronController.js';
 import { startContractMonitoring, stopContractMonitoring } from './controllers/contractController.js';
 import { logger } from './utils/logger.js';
 import { initializeSocket } from './socket/socketServer.js';
@@ -21,51 +19,12 @@ logger.info('Environment variables loaded:', {
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET'
 });
 
-// Initialize cron jobs
-const initializeCronJobs = () => {
-  // Daily rent check - runs at 9:00 AM every day
-  cron.schedule('0 9 * * *', async () => {
-    logger.info('🕐 Running daily rent check cron job...');
-    try {
-      await dailyRentCheck();
-      logger.info('✅ Daily rent check completed successfully');
-    } catch (error) {
-      logger.error('❌ Daily rent check failed:', error);
-    }
-  }, {
-    scheduled: true,
-    timezone: "Europe/Warsaw"
-  });
-
-  // 🚀 SCALABILITY: Continuous request matching - runs every 5 minutes
-  cron.schedule('*/5 * * * *', async () => {
-    logger.info('🔄 Running continuous request matching cron job...');
-    try {
-      const { continuousRequestMatching } = await import('./controllers/cronController.js');
-      await continuousRequestMatching();
-      logger.info('✅ Continuous request matching completed successfully');
-    } catch (error) {
-      logger.error('❌ Continuous request matching failed:', error);
-    }
-  }, {
-    scheduled: true,
-    timezone: "Europe/Warsaw"
-  });
-
-  logger.info('⏰ Cron jobs initialized:');
-  logger.info('   Daily rent check: 9:00 AM (Europe/Warsaw)');
-  logger.info('   Continuous request matching: Every 5 minutes');
-};
-
 // Start server
 const startServer = async () => {
   try {
     // Test database connection
     await prisma.$connect();
     logger.info('✅ Database connected successfully');
-
-    // Initialize cron jobs
-    initializeCronJobs();
 
     // Start contract generation scheduler
     startContractMonitoring();
