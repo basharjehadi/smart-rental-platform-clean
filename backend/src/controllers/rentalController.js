@@ -154,8 +154,8 @@ const getAllActiveRequests = async (req, res) => {
 
     // Transform data for frontend compatibility
     const requests = poolRequests.requests.map(match => {
-      // Get the best matching property for this landlord and request
-      const bestProperty = match.rentalRequest.bestMatchingProperty || null;
+      // Prefer anchored property from match; fall back to bestMatchingProperty
+      const bestProperty = match.property || match.rentalRequest.bestMatchingProperty || null;
       
       return {
         ...match.rentalRequest,
@@ -244,9 +244,10 @@ const createOffer = async (req, res) => {
     console.log('🔍 Checking landlord availability for user:', req.user.id);
     
     // First, validate that the property exists and belongs to this landlord
+    // NOTE: Property IDs are strings (cuid). Do NOT parseInt here.
     const property = await prisma.property.findFirst({
       where: {
-        id: parseInt(propertyId),
+        id: propertyId,
         landlordId: req.user.id,
         status: 'AVAILABLE',
         availability: true
@@ -345,7 +346,7 @@ const createOffer = async (req, res) => {
       data: {
         landlordId: req.user.id,
         rentalRequestId: parseInt(requestId),
-        propertyId: parseInt(propertyId), // 🚀 SCALABILITY: Link offer to specific property
+        propertyId: propertyId, // 🚀 SCALABILITY: Link offer to specific property (string cuid)
         rentAmount: parseFloat(rentAmount),
         depositAmount: parseFloat(depositAmount || 0),
         leaseDuration: parseInt(leaseDuration),
