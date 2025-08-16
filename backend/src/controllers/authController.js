@@ -1,6 +1,8 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../utils/prisma.js';
+import reviewService from '../services/reviewService.js';
+import rankService from '../services/rankService.js';
 
 // Register new user
 const register = async (req, res) => {
@@ -70,6 +72,37 @@ const register = async (req, res) => {
     });
 
     console.log('User created successfully:', { id: user.id, email: user.email, role: user.role });
+
+    // 🏆 Initialize 5-star rating for new user
+    try {
+      await reviewService.initializeUserRating(user.id);
+      console.log('✅ 5-star rating initialized for new user:', user.id);
+    } catch (reviewError) {
+      console.error('⚠️ Failed to initialize user rating:', reviewError);
+      // Don't fail registration if rating initialization fails
+    }
+
+    // 🏆 Initialize user rank
+    try {
+      await rankService.calculateUserRank(user.id);
+      console.log('✅ User rank initialized for new user:', user.id);
+    } catch (rankError) {
+      console.error('⚠️ Failed to initialize user rank:', rankError);
+      // Set default rank manually if service fails
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { 
+            rank: 'NEW_USER',
+            rankPoints: 0,
+            rankUpdatedAt: new Date()
+          }
+        });
+        console.log('✅ Default rank set manually for new user:', user.id);
+      } catch (manualRankError) {
+        console.error('⚠️ Failed to set manual default rank:', manualRankError);
+      }
+    }
 
     // Generate JWT token for the new user
     const token = jwt.sign(

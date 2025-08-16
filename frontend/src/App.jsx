@@ -34,6 +34,7 @@ import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import TenantDashboardRent from './pages/TenantDashboardRent';
 import TenantRentHistory from './pages/TenantRentHistory';
 import PaymentHistory from './pages/PaymentHistory';
+import ReviewPage from './pages/ReviewPage';
 
 import AdminDashboard from './pages/AdminDashboard';
 import AuthCallback from './pages/AuthCallback';
@@ -52,7 +53,7 @@ import TenantDashboardRedirect from './components/TenantDashboardRedirect';
 // Component to conditionally render Navbar
 const AppContent = () => {
   const location = useLocation();
-  const hideNavbarRoutes = ['/', '/login', '/register', '/dashboard', '/tenant-dashboard', '/tenant-help-center', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/property', '/contracts', '/payments', '/payment', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details', '/landlord-help-center', '/landlord-my-tenants', '/landlord-tenant-profile', '/admin', '/payment-success', '/payment-history', '/messaging'];
+  const hideNavbarRoutes = ['/', '/login', '/register', '/dashboard', '/tenant-dashboard', '/tenant-help-center', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/property', '/contracts', '/payments', '/payment', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details', '/landlord-help-center', '/landlord-my-tenants', '/landlord-tenant-profile', '/admin', '/payment-success', '/payment-history', '/reviews', '/messaging'];
   
   // Check if current path should hide navbar (including parameterized routes)
   const shouldHideNavbar = hideNavbarRoutes.some(route => {
@@ -206,6 +207,15 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <PaymentHistory />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/reviews" 
+          element={
+            <ProtectedRoute>
+              <ReviewPage />
             </ProtectedRoute>
           } 
         />

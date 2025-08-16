@@ -3,6 +3,7 @@ import { prisma } from '../utils/prisma.js';
 import { sendPaymentSuccess } from '../utils/emailService.js';
 import { activateConversationAfterPayment } from '../utils/chatGuard.js';
 import propertyAvailabilityService from '../services/propertyAvailabilityService.js';
+import reviewService from '../services/reviewService.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -510,6 +511,31 @@ const handlePaymentSucceeded = async (paymentIntent) => {
       } catch (emailError) {
         console.error('❌ Error sending email notification:', emailError);
         // Don't fail the payment if email fails
+      }
+    }
+
+    // 🏆 TRIGGER FIRST REVIEW STAGE: After payment completion
+    if (rentalRequestId && metadata.tenantId) {
+      try {
+        console.log('🎯 Triggering first review stage for payment completion');
+        
+        // Find the lease associated with this rental request
+        const lease = await prisma.lease.findFirst({
+          where: { 
+            rentalRequestId: parseInt(rentalRequestId),
+            tenantId: metadata.tenantId
+          }
+        });
+
+        if (lease) {
+          await reviewService.triggerReviewByEvent('PAYMENT_COMPLETED', lease.id, metadata.tenantId);
+          console.log('✅ First review stage triggered for lease:', lease.id);
+        } else {
+          console.log('⚠️ No lease found for rental request:', rentalRequestId);
+        }
+      } catch (reviewError) {
+        console.error('❌ Error triggering review stage:', reviewError);
+        // Don't fail the payment if review trigger fails
       }
     }
 

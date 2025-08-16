@@ -3,7 +3,7 @@ import {
   getUserIdentity, getUserProfile, updateUserProfile,
   updateUserIdentity, saveUserSignature, saveContractSignatures, getContractSignatures,
   uploadIdentityDocument, getProfileStatus, uploadProfilePhoto, deleteProfilePhoto,
-  getPendingKYC, reviewKYC, findUserByEmail
+  getPendingKYC, reviewKYC, findUserByEmail, getUserRank
 } from '../controllers/userController.js';
 import { validateProfileData } from '../middlewares/profileValidationMiddleware.js';
 import verifyToken from '../middlewares/verifyToken.js';
@@ -37,5 +37,8 @@ router.post('/admin/kyc/review', reviewKYC);
 
 // User search routes
 router.post('/find-by-email', findUserByEmail);
+
+// User rank routes
+router.get('/:userId/rank', getUserRank);
 
 export default router; 

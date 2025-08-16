@@ -53,6 +53,11 @@ model User {
   lastActiveAt             DateTime                  @default(now())
   requestCount             Int                       @default(0)
   responseTime             Int?
+  averageRating            Float?                   @default(5.0)
+  totalReviews            Int                       @default(1)
+  rank                    UserRank                  @default(NEW_USER)
+  rankPoints              Int                       @default(0)
+  rankUpdatedAt           DateTime                  @default(now())
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
   conversationParticipants ConversationParticipant[] @relation("UserConversations")
@@ -66,7 +71,8 @@ model User {
   properties               Property[]                @relation("LandlordProperties")
   rentPayments             RentPayment[]             @relation("TenantRentPayments")
   rentalRequests           RentalRequest[]           @relation("TenantRequests")
-  reviews                  Review[]                  @relation("TenantReviews")
+  reviewsGiven            Review[]                  @relation("UserReviewsGiven")
+  reviewsReceived         Review[]                  @relation("UserReviewsReceived")
   notifications            Notification[]            @relation("UserNotifications")
   supportTickets          SupportTicket[]           @relation("UserSupportTickets")
   ticketMessages          TicketMessage[]           @relation("UserTicketMessages")
@@ -422,19 +428,26 @@ model Lease {
 }
 
 model Review {
-  id          String   @id @default(cuid())
-  rating      Int
-  comment     String
-  isAnonymous Boolean  @default(false)
-  tenantId    String
-  leaseId     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  lease       Lease    @relation("LeaseReviews", fields: [leaseId], references: [id], onDelete: Cascade)
-  tenant      User     @relation("TenantReviews", fields: [tenantId], references: [id], onDelete: Cascade)
+  id                    String   @id @default(cuid())
+  rating                Int
+  comment               String
+  isAnonymous           Boolean  @default(false)
+  reviewerId            String   // Who is giving the review
+  targetUserId          String   // Who is being reviewed
+  leaseId               String?
+  reviewStage           ReviewStage @default(INITIAL)
+  isSystemGenerated     Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  lease                 Lease?   @relation("LeaseReviews", fields: [leaseId], references: [id], onDelete: Cascade)
+  reviewer              User     @relation("UserReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
+  targetUser            User     @relation("UserReviewsReceived", fields: [targetUserId], references: [id], onDelete: Cascade)
 
   @@index([leaseId])
   @@index([rating])
+  @@index([reviewStage])
+  @@index([reviewerId])
+  @@index([targetUserId])
   @@map("reviews")
 }
 
@@ -687,6 +700,13 @@ enum MaintenanceStatus {
   CANCELLED
 }
 
+enum ReviewStage {
+  INITIAL
+  PAYMENT_COMPLETED
+  MOVE_IN
+  LEASE_END
+}
+
 enum ConversationType {
   DIRECT
   GROUP
@@ -753,4 +773,17 @@ enum ChatSessionStatus {
   WAITING
   ACTIVE
   ENDED
+}
+
+enum UserRank {
+  NEW_USER
+  BRONZE_TENANT
+  SILVER_TENANT
+  GOLD_TENANT
+  PLATINUM_TENANT
+  BRONZE_LANDLORD
+  SILVER_LANDLORD
+  GOLD_LANDLORD
+  PLATINUM_LANDLORD
+  DIAMOND_LANDLORD
 }

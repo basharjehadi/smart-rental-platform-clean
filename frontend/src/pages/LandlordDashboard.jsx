@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import LandlordSidebar from '../components/LandlordSidebar';
 import NotificationHeader from '../components/common/NotificationHeader';
+import ReviewSystem from '../components/ReviewSystem';
 import { 
   LogOut, 
   DollarSign, 
@@ -286,62 +287,25 @@ const LandlordDashboard = () => {
     </div>
   );
 
-  // Tenant Reviews Card
+  // Review System Card
   const ReviewsCard = () => (
     <div className="card-modern p-6">
       <div className="flex items-center mb-4">
         <Star className="w-5 h-5 text-blue-600 mr-2" />
-        <h3 className="text-lg font-semibold text-gray-900">Tenant Reviews</h3>
-        <div className="ml-auto flex items-center space-x-1">
-          <Star className="w-4 h-4 text-yellow-400 fill-current" />
-          <span className="text-sm font-medium text-gray-900">
-            {dashboardData?.averageRating || 0} ({dashboardData?.totalReviews || 0} reviews)
-          </span>
-        </div>
+        <h3 className="text-lg font-semibold text-gray-900">Review System</h3>
       </div>
       
-      <div className="space-y-4 mb-4">
-        {dashboardData?.reviews && dashboardData.reviews.length > 0 ? (
-          dashboardData.reviews.slice(0, 3).map((review, index) => (
-            <div key={index} className="border-b border-gray-100 pb-3 last:border-b-0">
-              <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-blue-600">
-                    {review.tenantName?.split(' ').map(n => n[0]).join('').toUpperCase() || 'T'}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <p className="text-sm font-medium text-gray-900">{review.tenantName || 'Tenant'}</p>
-                    <span className="text-xs text-gray-500">({review.propertyName || 'Property'})</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">{review.comment || 'No review text'}</p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-1">
-                      {[...Array(5)].map((_, i) => (
-                        <Star 
-                          key={i} 
-                          className={`w-3 h-3 ${i < (review.rating || 0) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
-                        />
-                      ))}
-                    </div>
-                    <span className="text-xs text-gray-500">{review.date || 'No date'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="text-center py-4">
-            <p className="text-sm text-gray-500">No reviews available</p>
-          </div>
-        )}
+      <ReviewSystem userId={user?.id} isLandlord={true} />
+      
+      <div className="mt-4 text-center">
+        <button 
+          onClick={() => navigate('/reviews')}
+          className="btn-secondary flex items-center space-x-2 w-full justify-center"
+        >
+          <Eye className="w-4 h-4" />
+          <span>View Full Review System</span>
+        </button>
       </div>
-
-      <button className="btn-secondary flex items-center space-x-2 w-full justify-center">
-        <Eye className="w-4 h-4" />
-        <span>View All Reviews</span>
-      </button>
     </div>
   );
 

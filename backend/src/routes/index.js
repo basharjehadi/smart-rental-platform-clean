@@ -18,6 +18,7 @@ import messagingRoutes from './messaging.js';
 import notificationRoutes from './notifications.js';
 import systemRoutes from './systemRoutes.js';
 import supportRoutes from './supportRoutes.js';
+import reviewRoutes from './reviewRoutes.js';
 
 const router = Router();
 
@@ -73,5 +74,8 @@ router.use('/system', systemRoutes);
 
 // Support routes
 router.use('/support', supportRoutes);
+
+// Review routes
+router.use('/reviews', reviewRoutes);
 
 export default router; 

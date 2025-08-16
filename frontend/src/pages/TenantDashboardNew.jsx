@@ -6,6 +6,7 @@ import TenantSidebar from '../components/TenantSidebar';
 import { LogOut } from 'lucide-react';
 import { viewContract, downloadContract } from '../utils/contractGenerator.js';
 import NotificationHeader from '../components/common/NotificationHeader';
+import ReviewSystem from '../components/ReviewSystem';
 
 const TenantDashboardNew = () => {
   const { user, logout } = useAuth();
@@ -802,45 +803,19 @@ const TenantDashboardNew = () => {
               )}
             </div>
 
-            {/* Account Review */}
+            {/* Review System */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Account Review</h3>
-              <p className="text-sm text-gray-600 mb-6">Your rental account status and recommendations</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Account Status */}
-                <div>
-                  <h4 className="text-md font-semibold text-gray-900 mb-3">Account Status</h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Payment History</span>
-                      {getStatusBadge(dashboardData.accountStatus.paymentHistory)}
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Lease Compliance</span>
-                      {getStatusBadge(dashboardData.accountStatus.leaseCompliance)}
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Communication</span>
-                      {getStatusBadge(dashboardData.accountStatus.communication)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Upcoming Actions */}
-                <div>
-                  <h4 className="text-md font-semibold text-gray-900 mb-3">Upcoming Actions</h4>
-                  <ul className="space-y-2">
-                    {dashboardData.upcomingActions?.map((action, index) => (
-                      <li key={index} className="flex items-start">
-                        <span className={`inline-block w-2 h-2 rounded-full mt-2 mr-3 ${
-                          index === 0 ? 'bg-orange-500' : 
-                          index === 1 ? 'bg-blue-500' : 'bg-green-500'
-                        }`}></span>
-                        <span className="text-sm text-gray-600">{action}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Review System</h3>
+              <p className="text-sm text-gray-600 mb-6">Your 3-stage review progress and rating</p>
+              <ReviewSystem userId={user?.id} isLandlord={false} />
+              
+              <div className="mt-4 text-center">
+                <button 
+                  onClick={() => navigate('/reviews')}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  View Full Review System
+                </button>
               </div>
             </div>
           </div>

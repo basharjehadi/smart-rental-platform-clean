@@ -905,4 +905,95 @@ export const findUserByEmail = async (req, res) => {
       message: 'An error occurred while searching for the user'
     });
   }
+};
+
+// Get user rank information
+export const getUserRank = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requestingUserId = req.user.id;
+
+    // Users can only view their own rank or admin can view all
+    if (requestingUserId !== userId && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'You can only view your own rank'
+      });
+    }
+
+    // Get user with rank information
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        role: true,
+        rank: true,
+        rankPoints: true,
+        totalReviews: true,
+        averageRating: true,
+        createdAt: true,
+        lastActiveAt: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+        message: 'The specified user does not exist'
+      });
+    }
+
+    // Import rank service dynamically to avoid circular dependencies
+    let rankInfo, nextRankRequirements, nextRankInfo;
+    
+    try {
+      const rankService = (await import('../services/rankService.js')).default;
+      
+      // Get rank information
+      rankInfo = rankService.getRankInfo(user.rank);
+      nextRankRequirements = rankService.getNextRankRequirements(user.rank, user.role);
+      
+      if (nextRankRequirements) {
+        nextRankInfo = rankService.getRankInfo(nextRankRequirements.nextRank);
+      }
+    } catch (rankError) {
+      console.warn('Rank service error, using fallback:', rankError);
+      // Fallback rank info
+      rankInfo = {
+        name: 'New User',
+        description: 'Just getting started',
+        color: 'text-gray-500',
+        bgColor: 'bg-gray-100',
+        icon: '⭐',
+        requirements: 'Complete your first review to earn a rank'
+      };
+      nextRankRequirements = null;
+      nextRankInfo = null;
+    }
+
+    const rankData = {
+      rank: user.rank,
+      rankPoints: user.rankPoints || 0,
+      totalReviews: user.totalReviews || 1,
+      averageRating: user.averageRating || 5.0,
+      rankInfo,
+      nextRankRequirements: nextRankRequirements ? {
+        ...nextRankRequirements,
+        nextRankInfo
+      } : null,
+      accountAge: Math.floor((new Date() - user.createdAt) / (1000 * 60 * 60 * 24))
+    };
+
+    res.json({
+      success: true,
+      data: rankData
+    });
+
+  } catch (error) {
+    console.error('Get user rank error:', error);
+    res.status(500).json({
+      error: 'Failed to get user rank',
+      message: 'An error occurred while fetching user rank'
+    });
+  }
 }; 
