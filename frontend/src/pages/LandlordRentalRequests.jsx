@@ -117,29 +117,31 @@ const LandlordRentalRequests = () => {
        const { pending = [], offered = [], declined = [] } = response.data || {};
  
        const mapOne = (request) => {
-         const tenant = request.tenant;
+         const tenant = request.tenant || {};
          const budgetFrom = request.budgetFrom || request.budget;
          const budgetTo = request.budgetTo || request.budget;
          const budgetRange = budgetFrom === budgetTo 
            ? `${formatCurrencyDisplay(budgetFrom)}`
            : `${formatCurrencyDisplay(budgetFrom)} - ${formatCurrencyDisplay(budgetTo)}`;
  
-         const initials = tenant?.firstName && tenant?.lastName 
+         const initials = tenant.firstName && tenant.lastName 
            ? `${tenant.firstName.charAt(0)}${tenant.lastName.charAt(0)}`
-           : tenant?.firstName?.charAt(0) || 'T';
+           : tenant.firstName?.charAt(0) || 'T';
  
          const propertyMatch = request.propertyMatch || request.matchedProperty || {};
  
          return {
            id: request.id,
-           name: `${tenant?.firstName || 'Tenant'} ${tenant?.lastName || ''}`.trim(),
+           name: `${tenant.firstName || 'Tenant'} ${tenant.lastName || ''}`.trim(),
            initials,
-           profileImage: tenant?.profileImage || null,
-           email: tenant?.email || null,
-           phone: tenant?.phoneNumber || null,
-           age: null,
-           occupation: tenant?.profession || null,
-           verified: tenant?.isVerified || false,
+           profileImage: tenant.profileImage || null,
+           email: tenant.email || null,
+           phone: tenant.phoneNumber || null,
+           age: tenant.age || null,
+           occupation: tenant.profession || null,
+           verified: tenant.isVerified || false,
+           rating: tenant.rating ?? undefined,
+           reviews: tenant.reviews ?? undefined,
            budgetRange,
            budgetFrom,
            budgetTo,

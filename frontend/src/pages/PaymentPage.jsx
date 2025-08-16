@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowLeft, Shield, CreditCard, Building, Wallet, MessageCircle, RefreshCw, Home, MapPin, Calendar, User, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Shield, CreditCard, Building, Wallet, MessageCircle, RefreshCw, Home, MapPin, Calendar, User, HelpCircle, Star, Users } from 'lucide-react';
 
 const PaymentPage = () => {
   const [offer, setOffer] = useState(null);
@@ -18,6 +18,9 @@ const PaymentPage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showProcessingModal, setShowProcessingModal] = useState(false);
   const [processingStep, setProcessingStep] = useState(1);
+  const [showLandlordReviews, setShowLandlordReviews] = useState(false);
+  const [landlordReviews, setLandlordReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   
   const { api } = useAuth();
   const navigate = useNavigate();
@@ -195,6 +198,83 @@ const PaymentPage = () => {
       'SHARED_ROOM': 'Shared Room'
     };
     return typeMap[type.toLowerCase()] || type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+  };
+
+  // Mask landlord's last name for privacy
+  const maskLandlordName = (fullName) => {
+    if (!fullName) return 'Landlord';
+    
+    // If offer is paid, show full name
+    if (offer?.status === 'PAID' || offer?.isPaid === true) {
+      return fullName;
+    }
+    
+    const nameParts = fullName.trim().split(' ');
+    
+    if (nameParts.length >= 2) {
+      const firstName = nameParts[0];
+      const lastName = nameParts[nameParts.length - 1];
+      
+      // Mask the last name (show first letter, rest as asterisks)
+      const maskedLastName = lastName.charAt(0) + '*'.repeat(lastName.length - 1);
+      
+      return `${firstName} ${maskedLastName}`;
+    } else {
+      // If only one name, mask it partially
+      const name = nameParts[0];
+      if (name.length > 2) {
+        return name.charAt(0) + '*'.repeat(name.length - 1);
+      }
+      return name;
+    }
+  };
+
+  // Build profile photo URL like rental request card logic
+  const getProfilePhotoUrl = (photoPath) => {
+    if (!photoPath) return null;
+    // Already full URL
+    if (photoPath.startsWith('http://') || photoPath.startsWith('https://')) {
+      return photoPath;
+    }
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    // If just filename (no leading slash), point to uploads/profile_images
+    if (!photoPath.startsWith('/')) {
+      return `${baseUrl}/uploads/profile_images/${photoPath}`;
+    }
+    // If path starts with /uploads/, prefix base URL
+    if (photoPath.startsWith('/uploads/')) {
+      return `${baseUrl}${photoPath}`;
+    }
+    // Fallback: prefix base URL
+    return `${baseUrl}${photoPath}`;
+  };
+
+  // Get real landlord data
+  const landlordData = {
+    name: offer?.landlord?.name || 'Landlord information not available',
+    email: offer?.landlord?.email || 'Email not available',
+    phone: offer?.landlord?.phoneNumber || 'Phone not available',
+    rating: offer?.landlord?.averageRating ?? 'No rating available',
+    reviews: offer?.landlord?.totalReviews ?? 0,
+    rank: offer?.landlord?.rank || 'NEW_USER',
+    rankPoints: offer?.landlord?.rankPoints || 0,
+    profileImage: offer?.landlord?.profileImage || null,
+    memberSince: offer?.landlord?.createdAt ? new Date(offer.landlord.createdAt).getFullYear() : 'Not available',
+    responseTime: offer?.landlord?.responseTime || 'Response time not available'
+  };
+
+  const fetchLandlordReviews = async () => {
+    try {
+      setReviewsLoading(true);
+      // TODO: Replace with API endpoint for landlord reviews
+      const mock = [
+        { id: 1, tenantName: 'Anna Nowak', propertyName: 'City Center Loft', rating: 5, comment: 'Very responsive and professional.', reviewDate: '2024-05-12', reviewStage: 'Lease End' },
+        { id: 2, tenantName: 'Piotr Kowalski', propertyName: 'Green Park Flat', rating: 4, comment: 'Good experience overall, minor delays once.', reviewDate: '2024-03-18', reviewStage: 'Move-in' }
+      ];
+      setLandlordReviews(mock);
+    } finally {
+      setReviewsLoading(false);
+    }
   };
 
   if (loading) {
@@ -664,23 +744,43 @@ const PaymentPage = () => {
               </div>
             </div>
 
-            {/* Landlord */}
+            {/* Landlord Profile */}
             <div className="card-modern">
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Landlord</h3>
-                <div className="flex items-center space-x-3 mb-3">
-                  <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                    <User className="w-5 h-5 text-gray-400" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">
-                      {offer.landlord?.name?.split(' ').map(n => n.charAt(0)).join('') || 'J'}.***
+                <div className="flex items-center space-x-3 mb-4">
+                  {landlordData.profileImage ? (
+                    <img src={getProfilePhotoUrl(landlordData.profileImage)} alt="Landlord" className="w-12 h-12 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
+                      <Users className="w-6 h-6 text-gray-400" />
                     </div>
+                  )}
+                  <div>
+                    <div className="font-semibold text-gray-900">{maskLandlordName(landlordData.name)}</div>
+                    <div className="text-sm text-gray-600">Contact details available after payment</div>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-sm text-blue-600">Verified landlord</div>
-                  <div className="text-sm text-blue-600">Contact after payment</div>
+                  <div className="flex items-center space-x-2">
+                    <Star className="w-4 h-4 text-yellow-400" />
+                    <span className="text-sm">{landlordData.rating} ({landlordData.reviews} reviews)</span>
+                  </div>
+                  <div className="text-xs inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                    {offer?.landlord?.rankInfo?.icon || '⭐'} {offer?.landlord?.rankInfo?.name || String(landlordData.rank).replace('_',' ')}
+                  </div>
+                  <div className="text-sm text-gray-600">Since {landlordData.memberSince}</div>
+                </div>
+                <button
+                  onClick={() => { setShowLandlordReviews(true); fetchLandlordReviews(); }}
+                  className="mt-3 text-sm text-blue-600 underline"
+                >
+                  View reviews from previous tenants
+                </button>
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    Full contact details will be available after payment completion to protect both parties.
+                  </p>
                 </div>
               </div>
             </div>
@@ -774,6 +874,67 @@ const PaymentPage = () => {
                 </span>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Landlord Reviews Modal */}
+      {showLandlordReviews && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Landlord Reviews</h2>
+              <button
+                onClick={() => setShowLandlordReviews(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {reviewsLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading reviews...</p>
+              </div>
+            ) : landlordReviews.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-600">No reviews available yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {landlordReviews.map((review) => (
+                  <div key={review.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-4 h-4 ${
+                                i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">{review.rating}/5</span>
+                      </div>
+                      <span className="text-xs text-gray-500">{review.reviewDate}</span>
+                    </div>
+                    <div className="mb-2">
+                      <span className="text-sm font-medium text-gray-900">{review.tenantName}</span>
+                      <span className="text-sm text-gray-600"> • {review.propertyName}</span>
+                    </div>
+                    <p className="text-sm text-gray-700 mb-2">{review.comment}</p>
+                    <div className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                      {review.reviewStage}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

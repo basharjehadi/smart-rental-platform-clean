@@ -410,7 +410,16 @@ class RequestPoolService {
                 select: {
                   id: true,
                   name: true,
-                  profileImage: true
+                  email: true,
+                  firstName: true,
+                  lastName: true,
+                  profileImage: true,
+                  phoneNumber: true,
+                  profession: true,
+                  dateOfBirth: true,
+                  averageRating: true,
+                  totalReviews: true,
+                  rank: true
                 }
               }
             }

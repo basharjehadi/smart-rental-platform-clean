@@ -172,7 +172,23 @@ const getAllActiveRequests = async (req, res) => {
        ...match.rentalRequest,
        matchScore: match.matchScore,
        matchReason: match.matchReason,
-       tenant: match.rentalRequest.tenant,
+       tenant: {
+         id: match.rentalRequest.tenant?.id,
+         name: match.rentalRequest.tenant?.name,
+         email: match.rentalRequest.tenant?.email,
+         firstName: match.rentalRequest.tenant?.firstName,
+         lastName: match.rentalRequest.tenant?.lastName,
+         profileImage: match.rentalRequest.tenant?.profileImage,
+         phoneNumber: match.rentalRequest.tenant?.phoneNumber,
+         profession: match.rentalRequest.tenant?.profession,
+         age: match.rentalRequest.tenant?.dateOfBirth
+           ? Math.max(18, Math.floor((Date.now() - new Date(match.rentalRequest.tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
+           : null,
+         rating: match.rentalRequest.tenant?.averageRating ?? 5.0,
+         reviews: match.rentalRequest.tenant?.totalReviews ?? 1,
+         rank: match.rentalRequest.tenant?.rank
+       },
+       landlord: null, // RentalRequest doesn't have landlord field
        propertyMatch: mapBestProperty(match),
        status: 'pending'
      }));
@@ -188,7 +204,7 @@ const getAllActiveRequests = async (req, res) => {
        include: {
          rentalRequest: {
            include: {
-             tenant: { select: { id: true, name: true, profileImage: true } },
+             tenant: { select: { id: true, name: true, email: true, firstName: true, lastName: true, profileImage: true, phoneNumber: true, profession: true, dateOfBirth: true, averageRating: true, totalReviews: true, rank: true } },
              offers: { where: { landlordId: req.user.id }, select: { id: true } }
            }
          },
@@ -205,7 +221,22 @@ const getAllActiveRequests = async (req, res) => {
        ...match.rentalRequest,
        matchScore: match.matchScore,
        matchReason: match.matchReason,
-       tenant: match.rentalRequest.tenant,
+       tenant: {
+         id: match.rentalRequest.tenant?.id,
+         name: match.rentalRequest.tenant?.name,
+         email: match.rentalRequest.tenant?.email,
+         firstName: match.rentalRequest.tenant?.firstName,
+         lastName: match.rentalRequest.tenant?.lastName,
+         profileImage: match.rentalRequest.tenant?.profileImage,
+         phoneNumber: match.rentalRequest.tenant?.phoneNumber,
+         profession: match.rentalRequest.tenant?.profession,
+         age: match.rentalRequest.tenant?.dateOfBirth
+           ? Math.max(18, Math.floor((Date.now() - new Date(match.rentalRequest.tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
+           : null,
+         rating: match.rentalRequest.tenant?.averageRating ?? 5.0,
+         reviews: match.rentalRequest.tenant?.totalReviews ?? 1,
+         rank: match.rentalRequest.tenant?.rank
+       },
        propertyMatch: mapBestProperty(match),
        status: 'offered'
      }));
@@ -219,7 +250,7 @@ const getAllActiveRequests = async (req, res) => {
        include: {
          rentalRequest: {
            include: {
-             tenant: { select: { id: true, name: true, profileImage: true } }
+             tenant: { select: { id: true, name: true, email: true, firstName: true, lastName: true, profileImage: true, phoneNumber: true, profession: true, dateOfBirth: true, averageRating: true, totalReviews: true, rank: true } }
            }
          },
          property: {
@@ -234,7 +265,22 @@ const getAllActiveRequests = async (req, res) => {
        ...match.rentalRequest,
        matchScore: match.matchScore,
        matchReason: match.matchReason,
-       tenant: match.rentalRequest.tenant,
+       tenant: {
+         id: match.rentalRequest.tenant?.id,
+         name: match.rentalRequest.tenant?.name,
+         email: match.rentalRequest.tenant?.email,
+         firstName: match.rentalRequest.tenant?.firstName,
+         lastName: match.rentalRequest.tenant?.lastName,
+         profileImage: match.rentalRequest.tenant?.profileImage,
+         phoneNumber: match.rentalRequest.tenant?.phoneNumber,
+         profession: match.rentalRequest.tenant?.profession,
+         age: match.rentalRequest.tenant?.dateOfBirth
+           ? Math.max(18, Math.floor((Date.now() - new Date(match.rentalRequest.tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
+           : null,
+         rating: match.rentalRequest.tenant?.averageRating ?? 5.0,
+         reviews: match.rentalRequest.tenant?.totalReviews ?? 1,
+         rank: match.rentalRequest.tenant?.rank
+       },
        propertyMatch: mapBestProperty(match),
        status: 'declined'
      }));
@@ -1107,6 +1153,10 @@ const getOfferDetails = async (req, res) => {
             email: true,
             phoneNumber: true,
             profileImage: true,
+            averageRating: true,
+            totalReviews: true,
+            rank: true,
+            rankPoints: true,
             signatureBase64: true,
             pesel: true,
             street: true,
@@ -1159,6 +1209,17 @@ const getOfferDetails = async (req, res) => {
       landlordLastName: offer.landlord?.lastName
     });
 
+    // Optional: compute landlord rank info
+    let landlordRankInfo = null;
+    try {
+      const rankService = (await import('../services/rankService.js')).default;
+      if (offer.landlord?.rank) {
+        landlordRankInfo = rankService.getRankInfo(offer.landlord.rank);
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not compute landlord rank info:', e?.message || e);
+    }
+
     // Simplified transformation to avoid complex logic
     const transformedOffer = {
       id: offer.id,
@@ -1200,7 +1261,8 @@ const getOfferDetails = async (req, res) => {
         name: offer.landlord?.firstName && offer.landlord?.lastName ? 
           `${offer.landlord.firstName} ${offer.landlord.lastName}` : 
           offer.landlord?.name || 'Landlord',
-        signatureBase64: offer.landlord?.signatureBase64 || null
+        signatureBase64: offer.landlord?.signatureBase64 || null,
+        rankInfo: landlordRankInfo
       },
       
       // Include property data if available
@@ -1256,7 +1318,7 @@ const updateTenantOfferStatus = async (req, res) => {
 
     // Validate offer exists and belongs to the tenant
     const offer = await prisma.offer.findUnique({
-      where: { id: parseInt(offerId) },
+      where: { id: offerId },
       include: {
         rentalRequest: {
           select: {
@@ -1287,10 +1349,9 @@ const updateTenantOfferStatus = async (req, res) => {
       const result = await prisma.$transaction(async (tx) => {
         // Update the accepted offer
         const updatedOffer = await tx.offer.update({
-          where: { id: parseInt(offerId) },
+          where: { id: offerId },
           data: {
             status: 'ACCEPTED',
-            acceptedAt: new Date(),
             updatedAt: new Date()
           }
         });
@@ -1299,7 +1360,7 @@ const updateTenantOfferStatus = async (req, res) => {
         const otherOffers = await tx.offer.updateMany({
           where: {
             rentalRequestId: offer.rentalRequest.id,
-            id: { not: parseInt(offerId) },
+            id: { not: offerId },
             status: { in: ['PENDING', 'ACCEPTED'] }
           },
           data: {
@@ -1325,10 +1386,9 @@ const updateTenantOfferStatus = async (req, res) => {
     } else if (status === 'REJECTED') {
       // 🚀 SCALABILITY: When tenant rejects an offer, it stays rejected but request remains in pool
       const updatedOffer = await prisma.offer.update({
-        where: { id: parseInt(offerId) },
+        where: { id: offerId },
         data: {
           status: 'REJECTED',
-          rejectedAt: new Date(),
           updatedAt: new Date()
         }
       });
@@ -1347,7 +1407,7 @@ const updateTenantOfferStatus = async (req, res) => {
         // Update offer to PAID with payment timestamp
         const paidAt = new Date();
         const updatedOffer = await tx.offer.update({
-          where: { id: parseInt(offerId) },
+          where: { id: offerId },
           data: {
             status: 'PAID',
             isPaid: true,
@@ -1371,9 +1431,10 @@ const updateTenantOfferStatus = async (req, res) => {
             amount: amountTotal,
             status: 'SUCCEEDED',
             purpose: 'DEPOSIT_AND_FIRST_MONTH',
+            gateway: 'STRIPE',
             userId: req.user.id,
             rentalRequestId: updatedOffer.rentalRequestId,
-            stripePaymentIntentId: `mock_${Date.now()}_${updatedOffer.id}`,
+            paymentIntentId: `mock_${Date.now()}_${updatedOffer.id}`,
             createdAt: paidAt
           }
         });
@@ -1383,7 +1444,7 @@ const updateTenantOfferStatus = async (req, res) => {
           await tx.offer.updateMany({
             where: {
               propertyId: updatedOffer.propertyId,
-              id: { not: parseInt(offerId) },
+              id: { not: offerId },
               status: { in: ['PENDING', 'ACCEPTED'] }
             },
             data: { status: 'REJECTED', updatedAt: new Date() }

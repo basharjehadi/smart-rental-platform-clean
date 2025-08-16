@@ -15,6 +15,9 @@ const PropertyDetailsView = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [photoGalleryOpen, setPhotoGalleryOpen] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [showLandlordReviews, setShowLandlordReviews] = useState(false);
+  const [landlordReviews, setLandlordReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   useEffect(() => {
     fetchOfferDetails();
@@ -77,6 +80,20 @@ const PropertyDetailsView = () => {
       setError('Failed to decline offer');
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const fetchLandlordReviews = async () => {
+    try {
+      setReviewsLoading(true);
+      // TODO: Replace with API endpoint for landlord reviews
+      const mock = [
+        { id: 1, tenantName: 'Anna Nowak', propertyName: 'City Center Loft', rating: 5, comment: 'Very responsive and professional.', reviewDate: '2024-05-12', reviewStage: 'Lease End' },
+        { id: 2, tenantName: 'Piotr Kowalski', propertyName: 'Green Park Flat', rating: 4, comment: 'Good experience overall, minor delays once.', reviewDate: '2024-03-18', reviewStage: 'Move-in' }
+      ];
+      setLandlordReviews(mock);
+    } finally {
+      setReviewsLoading(false);
     }
   };
 
@@ -251,8 +268,11 @@ const PropertyDetailsView = () => {
     name: offer?.landlord?.name || 'Landlord information not available',
     email: offer?.landlord?.email || 'Email not available',
     phone: offer?.landlord?.phoneNumber || 'Phone not available',
-    rating: offer?.landlord?.rating || 'No rating available',
-    reviews: offer?.landlord?.reviewCount || 0,
+    rating: offer?.landlord?.averageRating ?? 'No rating available',
+    reviews: offer?.landlord?.totalReviews ?? 0,
+    rank: offer?.landlord?.rank || 'NEW_USER',
+    rankPoints: offer?.landlord?.rankPoints || 0,
+    profileImage: offer?.landlord?.profileImage || null,
     memberSince: offer?.landlord?.createdAt ? new Date(offer.landlord.createdAt).getFullYear() : 'Not available',
     responseTime: offer?.landlord?.responseTime || 'Response time not available'
   };
@@ -322,6 +342,26 @@ const PropertyDetailsView = () => {
     // If it's a relative path, construct full URL
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     return `${baseUrl}${imagePath}`;
+  };
+
+  // Build profile photo URL like rental request card logic
+  const getProfilePhotoUrl = (photoPath) => {
+    if (!photoPath) return null;
+    // Already full URL
+    if (photoPath.startsWith('http://') || photoPath.startsWith('https://')) {
+      return photoPath;
+    }
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    // If just filename (no leading slash), point to uploads/profile_images
+    if (!photoPath.startsWith('/')) {
+      return `${baseUrl}/uploads/profile_images/${photoPath}`;
+    }
+    // If path starts with /uploads/, prefix base URL
+    if (photoPath.startsWith('/uploads/')) {
+      return `${baseUrl}${photoPath}`;
+    }
+    // Fallback: prefix base URL
+    return `${baseUrl}${photoPath}`;
   };
 
   if (loading) {
@@ -811,22 +851,35 @@ const PropertyDetailsView = () => {
                     <div className="p-6">
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Landlord Profile</h3>
                       <div className="flex items-center space-x-3 mb-4">
-                        <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                          <Users className="w-6 h-6 text-gray-400" />
-                        </div>
-                                                  <div>
-                            <div className="font-semibold text-gray-900">{maskLandlordName(landlordData.name)}</div>
-                            <div className="text-sm text-gray-600">Contact details available after payment</div>
+                        {landlordData.profileImage ? (
+                          <img src={getProfilePhotoUrl(landlordData.profileImage)} alt="Landlord" className="w-12 h-12 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
+                            <Users className="w-6 h-6 text-gray-400" />
                           </div>
+                        )}
+                        <div>
+                          <div className="font-semibold text-gray-900">{maskLandlordName(landlordData.name)}</div>
+                          <div className="text-sm text-gray-600">Contact details available after payment</div>
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center space-x-2">
                           <Star className="w-4 h-4 text-yellow-400" />
                           <span className="text-sm">{landlordData.rating} ({landlordData.reviews} reviews)</span>
                         </div>
+                        <div className="text-xs inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                          {offer?.landlord?.rankInfo?.icon || '⭐'} {offer?.landlord?.rankInfo?.name || String(landlordData.rank).replace('_',' ')}
+                        </div>
                         <div className="text-sm text-gray-600">Since {landlordData.memberSince}</div>
-                        <div className="text-sm text-gray-600">{landlordData.responseTime}</div>
+                        {/* Removed response time per request */}
                       </div>
+                      <button
+                        onClick={() => { setShowLandlordReviews(true); fetchLandlordReviews(); }}
+                        className="mt-3 text-sm text-blue-600 underline"
+                      >
+                        View reviews from previous tenants
+                      </button>
                       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                         <p className="text-sm text-blue-800">
                           Full contact details will be available after payment completion to protect both parties.
@@ -989,6 +1042,54 @@ const PropertyDetailsView = () => {
               <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded-full">
                 {currentPhotoIndex + 1} / {propertyImages.length}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Landlord Reviews Modal */}
+      {showLandlordReviews && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Reviews about this landlord</h3>
+                <p className="text-sm text-gray-600">From previous tenants</p>
+              </div>
+              <button onClick={() => setShowLandlordReviews(false)} className="text-gray-500 hover:text-gray-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              {reviewsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <span className="ml-3 text-gray-600">Loading reviews...</span>
+                </div>
+              ) : landlordReviews.length > 0 ? (
+                <div className="space-y-4">
+                  {landlordReviews.map(r => (
+                    <div key={r.id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <div className="font-medium text-gray-900">{r.tenantName}</div>
+                          <div className="text-sm text-gray-600">{r.propertyName}</div>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          {[1,2,3,4,5].map(s => (
+                            <Star key={s} className={`w-4 h-4 ${s <= r.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
+                          ))}
+                          <span className="text-sm font-medium text-gray-900 ml-1">{r.rating}</span>
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-700 mb-1">{r.comment}</div>
+                      <div className="text-xs text-gray-500">Posted on {new Date(r.reviewDate).toLocaleDateString()}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-600">No reviews yet.</div>
+              )}
             </div>
           </div>
         </div>
