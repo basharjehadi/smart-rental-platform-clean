@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 const TenantRequestCard = ({ 
   tenant, 
@@ -12,6 +12,79 @@ const TenantRequestCard = ({
   getProfilePhotoUrl,
   t
 }) => {
+  const [tenantRank, setTenantRank] = useState(null);
+  const [rankLoading, setRankLoading] = useState(true);
+  const [showReviewsModal, setShowReviewsModal] = useState(false);
+  const [tenantReviews, setTenantReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  // Fetch tenant rank information
+  useEffect(() => {
+    const fetchTenantRank = async () => {
+      if (!tenant.id) return;
+      
+      try {
+        setRankLoading(true);
+        const response = await fetch(`/api/users/${tenant.id}/rank`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (response.ok) {
+          const rankData = await response.json();
+          setTenantRank(rankData.data);
+        }
+      } catch (error) {
+        console.warn('Error fetching tenant rank:', error);
+      } finally {
+        setRankLoading(false);
+      }
+    };
+
+    fetchTenantRank();
+  }, [tenant.id]);
+
+  // Fetch tenant reviews when modal opens
+  const fetchTenantReviews = async () => {
+    if (!tenant.id) return;
+    
+    try {
+      setReviewsLoading(true);
+      // TODO: Replace with actual API call to get tenant reviews
+      // const response = await fetch(`/api/tenants/${tenant.id}/reviews`);
+      // const reviewsData = await response.json();
+      // setTenantReviews(reviewsData.data);
+      
+      // Mock data for now
+      const mockReviews = [
+        {
+          id: 1,
+          landlordName: 'Maria Kowalska',
+          propertyName: 'Sunset Apartments',
+          rating: 5,
+          comment: 'Excellent tenant! Always paid rent on time, kept the property clean, and was very respectful. Highly recommend.',
+          reviewDate: '2024-01-15',
+          reviewStage: 'Lease End'
+        },
+        {
+          id: 2,
+          landlordName: 'Jan Nowak',
+          propertyName: 'City Center Loft',
+          rating: 4,
+          comment: 'Good tenant overall. Quiet and responsible. Minor issues with late rent once, but resolved quickly.',
+          reviewDate: '2023-11-20',
+          reviewStage: 'Move-in'
+        }
+      ];
+      setTenantReviews(mockReviews);
+    } catch (error) {
+      console.warn('Error fetching tenant reviews:', error);
+      setTenantReviews([]);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
   // Calculate match score and indicators
   const calculateMatchScore = () => {
     // More robust property rent parsing
@@ -313,7 +386,7 @@ const TenantRequestCard = ({
               )}
             </div>
 
-            {/* Rating */}
+            {/* Rating and Rank */}
             <div className="flex items-center space-x-2 mb-3">
               <div className="flex items-center">
                 {[1, 2, 3, 4, 5].map((star) => (
@@ -334,7 +407,45 @@ const TenantRequestCard = ({
               <span className="text-sm text-gray-600">
                 {tenant.rating ? `${tenant.rating} (${tenant.reviews || 0} reviews)` : 'No rating yet'}
               </span>
+              {/* Rank Badge */}
+              {tenantRank && tenantRank.rankInfo ? (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {tenantRank.rankInfo.icon || '⭐'} {tenantRank.rankInfo.name || 'New User'}
+                </span>
+              ) : tenant.rank ? (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {tenant.rank.icon || '⭐'} {tenant.rank.name || 'New User'}
+                </span>
+              ) : rankLoading ? (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b border-gray-600 mr-1"></div>
+                  Loading...
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                  ⭐ New User
+                </span>
+              )}
             </div>
+
+            {/* Simple Review Link */}
+            <div className="mb-4">
+              <button 
+                onClick={() => {
+                  setShowReviewsModal(true);
+                  fetchTenantReviews();
+                }}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium underline flex items-center space-x-1"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <span>View reviews from previous landlords</span>
+              </button>
+            </div>
+
+
 
             {/* Contact Details (Masked) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -471,11 +582,108 @@ const TenantRequestCard = ({
                 </p>
               </div>
             ) : null}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+                     </div>
+         </div>
+       </div>
+
+       {/* Tenant Reviews Modal */}
+       {showReviewsModal && (
+         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+             {/* Modal Header */}
+             <div className="flex items-center justify-between p-6 border-b border-gray-200">
+               <div className="flex items-center space-x-3">
+                 <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                 </svg>
+                 <div>
+                   <h2 className="text-xl font-semibold text-gray-900">
+                     Reviews for {tenant.name}
+                   </h2>
+                   <p className="text-sm text-gray-600">
+                     Feedback from previous landlords
+                   </p>
+                 </div>
+               </div>
+               <button
+                 onClick={() => setShowReviewsModal(false)}
+                 className="text-gray-400 hover:text-gray-600 transition-colors"
+               >
+                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                 </svg>
+               </button>
+             </div>
+
+             {/* Modal Content */}
+             <div className="p-6">
+               {reviewsLoading ? (
+                 <div className="flex items-center justify-center py-8">
+                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                   <span className="ml-3 text-gray-600">Loading reviews...</span>
+                 </div>
+               ) : tenantReviews.length > 0 ? (
+                 <div className="space-y-4">
+                   {tenantReviews.map((review) => (
+                     <div key={review.id} className="border border-gray-200 rounded-lg p-4">
+                       <div className="flex items-start justify-between mb-3">
+                         <div>
+                           <h4 className="font-medium text-gray-900">{review.landlordName}</h4>
+                           <p className="text-sm text-gray-600">{review.propertyName}</p>
+                         </div>
+                         <div className="text-right">
+                           <div className="flex items-center space-x-1 mb-1">
+                             {[1, 2, 3, 4, 5].map((star) => (
+                               <svg
+                                 key={star}
+                                 className={`h-4 w-4 ${
+                                   star <= review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                                 }`}
+                                 fill="currentColor"
+                                 viewBox="0 0 20 20"
+                               >
+                                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                               </svg>
+                             ))}
+                             <span className="text-sm font-medium text-gray-900 ml-1">{review.rating}</span>
+                           </div>
+                           <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                             {review.reviewStage}
+                           </span>
+                         </div>
+                       </div>
+                       <p className="text-sm text-gray-700 mb-2">{review.comment}</p>
+                       <p className="text-xs text-gray-500">Posted on {new Date(review.reviewDate).toLocaleDateString()}</p>
+                     </div>
+                   ))}
+                 </div>
+               ) : (
+                 <div className="text-center py-8">
+                   <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                   </svg>
+                   <h3 className="text-lg font-medium text-gray-900 mb-2">No reviews yet</h3>
+                   <p className="text-gray-500">This tenant doesn't have any reviews from previous landlords yet.</p>
+                 </div>
+               )}
+             </div>
+
+             {/* Modal Footer */}
+             <div className="flex items-center justify-end p-6 border-t border-gray-200">
+               <button
+                 onClick={() => setShowReviewsModal(false)}
+                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+               >
+                 Close
+               </button>
+             </div>
+           </div>
+         </div>
+       )}
+     </div>
+   );
+ };
 
 export default TenantRequestCard; 

@@ -594,14 +594,19 @@ const LandlordRentalRequests = () => {
       moveInDate: 'Sep 15, 2024',
       location: 'Poznań',
       requirements: 'Clean, responsible tenant looking for long-term rental. Non-smoker, no pets.',
-             propertyMatch: {
+      propertyMatch: {
          name: 'Modern Apartment in Stare Miasto',
          address: 'ul. Poznańska 125, 60-129, Poznań, Stare Miasto',
          rent: '3200 zł',
          available: 'Sep 01, 2024'
        },
-             interestCount: 3,
-       status: 'offered'
+      interestCount: 3,
+      status: 'offered',
+      // Sample rank data for testing
+      rank: {
+        name: 'Silver Tenant',
+        icon: '🥈'
+      }
     },
     {
       id: 19, // Real rental request ID from database
@@ -618,14 +623,19 @@ const LandlordRentalRequests = () => {
       moveInDate: 'Oct 01, 2024',
       location: 'Warszawa',
       requirements: 'Professional looking for quiet apartment near business district.',
-             propertyMatch: {
+      propertyMatch: {
          name: 'Luxury Apartment in Śródmieście',
          address: 'ul. Marszałkowska 45, 00-001, Warszawa, Śródmieście',
          rent: '5200 zł',
          available: 'Oct 01, 2024'
        },
-             interestCount: 1,
-       status: 'declined'
+      interestCount: 1,
+      status: 'declined',
+      // Sample rank data for testing
+      rank: {
+        name: 'Bronze Tenant',
+        icon: '🥉'
+      }
     }
   ];
 
