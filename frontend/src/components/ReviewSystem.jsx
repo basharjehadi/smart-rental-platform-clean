@@ -142,124 +142,137 @@ const ReviewSystem = ({ userId, isLandlord = false }) => {
 
   return (
     <div className="space-y-6">
-      {/* My Current Rating */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          My Current Rating
-        </h3>
-        
-        <div className="flex items-center space-x-4 mb-4">
-          <div className="flex items-center space-x-1">
-            {Array.from({ length: 5 }, (_, i) => (
-              <Star
-                key={i}
-                className={`w-5 h-5 ${
-                  i < (myRating?.averageRating || 5) ? 'text-yellow-400 fill-current' : 'text-gray-300'
-                }`}
-              />
-            ))}
-          </div>
-          <div className="text-2xl font-bold text-gray-900">
-            {myRating?.averageRating || 5.0}
-          </div>
-          <div className="text-sm text-gray-500">
-            ({myRating?.totalReviews || 1} reviews)
-          </div>
-        </div>
-
-        <div className="text-sm text-gray-600">
-          <p>• New users start with a 5-star rating</p>
-          <p>• Your rating becomes more authentic as you complete rental stages</p>
-        </div>
-      </div>
-
-      {/* User Rank */}
-      {userRank && userRank.rankInfo ? (
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg shadow-sm border border-purple-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <span className="text-2xl mr-2">{userRank.rankInfo.icon || '⭐'}</span>
-            Your Current Rank: {userRank.rankInfo.name || 'New User'}
+      {/* Top Row - Rating and Rank Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* My Current Rating */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            My Current Rating
           </h3>
           
-          <div className="mb-4">
-            <p className="text-gray-700 mb-2">{userRank.rankInfo.description || 'Just getting started'}</p>
-            <div className="flex items-center space-x-4">
-              <div className="text-sm">
-                <span className="font-medium text-gray-600">Rank Points:</span>
-                <span className="ml-2 text-lg font-bold text-purple-600">{userRank.rankPoints || 0}</span>
-              </div>
-              <div className="text-sm">
-                <span className="font-medium text-gray-600">Total Reviews:</span>
-                <span className="ml-2 text-lg font-bold text-blue-600">{userRank.totalReviews || 1}</span>
-              </div>
+          <div className="flex items-center space-x-4 mb-4">
+            <div className="flex items-center space-x-1">
+              {Array.from({ length: 5 }, (_, i) => (
+                <Star
+                  key={i}
+                  className={`w-6 h-6 ${
+                    i < (myRating?.averageRating || 5) ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                  }`}
+                />
+              ))}
+            </div>
+            <div className="text-3xl font-bold text-gray-900">
+              {myRating?.averageRating || 5.0}
+            </div>
+            <div className="text-sm text-gray-500">
+              ({myRating?.totalReviews || 1} reviews)
             </div>
           </div>
 
-          {userRank.nextRankRequirements && userRank.nextRankInfo && (
-            <div className="bg-white rounded-lg p-4 border border-purple-200">
-              <h4 className="font-medium text-purple-900 mb-2">Next Rank: {userRank.nextRankInfo.name || 'Next Level'}</h4>
-              <p className="text-sm text-purple-700 mb-3">{userRank.nextRankInfo.description || 'Keep going to reach the next rank!'}</p>
+          <div className="flex items-center text-sm text-gray-600">
+            <CheckCircle className="w-4 h-4 text-green-500 mr-2" />
+            <span>Based on authentic rental experiences</span>
+          </div>
+          <p className="text-sm text-gray-600 mt-1">
+            {isLandlord 
+              ? "Your rating reflects real feedback from tenants across all rental stages"
+              : "Your rating reflects real feedback from landlords across all rental stages"
+            }
+          </p>
+        </div>
+
+        {/* User Rank */}
+        {userRank && userRank.rankInfo ? (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <span className="text-2xl mr-2">{userRank.rankInfo.icon || '⭐'}</span>
+              Your Current Rank: {userRank.rankInfo.name || 'New User'}
+            </h3>
+            
+            <div className="mb-4">
+                        <div className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mb-3">
+            {isLandlord ? "Trusted by tenants" : "Trusted by landlords"}
+          </div>
+              <div className="flex items-center space-x-6">
+                <div className="text-sm">
+                  <span className="font-medium text-gray-600">Rank Points:</span>
+                  <span className="ml-2 text-lg font-bold text-green-600">{userRank.rankPoints || 0}</span>
+                </div>
+                <div className="text-sm">
+                  <span className="font-medium text-gray-600">Total Reviews:</span>
+                  <span className="ml-2 text-lg font-bold text-gray-900">{userRank.totalReviews || 1}</span>
+                </div>
+              </div>
+            </div>
+
+            {userRank.nextRankRequirements && userRank.nextRankInfo && (
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <h4 className="font-medium text-gray-900 mb-2">Next Rank: {userRank.nextRankInfo.name || 'Next Level'}</h4>
+                <p className="text-sm text-gray-600 mb-3">{userRank.nextRankInfo.description || 'Keep going to reach the next rank!'}</p>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    <span>Points needed: </span>
+                    <span className="font-medium">{userRank.nextRankRequirements.pointsNeeded - userRank.rankPoints}</span>
+                  </div>
+                  <div className="w-32 bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${Math.min(100, (userRank.rankPoints / userRank.nextRankRequirements.pointsNeeded) * 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 text-xs text-gray-500">
+              <p>• Ranks are automatically updated based on your activity and reviews</p>
+              <p>• Complete more rental stages to earn higher ranks</p>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <span className="text-2xl mr-2">⭐</span>
+              Your Current Rank: New User
+            </h3>
+            
+            <div className="mb-4">
+                        <div className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mb-3">
+            {isLandlord ? "New landlord" : "New tenant"}
+          </div>
+              <div className="flex items-center space-x-6">
+                <div className="text-sm">
+                  <span className="font-medium text-gray-600">Rank Points:</span>
+                  <span className="ml-2 text-lg font-bold text-green-600">0</span>
+                </div>
+                <div className="text-sm">
+                  <span className="font-medium text-gray-600">Total Reviews:</span>
+                  <span className="ml-2 text-lg font-bold text-gray-900">1</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <h4 className="font-medium text-gray-900 mb-2">Next Rank: Bronze {isLandlord ? 'Landlord' : 'Tenant'}</h4>
+              <p className="text-sm text-gray-600 mb-3">Complete 3 reviews and earn {isLandlord ? '50' : '75'} points to reach the next rank</p>
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-600">
                   <span>Points needed: </span>
-                  <span className="font-medium">{userRank.nextRankRequirements.pointsNeeded - userRank.rankPoints}</span>
+                  <span className="font-medium">{isLandlord ? '50' : '75'}</span>
                 </div>
                 <div className="w-32 bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-purple-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${Math.min(100, (userRank.rankPoints / userRank.nextRankRequirements.pointsNeeded) * 100)}%` }}
-                  ></div>
+                  <div className="bg-blue-500 h-2 rounded-full transition-all duration-300" style={{ width: '0%' }}></div>
                 </div>
               </div>
             </div>
-          )}
 
-          <div className="mt-4 text-xs text-gray-500">
-            <p>• Ranks are automatically updated based on your activity and reviews</p>
-            <p>• Complete more rental stages to earn higher ranks</p>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg shadow-sm border border-purple-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <span className="text-2xl mr-2">⭐</span>
-            Your Current Rank: New User
-          </h3>
-          
-          <div className="mb-4">
-            <p className="text-gray-700 mb-2">Just getting started with your rental journey</p>
-            <div className="flex items-center space-x-4">
-              <div className="text-sm">
-                <span className="font-medium text-gray-600">Rank Points:</span>
-                <span className="ml-2 text-lg font-bold text-purple-600">0</span>
-              </div>
-              <div className="text-sm">
-                <span className="font-medium text-gray-600">Total Reviews:</span>
-                <span className="ml-2 text-lg font-bold text-blue-600">1</span>
-              </div>
+            <div className="mt-4 text-xs text-gray-500">
+              <p>• Ranks are automatically updated based on your activity and reviews</p>
+              <p>• Complete more rental stages to earn higher ranks</p>
             </div>
           </div>
-
-          <div className="bg-white rounded-lg p-4 border border-purple-200">
-            <h4 className="font-medium text-purple-900 mb-2">Next Rank: Bronze {isLandlord ? 'Landlord' : 'Tenant'}</h4>
-            <p className="text-sm text-purple-700 mb-3">Complete 3 reviews and earn {isLandlord ? '50' : '75'} points to reach the next rank</p>
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                <span>Points needed: </span>
-                <span className="font-medium">{isLandlord ? '50' : '75'}</span>
-              </div>
-              <div className="w-32 bg-gray-200 rounded-full h-2">
-                <div className="bg-purple-500 h-2 rounded-full transition-all duration-300" style={{ width: '0%' }}></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 text-xs text-gray-500">
-            <p>• Ranks are automatically updated based on your activity and reviews</p>
-            <p>• Complete more rental stages to earn higher ranks</p>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Pending Reviews - What I Need to Review */}
       {pendingReviews.length > 0 ? (
@@ -267,20 +280,23 @@ const ReviewSystem = ({ userId, isLandlord = false }) => {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
             Pending Reviews - Review Your {getReviewTargetRole()}
           </h3>
+          <p className="text-sm text-gray-600 mb-6">
+            {isLandlord 
+              ? "Complete these reviews to help build trust with your tenants and improve your landlord reputation."
+              : "Complete these reviews to help build trust with your landlords and improve your tenant reputation."
+            }
+          </p>
           
           <div className="space-y-4">
             {pendingReviews.map((review) => {
               const stageInfo = getStageInfo(review.reviewStage);
               return (
-                <div key={review.id} className={`border border-${stageInfo.color}-200 bg-${stageInfo.color}-50 rounded-lg p-4`}>
+                <div key={review.id} className="border border-gray-200 bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       {stageInfo.icon}
                       <div>
                         <div className="font-medium text-sm text-gray-900">
-                          {stageInfo.name} Review
-                        </div>
-                        <div className="text-xs text-gray-600">
                           {getReviewTargetName(review)} • {stageInfo.description}
                         </div>
                         {review.property && (
@@ -316,43 +332,139 @@ const ReviewSystem = ({ userId, isLandlord = false }) => {
         </div>
       )}
 
+      {/* Review History */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h4 className="font-medium text-gray-900 mb-6 text-lg flex items-center">
+          <MessageSquare className="w-5 h-5 mr-2 text-gray-600" />
+          {isLandlord ? "Tenant Reviews" : "Landlord Reviews"}
+        </h4>
+        <p className="text-sm text-gray-600 mb-6">
+          {isLandlord 
+            ? "View reviews from your tenants and reviews you've given to tenants"
+            : "View reviews from your landlords and reviews you've given to landlords"
+          }
+        </p>
+        
+        <div className="flex space-x-1 border-b border-gray-200 mb-6">
+          <button className="px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600">
+            {isLandlord ? "Reviews from Tenants (2)" : "Reviews from Landlords (2)"}
+          </button>
+          <button className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">
+            {isLandlord ? "Reviews I've Given to Tenants (1)" : "Reviews I've Given to Landlords (1)"}
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {/* Demo Review 1 */}
+          <div className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg">
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-sm font-medium text-blue-600">{isLandlord ? 'DT' : 'MJ'}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center space-x-2 mb-1">
+                <span className="font-medium text-gray-900">{isLandlord ? 'Demo Tenant' : 'Mike Johnson'}</span>
+                <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded">{isLandlord ? 'Tenant' : 'Landlord'}</span>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">{isLandlord ? 'Demo Property • Payment Completion' : 'Sunset Apartments • Payment Completion'}</p>
+              <div className="flex items-center space-x-1 mb-2">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
+                ))}
+                <span className="text-sm font-medium text-gray-900 ml-1">5</span>
+              </div>
+              <p className="text-xs text-gray-500 mb-2">Posted 2 days ago</p>
+              <p className="text-sm text-gray-700">
+                {isLandlord 
+                  ? "Excellent landlord! Very responsive and professional during the payment process. All paperwork was handled efficiently."
+                  : "Great tenant! Very responsible with payments and communication. Highly recommend!"
+                }
+              </p>
+            </div>
+          </div>
+
+          {/* Demo Review 2 */}
+          <div className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg">
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-sm font-medium text-green-600">{isLandlord ? 'SJ' : 'AL'}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center space-x-2 mb-1">
+                <span className="flex-1 min-w-0">
+                  <span className="font-medium text-gray-900">{isLandlord ? 'Sarah Johnson' : 'Anna Lee'}</span>
+                  <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded ml-2">{isLandlord ? 'Tenant' : 'Landlord'}</span>
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">{isLandlord ? 'Sunset Apartments • Move-in' : 'Downtown Lofts • Move-in'}</p>
+              <div className="flex items-center space-x-1 mb-2">
+                {Array.from({ length: 4 }, (_, i) => (
+                  <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
+                ))}
+                <Star className="w-4 h-4 text-gray-300" />
+                <span className="text-sm font-medium text-gray-900 ml-1">4</span>
+              </div>
+              <p className="text-xs text-gray-500 mb-2">Posted 1 week ago</p>
+              <p className="text-sm text-gray-700">
+                {isLandlord 
+                  ? "Great property and smooth move-in process. The landlord was helpful with the setup and provided all necessary information."
+                  : "Responsible tenant who takes good care of the property. Communication has been excellent throughout the process."
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* How Reviews Work */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h4 className="font-medium text-blue-900 mb-4 text-lg">How the Review System Works</h4>
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h4 className="font-medium text-gray-900 mb-6 text-lg flex items-center">
+          <User className="w-5 h-5 mr-2 text-gray-600" />
+          {isLandlord ? "How the 3-Stage Review System Works for Landlords" : "How the 3-Stage Review System Works for Tenants"}
+        </h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="text-center">
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-xl font-bold text-blue-600">1</span>
             </div>
-            <h5 className="font-medium text-blue-900 mb-2">Payment Stage</h5>
+            <h5 className="font-medium text-blue-900 mb-2">Payment Completion</h5>
             <p className="text-sm text-blue-800">
-              {isLandlord ? 'Review tenant after they complete payment' : 'Review landlord after completing payment'}
+              {isLandlord 
+                ? "Review your tenant after they complete payment"
+                : "Review your landlord after completing payment"
+              }
             </p>
           </div>
           <div className="text-center">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-xl font-bold text-blue-600">2</span>
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <span className="text-xl font-bold text-green-600">2</span>
             </div>
-            <h5 className="font-medium text-blue-900 mb-2">Move-in Stage</h5>
-            <p className="text-sm text-blue-800">
-              {isLandlord ? 'Review tenant after move-in' : 'Review landlord after moving in'}
+            <h5 className="font-medium text-green-900 mb-2">Move-in</h5>
+            <p className="text-sm text-green-800">
+              {isLandlord 
+                ? "Review your tenant after move-in"
+                : "Review your landlord after moving in"
+              }
             </p>
           </div>
           <div className="text-center">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-xl font-bold text-blue-600">3</span>
+            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <span className="text-xl font-bold text-purple-600">3</span>
             </div>
-            <h5 className="font-medium text-blue-900 mb-2">Lease End</h5>
-            <p className="text-sm text-blue-800">
-              {isLandlord ? 'Final review of tenant' : 'Final review of landlord'}
+            <h5 className="font-medium text-purple-900 mb-2">Lease End</h5>
+            <p className="text-sm text-purple-800">
+              {isLandlord 
+                ? "Final review of your tenant"
+                : "Final review of your landlord"
+              }
             </p>
           </div>
         </div>
         
         <div className="mt-6 p-4 bg-blue-100 rounded-lg">
           <p className="text-sm text-blue-900">
-            <strong>Note:</strong> Reviews are mutual and help build trust in the rental community. 
-            Both parties review each other at each stage, creating a fair and transparent rating system.
+            <strong>Note:</strong> {isLandlord 
+              ? "As a landlord, you'll review your tenants at each stage, and they'll review you too. This mutual feedback system helps build trust and improves the rental experience for everyone."
+              : "As a tenant, you'll review your landlords at each stage, and they'll review you too. This mutual feedback system helps build trust and improves the rental experience for everyone."
+            }
           </p>
         </div>
       </div>

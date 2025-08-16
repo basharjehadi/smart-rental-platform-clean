@@ -35,25 +35,29 @@ const ReviewPage = () => {
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                   <Star className="w-5 h-5 text-blue-600" />
                 </div>
-                <div>
-                  <h1 className="text-xl font-semibold text-gray-900">Review System</h1>
-                  <p className="text-sm text-gray-600">
-                    {user.role === 'LANDLORD' ? 'Landlord' : 'Tenant'} Rating & Reviews
-                  </p>
-                </div>
+                                 <div>
+                   <h1 className="text-xl font-semibold text-gray-900">
+                     {user.role === 'LANDLORD' ? 'Tenant Review System' : 'Landlord Review System'}
+                   </h1>
+                   <p className="text-sm text-gray-600">
+                     {user.role === 'LANDLORD' ? 'Review and rate your tenants' : 'Review and rate your landlords'}
+                   </p>
+                 </div>
               </div>
             </div>
             
             <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm text-gray-600">Current Rating</p>
-                <div className="flex items-center space-x-1">
-                  <Star className="w-5 h-5 text-yellow-400 fill-current" />
-                  <span className="text-lg font-semibold text-gray-900">
-                    {user.averageRating || 5.0}
-                  </span>
-                </div>
-              </div>
+                             <div className="text-right">
+                 <p className="text-sm text-gray-600">
+                   {user.role === 'LANDLORD' ? 'Landlord Rating' : 'Tenant Rating'}
+                 </p>
+                 <div className="flex items-center space-x-1">
+                   <Star className="w-5 h-5 text-yellow-400 fill-current" />
+                   <span className="text-lg font-semibold text-gray-900">
+                     {user.averageRating || 5.0}
+                   </span>
+                 </div>
+               </div>
             </div>
           </div>
         </div>
@@ -61,43 +65,6 @@ const ReviewPage = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-blue-900 mb-3">
-              How the 3-Stage Review System Works
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-xl font-bold text-blue-600">1</span>
-                </div>
-                <h3 className="font-medium text-blue-900 mb-2">Payment Completion</h3>
-                <p className="text-sm text-blue-800">
-                  First review stage after you complete payment for a property
-                </p>
-              </div>
-              <div className="text-center">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-xl font-bold text-blue-600">2</span>
-                </div>
-                <h3 className="font-medium text-blue-900 mb-2">Move-in</h3>
-                <p className="text-sm text-blue-800">
-                  Second review stage after you move into the property
-                </p>
-              </div>
-              <div className="text-center">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-xl font-bold text-blue-600">3</span>
-                </div>
-                <h3 className="font-medium text-blue-900 mb-2">Lease End</h3>
-                <p className="text-sm text-blue-800">
-                  Final review stage after your lease term ends
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Review System Component */}
         <ReviewSystem userId={user.id} isLandlord={user.role === 'LANDLORD'} />
       </div>

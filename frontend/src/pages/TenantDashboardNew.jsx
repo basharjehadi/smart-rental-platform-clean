@@ -6,7 +6,7 @@ import TenantSidebar from '../components/TenantSidebar';
 import { LogOut } from 'lucide-react';
 import { viewContract, downloadContract } from '../utils/contractGenerator.js';
 import NotificationHeader from '../components/common/NotificationHeader';
-import ReviewSystem from '../components/ReviewSystem';
+import ReviewCard from '../components/ReviewCard';
 
 const TenantDashboardNew = () => {
   const { user, logout } = useAuth();
@@ -807,7 +807,7 @@ const TenantDashboardNew = () => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Review System</h3>
               <p className="text-sm text-gray-600 mb-6">Your 3-stage review progress and rating</p>
-              <ReviewSystem userId={user?.id} isLandlord={false} />
+                              <ReviewCard userId={user?.id} isLandlord={false} />
               
               <div className="mt-4 text-center">
                 <button 

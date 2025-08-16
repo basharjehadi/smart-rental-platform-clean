@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import LandlordSidebar from '../components/LandlordSidebar';
 import NotificationHeader from '../components/common/NotificationHeader';
-import ReviewSystem from '../components/ReviewSystem';
+import ReviewCard from '../components/ReviewCard';
 import { 
   LogOut, 
   DollarSign, 
@@ -295,7 +295,7 @@ const LandlordDashboard = () => {
         <h3 className="text-lg font-semibold text-gray-900">Review System</h3>
       </div>
       
-      <ReviewSystem userId={user?.id} isLandlord={true} />
+                      <ReviewCard userId={user?.id} isLandlord={true} />
       
       <div className="mt-4 text-center">
         <button 
