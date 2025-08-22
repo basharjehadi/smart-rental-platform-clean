@@ -34,6 +34,8 @@ import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import TenantDashboardRent from './pages/TenantDashboardRent';
 import TenantRentHistory from './pages/TenantRentHistory';
 import PaymentHistory from './pages/PaymentHistory';
+import MonthlyRentPaymentPage from './pages/MonthlyRentPaymentPage';
+import MockPaymentPage from './pages/MockPaymentPage';
 import ReviewPage from './pages/ReviewPage';
 
 import AdminDashboard from './pages/AdminDashboard';
@@ -53,7 +55,7 @@ import TenantDashboardRedirect from './components/TenantDashboardRedirect';
 // Component to conditionally render Navbar
 const AppContent = () => {
   const location = useLocation();
-  const hideNavbarRoutes = ['/', '/login', '/register', '/dashboard', '/tenant-dashboard', '/tenant-help-center', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/property', '/contracts', '/payments', '/payment', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details', '/landlord-help-center', '/landlord-my-tenants', '/landlord-tenant-profile', '/admin', '/payment-success', '/payment-history', '/reviews', '/messaging'];
+  const hideNavbarRoutes = ['/', '/login', '/register', '/dashboard', '/tenant-dashboard', '/tenant-help-center', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/property', '/contracts', '/payments', '/payment', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details', '/landlord-help-center', '/landlord-my-tenants', '/landlord-tenant-profile', '/admin', '/payment-success', '/payment-history', '/monthly-rent-payment', '/mock-payment', '/reviews', '/messaging'];
   
   // Check if current path should hide navbar (including parameterized routes)
   const shouldHideNavbar = hideNavbarRoutes.some(route => {
@@ -209,6 +211,22 @@ const AppContent = () => {
               <PaymentHistory />
             </ProtectedRoute>
           } 
+        />
+
+        <Route 
+          path="/monthly-rent-payment" 
+          element={
+            <ProtectedRoute>
+              <div className="min-h-screen bg-gray-50">
+                <MonthlyRentPaymentPage />
+              </div>
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route 
+          path="/mock-payment" 
+          element={<MockPaymentPage />}
         />
 
         <Route 

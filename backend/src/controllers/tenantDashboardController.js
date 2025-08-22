@@ -51,16 +51,19 @@ const getTenantPaymentsData = async (tenantId) => {
     // Combine and format all payments
     const allPayments = [];
 
-    // Add general payments
+    // Add general payments (but exclude monthly rent payments to avoid duplicates)
     generalPayments.forEach(payment => {
-      allPayments.push({
-        month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-        date: payment.createdAt,
-        amount: payment.amount,
-        status: payment.status === 'SUCCEEDED' ? 'Paid' : payment.status,
-        purpose: payment.purpose,
-        type: 'general'
-      });
+      // Skip general payments that are for monthly rent (these are handled by RentPayment table)
+      if (payment.purpose !== 'RENT') {
+        allPayments.push({
+          month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          date: payment.createdAt,
+          amount: payment.amount,
+          status: payment.status === 'SUCCEEDED' ? 'Paid' : payment.status,
+          purpose: payment.purpose,
+          type: 'general'
+        });
+      }
     });
 
     // Add rent payments
@@ -475,7 +478,7 @@ export const getTenantPaymentHistory = async (req, res) => {
 
     let upcomingPayments = [];
     if (activeLease) {
-      upcomingPayments = generateUpcomingPayments(activeLease);
+      upcomingPayments = await generateUpcomingPayments(activeLease, tenantId);
     }
 
     res.json({
@@ -502,10 +505,28 @@ export const getTenantPaymentHistory = async (req, res) => {
 };
 
 // Helper function to generate upcoming payments
-const generateUpcomingPayments = (lease) => {
+const generateUpcomingPayments = async (lease, tenantId) => {
   if (!lease || !lease.rentalRequest.moveInDate || !lease.rentAmount) {
     return [];
   }
+
+  // Get all paid rent payments for this tenant to exclude them
+  const paidRentPayments = await prisma.rentPayment.findMany({
+    where: {
+      userId: tenantId,
+      status: 'SUCCEEDED'
+    },
+    select: {
+      month: true,
+      year: true
+    }
+  });
+
+  // Create a set of paid month-year combinations for fast lookup
+  const paidMonths = new Set();
+  paidRentPayments.forEach(payment => {
+    paidMonths.add(`${payment.month}-${payment.year}`);
+  });
 
   const upcoming = [];
   const startDate = new Date(lease.rentalRequest.moveInDate);
@@ -525,36 +546,139 @@ const generateUpcomingPayments = (lease) => {
 
   // Generate payments for each month until lease end
   while (currentDate < endDate) {
-    // Calculate due date (10th of the month)
-    const dueDate = new Date(currentDate);
-    dueDate.setDate(10);
+    // Check if this month has already been paid
+    const monthKey = `${currentDate.getMonth() + 1}-${currentDate.getFullYear()}`;
+    
+    if (!paidMonths.has(monthKey)) {
+      // Calculate due date (10th of the month)
+      const dueDate = new Date(currentDate);
+      dueDate.setDate(10);
 
-    // Check if this is the last month (August 2026)
-    const isLastMonth = currentDate.getMonth() === endDate.getMonth() && currentDate.getFullYear() === endDate.getFullYear();
-    
-    let amount = monthlyRent;
-    let description = 'Monthly Rent';
-    
-    if (isLastMonth) {
-      // Last month: prorated for August 1-16 (16 days)
-      const daysInLastMonth = endDate.getDate(); // 16 days
-      amount = Math.round((monthlyRent * daysInLastMonth) / 30);
-      description = 'Final Month (Prorated)';
+      // Check if this is the last month (August 2026)
+      const isLastMonth = currentDate.getMonth() === endDate.getMonth() && currentDate.getFullYear() === endDate.getFullYear();
+      
+      let amount = monthlyRent;
+      let description = 'Monthly Rent';
+      
+      if (isLastMonth) {
+        // Last month: prorated for August 1-16 (16 days)
+        const daysInLastMonth = endDate.getDate(); // 16 days
+        amount = Math.round((monthlyRent * daysInLastMonth) / 30);
+        description = 'Final Month (Prorated)';
+      }
+
+      upcoming.push({
+        month: currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        dueDate: dueDate,
+        amount: amount,
+        status: 'PENDING',
+        type: 'monthly_rent',
+        description: description,
+        isLastMonth: isLastMonth
+      });
     }
-
-    upcoming.push({
-      month: currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-      dueDate: dueDate,
-      amount: amount,
-      status: 'PENDING',
-      type: 'monthly_rent',
-      description: description,
-      isLastMonth: isLastMonth
-    });
 
     // Move to next month
     currentDate.setMonth(currentDate.getMonth() + 1);
   }
 
   return upcoming;
+};
+
+// Get tenant's current rental information for monthly rent payments
+export const getCurrentRental = async (req, res) => {
+  try {
+    const tenantId = req.user.id;
+    console.log('🔍 Fetching current rental info for tenant:', tenantId);
+
+    // Get tenant's active lease (paid offer represents active lease)
+    const activeLease = await prisma.offer.findFirst({
+      where: {
+        rentalRequest: {
+          tenantId: tenantId
+        },
+        status: 'PAID'
+      },
+      include: {
+        rentalRequest: {
+          include: {
+            tenant: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        },
+        property: {
+          include: {
+            landlord: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phoneNumber: true,
+                profileImage: true,
+                createdAt: true,
+                averageRating: true,
+                totalReviews: true,
+                rank: true
+              }
+            }
+          }
+        },
+        landlord: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+            createdAt: true,
+            averageRating: true,
+            totalReviews: true,
+            rank: true
+          }
+        }
+      }
+    });
+
+    if (!activeLease) {
+      return res.status(404).json({ 
+        error: 'No active lease found. Please ensure you have an accepted and paid offer.' 
+      });
+    }
+
+    // Format the response
+    const rentalData = {
+      offerId: activeLease.id, // This is the actual offer ID (CUID string)
+      rentalRequestId: activeLease.rentalRequestId,
+      lease: {
+        startDate: activeLease.rentalRequest.moveInDate,
+        endDate: activeLease.leaseEndDate || (() => {
+          const start = new Date(activeLease.rentalRequest.moveInDate);
+          const end = new Date(start);
+          end.setMonth(end.getMonth() + (activeLease.leaseDuration || 12));
+          return end;
+        })(),
+        monthlyRent: activeLease.rentAmount,
+        securityDeposit: activeLease.depositAmount,
+        leaseDuration: activeLease.leaseDuration
+      },
+      property: activeLease.property ? {
+        id: activeLease.property.id,
+        address: activeLease.propertyAddress || activeLease.property.address,
+        propertyType: activeLease.propertyType || activeLease.property.propertyType
+      } : null,
+      landlord: activeLease.landlord
+    };
+
+    console.log('🔍 Returning current rental data:', rentalData);
+    res.json(rentalData);
+
+  } catch (error) {
+    console.error('Error fetching current rental:', error);
+    res.status(500).json({ error: 'Failed to fetch current rental information' });
+  }
 }; 

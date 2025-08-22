@@ -10,11 +10,35 @@ const PaymentHistory = () => {
   const [error, setError] = useState('');
   const [selectedPayments, setSelectedPayments] = useState([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [processingPayment, setProcessingPayment] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchPaymentData();
+    
+    // Refresh data when page becomes visible (user returns from payment)
+    const handleFocus = () => {
+      console.log('🔍 PaymentHistory page focused, refreshing data...');
+      fetchPaymentData();
+      
+      // Check if user is returning from a successful payment
+      if (sessionStorage.getItem('paymentCompleted')) {
+        setShowSuccessMessage(true);
+        sessionStorage.removeItem('paymentCompleted');
+        
+        // Hide success message after 5 seconds
+        setTimeout(() => {
+          setShowSuccessMessage(false);
+        }, 5000);
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const fetchPaymentData = async () => {
@@ -92,39 +116,18 @@ const PaymentHistory = () => {
   };
 
   const handleProcessPayment = async () => {
-    setProcessingPayment(true);
-    try {
-      // Calculate total amount for selected payments
-      const totalAmount = selectedPayments.reduce((sum, payment) => sum + payment.amount, 0);
-      
-      // Create payment intent for multiple months
-      const response = await api.post('/payments/create-intent', {
-        amount: totalAmount,
-        purpose: 'ADVANCE_RENT',
-        selectedPayments: selectedPayments.map(p => ({
-          month: p.month,
-          amount: p.amount,
-          dueDate: p.dueDate
-        }))
-      });
-
-      // For now, simulate successful payment
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Close modal and refresh data
-      setShowPaymentModal(false);
-      setSelectedPayments([]);
-      fetchPaymentData();
-      
-      // Show success message
-      alert(`Successfully paid ${selectedPayments.length} month(s) in advance!`);
-      
-    } catch (error) {
-      console.error('Payment error:', error);
-      alert('Payment failed. Please try again.');
-    } finally {
-      setProcessingPayment(false);
-    }
+    console.log('🔍 handleProcessPayment called');
+    console.log('🔍 Selected payments:', selectedPayments);
+    console.log('🔍 Navigating to /monthly-rent-payment');
+    
+    // Navigate to the dedicated monthly rent payment page
+    navigate('/monthly-rent-payment', {
+      state: {
+        selectedPayments: selectedPayments
+      }
+    });
+    
+    console.log('🔍 Navigation completed');
   };
 
   const getTotalSelectedAmount = () => {
@@ -189,11 +192,36 @@ const PaymentHistory = () => {
               </button>
               <h1 className="text-2xl font-bold text-gray-900">Payment History</h1>
             </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={fetchPaymentData}
+                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                title="Refresh payment data"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Success Message */}
+        {showSuccessMessage && (
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-green-800 font-medium">
+                Payment completed successfully! Your payment history has been updated.
+              </span>
+            </div>
+          </div>
+        )}
+        
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -434,26 +462,17 @@ const PaymentHistory = () => {
             </div>
 
             <div className="flex space-x-3">
-              <button
-                onClick={() => setShowPaymentModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                disabled={processingPayment}
-              >
+                             <button
+                 onClick={() => setShowPaymentModal(false)}
+                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+               >
                 Cancel
               </button>
               <button
                 onClick={handleProcessPayment}
-                disabled={processingPayment}
-                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
-                {processingPayment ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Processing...
-                  </div>
-                ) : (
-                  `Pay ${formatCurrency(getTotalSelectedAmount())}`
-                )}
+                Pay {formatCurrency(getTotalSelectedAmount())}
               </button>
             </div>
           </div>

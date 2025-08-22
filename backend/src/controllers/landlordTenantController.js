@@ -339,28 +339,23 @@ export const getLandlordTenantDetails = async (req, res) => {
       }
     });
 
-         // Get on-time payments count - simplified for now
-     const onTimePayments = await prisma.rentPayment.count({
-       where: {
-         userId: tenantId,
-         status: 'SUCCEEDED'
-       }
-     });
+    // Get on-time payments count - simplified for now
+    const onTimePayments = await prisma.rentPayment.count({
+      where: {
+        userId: tenantId,
+        status: 'SUCCEEDED'
+      }
+    });
 
     // Calculate days rented
     const today = new Date();
     const daysRented = Math.floor((today - moveInDate) / (1000 * 60 * 60 * 24));
 
-    // Get next payment date
-    const nextPayment = await prisma.rentPayment.findFirst({
-      where: {
-        userId: tenantId,
-        status: 'PENDING'
-      },
-      orderBy: {
-        dueDate: 'asc'
-      }
-    });
+    // TODO: Remove this query once payment table structure is fixed
+    // const nextUnpaidRentPayment = null;
+
+    // TODO: Fix payment table structure first, then implement proper next payment date calculation
+    const nextPaymentDate = null;
 
     // Create recent activity
     const recentActivity = [
@@ -392,7 +387,7 @@ export const getLandlordTenantDetails = async (req, res) => {
       totalPaid: totalPaid._sum.amount || 0,
       onTimePayments: onTimePayments,
       daysRented: Math.max(0, daysRented),
-      nextPaymentDate: nextPayment?.dueDate,
+      nextPaymentDate: nextPaymentDate,
       contractStatus: 'Active',
       rentalRequestId: paidOffer.rentalRequest.id,
       contract: contract,

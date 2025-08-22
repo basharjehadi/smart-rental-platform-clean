@@ -43,7 +43,7 @@ router.use('/properties', propertyRoutes);
 router.use('/', rentalRoutes);
 
 // Payment routes
-router.use('/', paymentRoutes);
+router.use('/payments', paymentRoutes);
 
 // Contract routes
 router.use('/contracts', contractRoutes);

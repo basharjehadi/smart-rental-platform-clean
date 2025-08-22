@@ -64,10 +64,97 @@ const getRentalRequestId = async (offerId) => {
   }
 };
 
+// Complete mock payment and update database
+const completeMockPayment = async (req, res) => {
+  try {
+    const { paymentId, amount, purpose, offerId, selectedPayments } = req.body;
+    const userId = req.user.id;
+
+    console.log('🔍 Completing mock payment:', { paymentId, amount, purpose, offerId, selectedPayments });
+    console.log('🔍 User ID:', userId);
+
+    if (!paymentId || !amount || !purpose || !offerId || !selectedPayments) {
+      return res.status(400).json({
+        error: 'Missing required payment information'
+      });
+    }
+
+    // For monthly rent payments, create RentPayment records
+    if (purpose === 'MONTHLY_RENT') {
+      // First create a general payment record for tracking
+      const generalPayment = await prisma.payment.create({
+        data: {
+          amount: amount,
+          status: 'SUCCEEDED',
+          purpose: 'RENT',
+          gateway: 'PAYU',
+          userId: userId,
+          offerId: offerId, // This will be the offer ID
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+
+      console.log('✅ Created general payment record:', generalPayment.id);
+
+      const rentPayments = [];
+
+      console.log('🔍 Processing selected payments:', selectedPayments);
+      
+      for (const payment of selectedPayments) {
+        console.log('🔍 Processing payment:', payment);
+        // Create a new rent payment record
+        const rentPayment = await prisma.rentPayment.create({
+          data: {
+            amount: payment.amount,
+            status: 'SUCCEEDED',
+            dueDate: new Date(payment.dueDate),
+            paidDate: new Date(),
+            month: new Date(payment.dueDate).getMonth() + 1,
+            year: new Date(payment.dueDate).getFullYear(),
+            lateFee: 0,
+            gracePeriod: 5,
+            isOverdue: false,
+            userId: userId,
+            paymentId: generalPayment.id // Link to the general payment record
+          }
+        });
+
+        rentPayments.push(rentPayment);
+        console.log('✅ Created rent payment record:', rentPayment.id);
+      }
+
+      return res.json({
+        success: true,
+        message: 'Mock payment completed successfully',
+        rentPayments: rentPayments,
+        generalPayment: generalPayment
+      });
+    }
+
+    return res.status(400).json({
+      error: 'Unsupported payment purpose'
+    });
+
+  } catch (error) {
+    console.error('Error completing mock payment:', error);
+    res.status(500).json({
+      error: 'Failed to complete mock payment'
+    });
+  }
+};
+
 // Create payment intent
 const createPaymentIntent = async (req, res) => {
   try {
-    const { amount, purpose, offerId } = req.body;
+    const { amount, purpose, offerId, paymentGateway: requestedGateway } = req.body;
+    
+    // Check if we should use mock payments
+    const paymentProvider = process.env.PAYMENT_PROVIDER || 'MOCK';
+    const allowMockPayments = process.env.ALLOW_MOCK_PAYMENTS === 'true';
+    
+    console.log('🔍 Payment provider:', paymentProvider);
+    console.log('🔍 Allow mock payments:', allowMockPayments);
 
     if (!amount || amount <= 0) {
       return res.status(400).json({
@@ -113,8 +200,9 @@ const createPaymentIntent = async (req, res) => {
         });
       }
 
-      // Check if payment gateway is selected
-      if (!offer.preferredPaymentGateway) {
+      // Check if payment gateway is selected (only for initial offer acceptance)
+      // For monthly rent payments, we'll use the requested gateway instead
+      if (purpose !== 'MONTHLY_RENT' && !offer.preferredPaymentGateway) {
         return res.status(400).json({
           error: 'Payment gateway not selected. Please accept the offer with a payment method first.'
         });
@@ -122,8 +210,37 @@ const createPaymentIntent = async (req, res) => {
     }
 
     // Handle different payment gateways
-    const paymentGateway = offer?.preferredPaymentGateway || 'STRIPE';
+    // For monthly rent payments, prioritize the requested gateway
+    const paymentGateway = purpose === 'MONTHLY_RENT' 
+      ? (requestedGateway || offer?.preferredPaymentGateway || 'STRIPE')
+      : (offer?.preferredPaymentGateway || requestedGateway || 'STRIPE');
     
+    console.log('🔍 Selected payment gateway:', paymentGateway);
+    
+    // If using mock payments, always use mock gateways regardless of selection
+    if (paymentProvider === 'MOCK' && allowMockPayments) {
+      console.log('🔍 Using mock payment system');
+      
+      // Map Stripe to a mock gateway for testing
+      if (paymentGateway === 'STRIPE') {
+        console.log('🔍 Stripe selected, using mock PayU instead');
+        return await handlePayUPayment(req, res, amount, purpose, offerId, offer);
+      }
+      
+      // Use the selected gateway if it's already a mock gateway
+      switch (paymentGateway) {
+        case 'PAYU':
+        case 'P24':
+        case 'TPAY':
+          return await handlePayUPayment(req, res, amount, purpose, offerId, offer);
+        default:
+          // Fallback to PayU for any other gateway
+          return await handlePayUPayment(req, res, amount, purpose, offerId, offer);
+      }
+    }
+    
+    // Real payment processing
+    console.log('🔍 Using real payment system');
     switch (paymentGateway) {
       case 'STRIPE':
         return await handleStripePayment(req, res, amount, purpose, offerId, offer);
@@ -635,13 +752,25 @@ const handlePayUPayment = async (req, res, amount, purpose, offerId, offer) => {
     // TODO: Implement PayU payment integration
     // For now, return a mock response
     const mockPaymentId = `payu_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    res.json({
-      paymentId: mockPaymentId,
-      paymentGateway: 'PAYU',
-      redirectUrl: `https://secure.payu.com/payment/${mockPaymentId}`,
-      message: 'PayU payment integration coming soon'
-    });
+
+    // For monthly rent payments, pass additional data needed for completion
+    if (purpose === 'MONTHLY_RENT') {
+      const { selectedPayments } = req.body;
+      
+      res.json({
+        paymentId: mockPaymentId,
+        paymentGateway: 'PAYU',
+        redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:3002'}/mock-payment?paymentId=${mockPaymentId}&amount=${amount}&gateway=PAYU&offerId=${offerId}&selectedPayments=${encodeURIComponent(JSON.stringify(selectedPayments))}`,
+        message: 'PayU payment integration coming soon'
+      });
+    } else {
+      res.json({
+        paymentId: mockPaymentId,
+        paymentGateway: 'PAYU',
+        redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:3002'}/mock-payment?paymentId=${mockPaymentId}&amount=${amount}&gateway=PAYU`,
+        message: 'PayU payment integration coming soon'
+      });
+    }
   } catch (error) {
     console.error('PayU payment error:', error);
     res.status(500).json({
@@ -656,13 +785,25 @@ const handleP24Payment = async (req, res, amount, purpose, offerId, offer) => {
     // TODO: Implement Przelewy24 payment integration
     // For now, return a mock response
     const mockPaymentId = `p24_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    res.json({
-      paymentId: mockPaymentId,
-      paymentGateway: 'P24',
-      redirectUrl: `https://secure.przelewy24.pl/payment/${mockPaymentId}`,
-      message: 'Przelewy24 payment integration coming soon'
-    });
+
+    // For monthly rent payments, pass additional data needed for completion
+    if (purpose === 'MONTHLY_RENT') {
+      const { selectedPayments } = req.body;
+      
+      res.json({
+        paymentId: mockPaymentId,
+        paymentGateway: 'P24',
+        redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:3002'}/mock-payment?paymentId=${mockPaymentId}&amount=${amount}&gateway=P24&offerId=${offerId}&selectedPayments=${encodeURIComponent(JSON.stringify(selectedPayments))}`,
+        message: 'Przelewy24 payment integration coming soon'
+      });
+    } else {
+      res.json({
+        paymentId: mockPaymentId,
+        paymentGateway: 'P24',
+        redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:3002'}/mock-payment?paymentId=${mockPaymentId}&amount=${amount}&gateway=P24`,
+        message: 'Przelewy24 payment integration coming soon'
+      });
+    }
   } catch (error) {
     console.error('P24 payment error:', error);
     res.status(500).json({
@@ -677,13 +818,25 @@ const handleTPayPayment = async (req, res, amount, purpose, offerId, offer) => {
     // TODO: Implement Tpay payment integration
     // For now, return a mock response
     const mockPaymentId = `tpay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    res.json({
-      paymentId: mockPaymentId,
-      paymentGateway: 'TPAY',
-      redirectUrl: `https://secure.tpay.com/payment/${mockPaymentId}`,
-      message: 'Tpay payment integration coming soon'
-    });
+
+    // For monthly rent payments, pass additional data needed for completion
+    if (purpose === 'MONTHLY_RENT') {
+      const { selectedPayments } = req.body;
+      
+      res.json({
+        paymentId: mockPaymentId,
+        paymentGateway: 'TPAY',
+        redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:3002'}/mock-payment?paymentId=${mockPaymentId}&amount=${amount}&gateway=TPAY&offerId=${offerId}&selectedPayments=${encodeURIComponent(JSON.stringify(selectedPayments))}`,
+        message: 'Tpay payment integration coming soon'
+      });
+    } else {
+      res.json({
+        paymentId: mockPaymentId,
+        paymentGateway: 'TPAY',
+        redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:3002'}/mock-payment?paymentId=${mockPaymentId}&amount=${amount}&gateway=TPAY`,
+        message: 'Tpay payment integration coming soon'
+      });
+    }
   } catch (error) {
     console.error('Tpay payment error:', error);
     res.status(500).json({
@@ -695,5 +848,6 @@ const handleTPayPayment = async (req, res, amount, purpose, offerId, offer) => {
 export {
   createPaymentIntent,
   handleWebhook,
-  getMyPayments
+  getMyPayments,
+  completeMockPayment
 }; 

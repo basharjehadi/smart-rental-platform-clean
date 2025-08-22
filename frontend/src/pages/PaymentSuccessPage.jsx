@@ -12,11 +12,18 @@ const PaymentSuccessPage = () => {
   const { user } = useAuth();
 
   useEffect(() => {
+    // Handle different payment types
     if (location.state?.offer) {
       setOffer(location.state.offer);
       setLoading(false);
+    } else if (location.state?.paymentType === 'monthly_rent') {
+      // Handle monthly rent payment success
+      setLoading(false);
+      
+      // Set flag to show success message when returning to payment history
+      sessionStorage.setItem('paymentCompleted', 'true');
     } else {
-      // If no offer data, redirect back to offers
+      // If no payment data, redirect back to offers
       navigate('/my-offers');
     }
   }, [location.state, navigate]);
@@ -222,6 +229,153 @@ const PaymentSuccessPage = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading payment confirmation...</p>
         </div>
+      </div>
+    );
+  }
+
+  // Handle monthly rent payment success
+  if (location.state?.paymentType === 'monthly_rent') {
+    const { selectedPayments, totalAmount, paymentData } = location.state;
+    
+    return (
+      <div className="min-h-screen bg-primary">
+        {/* Header */}
+        <header className="header-modern px-6 py-4">
+          <div className="flex items-center justify-between max-w-7xl mx-auto">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => navigate('/payment-history')}
+                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors duration-200"
+              >
+                <span className="font-medium">← Back to Payment History</span>
+              </button>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => navigate('/tenant-dashboard')}
+                className="btn-primary flex items-center space-x-2"
+              >
+                <span>Back to Dashboard</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="max-w-7xl mx-auto px-6 py-8">
+          {/* Success Header */}
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+              <CheckCircle className="w-16 h-16 text-green-500" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Monthly Rent Payment Successful!</h1>
+            <p className="text-lg text-gray-600">Your monthly rent payment has been processed and confirmed.</p>
+          </div>
+
+          {/* Payment Details */}
+          <div className="max-w-2xl mx-auto">
+            <div className="card-modern border-green-200 bg-green-50 mb-6">
+              <div className="p-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <Shield className="w-6 h-6 text-green-600" />
+                  <h2 className="text-lg font-semibold text-green-900">Payment Confirmed</h2>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        <span className="text-sm text-green-800">Payment processed</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        <span className="text-sm text-green-800">Funds transferred</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Clock className="w-4 h-4 text-green-600" />
+                        <span className="text-sm text-green-800">Confirmation sent</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <MessageCircle className="w-4 h-4 text-green-600" />
+                        <span className="text-sm text-green-800">Receipt available</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Summary */}
+            <div className="card-modern mb-6">
+              <div className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Summary</h3>
+                
+                <div className="space-y-3 mb-4">
+                  {selectedPayments?.map((payment, index) => (
+                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <div className="font-medium text-gray-900">{payment.month}</div>
+                        <div className="text-sm text-gray-600">Due: {new Date(payment.dueDate).toLocaleDateString('pl-PL')}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-gray-900">{payment.amount} zł</div>
+                        <div className="text-xs text-gray-500">Monthly Rent</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="border-t pt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-semibold text-gray-900">Total Amount</span>
+                    <span className="text-2xl font-bold text-blue-600">{totalAmount} zł</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Details */}
+            <div className="card-modern mb-6">
+              <div className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Details</h3>
+                
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-600">Payment Gateway:</span>
+                    <span className="font-medium text-gray-900">{paymentData?.paymentGateway || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-600">Payment ID:</span>
+                    <span className="font-mono text-xs text-gray-500">{paymentData?.paymentId || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-600">Payment Date:</span>
+                    <span className="font-medium text-gray-900">{new Date().toLocaleDateString('pl-PL')}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex space-x-4">
+              <button
+                onClick={() => navigate('/payment-history')}
+                className="btn-secondary flex-1"
+              >
+                View Payment History
+              </button>
+              <button
+                onClick={() => navigate('/tenant-dashboard')}
+                className="btn-primary flex-1"
+              >
+                Back to Dashboard
+              </button>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
