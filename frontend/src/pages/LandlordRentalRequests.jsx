@@ -32,7 +32,7 @@ const LandlordRentalRequests = () => {
   const navigate = useNavigate();
   const [rentalRequests, setRentalRequests] = useState([]);
   const [totalRequests, setTotalRequests] = useState(0);
-  const [activeTab, setActiveTab] = useState('Pending'); // Pending | Offered | Declined
+  const [activeTab, setActiveTab] = useState('Pending'); // Pending | Offered | Accepted | Declined
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedTenant, setSelectedTenant] = useState(null);
@@ -113,8 +113,8 @@ const LandlordRentalRequests = () => {
       setLoading(true);
       const response = await api.get('/pool/rental-requests');
  
-       // New API shape: { pending, offered, declined }
-       const { pending = [], offered = [], declined = [] } = response.data || {};
+       // New API shape: { pending, offered, accepted, declined }
+       const { pending = [], offered = [], accepted = [], declined = [] } = response.data || {};
  
        const mapOne = (request) => {
          const tenant = request.tenant || {};
@@ -163,11 +163,12 @@ const LandlordRentalRequests = () => {
          };
        };
  
-       const pendingMapped = pending.map(r => ({ ...mapOne(r), status: 'pending' }));
+              const pendingMapped = pending.map(r => ({ ...mapOne(r), status: 'pending' }));
        const offeredMapped  = offered.map(r => ({ ...mapOne(r), status: 'offered' }));
+       const acceptedMapped = accepted.map(r => ({ ...mapOne(r), status: 'accepted' }));
        const declinedMapped = declined.map(r => ({ ...mapOne(r), status: 'declined' }));
- 
-       const all = [...pendingMapped, ...offeredMapped, ...declinedMapped];
+       
+       const all = [...pendingMapped, ...offeredMapped, ...acceptedMapped, ...declinedMapped];
        setTotalRequests(all.length);
        setRentalRequests(all);
      } catch (error) {
@@ -831,16 +832,17 @@ const LandlordRentalRequests = () => {
               </div>
             )}
 
-            {/* Tabs: Pending | Offered | Declined */}
+            {/* Tabs: Pending | Offered | Accepted | Declined */}
             <div className="mb-4">
               <div className="flex space-x-2">
-                {['Pending','Offered','Declined'].map(tab => {
+                {['Pending','Offered','Accepted','Declined'].map(tab => {
                   const counts = {
                     Pending: rentalRequests.filter(t => {
                       const s = (t.status || 'active').toLowerCase();
                       return s === 'active' || s === 'pending';
                     }).length,
                     Offered: rentalRequests.filter(t => (t.status || '').toLowerCase() === 'offered').length,
+                    Accepted: rentalRequests.filter(t => (t.status || '').toLowerCase() === 'accepted').length,
                     Declined: rentalRequests.filter(t => (t.status || '').toLowerCase() === 'declined').length
                   };
                   const count = counts[tab];
@@ -878,6 +880,7 @@ const LandlordRentalRequests = () => {
                   const s = (t.status || 'active').toLowerCase();
                   if (activeTab === 'Pending') return s === 'active' || s === 'pending';
                   if (activeTab === 'Offered') return s === 'offered';
+                  if (activeTab === 'Accepted') return s === 'accepted';
                   if (activeTab === 'Declined') return s === 'declined';
                   return true;
                 })
@@ -903,6 +906,7 @@ const LandlordRentalRequests = () => {
               const s = (t.status || 'active').toLowerCase();
               if (activeTab === 'Pending') return s === 'active' || s === 'pending';
               if (activeTab === 'Offered') return s === 'offered';
+              if (activeTab === 'Accepted') return s === 'accepted';
               if (activeTab === 'Declined') return s === 'declined';
               return true;
             }).length === 0 && !error.includes('No properties found') && (

@@ -241,7 +241,64 @@ const getAllActiveRequests = async (req, res) => {
        status: 'offered'
      }));
  
-     // 3) Declined (by this landlord)
+          // 3) Accepted (property rented - request accepted)
+     // Find rental requests where this landlord has a PAID offer and the property is RENTED
+     const acceptedOffers = await prisma.offer.findMany({
+       where: {
+         landlordId: req.user.id,
+         status: 'PAID' // Offer has been paid for
+       },
+       include: {
+         rentalRequest: {
+           include: {
+             tenant: { select: { id: true, name: true, email: true, firstName: true, lastName: true, profileImage: true, phoneNumber: true, profession: true, dateOfBirth: true, averageRating: true, totalReviews: true, rank: true } }
+           }
+         },
+         property: {
+           select: { id: true, name: true, address: true, city: true, monthlyRent: true, propertyType: true, bedrooms: true, furnished: true, parking: true, petsAllowed: true, availableFrom: true, status: true }
+         }
+       },
+       orderBy: [{ updatedAt: 'desc' }],
+       take: parseInt(limit)
+     });
+
+     // Filter to only include offers where the property status is RENTED
+     const acceptedOffersFiltered = acceptedOffers.filter(offer => 
+       offer.property && offer.property.status === 'RENTED'
+     );
+
+     const normalizeAccepted = acceptedOffersFiltered.map((offer) => ({
+       ...offer.rentalRequest,
+       matchScore: offer.matchScore || 0,
+       matchReason: 'Property rented - request accepted',
+       tenant: {
+         id: offer.rentalRequest.tenant?.id,
+         name: offer.rentalRequest.tenant?.name,
+         email: offer.rentalRequest.tenant?.email,
+         firstName: offer.rentalRequest.tenant?.firstName,
+         lastName: offer.rentalRequest.tenant?.lastName,
+         profileImage: offer.rentalRequest.tenant?.profileImage,
+         phoneNumber: offer.rentalRequest.tenant?.phoneNumber,
+         profession: offer.rentalRequest.tenant?.profession,
+         age: offer.rentalRequest.tenant?.dateOfBirth
+           ? Math.max(18, Math.floor((Date.now() - new Date(offer.rentalRequest.tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
+           : null,
+         rating: offer.rentalRequest.tenant?.averageRating ?? 5.0,
+         reviews: offer.rentalRequest.tenant?.totalReviews ?? 1,
+         rank: offer.rentalRequest.tenant?.rank
+       },
+       propertyMatch: {
+         id: offer.property?.id,
+         name: offer.property?.name || 'Your Property',
+         address: offer.property?.address || 'Address not specified',
+         rent: offer.property?.monthlyRent ? `${offer.property.monthlyRent.toLocaleString('pl-PL')} zł` : 'Rent not specified',
+         available: offer.property?.availableFrom ? new Date(offer.property.availableFrom).toISOString() : 'Date not specified',
+         propertyType: offer.property?.propertyType || 'Apartment'
+       },
+       status: 'accepted'
+     }));
+
+     // 4) Declined (by this landlord)
      const declinedMatches = await prisma.landlordRequestMatch.findMany({
        where: {
          landlordId: req.user.id,
@@ -260,7 +317,7 @@ const getAllActiveRequests = async (req, res) => {
        orderBy: [{ updatedAt: 'desc' }],
        take: parseInt(limit)
      });
- 
+
      const normalizeDeclined = declinedMatches.map((match) => ({
        ...match.rentalRequest,
        matchScore: match.matchScore,
@@ -288,6 +345,7 @@ const getAllActiveRequests = async (req, res) => {
      return res.json({
        pending: normalizePending,
        offered: normalizeOffered,
+       accepted: normalizeAccepted,
        declined: normalizeDeclined,
        pagination: poolRequests.pagination
      });
@@ -1034,9 +1092,7 @@ const getMyOffers = async (req, res) => {
           propertyTitle: offer.property.name || offer.property.description || 'Property Offer',
           // For paid offers, show full address; for others, show masked address
           propertyAddress: (() => {
-            const isPaid = offer.isPaid || (offer.status === 'ACCEPTED' && offer.paymentIntentId);
-            
-            if (isPaid) {
+            if (offer.status === 'PAID') {
               // Show full address for paid offers
               let completeAddress = offer.property.address;
               if (offer.property.district) {
@@ -1076,7 +1132,7 @@ const getMyOffers = async (req, res) => {
             petsAllowed: offer.property.petsAllowed,
             smokingAllowed: offer.property.smokingAllowed
           },
-          isPaid: offer.isPaid || (offer.status === 'PAID') || (offer.status === 'ACCEPTED' && offer.paymentIntentId)
+          isPaid: offer.status === 'PAID'
         };
       }
       
@@ -1090,7 +1146,7 @@ const getMyOffers = async (req, res) => {
         propertyAmenities: offer.propertyAmenities ? (typeof offer.propertyAmenities === 'string' && offer.propertyAmenities.startsWith('[') ? offer.propertyAmenities : JSON.stringify([offer.propertyAmenities])) : null,
         propertyType: offer.propertyType || 'Apartment',
         propertySize: offer.propertySize || offer.rentalRequest?.bedrooms?.toString() || '1',
-        isPaid: offer.isPaid || (offer.status === 'PAID') || (offer.status === 'ACCEPTED' && offer.paymentIntentId)
+        isPaid: offer.status === 'PAID'
       };
     });
 
@@ -1234,7 +1290,21 @@ const getOfferDetails = async (req, res) => {
       paymentDate: offer.paymentDate,
       leaseStartDate: offer.leaseStartDate,
       leaseEndDate: offer.leaseEndDate,
-      propertyAddress: offer.propertyAddress,
+      propertyAddress: (() => {
+        // For paid offers, show full address; for others, show offer address
+        if (offer.status === 'PAID' && offer.property) {
+          // Show full address for paid offers
+          let completeAddress = offer.property.address;
+          if (offer.property.district) {
+            completeAddress += ', ' + offer.property.district;
+          }
+          completeAddress += ', ' + offer.property.zipCode + ', ' + offer.property.city;
+          return completeAddress;
+        } else {
+          // Show offer address for unpaid offers
+          return offer.propertyAddress || offer.rentalRequest?.location || 'Location not specified';
+        }
+      })(),
       propertyImages: offer.propertyImages,
       propertyVideo: offer.propertyVideo,
       propertyType: offer.propertyType,
@@ -1454,17 +1524,39 @@ const updateTenantOfferStatus = async (req, res) => {
         return updatedOffer;
       });
 
-      // Remove the rental request from the pool
+      // Remove the rental request from the pool and update its status
       try {
+        console.log(`🔄 Updating rental request ${result.rentalRequestId} status to MATCHED...`);
+        
+        // First, update the rental request status to MATCHED
+        const updatedRequest = await prisma.rentalRequest.update({
+          where: { id: result.rentalRequestId },
+          data: {
+            status: 'MATCHED',
+            poolStatus: 'MATCHED',
+            updatedAt: new Date()
+          }
+        });
+        
+        console.log(`✅ Rental request ${result.rentalRequestId} status updated:`, {
+          id: updatedRequest.id,
+          status: updatedRequest.status,
+          poolStatus: updatedRequest.poolStatus
+        });
+        
+        // Then remove from request pool
         await requestPoolService.removeFromPool(result.rentalRequestId, 'MATCHED');
+        console.log('✅ Rental request removed from pool');
       } catch (poolError) {
         console.error('❌ Error removing request from pool:', poolError);
       }
 
-      // Update property availability to OCCUPIED
+      // Update property availability to RENTED (not OCCUPIED)
       try {
         if (result.propertyId) {
-          await propertyAvailabilityService.updatePropertyAvailability(result.propertyId, false, 'OCCUPIED');
+          console.log(`🔄 Updating property ${result.propertyId} status to RENTED...`);
+          await propertyAvailabilityService.updatePropertyAvailability(result.propertyId, false, 'RENTED');
+          console.log('✅ Property status updated to RENTED');
         }
       } catch (availabilityError) {
         console.error('❌ Error updating property availability:', availabilityError);

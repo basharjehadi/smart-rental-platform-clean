@@ -414,7 +414,7 @@ const handlePaymentSucceeded = async (paymentIntent) => {
         }
       }
 
-      // Update property status to OCCUPIED when offer is paid
+      // Update property status to RENTED when offer is paid
       try {
         const offer = await prisma.offer.findUnique({
           where: { id: offerId },
@@ -425,10 +425,10 @@ const handlePaymentSucceeded = async (paymentIntent) => {
           // Use property availability service to update property status and availability
           await propertyAvailabilityService.updatePropertyAvailability(
             offer.propertyId, 
-            false, // availability = false when occupied
-            'OCCUPIED' // status = OCCUPIED
+            false, // availability = false when rented
+            'RENTED' // status = RENTED (not OCCUPIED)
           );
-          console.log('✅ Property status updated to OCCUPIED:', offer.propertyId);
+          console.log('✅ Property status updated to RENTED:', offer.propertyId);
         }
       } catch (propertyUpdateError) {
         console.error('❌ Error updating property status:', propertyUpdateError);

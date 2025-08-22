@@ -135,9 +135,9 @@ const LandlordEditProperty = () => {
         const property = response.data.property;
         console.log('📋 Received property data:', property);
         
-        // Check if property is locked (occupied or rented)
-        if (['OCCUPIED', 'RENTED'].includes(property.status)) {
-          setErrors({ fetch: 'This property is currently occupied/rented and cannot be edited. Please contact support if you need to make changes.' });
+                  // Check if property is locked (rented)
+        if (['RENTED'].includes(property.status)) {
+                      setErrors({ fetch: 'This property is currently rented and cannot be edited. Please contact support if you need to make changes.' });
           setFetching(false);
           return;
         }
@@ -539,15 +539,6 @@ const LandlordEditProperty = () => {
             </div>
             
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <span className="text-sm font-medium text-gray-900">{user?.name || 'Landlord'}</span>
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-md">
-                  <span className="text-base font-bold text-white">
-                    {user?.name?.charAt(0) || 'L'}
-                  </span>
-                </div>
-              </div>
-              
               <button
                 onClick={() => {
                   logout();

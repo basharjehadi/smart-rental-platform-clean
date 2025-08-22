@@ -53,7 +53,7 @@ const LandlordHelpCenter = () => {
     'properties': [
       { question: 'How do I add a new property?', answer: 'Go to My Properties and click “Add Property” to list a new rental property with full details and photos.' },
       { question: 'How can I update my property details?', answer: 'Navigate to My Properties, select the property, and click Edit to update pricing, address, or amenities.' },
-      { question: 'Can I pause a property listing?', answer: 'Yes. Set the property status to UNAVAILABLE to hide it from matching temporarily.' }
+      { question: 'Can I pause a property listing?', answer: 'Yes. You can temporarily hide your property from matching by contacting support to adjust the listing status.' }
     ],
     'requests': [
       { question: 'How do I receive rental requests?', answer: 'Our matching engine notifies you when tenants match your properties. Check Rental Requests to review and respond.' },
@@ -91,22 +91,6 @@ const LandlordHelpCenter = () => {
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-900">Help Center</h1>
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <span className="text-sm font-medium text-gray-900">{user?.name || 'Landlord'}</span>
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-md overflow-hidden">
-                  {profileData?.profileImage ? (
-                    <img
-                      src={profileData.profileImage.startsWith('/')
-                        ? `http://localhost:3001${profileData.profileImage}`
-                        : `http://localhost:3001/uploads/profile_images/${profileData.profileImage}`}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-base font-bold text-white">{user?.name?.charAt(0) || 'L'}</span>
-                  )}
-                </div>
-              </div>
               <button onClick={handleLogout} className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200">
                 <LogOut className="w-4 h-4" />
                 <span>Logout</span>

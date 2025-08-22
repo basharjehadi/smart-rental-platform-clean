@@ -200,15 +200,6 @@ const LandlordMyTenants = () => {
             </div>
             
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <span className="text-sm font-medium text-gray-900">{user?.name || 'Landlord'}</span>
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-md">
-                  <span className="text-base font-bold text-white">
-                    {user?.name?.charAt(0) || 'L'}
-                  </span>
-                </div>
-              </div>
-              
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"

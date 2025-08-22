@@ -183,9 +183,9 @@ const LandlordMyProperty = () => {
     });
   };
 
-  // Check if property is locked (occupied or rented)
+  // Check if property is locked (rented)
   const isPropertyLocked = (property) => {
-    return ['OCCUPIED', 'RENTED'].includes(property.status);
+    return ['RENTED'].includes(property.status);
   };
 
   const filteredProperties = filterAndSortProperties();
@@ -222,9 +222,7 @@ const LandlordMyProperty = () => {
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 font-poppins">Property Management</h2>
                 <p className="text-gray-600 mt-1">
-                  You have {properties.length} properties listed • 
-                  <span className="text-green-600 font-medium"> {properties.filter(p => !isPropertyLocked(p)).length} editable</span> • 
-                  <span className="text-orange-600 font-medium"> {properties.filter(p => isPropertyLocked(p)).length} locked</span>
+                  You have {properties.length} properties listed
                 </p>
               </div>
               
@@ -272,10 +270,7 @@ const LandlordMyProperty = () => {
                 >
                   <option value="all">All Status</option>
                   <option value="AVAILABLE">Available</option>
-                  <option value="OCCUPIED">Occupied</option>
                   <option value="RENTED">Rented</option>
-                  <option value="MAINTENANCE">Maintenance</option>
-                  <option value="UNAVAILABLE">Unavailable</option>
                 </select>
 
                 {/* Sort By */}
@@ -298,49 +293,7 @@ const LandlordMyProperty = () => {
                 </div>
               </div>
 
-              {/* Quick Filter Buttons */}
-              <div className="flex flex-wrap gap-2 mt-4">
-                <button
-                  onClick={() => setFilterStatus('all')}
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                    filterStatus === 'all' 
-                      ? 'bg-blue-100 text-blue-700' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  All Properties ({properties.length})
-                </button>
-                <button
-                  onClick={() => setFilterStatus('AVAILABLE')}
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                    filterStatus === 'AVAILABLE' 
-                      ? 'bg-green-100 text-green-700' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  Available ({properties.filter(p => p.status === 'AVAILABLE').length})
-                </button>
-                <button
-                  onClick={() => setFilterStatus('OCCUPIED')}
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                    filterStatus === 'OCCUPIED' 
-                      ? 'bg-orange-100 text-orange-700' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  Occupied ({properties.filter(p => p.status === 'OCCUPIED').length})
-                </button>
-                <button
-                  onClick={() => setFilterStatus('RENTED')}
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                    filterStatus === 'RENTED' 
-                      ? 'bg-purple-100 text-purple-700' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  Rented ({properties.filter(p => p.status === 'RENTED').length})
-                </button>
-              </div>
+
             </div>
 
             {/* Properties Grid */}
@@ -412,12 +365,8 @@ const LandlordMyProperty = () => {
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                             property.status === 'AVAILABLE' 
                               ? 'bg-green-100 text-green-700' 
-                              : property.status === 'OCCUPIED'
-                              ? 'bg-orange-100 text-orange-700'
                               : property.status === 'RENTED'
                               ? 'bg-purple-100 text-purple-700'
-                              : property.status === 'MAINTENANCE'
-                              ? 'bg-red-100 text-red-700'
                               : 'bg-gray-100 text-gray-700'
                           }`}>
                             {isPropertyLocked(property) && <span className="mr-1">🔒</span>}
@@ -473,7 +422,7 @@ const LandlordMyProperty = () => {
                                 ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
                                 : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
                             }`}
-                            title={isPropertyLocked(property) ? 'Cannot edit occupied/rented property' : 'Edit Property'}
+                            title={isPropertyLocked(property) ? 'Cannot edit rented property' : 'Edit Property'}
                           >
                             <Edit className="w-4 h-4" />
                           </button>
@@ -487,7 +436,7 @@ const LandlordMyProperty = () => {
                                 ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
                                 : 'text-red-600 bg-red-50 hover:bg-red-100'
                             }`}
-                            title={isPropertyLocked(property) ? 'Cannot delete occupied/rented property' : 'Delete Property'}
+                            title={isPropertyLocked(property) ? 'Cannot delete rented property' : 'Delete Property'}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

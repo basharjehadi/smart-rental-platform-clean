@@ -219,7 +219,8 @@ export const getLandlordTenantDetails = async (req, res) => {
                 email: true,
                 firstName: true,
                 lastName: true,
-                phoneNumber: true
+                phoneNumber: true,
+                profileImage: true
               }
             }
           }
@@ -380,6 +381,7 @@ export const getLandlordTenantDetails = async (req, res) => {
         : paidOffer.rentalRequest.tenant.name,
       email: paidOffer.rentalRequest.tenant.email,
       phone: paidOffer.rentalRequest.tenant.phoneNumber,
+      profileImage: paidOffer.rentalRequest.tenant.profileImage,
       moveInDate: paidOffer.rentalRequest.moveInDate,
       leaseStartDate: leaseStartDate,
       leaseEndDate: leaseEndDate,

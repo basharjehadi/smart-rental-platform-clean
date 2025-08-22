@@ -450,11 +450,11 @@ export const updatePropertyStatus = async (req, res) => {
     const landlordId = req.user.id;
 
     // Validate status
-    const validStatuses = ['AVAILABLE', 'OCCUPIED', 'MAINTENANCE', 'RENTED', 'UNAVAILABLE'];
+    const validStatuses = ['AVAILABLE', 'RENTED'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid status. Must be one of: AVAILABLE, OCCUPIED, MAINTENANCE, RENTED, UNAVAILABLE'
+        error: 'Invalid status. Must be one of: AVAILABLE, RENTED'
       });
     }
 

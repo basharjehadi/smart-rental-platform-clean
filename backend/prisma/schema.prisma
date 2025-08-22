@@ -614,6 +614,7 @@ enum UserRole {
 enum RentalRequestStatus {
   ACTIVE
   LOCKED
+  MATCHED
   COMPLETED
   CANCELLED
 }

@@ -35,6 +35,8 @@ const LandlordTenantProfile = () => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
 
+
+
   useEffect(() => {
     fetchTenantDetails();
   }, [tenantId]);
@@ -362,7 +364,7 @@ const LandlordTenantProfile = () => {
         {/* Top Header */}
         <header className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center">
               <button
                 onClick={() => navigate('/landlord-my-tenants')}
                 className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors duration-200"
@@ -370,22 +372,14 @@ const LandlordTenantProfile = () => {
                 <ArrowLeft className="w-4 h-4" />
                 <span>Back to Tenants</span>
               </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{tenant.name || 'Tenant Profile'}</h1>
-                <p className="text-gray-600 mt-1">Tenant details and management</p>
-              </div>
+            </div>
+            
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-gray-900">{tenant.name || 'Tenant Profile'}</h1>
+              <p className="text-gray-600 mt-1">Tenant details and management</p>
             </div>
             
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <span className="text-sm font-medium text-gray-900">{user?.name || 'Landlord'}</span>
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-md">
-                  <span className="text-base font-bold text-white">
-                    {user?.name?.charAt(0) || 'L'}
-                  </span>
-                </div>
-              </div>
-              
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"
@@ -404,8 +398,16 @@ const LandlordTenantProfile = () => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                    <User className="w-8 h-8 text-blue-600" />
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center overflow-hidden">
+                    {tenant.profileImage ? (
+                      <img
+                        src={tenant.profileImage.startsWith('/') ? `http://localhost:3001${tenant.profileImage}` : `http://localhost:3001/uploads/profile_images/${tenant.profileImage}`}
+                        alt={tenant.name || 'Tenant'}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-8 h-8 text-blue-600" />
+                    )}
                   </div>
                   <div>
                     <h2 className="text-xl font-semibold text-gray-900">{tenant.name || 'Tenant'}</h2>
