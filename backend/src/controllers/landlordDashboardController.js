@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client';
+import { getLandlordPaymentData } from '../services/paymentService.js';
+
 const prisma = new PrismaClient();
 
 const getLandlordDashboard = async (req, res) => {
@@ -133,43 +135,8 @@ const getLandlordDashboard = async (req, res) => {
       bgColor: 'bg-blue-50'
     });
 
-    // Get recent payments - Fixed query to go through rentalRequest.offers
-    const recentPayments = await prisma.payment.findMany({
-      where: {
-        rentalRequest: {
-          offers: {
-            some: {
-              landlordId
-            }
-          }
-        }
-      },
-      include: {
-        rentalRequest: {
-          include: {
-            offers: {
-              where: { landlordId },
-              include: {
-                property: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 6
-    });
-
-    const paymentData = recentPayments.map(payment => ({
-      month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-      collectedDate: `Collected on ${new Date(payment.createdAt).toLocaleDateString('en-US', { 
-        month: 'long', 
-        day: 'numeric', 
-        year: 'numeric' 
-      })}`,
-      amount: payment.amount,
-      status: payment.status === 'SUCCEEDED' ? 'Complete' : 'Late Payment'
-    }));
+    // Use unified payment service for consistent data
+    const paymentData = await getLandlordPaymentData(landlordId);
 
     // Get tenant reviews - Since reviews are not implemented yet, we'll use mock data
     const reviews = [];
@@ -229,7 +196,7 @@ const getLandlordDashboard = async (req, res) => {
       // Recent data
       recentTenants: tenantData,
       upcomingTasks: upcomingTasks.slice(0, 3),
-      paymentHistory: paymentData, // Renamed to match frontend
+      paymentHistory: paymentData.payments, // Renamed to match frontend
       reviews: reviewData, // Renamed to match frontend
       maintenanceRequests: maintenanceData,
 

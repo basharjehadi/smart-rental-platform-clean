@@ -1,90 +1,18 @@
 import { prisma } from '../utils/prisma.js';
+import { getUnifiedPaymentData, getUpcomingPayments } from '../services/paymentService.js';
 
-// Helper function to get tenant payment data
+// Helper function to get tenant payment data - Now using unified service
 const getTenantPaymentsData = async (tenantId) => {
   try {
     console.log('🔍 getTenantPaymentsData called with tenantId:', tenantId);
     
-    // Get general payments (deposits, first month payments, etc.)
-    // Look for payments by userId OR by rentalRequestId where the rental request belongs to this tenant
-    const generalPayments = await prisma.payment.findMany({
-      where: {
-        OR: [
-          {
-            userId: tenantId,
-            status: 'SUCCEEDED'
-          },
-          {
-            rentalRequest: {
-              tenantId: tenantId
-            },
-            status: 'SUCCEEDED'
-          }
-        ]
-      },
-      include: {
-        rentalRequest: {
-          include: {
-            tenant: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    // Get rent payments (monthly rent)
-    const rentPayments = await prisma.rentPayment.findMany({
-      where: {
-        userId: tenantId,
-        status: 'SUCCEEDED'
-      },
-      include: {
-        user: true
-      },
-      orderBy: {
-        paidDate: 'desc'
-      }
-    });
-
-    // Combine and format all payments
-    const allPayments = [];
-
-    // Add general payments (but exclude monthly rent payments to avoid duplicates)
-    generalPayments.forEach(payment => {
-      // Skip general payments that are for monthly rent (these are handled by RentPayment table)
-      if (payment.purpose !== 'RENT') {
-        allPayments.push({
-          month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-          date: payment.createdAt,
-          amount: payment.amount,
-          status: payment.status === 'SUCCEEDED' ? 'Paid' : payment.status,
-          purpose: payment.purpose,
-          type: 'general'
-        });
-      }
-    });
-
-    // Add rent payments
-    rentPayments.forEach(payment => {
-      allPayments.push({
-        month: new Date(payment.paidDate || payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-        date: payment.paidDate || payment.createdAt,
-        amount: payment.amount,
-        status: payment.status === 'SUCCEEDED' ? 'Paid' : payment.status,
-        purpose: 'RENT',
-        type: 'rent'
-      });
-    });
-
-    // Sort by date (most recent first)
-    allPayments.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    console.log('🔍 getTenantPaymentsData returning payments:', allPayments.length);
-    console.log('🔍 Payment details:', allPayments);
-
-    return allPayments;
+    // Use unified payment service
+    const paymentData = await getUnifiedPaymentData(tenantId);
+    
+    console.log('✅ getTenantPaymentsData returning payments:', paymentData.payments.length);
+    console.log('✅ Total paid amount:', paymentData.totalPaid);
+    
+    return paymentData.payments;
   } catch (error) {
     console.error('Error fetching tenant payments:', error);
     return [];
@@ -476,10 +404,10 @@ export const getTenantPaymentHistory = async (req, res) => {
       }
     });
 
-    let upcomingPayments = [];
-    if (activeLease) {
-      upcomingPayments = await generateUpcomingPayments(activeLease, tenantId);
-    }
+          let upcomingPayments = [];
+      if (activeLease) {
+        upcomingPayments = await getUpcomingPayments(tenantId);
+      }
 
     res.json({
       payments: pastPayments,
@@ -502,87 +430,6 @@ export const getTenantPaymentHistory = async (req, res) => {
     console.error('Error fetching tenant payment history:', error);
     res.status(500).json({ error: 'Failed to fetch payment history' });
   }
-};
-
-// Helper function to generate upcoming payments
-const generateUpcomingPayments = async (lease, tenantId) => {
-  if (!lease || !lease.rentalRequest.moveInDate || !lease.rentAmount) {
-    return [];
-  }
-
-  // Get all paid rent payments for this tenant to exclude them
-  const paidRentPayments = await prisma.rentPayment.findMany({
-    where: {
-      userId: tenantId,
-      status: 'SUCCEEDED'
-    },
-    select: {
-      month: true,
-      year: true
-    }
-  });
-
-  // Create a set of paid month-year combinations for fast lookup
-  const paidMonths = new Set();
-  paidRentPayments.forEach(payment => {
-    paidMonths.add(`${payment.month}-${payment.year}`);
-  });
-
-  const upcoming = [];
-  const startDate = new Date(lease.rentalRequest.moveInDate);
-  const endDate = lease.leaseEndDate ? new Date(lease.leaseEndDate) : new Date(startDate.getFullYear() + 1, startDate.getMonth(), startDate.getDate());
-  const monthlyRent = lease.rentAmount;
-
-  // Polish landlord-friendly approach: Standard monthly payments
-  // First month is already paid with deposit (prorated for partial month)
-  // All other months: Full monthly rent due on 10th of each month
-  
-  // Start from the second month (first month is already paid)
-  let currentDate = new Date(startDate);
-  currentDate.setMonth(currentDate.getMonth() + 1);
-  
-  // Set to 1st of the month for consistent calculation
-  currentDate.setDate(1);
-
-  // Generate payments for each month until lease end
-  while (currentDate < endDate) {
-    // Check if this month has already been paid
-    const monthKey = `${currentDate.getMonth() + 1}-${currentDate.getFullYear()}`;
-    
-    if (!paidMonths.has(monthKey)) {
-      // Calculate due date (10th of the month)
-      const dueDate = new Date(currentDate);
-      dueDate.setDate(10);
-
-      // Check if this is the last month (August 2026)
-      const isLastMonth = currentDate.getMonth() === endDate.getMonth() && currentDate.getFullYear() === endDate.getFullYear();
-      
-      let amount = monthlyRent;
-      let description = 'Monthly Rent';
-      
-      if (isLastMonth) {
-        // Last month: prorated for August 1-16 (16 days)
-        const daysInLastMonth = endDate.getDate(); // 16 days
-        amount = Math.round((monthlyRent * daysInLastMonth) / 30);
-        description = 'Final Month (Prorated)';
-      }
-
-      upcoming.push({
-        month: currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-        dueDate: dueDate,
-        amount: amount,
-        status: 'PENDING',
-        type: 'monthly_rent',
-        description: description,
-        isLastMonth: isLastMonth
-      });
-    }
-
-    // Move to next month
-    currentDate.setMonth(currentDate.getMonth() + 1);
-  }
-
-  return upcoming;
 };
 
 // Get tenant's current rental information for monthly rent payments

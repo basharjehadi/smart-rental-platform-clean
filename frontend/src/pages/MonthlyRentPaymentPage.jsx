@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowLeft, Shield, CreditCard, Building, Wallet, Calendar, User, Star, Users, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Shield, CreditCard, Building, Wallet, Calendar, User, Star, Users, CheckCircle, AlertCircle, AlertTriangle, Lock, Eye } from 'lucide-react';
 
 const MonthlyRentPaymentPage = () => {
   const [selectedPayments, setSelectedPayments] = useState([]);
@@ -101,18 +101,18 @@ const MonthlyRentPaymentPage = () => {
       await new Promise(resolve => setTimeout(resolve, 1500));
       setProcessingStep(4);
 
-             // Create payment intent with backend using your mock payment system
-       const totalAmount = getTotalAmount();
-       
-       // For monthly rent payments, we need to create a proper offer structure
-       // Since this is for existing tenants, we'll use a special approach
-       const response = await api.post('/payments/create-payment-intent', {
-         amount: totalAmount,
-         purpose: 'MONTHLY_RENT',
-         offerId: paymentData.offerId, // Use the actual offerId (CUID string)
-         paymentGateway: selectedPaymentMethod, // Pass the selected payment method
-         selectedPayments: selectedPayments // Pass the selected payments for backend processing
-       });
+      // Create payment intent with backend using your mock payment system
+      const totalAmount = getTotalAmount();
+      
+      // For monthly rent payments, we need to create a proper offer structure
+      // Since this is for existing tenants, we'll use a special approach
+      const response = await api.post('/payments/create-payment-intent', {
+        amount: totalAmount,
+        purpose: 'MONTHLY_RENT',
+        offerId: paymentData.offerId, // Use the actual offerId (CUID string)
+        paymentGateway: selectedPaymentMethod, // Pass the selected payment method
+        selectedPayments: selectedPayments // Pass the selected payments for backend processing
+      });
 
       console.log('Payment intent created successfully:', response.data);
       
@@ -286,7 +286,7 @@ const MonthlyRentPaymentPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading payment information...</p>
@@ -297,7 +297,7 @@ const MonthlyRentPaymentPage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="w-8 h-8 text-red-600" />
@@ -316,7 +316,7 @@ const MonthlyRentPaymentPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -334,54 +334,57 @@ const MonthlyRentPaymentPage = () => {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Payment Form */}
+          {/* Payment Form - Left Panel */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Payment Details</h2>
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8 mb-6">
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Method</h2>
+                <p className="text-gray-600">Complete your payment securely and easily</p>
+              </div>
               
               {/* Payment Method Selection */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-3">Payment Method</label>
-                <div className="grid grid-cols-3 gap-3">
+              <div className="mb-8">
+                <label className="block text-sm font-medium text-gray-700 mb-4">Select Payment Gateway</label>
+                <div className="grid grid-cols-3 gap-4">
                   <button
                     onClick={() => handlePaymentMethodChange('STRIPE')}
-                    className={`p-3 border rounded-lg transition-colors ${
+                    className={`p-4 border-2 rounded-xl transition-all duration-200 ${
                       selectedPaymentMethod === 'STRIPE'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 hover:border-gray-400'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
+                        : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
                     }`}
                   >
-                    <div className="flex items-center space-x-2">
-                      <CreditCard className="w-5 h-5" />
-                      <span>Credit Card (Stripe)</span>
+                    <div className="flex flex-col items-center space-y-2">
+                      <CreditCard className="w-6 h-6" />
+                      <span className="text-sm font-medium">Credit Card</span>
                     </div>
                   </button>
                   <button
                     onClick={() => handlePaymentMethodChange('PAYU')}
-                    className={`p-3 border rounded-lg transition-colors ${
+                    className={`p-4 border-2 rounded-xl transition-all duration-200 ${
                       selectedPaymentMethod === 'PAYU'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 hover:border-gray-400'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
+                        : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
                     }`}
                   >
-                    <div className="flex items-center space-x-2">
-                      <Building className="w-5 h-5" />
-                      <span>PayU</span>
+                    <div className="flex flex-col items-center space-y-2">
+                      <Building className="w-6 h-6" />
+                      <span className="text-sm font-medium">PayU</span>
                     </div>
                   </button>
                   <button
                     onClick={() => handlePaymentMethodChange('P24')}
-                    className={`p-3 border rounded-lg transition-colors ${
+                    className={`p-4 border-2 rounded-xl transition-all duration-200 ${
                       selectedPaymentMethod === 'P24'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 hover:border-gray-400'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md'
+                        : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
                     }`}
                   >
-                    <div className="flex items-center space-x-2">
-                      <Building className="w-5 h-5" />
-                      <span>Przelewy24</span>
+                    <div className="flex flex-col items-center space-y-2">
+                      <Building className="w-6 h-6" />
+                      <span className="text-sm font-medium">Paydoo24</span>
                     </div>
                   </button>
                 </div>
@@ -389,14 +392,14 @@ const MonthlyRentPaymentPage = () => {
 
               {/* Payment Form Fields */}
               {selectedPaymentMethod === 'STRIPE' && (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Card Number</label>
                     <input
                       type="text"
                       value={paymentForm.cardNumber}
                       onChange={(e) => handleInputChange('cardNumber', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                       placeholder="1234 5678 9012 3456"
                     />
                   </div>
@@ -407,18 +410,18 @@ const MonthlyRentPaymentPage = () => {
                         type="text"
                         value={paymentForm.cardholderName}
                         onChange={(e) => handleInputChange('cardholderName', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                         placeholder="Your Full Name"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Expiry Date</label>
                         <input
                           type="text"
                           value={paymentForm.expiryDate}
                           onChange={(e) => handleInputChange('expiryDate', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                           placeholder="MM/YY"
                         />
                       </div>
@@ -428,22 +431,30 @@ const MonthlyRentPaymentPage = () => {
                           type="text"
                           value={paymentForm.cvv}
                           onChange={(e) => handleInputChange('cvv', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                           placeholder="123"
                         />
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Preview Button */}
+                  <div className="flex justify-end">
+                    <button className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2">
+                      <Eye className="w-4 h-4" />
+                      <span>Preview</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
               {selectedPaymentMethod === 'PAYU' && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Building className="w-5 h-5 text-blue-600" />
-                    <span className="font-medium text-blue-900">PayU Payment</span>
+                <div className="p-6 bg-blue-50 border border-blue-200 rounded-xl">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <Building className="w-6 h-6 text-blue-600" />
+                    <span className="font-semibold text-blue-900">PayU Payment</span>
                   </div>
-                  <p className="text-sm text-blue-800">
+                  <p className="text-blue-800">
                     You will be redirected to PayU's secure payment gateway to complete your transaction. 
                     PayU supports various payment methods including bank transfers, cards, and digital wallets.
                   </p>
@@ -451,56 +462,50 @@ const MonthlyRentPaymentPage = () => {
               )}
 
               {selectedPaymentMethod === 'P24' && (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Building className="w-5 h-5 text-green-600" />
-                    <span className="font-medium text-green-900">Przelewy24 Payment</span>
+                <div className="p-6 bg-green-50 border border-green-200 rounded-xl">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <Building className="w-6 h-6 text-green-600" />
+                    <span className="font-semibold text-green-900">Paydoo24 Payment</span>
                   </div>
-                  <p className="text-sm text-green-800">
-                    You will be redirected to Przelewy24's secure payment gateway. 
-                    Przelewy24 is Poland's leading online payment system supporting bank transfers and cards.
+                  <p className="text-green-800">
+                    You will be redirected to Paydoo24's secure payment gateway. 
+                    Paydoo24 is Poland's leading online payment system supporting bank transfers and cards.
                   </p>
                 </div>
               )}
 
               {/* Terms Agreement */}
-              <div className="mt-6">
-                <label className="flex items-center space-x-2">
+              <div className="mt-8">
+                <label className="flex items-start space-x-3">
                   <input
                     type="checkbox"
                     checked={agreedToTerms}
                     onChange={(e) => setAgreedToTerms(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-sm text-gray-700">
-                    I agree to the <a href="#" className="text-blue-600 hover:underline">Terms of Service</a> and{' '}
-                    <a href="#" className="text-blue-600 hover:underline">Safety Protection Policy</a>
+                    I agree to the <a href="#" className="text-blue-600 hover:underline font-medium">Terms of Service</a> and{' '}
+                    <a href="#" className="text-blue-600 hover:underline font-medium">Safety Protection Policy</a>
                   </span>
                 </label>
               </div>
-
-              {/* Pay Button */}
-              <button
-                onClick={handlePaySecurely}
-                disabled={!agreedToTerms || isProcessing}
-                className="w-full mt-6 bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isProcessing ? 'Processing...' : `Pay ${formatCurrency(getTotalAmount())} Securely`}
-              </button>
             </div>
           </div>
 
-          {/* Payment Summary & Landlord Info */}
+          {/* Right Sidebar */}
           <div className="space-y-6">
             {/* Payment Summary */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Summary</h3>
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <Calendar className="w-5 h-5 mr-2 text-blue-600" />
+                Payment Summary
+              </h3>
               
-              <div className="space-y-3 mb-4">
+              <div className="space-y-4 mb-6">
                 {selectedPayments.map((payment, index) => (
-                  <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <div key={index} className="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
                     <div>
-                      <div className="font-medium text-gray-900">{payment.month}</div>
+                      <div className="font-semibold text-gray-900">{payment.month}</div>
                       <div className="text-sm text-gray-600">Due: {formatDate(payment.dueDate)}</div>
                     </div>
                     <div className="text-right">
@@ -519,11 +524,14 @@ const MonthlyRentPaymentPage = () => {
               </div>
             </div>
 
-            {/* Landlord Information - Unmasked */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Landlord</h3>
+            {/* Landlord Information */}
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <User className="w-5 h-5 mr-2 text-green-600" />
+                Your Landlord
+              </h3>
               
-              <div className="flex items-center space-x-3 mb-4">
+              <div className="flex items-center space-x-4 mb-4">
                 {landlordInfo?.profileImage ? (
                   <img 
                     src={getProfilePhotoUrl(landlordInfo.profileImage)} 
@@ -531,8 +539,10 @@ const MonthlyRentPaymentPage = () => {
                     className="w-12 h-12 rounded-full object-cover" 
                   />
                 ) : (
-                  <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                    <Users className="w-6 h-6 text-gray-400" />
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                    <span className="text-lg font-semibold text-green-600">
+                      {landlordInfo?.name?.split(' ').map(n => n[0]).join('') || 'JL'}
+                    </span>
                   </div>
                 )}
                 <div>
@@ -553,44 +563,70 @@ const MonthlyRentPaymentPage = () => {
                   <div className="flex items-center space-x-2">
                     <Star className="w-4 h-4 text-yellow-400" />
                     <span className="text-sm text-gray-600">
-                      {landlordInfo.averageRating} ({landlordInfo.totalReviews || 0} reviews)
+                      {landlordInfo.averageRating} ({landlordInfo.totalReviews || 0} review{landlordInfo.totalReviews !== 1 ? 's' : ''})
                     </span>
                   </div>
                 )}
                 
                 {landlordInfo?.rank && (
-                  <div className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs">
-                    {landlordInfo.rankInfo?.icon || '⭐'} {landlordInfo.rankInfo?.name || landlordInfo.rank}
+                  <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
+                    ⭐ {landlordInfo.rank}
                   </div>
                 )}
               </div>
             </div>
 
             {/* Security Notice */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <Shield className="w-4 h-4 text-green-600" />
-                <span className="font-medium text-green-900">Secure Payment</span>
+            <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+              <div className="flex items-start space-x-3 mb-3">
+                <Shield className="w-6 h-6 text-green-600 mt-0.5" />
+                <div>
+                  <span className="font-semibold text-green-900 text-lg">Secure Payment</span>
+                </div>
               </div>
-              <p className="text-sm text-green-800">
-                Your payment is processed securely through our trusted payment partners. 
-                All transactions are encrypted and protected.
-              </p>
+              <div className="space-y-2 text-sm text-green-800">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span>256-bit SSL encryption</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span>Your payment is processed securely through our trusted banking partners</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span>All transactions are encrypted and protected</span>
+                </div>
+              </div>
             </div>
           </div>
+        </div>
+
+        {/* Pay Button - Full Width */}
+        <div className="mt-8 flex justify-center">
+          <button
+            onClick={handlePaySecurely}
+            disabled={!agreedToTerms || isProcessing}
+            className="w-full max-w-md bg-blue-600 text-white py-4 px-8 rounded-xl hover:bg-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center justify-center space-x-3"
+          >
+            <Lock className="w-5 h-5" />
+            <span className="text-lg font-semibold">
+              {isProcessing ? 'Processing...' : `Pay ${formatCurrency(getTotalAmount())} Securely`}
+            </span>
+          </button>
         </div>
       </div>
 
       {/* Processing Modal */}
       {showProcessingModal && (
         <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 text-center">
+          <div className="bg-white rounded-xl p-8 max-w-md w-full mx-4 text-center shadow-2xl">
             <div className="mb-6">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent"></div>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Processing Payment</h3>
-              <p className="text-gray-600">Please wait while we process your monthly rent payment...</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Processing Payment</h3>
+              <p className="text-gray-600">Please wait while we process your payment securely...</p>
             </div>
             
             <div className="space-y-3">

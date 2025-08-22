@@ -1,4 +1,5 @@
 import { prisma } from '../utils/prisma.js';
+import { getUnifiedPaymentData, getPaymentStatus } from '../services/paymentService.js';
 
 // Get all tenants for a landlord
 export const getLandlordTenants = async (req, res) => {
@@ -85,63 +86,23 @@ export const getLandlordTenants = async (req, res) => {
 
     // Transform data to tenant format
     const tenants = await Promise.all(paidOffers.map(async (offer) => {
-      // Get payment status for this tenant
-      const latestPayment = await prisma.rentPayment.findFirst({
-        where: {
-          userId: offer.rentalRequest.tenant.id,
-          status: 'PENDING'
-        },
-        orderBy: {
-          dueDate: 'desc'
-        }
-      });
-
-      // Calculate payment status
+      // Use unified payment service for consistent data
+      const paymentData = await getUnifiedPaymentData(offer.rentalRequest.tenant.id, landlordId);
+      
+      // Calculate payment status based on unified data
       let paymentStatus = 'paid';
-      if (latestPayment) {
-        const today = new Date();
-        const dueDate = new Date(latestPayment.dueDate);
-        if (dueDate < today) {
-          paymentStatus = 'overdue';
-        } else {
-          paymentStatus = 'pending';
-        }
+      if (paymentData.paymentStatus === 'pending' || paymentData.paymentStatus === 'overdue') {
+        paymentStatus = paymentData.paymentStatus;
       }
-
-      // Get total paid amount
-      const totalPaid = await prisma.payment.aggregate({
-        where: {
-          userId: offer.rentalRequest.tenant.id,
-          status: 'SUCCEEDED'
-        },
-        _sum: {
-          amount: true
-        }
-      });
-
-             // Get on-time payments count - simplified for now
-       const onTimePayments = await prisma.rentPayment.count({
-         where: {
-           userId: offer.rentalRequest.tenant.id,
-           status: 'SUCCEEDED'
-         }
-       });
 
       // Calculate days rented
       const moveInDate = new Date(offer.rentalRequest.moveInDate);
       const today = new Date();
       const daysRented = Math.floor((today - moveInDate) / (1000 * 60 * 60 * 24));
 
-      // Get next payment date
-      const nextPayment = await prisma.rentPayment.findFirst({
-        where: {
-          userId: offer.rentalRequest.tenant.id,
-          status: 'PENDING'
-        },
-        orderBy: {
-          dueDate: 'asc'
-        }
-      });
+      // Get next payment date from upcoming payments
+      const upcomingPayments = await getUpcomingPayments(offer.rentalRequest.tenant.id);
+      const nextPayment = upcomingPayments.length > 0 ? upcomingPayments[0] : null;
 
       return {
         id: offer.rentalRequest.tenant.id,
@@ -155,8 +116,8 @@ export const getLandlordTenants = async (req, res) => {
         monthlyRent: offer.rentAmount,
         securityDeposit: offer.depositAmount,
         paymentStatus: paymentStatus,
-        totalPaid: totalPaid._sum.amount || 0,
-        onTimePayments: onTimePayments,
+        totalPaid: paymentData.totalPaid || 0,
+        onTimePayments: paymentData.onTimePayments || 0,
         daysRented: Math.max(0, daysRented),
         nextPaymentDate: nextPayment?.dueDate,
         rentalRequestId: offer.rentalRequest.id,
@@ -248,27 +209,6 @@ export const getLandlordTenantDetails = async (req, res) => {
       });
     }
 
-    // Get payment history
-    const paymentHistory = await prisma.payment.findMany({
-      where: {
-        userId: tenantId,
-        status: 'SUCCEEDED'
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    // Get rent payment history
-    const rentPaymentHistory = await prisma.rentPayment.findMany({
-      where: {
-        userId: tenantId
-      },
-      orderBy: {
-        dueDate: 'desc'
-      }
-    });
-
     // Get contract information
     const contract = await prisma.contract.findFirst({
       where: {
@@ -284,68 +224,31 @@ export const getLandlordTenantDetails = async (req, res) => {
       }
     });
 
-    // Combine payment histories
-    const allPayments = [
-      ...paymentHistory.map(payment => ({
-        description: payment.purpose === 'DEPOSIT_AND_FIRST_MONTH' ? 'Deposit & First Month' : payment.purpose,
-        date: payment.createdAt,
-        amount: payment.amount,
-        status: 'paid'
-      })),
-      ...rentPaymentHistory.map(payment => ({
-        description: `Rent - ${new Date(payment.dueDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
-        date: payment.paidDate || payment.dueDate,
-        amount: payment.amount,
-        status: payment.status === 'SUCCEEDED' ? 'paid' : payment.status === 'PENDING' ? 'pending' : 'overdue'
-      }))
-    ].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    // Get current payment status
-    const latestPayment = await prisma.rentPayment.findFirst({
-      where: {
-        userId: tenantId,
-        status: 'PENDING'
-      },
-      orderBy: {
-        dueDate: 'desc'
-      }
-    });
-
-    let paymentStatus = 'paid';
-    if (latestPayment) {
-      const today = new Date();
-      const dueDate = new Date(latestPayment.dueDate);
-      if (dueDate < today) {
-        paymentStatus = 'overdue';
-      } else {
-        paymentStatus = 'pending';
-      }
+    // Use unified payment service for consistent data
+    let paymentData;
+    try {
+      paymentData = await getUnifiedPaymentData(tenantId, landlordId);
+      console.log('✅ Payment data retrieved successfully:', {
+        totalPayments: paymentData.payments?.length || 0,
+        totalPaid: paymentData.totalPaid || 0,
+        paymentStatus: paymentData.paymentStatus || 'unknown'
+      });
+    } catch (error) {
+      console.error('❌ Error getting unified payment data:', error);
+      // Fallback to basic payment data
+      paymentData = {
+        payments: [],
+        totalPaid: 0,
+        paymentStatus: 'unknown',
+        onTimePayments: 0
+      };
     }
-
+    
     // Calculate lease dates
     const moveInDate = new Date(paidOffer.rentalRequest.moveInDate);
     const leaseStartDate = moveInDate;
     const leaseEndDate = new Date(moveInDate);
     leaseEndDate.setFullYear(leaseEndDate.getFullYear() + (paidOffer.leaseDuration || 12));
-
-    // Calculate total paid
-    const totalPaid = await prisma.payment.aggregate({
-      where: {
-        userId: tenantId,
-        status: 'SUCCEEDED'
-      },
-      _sum: {
-        amount: true
-      }
-    });
-
-    // Get on-time payments count - simplified for now
-    const onTimePayments = await prisma.rentPayment.count({
-      where: {
-        userId: tenantId,
-        status: 'SUCCEEDED'
-      }
-    });
 
     // Calculate days rented
     const today = new Date();
@@ -362,12 +265,16 @@ export const getLandlordTenantDetails = async (req, res) => {
       {
         description: 'Lease agreement signed',
         date: paidOffer.createdAt
-      },
-      {
-        description: 'First payment received',
-        date: paymentHistory[0]?.createdAt || paidOffer.createdAt
       }
     ];
+
+    // Add first payment activity if payments exist
+    if (paymentData.payments && paymentData.payments.length > 0) {
+      recentActivity.push({
+        description: 'First payment received',
+        date: paymentData.payments[0].date
+      });
+    }
 
     const tenant = {
       id: paidOffer.rentalRequest.tenant.id,
@@ -383,15 +290,15 @@ export const getLandlordTenantDetails = async (req, res) => {
       leaseDuration: paidOffer.leaseDuration || 12,
       monthlyRent: paidOffer.rentAmount,
       securityDeposit: paidOffer.depositAmount,
-      paymentStatus: paymentStatus,
-      totalPaid: totalPaid._sum.amount || 0,
-      onTimePayments: onTimePayments,
+      paymentStatus: paymentData?.paymentStatus || 'unknown',
+      totalPaid: paymentData?.totalPaid || 0,
+      onTimePayments: paymentData?.onTimePayments || 0,
       daysRented: Math.max(0, daysRented),
       nextPaymentDate: nextPaymentDate,
       contractStatus: 'Active',
       rentalRequestId: paidOffer.rentalRequest.id,
       contract: contract,
-      paymentHistory: allPayments,
+      paymentHistory: paymentData?.payments || [],
       recentActivity: recentActivity,
       property: {
         id: paidOffer.property.id,

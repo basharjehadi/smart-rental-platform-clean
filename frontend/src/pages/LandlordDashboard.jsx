@@ -249,7 +249,7 @@ const LandlordDashboard = () => {
     <div className="card-modern p-6">
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-gray-900">Payment Collection Status</h3>
-        <p className="text-sm text-gray-600">Your last 6 rent payments</p>
+        <p className="text-sm text-gray-600">Your recent payments (rent + deposits)</p>
       </div>
       
       <div className="space-y-3 mb-4">
@@ -260,11 +260,12 @@ const LandlordDashboard = () => {
                 payment.status === "Complete" ? "bg-green-500" : "bg-yellow-500"
               }`}></div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">{payment.month || 'Month'}</p>
+                <p className="text-sm font-medium text-gray-900">{payment.tenant || 'Tenant'}</p>
                 <p className="text-xs text-gray-500">{payment.collectedDate || 'Date'}</p>
+                <p className="text-xs text-blue-600">{payment.type === 'rent' ? 'Monthly Rent' : payment.type}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm font-semibold text-gray-900">{payment.amount || '0 zł'}</p>
+                <p className="text-sm font-semibold text-green-600">{payment.amount || '0 zł'}</p>
                 <span className={`text-xs ${
                   payment.status === "Complete" ? "text-green-600" : "text-orange-600"
                 }`}>
