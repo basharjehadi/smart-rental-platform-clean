@@ -1,5 +1,5 @@
 import { prisma } from '../utils/prisma.js';
-import { getUnifiedPaymentData, getPaymentStatus } from '../services/paymentService.js';
+import { getUnifiedPaymentData, getPaymentStatus, getUpcomingPayments } from '../services/paymentService.js';
 
 // Get all tenants for a landlord
 export const getLandlordTenants = async (req, res) => {
@@ -244,21 +244,25 @@ export const getLandlordTenantDetails = async (req, res) => {
       };
     }
     
-    // Calculate lease dates
-    const moveInDate = new Date(paidOffer.rentalRequest.moveInDate);
-    const leaseStartDate = moveInDate;
-    const leaseEndDate = new Date(moveInDate);
-    leaseEndDate.setFullYear(leaseEndDate.getFullYear() + (paidOffer.leaseDuration || 12));
+    // Calculate lease dates correctly (using months, not years)
+    const leaseStartDate = new Date(paidOffer.rentalRequest.moveInDate);
+    const leaseEndDate = new Date(leaseStartDate);
+    leaseEndDate.setMonth(leaseEndDate.getMonth() + (paidOffer.leaseDuration || 12));
 
     // Calculate days rented
     const today = new Date();
-    const daysRented = Math.floor((today - moveInDate) / (1000 * 60 * 60 * 24));
+    const daysRented = Math.floor((today - leaseStartDate) / (1000 * 60 * 60 * 24));
+
+    // Get next payment date using unified payment service
+    const upcomingPayments = await getUpcomingPayments(paidOffer.rentalRequest.tenant.id);
+    const nextPayment = upcomingPayments.length > 0 ? upcomingPayments[0] : null;
+    const nextPaymentDate = nextPayment ? nextPayment.dueDate : null;
 
     // TODO: Remove this query once payment table structure is fixed
     // const nextUnpaidRentPayment = null;
 
     // TODO: Fix payment table structure first, then implement proper next payment date calculation
-    const nextPaymentDate = null;
+    // const nextPaymentDate = null;
 
     // Create recent activity
     const recentActivity = [
@@ -287,7 +291,7 @@ export const getLandlordTenantDetails = async (req, res) => {
       moveInDate: paidOffer.rentalRequest.moveInDate,
       leaseStartDate: leaseStartDate,
       leaseEndDate: leaseEndDate,
-      leaseDuration: paidOffer.leaseDuration || 12,
+      leaseDuration: `${paidOffer.leaseDuration || 12} months`,
       monthlyRent: paidOffer.rentAmount,
       securityDeposit: paidOffer.depositAmount,
       paymentStatus: paymentData?.paymentStatus || 'unknown',
