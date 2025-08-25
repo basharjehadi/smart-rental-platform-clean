@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { AuthProvider } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { ChatBadgeProvider } from './contexts/ChatBadgeContext';
 import ToastContainer from './components/common/ToastContainer';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -376,10 +377,12 @@ function App() {
     <AuthProvider>
       <SocketProvider>
         <NotificationProvider>
-          <Router>
-            <AppContent />
-            <ToastContainer />
-          </Router>
+          <ChatBadgeProvider>
+            <Router>
+              <AppContent />
+              <ToastContainer />
+            </Router>
+          </ChatBadgeProvider>
         </NotificationProvider>
       </SocketProvider>
     </AuthProvider>

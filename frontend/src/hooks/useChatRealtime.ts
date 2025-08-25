@@ -238,32 +238,11 @@ export const useChat = (): UseChatReturn => {
     setMessages([]);
   }, []);
 
-  // Send message with immediate UI update
+  // Send message with de-dupe (no optimistic to avoid duplicates with socket)
   const sendMessage = useCallback(async (content: string, replyToId?: string) => {
     if (!activeConversation || !token || !content.trim()) return;
     
     try {
-      // Create optimistic message for immediate UI update
-      const optimisticMessage: Message = {
-        id: `temp-${Date.now()}`,
-        content: content.trim(),
-        messageType: 'TEXT',
-        isRead: false,
-        senderId: 'current-user', // Will be replaced with actual user ID
-        sender: {
-          id: 'current-user',
-          name: 'You',
-          email: '',
-          profileImage: ''
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      // Add optimistic message immediately
-      setMessages(prev => [...prev, optimisticMessage]);
-
-      // Send actual message
       const res = await fetch(`${API_BASE}/messaging/conversations/${activeConversation.id}/messages`, {
         method: 'POST',
         headers: {
@@ -277,14 +256,9 @@ export const useChat = (): UseChatReturn => {
       
       const actualMessage = await res.json();
       
-      // Replace optimistic message with real message
-      setMessages(prev => prev.map(msg => 
-        msg.id === optimisticMessage.id ? actualMessage : msg
-      ));
-      
+      // Append only if not already present (socket may have delivered it)
+      setMessages(prev => (prev.some(m => m.id === actualMessage.id) ? prev : [...prev, actualMessage]));
     } catch (err) {
-      // Remove optimistic message on error
-      setMessages(prev => prev.filter(msg => !msg.id.startsWith('temp-')));
       setError(err instanceof Error ? err.message : 'Failed to send message');
     }
   }, [activeConversation, token]);
@@ -314,6 +288,14 @@ export const useChat = (): UseChatReturn => {
 
     const handleConversationsLoaded = (data: Conversation[]) => {
       setConversations(data);
+      
+      // Update activeConversation if it exists to get latest data (including property details)
+      if (activeConversationRef.current) {
+        const updatedActive = data.find(c => c.id === activeConversationRef.current?.id);
+        if (updatedActive) {
+          setActiveConversation(updatedActive);
+        }
+      }
     };
     
     const handleNewMessage = (msg: Message & { conversationId?: string }) => {
@@ -355,6 +337,9 @@ export const useChat = (): UseChatReturn => {
     socket.on('new-message', handleNewMessage);
     socket.on('user-typing', handleUserTyping);
     socket.on('user-stop-typing', handleUserStopTyping);
+    socket.on('message-read', (payload: { messageId: string; readAt?: string }) => {
+      setMessages(prev => prev.map(m => m.id === payload.messageId ? { ...m, isRead: true, readAt: payload.readAt || m.readAt } : m));
+    });
 
     const onDisconnect = () => {
       hasJoinedRef.current = false;
@@ -366,6 +351,7 @@ export const useChat = (): UseChatReturn => {
       socket.off('new-message', handleNewMessage);
       socket.off('user-typing', handleUserTyping);
       socket.off('user-stop-typing', handleUserStopTyping);
+      socket.off('message-read');
       socket.off('disconnect', onDisconnect);
     };
   }, [socket, isConnected, token, loadUnreadCount, loadConversations]);

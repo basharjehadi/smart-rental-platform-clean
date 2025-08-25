@@ -25,7 +25,7 @@ const Chat: React.FC<ChatProps> = ({
   const [isTyping, setIsTyping] = useState(false);
   const [conversationStatus, setConversationStatus] = useState<'PENDING' | 'ACTIVE' | 'ARCHIVED'>('PENDING');
   const [offerStatus, setOfferStatus] = useState<'PENDING' | 'ACCEPTED' | 'REJECTED' | 'PAID'>('PENDING');
-  const [showPropertyPanel, setShowPropertyPanel] = useState(false);
+  const [showPropertyPanel, setShowPropertyPanel] = useState(true);
   
   // Use external selected conversation ID if provided, otherwise use internal state
   const selectedConversationId = externalSelectedConversationId || internalSelectedConversationId;
@@ -157,7 +157,7 @@ const Chat: React.FC<ChatProps> = ({
     const conversation = conversations.find(c => c.id === selectedConversationId);
     if (!conversation) return 'Unknown conversation';
     
-    if (conversation.title) return conversation.title;
+    // Force Airbnb-style: show participant names only, not stored conversation title/property name
     
     const otherParticipants = conversation.participants.filter(
       p => p.userId !== user?.id
@@ -183,19 +183,26 @@ const Chat: React.FC<ChatProps> = ({
       p => p.userId !== user?.id
     );
 
-    if (otherParticipants.length === 1) {
-      return otherParticipants[0].user.avatar;
-    } else if (otherParticipants.length > 1) {
-      return 'https://via.placeholder.com/50'; // Placeholder for multiple participants
-    }
+    const profileImage = otherParticipants[0]?.user?.profileImage;
+    if (!profileImage) return null;
 
-    return null;
+    if (profileImage.startsWith('http')) return profileImage;
+    if (profileImage.startsWith('/uploads/')) return `http://localhost:3001${profileImage}`;
+    if (profileImage.startsWith('uploads/')) return `http://localhost:3001/${profileImage}`;
+    return `http://localhost:3001/uploads/profile_images/${profileImage}`;
   };
 
   // Get property images for display
   const getPropertyImages = () => {
-    if (!activeConversation || !activeConversation.property) return [];
-    return activeConversation.property.images || [];
+    if (!activeConversation || !activeConversation.property || !activeConversation.property.images) return [];
+    const imgs = activeConversation.property.images as any;
+    try {
+      if (Array.isArray(imgs)) return imgs;
+      if (typeof imgs === 'string') return JSON.parse(imgs);
+      return [];
+    } catch {
+      return [];
+    }
   };
 
   const isChatDisabled = conversationStatus !== 'ACTIVE';
@@ -235,30 +242,7 @@ const Chat: React.FC<ChatProps> = ({
           </div>
         ) : (
           <>
-            {/* Chat Header */}
-            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    {getConversationTitle()}
-                  </h2>
-                  {isChatDisabled && (
-                    <div className="flex items-center space-x-1 text-yellow-600">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                      <span className="text-xs font-medium">Locked</span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center space-x-2">
-                  <p className="text-sm text-gray-500">
-                    Connected
-                  </p>
-                  <UnreadBadge />
-                </div>
-              </div>
-            </div>
+            {/* Header removed here; ChatWindow renders its own header */}
 
             {/* Chat Messages */}
             <ChatWindow
@@ -269,7 +253,23 @@ const Chat: React.FC<ChatProps> = ({
               conversationAvatar={getConversationAvatar() || undefined}
               onLoadOlder={loadOlderMessages}
               hasMore={hasMore}
-              onMarkAsRead={() => {}}
+              onMarkAsRead={async (messageIds: string[]) => {
+                if (!selectedConversationId || messageIds.length === 0) return;
+                try {
+                  await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:3001'}/api/messaging/conversations/${selectedConversationId}/messages/read`, {
+                    method: 'PUT',
+                    headers: {
+                      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ messageIds })
+                  });
+                  // Notify global chat badge provider to refresh immediately
+                  try { window.dispatchEvent(new Event('chat-unread-refresh')); } catch {}
+                } catch {
+                  // ignore
+                }
+              }}
               showPropertyButton={!showPropertyPanel && !!(activeConversation && activeConversation.property)}
               onShowProperty={() => setShowPropertyPanel(true)}
             />

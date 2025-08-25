@@ -81,7 +81,12 @@ const MyOffers = () => {
   useEffect(() => {
     fetchOffers();
     // Mark offer notifications as read when visiting the page
-    markByTypeAsRead('NEW_OFFER');
+    (async () => {
+      try {
+        await markByTypeAsRead('NEW_OFFER');
+        try { window.dispatchEvent(new Event('notif-unread-refresh')); } catch {}
+      } catch {}
+    })();
   }, []);
 
   useEffect(() => {

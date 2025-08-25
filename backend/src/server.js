@@ -36,6 +36,10 @@ const startServer = async () => {
     const io = initializeSocket(server);
     logger.info('🔌 Socket.io initialized');
 
+    // Make io instance available to Express app for routes to emit events
+    app.set('io', io);
+    logger.info('🔌 Socket.io instance made available to Express app');
+
     // Connect Socket.io to notification service
     const { setSocketIO } = await import('./services/notificationService.js');
     setSocketIO(io);

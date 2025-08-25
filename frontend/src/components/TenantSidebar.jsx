@@ -11,7 +11,7 @@ import {
   X
 } from 'lucide-react';
 import { useNotifications } from '../contexts/NotificationContext';
-import { useChat } from '../hooks/useChat';
+import { useChatBadge } from '../contexts/ChatBadgeContext';
 import NotificationBadge from './common/NotificationBadge';
 
 const SidebarItem = ({ to, icon: Icon, children, isActive, isCollapsed, badge }) => {
@@ -62,7 +62,7 @@ const TenantSidebar = () => {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { counts } = useNotifications();
-  const { unreadCount } = useChat();
+  const { unreadCount, offersUnread, rentalRequestsUnread } = useChatBadge();
 
   const menuItems = [
     {
@@ -73,13 +73,14 @@ const TenantSidebar = () => {
     {
       to: '/tenant-request-for-landlord',
       icon: FileText,
-      label: 'My Requests'
+      label: 'My Requests',
+      badge: (rentalRequestsUnread || counts.rentalRequests) > 0 ? (rentalRequestsUnread || counts.rentalRequests) : null
     },
     {
       to: '/my-offers',
       icon: Handshake,
       label: 'View Offers',
-      badge: counts.offers > 0 ? counts.offers : null
+      badge: (offersUnread || counts.offers) > 0 ? (offersUnread || counts.offers) : null
     },
     {
       to: '/messaging',

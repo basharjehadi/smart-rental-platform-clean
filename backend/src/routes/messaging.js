@@ -76,7 +76,25 @@ router.get('/conversations', verifyToken, async (req, res) => {
                 id: true,
                 name: true,
                 address: true,
+                city: true,
+                district: true,
+                zipCode: true,
+                country: true,
+                propertyType: true,
+                monthlyRent: true,
+                depositAmount: true,
+                bedrooms: true,
+                bathrooms: true,
+                size: true,
                 images: true
+              }
+            },
+            offer: {
+              select: {
+                id: true,
+                status: true,
+                rentAmount: true,
+                depositAmount: true
               }
             }
           }
@@ -291,6 +309,15 @@ router.post('/conversations/:conversationId/messages', verifyToken, upload.singl
       data: { updatedAt: new Date() }
     });
 
+    // Emit socket event for real-time updates to all participants
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        const messageWithConversationId = { ...message, conversationId };
+        io.to(`conversation-${conversationId}`).emit('new-message', messageWithConversationId);
+      }
+    } catch (_) {}
+
     res.status(201).json(message);
   } catch (error) {
     console.error('Error sending message:', error);
@@ -316,7 +343,8 @@ router.put('/conversations/:conversationId/messages/read', verifyToken, async (r
     }
 
     // Mark messages as read
-    const updatedMessages = await prisma.message.updateMany({
+    const readAt = new Date();
+    await prisma.message.updateMany({
       where: {
         id: { in: messageIds },
         conversationId,
@@ -324,15 +352,21 @@ router.put('/conversations/:conversationId/messages/read', verifyToken, async (r
       },
       data: {
         isRead: true,
-        readAt: new Date()
+        readAt
       }
     });
 
-    res.json({ 
-      success: true, 
-      updatedCount: updatedMessages.count,
-      message: 'Messages marked as read'
-    });
+    // Emit socket updates so senders see read ticks immediately
+    try {
+      const io = req.app.get('io');
+      if (io && Array.isArray(messageIds)) {
+        messageIds.forEach(id => {
+          io.to(`conversation-${conversationId}`).emit('message-read', { messageId: id, readAt });
+        });
+      }
+    } catch (_) {}
+
+    res.json({ success: true });
   } catch (error) {
     console.error('Error marking messages as read:', error);
     res.status(500).json({ error: 'Failed to mark messages as read' });
@@ -455,6 +489,16 @@ router.get('/conversations/:conversationId', verifyToken, async (req, res) => {
             id: true,
             name: true,
             address: true,
+            city: true,
+            district: true,
+            zipCode: true,
+            country: true,
+            propertyType: true,
+            monthlyRent: true,
+            depositAmount: true,
+            bedrooms: true,
+            bathrooms: true,
+            size: true,
             images: true
           }
         },

@@ -7,11 +7,13 @@ import TenantSidebar from '../components/TenantSidebar';
 import Chat from '../components/chat/Chat';
 import { LogOut } from 'lucide-react';
 import NotificationHeader from '../components/common/NotificationHeader';
+import { useNotifications } from '../contexts/NotificationContext';
 
 const TenantDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   
+  const { markByTypeAsRead } = useNotifications();
   const [requests, setRequests] = useState([]);
   const [profileData, setProfileData] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -189,11 +191,18 @@ const TenantDashboard = () => {
     if (user) {
       console.log('✅ Dashboard: User is authenticated, fetching requests...');
       fetchRequests();
+      // Mark rental request notifications as read and refresh global badges
+      (async () => {
+        try {
+          await markByTypeAsRead('NEW_RENTAL_REQUEST');
+          try { window.dispatchEvent(new Event('notif-unread-refresh')); } catch {}
+        } catch {}
+      })();
     } else {
       console.log('❌ Dashboard: No user found, not fetching requests');
       setLoading(false);
     }
-  }, [user]);
+  }, [user, markByTypeAsRead]);
 
   // Separate useEffect for profile data fetching (like other working pages)
   useEffect(() => {
