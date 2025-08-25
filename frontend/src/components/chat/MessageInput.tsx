@@ -78,7 +78,9 @@ const MessageInput: React.FC<MessageInputProps> = ({
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain'
+      'text/plain',
+      'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/aac', 'audio/m4a', 'audio/ogg',
+      'video/mp4', 'video/quicktime', 'video/webm', 'video/ogg'
     ];
 
     if (!allowedTypes.includes(file.type)) {
@@ -215,7 +217,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
         ref={fileInputRef}
         type="file"
         onChange={handleFileSelect}
-        accept="image/*,.pdf,.doc,.docx,.txt"
+        accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.txt"
         className="hidden"
       />
     </div>

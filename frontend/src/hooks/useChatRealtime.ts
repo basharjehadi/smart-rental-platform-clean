@@ -87,7 +87,7 @@ interface UseChatReturn {
   error: string | null;
   joinConversation: (conversationId: string) => void;
   leaveConversation: () => void;
-  sendMessage: (content: string, replyToId?: string) => Promise<void>;
+  sendMessage: (content: string, file?: File, replyToId?: string) => Promise<void>;
   startTyping: () => void;
   stopTyping: () => void;
   typingUsers: { userId: string; userName: string }[];
@@ -239,23 +239,40 @@ export const useChat = (): UseChatReturn => {
   }, []);
 
   // Send message with de-dupe (no optimistic to avoid duplicates with socket)
-  const sendMessage = useCallback(async (content: string, replyToId?: string) => {
-    if (!activeConversation || !token || !content.trim()) return;
-    
+  const sendMessage = useCallback(async (content: string, file?: File, replyToId?: string) => {
+    if (!activeConversation || !token || (!content.trim() && !file)) return;
+
     try {
-      const res = await fetch(`${API_BASE}/messaging/conversations/${activeConversation.id}/messages`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ content: content.trim(), replyToId })
-      });
-      
+      const url = `${API_BASE}/messaging/conversations/${activeConversation.id}/messages`;
+
+      let res: Response;
+      if (file) {
+        const form = new FormData();
+        if (content && content.trim()) form.append('content', content.trim());
+        if (replyToId) form.append('replyToId', replyToId);
+        form.append('attachment', file);
+        res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: form
+        });
+      } else {
+        res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ content: content.trim(), replyToId })
+        });
+      }
+
       if (!res.ok) throw new Error('Failed to send message');
-      
+
       const actualMessage = await res.json();
-      
+
       // Append only if not already present (socket may have delivered it)
       setMessages(prev => (prev.some(m => m.id === actualMessage.id) ? prev : [...prev, actualMessage]));
     } catch (err) {

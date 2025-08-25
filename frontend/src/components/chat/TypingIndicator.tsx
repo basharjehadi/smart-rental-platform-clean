@@ -28,13 +28,13 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ typingUsers, currentU
   };
 
   return (
-    <div className="flex items-center space-x-2 p-3 text-gray-500 bg-gray-50 rounded-lg mx-4 mb-2">
+    <div className="inline-flex items-center space-x-2 px-3 py-2 text-gray-500 bg-gray-100 border border-gray-200 rounded-full mx-4 mb-2 sticky bottom-3 self-start shadow-sm">
       <div className="flex space-x-1">
-        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
       </div>
-      <span className="text-sm italic text-gray-600">{getTypingMessage()}</span>
+      <span className="text-xs italic text-gray-600">{getTypingMessage()}</span>
     </div>
   );
 };

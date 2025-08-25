@@ -130,28 +130,31 @@ export const getUnifiedPaymentData = async (userId, landlordId = null) => {
           });
 
           if (relatedOffer?.rentAmount && relatedOffer?.rentalRequest?.moveInDate) {
+            const moveIn = new Date(relatedOffer.rentalRequest.moveInDate);
+            const isFirstDay = moveIn.getUTCDate() === 1;
             const proration = calculateFirstMonthPayment(
               relatedOffer.rentAmount,
               relatedOffer.rentalRequest.moveInDate
             );
+            const firstMonthAmount = isFirstDay ? relatedOffer.rentAmount : proration.proratedAmount;
 
             // Push deposit line
             allPayments.push({
               description: 'Security Deposit',
               month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
               date: payment.createdAt,
-              amount: relatedOffer.depositAmount || Math.max(payment.amount - proration.proratedAmount, 0),
+              amount: relatedOffer.depositAmount || Math.max(payment.amount - firstMonthAmount, 0),
               status: 'paid',
               purpose: 'DEPOSIT',
               type: 'general'
             });
 
-            // Push first month prorated line
+            // Push first month: conditional label for detailed pages can be added elsewhere
             allPayments.push({
-              description: 'First Month (Prorated)',
+              description: isFirstDay ? 'First Month Rent' : 'First Month (Prorated)',
               month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
               date: payment.createdAt,
-              amount: proration.proratedAmount,
+              amount: firstMonthAmount,
               status: 'paid',
               purpose: 'RENT_FIRST_MONTH_PRORATED',
               type: 'rent'
@@ -164,16 +167,16 @@ export const getUnifiedPaymentData = async (userId, landlordId = null) => {
       }
 
       // Default push for general payments
-      allPayments.push({
-        description: payment.purpose === 'DEPOSIT_AND_FIRST_MONTH' ? 'Deposit & First Month' : payment.purpose,
-        month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-        date: payment.createdAt,
-        amount: payment.amount,
-        status: 'paid',
-        purpose: payment.purpose,
-        type: 'general'
-      });
-    }
+        allPayments.push({
+          description: payment.purpose === 'DEPOSIT_AND_FIRST_MONTH' ? 'Deposit & First Month' : payment.purpose,
+          month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          date: payment.createdAt,
+          amount: payment.amount,
+          status: 'paid',
+          purpose: payment.purpose,
+          type: 'general'
+        });
+      }
 
     // Add rent payments
     rentPayments.forEach(payment => {

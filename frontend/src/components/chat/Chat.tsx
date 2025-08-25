@@ -126,8 +126,7 @@ const Chat: React.FC<ChatProps> = ({
     if (!content.trim() && !file) return;
 
     try {
-      // Simple hook: only supports text messages
-        sendMessage(content);
+      await sendMessage(content, file);
     } catch (error) {
       console.error('Error sending message:', error);
     }
@@ -182,14 +181,21 @@ const Chat: React.FC<ChatProps> = ({
     const otherParticipants = conversation.participants.filter(
       p => p.userId !== user?.id
     );
+    
+    if (otherParticipants.length === 0) return null;
 
-    const profileImage = otherParticipants[0]?.user?.profileImage;
+    const profileImage = otherParticipants[0]?.user?.profileImage || '';
     if (!profileImage) return null;
 
+    // Build absolute URL for common stored formats
+    const serverBase = ((import.meta as any).env?.VITE_API_URL || 'http://localhost:3001').replace(/\/?api$/i, '');
+
     if (profileImage.startsWith('http')) return profileImage;
-    if (profileImage.startsWith('/uploads/')) return `http://localhost:3001${profileImage}`;
-    if (profileImage.startsWith('uploads/')) return `http://localhost:3001/${profileImage}`;
-    return `http://localhost:3001/uploads/profile_images/${profileImage}`;
+    if (profileImage.startsWith('/uploads/')) return `${serverBase}${profileImage}`;
+    if (profileImage.startsWith('uploads/')) return `${serverBase}/${profileImage}`;
+
+    // Fallback to default profile_images directory
+    return `${serverBase}/uploads/profile_images/${profileImage}`;
   };
 
   // Get property images for display
@@ -233,7 +239,7 @@ const Chat: React.FC<ChatProps> = ({
                 Chat is Locked
               </h3>
               <p className="text-gray-600 mb-4">
-                {conversationStatus !== 'ACTIVE' 
+                {conversationStatus === 'PENDING' || conversationStatus === 'ARCHIVED'
                   ? 'This conversation is not active yet.'
                   : 'Please complete payment to unlock this chat.'
                 }
@@ -272,8 +278,9 @@ const Chat: React.FC<ChatProps> = ({
               }}
               showPropertyButton={!showPropertyPanel && !!(activeConversation && activeConversation.property)}
               onShowProperty={() => setShowPropertyPanel(true)}
+              userRole={user?.role}
             />
-
+            
             {/* Message Input */}
             <MessageInput
               onSendMessage={handleSendMessage}

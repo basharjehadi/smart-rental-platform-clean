@@ -22,17 +22,18 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 50 * 1024 * 1024 // 50MB limit
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
+    const allowedExt = /jpeg|jpg|png|gif|pdf|doc|docx|txt|mp3|wav|m4a|aac|mp4|mov|webm|ogg/;
+    const allowedMime = /image\/.+|application\/pdf|application\/msword|application\/vnd.openxmlformats-officedocument.wordprocessingml.document|text\/plain|audio\/.+|video\/.+/;
+    const extname = allowedExt.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedMime.test(file.mimetype);
 
     if (mimetype && extname) {
       return cb(null, true);
     } else {
-      cb(new Error('Only image and document files are allowed!'));
+      cb(new Error('Only image, document, audio, and video files are allowed!'));
     }
   }
 });
@@ -248,7 +249,7 @@ router.post('/conversations', verifyToken, async (req, res) => {
 router.post('/conversations/:conversationId/messages', verifyToken, upload.single('attachment'), async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const { content, messageType = 'TEXT', replyToId } = req.body;
+    const { content: rawContent, messageType = 'TEXT', replyToId } = req.body;
 
     // Check if user can chat using enhanced guard
     const chatGuard = await canChat(conversationId, req.user.id);
@@ -262,8 +263,9 @@ router.post('/conversations/:conversationId/messages', verifyToken, upload.singl
     }
 
     // Prepare message data
+    const safeContent = typeof rawContent === 'string' ? rawContent : '';
     const messageData = {
-      content,
+      content: safeContent,
       messageType,
       conversationId,
       senderId: req.user.id,
@@ -276,7 +278,15 @@ router.post('/conversations/:conversationId/messages', verifyToken, upload.singl
       messageData.attachmentName = req.file.originalname;
       messageData.attachmentSize = req.file.size;
       messageData.attachmentType = req.file.mimetype;
-      messageData.messageType = req.file.mimetype.startsWith('image/') ? 'IMAGE' : 'DOCUMENT';
+      if (req.file.mimetype.startsWith('image/')) {
+        messageData.messageType = 'IMAGE';
+      } else if (req.file.mimetype.startsWith('video/')) {
+        messageData.messageType = 'DOCUMENT'; // temporary, front-end will treat by mimetype
+      } else if (req.file.mimetype.startsWith('audio/')) {
+        messageData.messageType = 'DOCUMENT';
+      } else {
+        messageData.messageType = 'DOCUMENT';
+      }
     }
 
     const message = await prisma.message.create({

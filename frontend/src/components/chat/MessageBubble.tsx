@@ -41,6 +41,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   isOwnMessage,
   showSender
 }) => {
+  const resolveUrl = (maybeRelative?: string) => {
+    if (!maybeRelative) return '';
+    if (maybeRelative.startsWith('http')) return maybeRelative;
+    const serverBase = (((import.meta as any).env?.VITE_API_URL) || 'http://localhost:3001').replace(/\/?api$/i, '');
+    if (maybeRelative.startsWith('/uploads/')) return `${serverBase}${maybeRelative}`;
+    if (maybeRelative.startsWith('uploads/')) return `${serverBase}/${maybeRelative}`;
+    return maybeRelative;
+  };
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -62,10 +70,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         return (
           <div className="space-y-2">
             <img
-              src={message.attachmentUrl}
+              src={resolveUrl(message.attachmentUrl)}
               alt="Shared image"
               className="max-w-xs rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => window.open(message.attachmentUrl, '_blank')}
+              onClick={() => window.open(resolveUrl(message.attachmentUrl), '_blank')}
             />
             {message.content && (
               <p className="text-sm text-gray-600">{message.content}</p>
@@ -74,6 +82,27 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         );
       
       case 'DOCUMENT':
+        // If it's media, render appropriate player, else show document card
+        if (message.attachmentType?.startsWith('audio/')) {
+          return (
+            <div className="space-y-2">
+              <audio controls src={resolveUrl(message.attachmentUrl)} className="max-w-xs" />
+              {message.content && (
+                <p className="text-sm text-gray-600">{message.content}</p>
+              )}
+            </div>
+          );
+        }
+        if (message.attachmentType?.startsWith('video/')) {
+          return (
+            <div className="space-y-2">
+              <video controls src={resolveUrl(message.attachmentUrl)} className="max-w-xs rounded-lg" />
+              {message.content && (
+                <p className="text-sm text-gray-600">{message.content}</p>
+              )}
+            </div>
+          );
+        }
         return (
           <div className="space-y-2">
             <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg border">
@@ -85,7 +114,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <p className="text-xs text-gray-500">Document</p>
               </div>
               <button
-                onClick={() => window.open(message.attachmentUrl, '_blank')}
+                onClick={() => window.open(resolveUrl(message.attachmentUrl), '_blank')}
                 className="p-1 hover:bg-gray-200 rounded transition-colors"
                 title="Download document"
               >
