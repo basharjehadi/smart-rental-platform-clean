@@ -89,6 +89,20 @@ const completeMockPayment = async (req, res) => {
     // For monthly rent payments, create RentPayment records
     if (purpose === 'MONTHLY_RENT') {
       // First create a general payment record for tracking
+      // Ensure we link payment to the tenant's rentalRequest for landlord filtering
+      let rentRentalRequestId = null;
+      try {
+        if (offerId) {
+          const rentOffer = await prisma.offer.findUnique({
+            where: { id: offerId },
+            select: { rentalRequestId: true }
+          });
+          rentRentalRequestId = rentOffer?.rentalRequestId || null;
+        }
+      } catch (lookupErr) {
+        console.error('❌ Error looking up offer for MONTHLY_RENT:', lookupErr);
+      }
+
       const generalPayment = await prisma.payment.create({
         data: {
           amount: amount,
@@ -97,6 +111,7 @@ const completeMockPayment = async (req, res) => {
           gateway: 'PAYU',
           userId: userId,
           offerId: offerId, // This will be the offer ID
+          ...(rentRentalRequestId ? { rentalRequestId: rentRentalRequestId } : {}),
           createdAt: new Date(),
           updatedAt: new Date()
         }
@@ -157,6 +172,20 @@ const completeMockPayment = async (req, res) => {
       }
       
       // Create the main payment record with offerId for chat system
+      // Also link to rentalRequestId so landlord dashboards can filter correctly
+      let depositRentalRequestId = null;
+      try {
+        if (offerId) {
+          const depOffer = await prisma.offer.findUnique({
+            where: { id: offerId },
+            select: { rentalRequestId: true }
+          });
+          depositRentalRequestId = depOffer?.rentalRequestId || null;
+        }
+      } catch (lookupErr) {
+        console.error('❌ Error looking up offer for DEPOSIT_AND_FIRST_MONTH:', lookupErr);
+      }
+
       const depositPayment = await prisma.payment.create({
         data: {
           amount: amount,
@@ -165,6 +194,7 @@ const completeMockPayment = async (req, res) => {
           gateway: 'PAYU',
           userId: userId,
           offerId: offerId, // This is crucial for chat system to work
+          ...(depositRentalRequestId ? { rentalRequestId: depositRentalRequestId } : {}),
           createdAt: new Date(),
           updatedAt: new Date()
         }
@@ -184,6 +214,89 @@ const completeMockPayment = async (req, res) => {
             }
           });
           console.log('✅ Updated offer status to PAID:', offerId);
+
+          // Fetch related identifiers for follow-up updates
+          const paidOffer = await prisma.offer.findUnique({
+            where: { id: offerId },
+            select: { propertyId: true, rentalRequestId: true }
+          });
+
+          // Invalidate other offers for the same property (PENDING/ACCEPTED → REJECTED)
+          try {
+            if (paidOffer?.propertyId) {
+              const otherOffers = await prisma.offer.findMany({
+                where: {
+                  propertyId: paidOffer.propertyId,
+                  id: { not: offerId },
+                  status: { in: ['PENDING', 'ACCEPTED'] }
+                }
+              });
+
+              if (otherOffers.length > 0) {
+                await prisma.offer.updateMany({
+                  where: {
+                    propertyId: paidOffer.propertyId,
+                    id: { not: offerId },
+                    status: { in: ['PENDING', 'ACCEPTED'] }
+                  },
+                  data: { status: 'REJECTED', updatedAt: new Date() }
+                });
+                console.log(`✅ Invalidated ${otherOffers.length} competing offers for property ${paidOffer.propertyId}`);
+              }
+            }
+          } catch (invalidateErr) {
+            console.error('❌ Error invalidating competing offers:', invalidateErr);
+          }
+
+          // Update property availability to RENTED
+          try {
+            if (paidOffer?.propertyId) {
+              await propertyAvailabilityService.updatePropertyAvailability(
+                paidOffer.propertyId,
+                false,
+                'RENTED'
+              );
+              console.log('✅ Property set to RENTED and unavailable:', paidOffer.propertyId);
+            }
+          } catch (propErr) {
+            console.error('❌ Error updating property availability:', propErr);
+          }
+
+          // Update rental request status to MATCHED (moves it out of Active in UIs)
+          try {
+            if (paidOffer?.rentalRequestId) {
+              await prisma.rentalRequest.update({
+                where: { id: paidOffer.rentalRequestId },
+                data: { status: 'MATCHED', updatedAt: new Date() }
+              });
+              console.log('✅ Rental request marked as MATCHED:', paidOffer.rentalRequestId);
+
+              // Remove from request pool
+              try {
+                const requestPoolService = await import('../services/requestPoolService.js');
+                await requestPoolService.default.removeFromPool(paidOffer.rentalRequestId, 'MATCHED');
+                console.log(`✅ Removed request ${paidOffer.rentalRequestId} from pool after payment`);
+              } catch (poolError) {
+                console.error('❌ Error removing request from pool:', poolError);
+              }
+            }
+          } catch (rrErr) {
+            console.error('❌ Error updating rental request status to MATCHED:', rrErr);
+          }
+
+          // Generate contract after successful mock payment
+          try {
+            if (paidOffer?.rentalRequestId) {
+              const { generateContractForRentalRequest } = await import('./contractController.js');
+              const contract = await generateContractForRentalRequest(paidOffer.rentalRequestId);
+              console.log('✅ Contract generated after mock payment:', {
+                contractId: contract?.id,
+                contractNumber: contract?.contractNumber
+              });
+            }
+          } catch (contractErr) {
+            console.error('❌ Error generating contract after mock payment:', contractErr);
+          }
         } catch (offerUpdateError) {
           console.error('❌ Error updating offer status:', offerUpdateError);
         }

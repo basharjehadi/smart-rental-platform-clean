@@ -14,13 +14,13 @@ export const getLandlordTenants = async (req, res) => {
     // Let's test the database queries now
     console.log('🔍 Testing database queries...');
 
-    // Get all paid offers (active tenants) for this landlord
-    console.log('🔍 Looking for offers with landlordId:', landlordId, 'and status: PAID or ACCEPTED');
+    // Get all PAID offers (only show tenants after payment is completed)
+    console.log('🔍 Looking for offers with landlordId:', landlordId, 'and status: PAID');
     
     const paidOffers = await prisma.offer.findMany({
       where: {
         landlordId: landlordId,
-        status: { in: ['PAID', 'ACCEPTED'] } // Check both PAID and ACCEPTED statuses
+        status: 'PAID'
       },
       include: {
         rentalRequest: {

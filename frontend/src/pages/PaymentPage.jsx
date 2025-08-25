@@ -124,14 +124,7 @@ const PaymentPage = () => {
       await new Promise(resolve => setTimeout(resolve, 2500));
       console.log('Step 3: Confirming with landlord - completed');
       
-          console.log('Updating offer status to PAID...');
-      // Update offer status to paid with payment timestamp
-      const paymentTimestamp = new Date().toISOString();
-      const response = await api.patch(`/tenant/offer/${offer.id}`, { 
-            status: 'PAID',
-        paymentDate: paymentTimestamp
-      });
-      console.log('Offer status update response:', response.data);
+      console.log('Skipping direct offer PAID patch. Completing via mock payment endpoint...');
       
       // Create payment record for DEPOSIT_AND_FIRST_MONTH
       console.log('Creating payment record...');

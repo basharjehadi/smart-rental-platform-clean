@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { getLandlordPaymentData } from '../services/paymentService.js';
+import { getLandlordPaymentData, getLandlordMonthlyRevenue } from '../services/paymentService.js';
 
 const prisma = new PrismaClient();
 
@@ -26,39 +26,21 @@ const getLandlordDashboard = async (req, res) => {
     // Calculate portfolio metrics based on offers
     const totalProperties = properties.length;
     const totalOffers = properties.reduce((sum, property) => sum + property.offers.length, 0);
+    // Only count PAID offers as occupied; ACCEPTED does not mean paid
     const activeOffers = properties.reduce((sum, property) => 
-      sum + property.offers.filter(offer => offer.status === 'ACCEPTED' || offer.status === 'PAID').length, 0
+      sum + property.offers.filter(offer => offer.status === 'PAID').length, 0
     );
     const vacantProperties = totalProperties - activeOffers;
     const occupancyRate = totalProperties > 0 ? Math.round((activeOffers / totalProperties) * 100) : 0;
 
-    // Calculate monthly revenue from accepted offers
-    const acceptedOffers = await prisma.offer.findMany({
-      where: {
-        landlordId,
-        status: {
-          in: ['ACCEPTED', 'PAID']
-        }
-      },
-      include: {
-        property: true,
-        rentalRequest: {
-          include: {
-            tenant: true
-          }
-        }
-      }
-    });
+    // Calculate monthly revenue based on actual payments (prorated first month + rent payments)
+    const monthlyRevenue = await getLandlordMonthlyRevenue(landlordId);
 
-    const monthlyRevenue = acceptedOffers.reduce((sum, offer) => sum + (offer.rentAmount || 0), 0);
-
-    // Get recent tenants from accepted offers
+    // Get recent tenants from PAID offers
     const recentTenants = await prisma.offer.findMany({
       where: {
         landlordId,
-        status: {
-          in: ['ACCEPTED', 'PAID']
-        }
+        status: 'PAID'
       },
       include: {
         property: true,
@@ -81,7 +63,7 @@ const getLandlordDashboard = async (req, res) => {
       return {
         name: tenantName,
         property: offer.property?.title || offer.property?.name || 'Property',
-        status: offer.status === 'PAID' ? 'Paid' : 'Active'
+        status: 'Paid'
       };
     });
 
@@ -92,9 +74,7 @@ const getLandlordDashboard = async (req, res) => {
     const expiringOffers = await prisma.offer.findMany({
       where: {
         landlordId,
-        status: {
-          in: ['ACCEPTED', 'PAID']
-        },
+        status: 'PAID',
         leaseEndDate: {
           gte: new Date(),
           lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Next 30 days
@@ -172,9 +152,7 @@ const getLandlordDashboard = async (req, res) => {
     const upcomingRenewals = await prisma.offer.count({
       where: {
         landlordId,
-        status: {
-          in: ['ACCEPTED', 'PAID']
-        },
+        status: 'PAID',
         leaseEndDate: {
           gte: new Date(),
           lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Next 30 days

@@ -74,7 +74,16 @@ export const getUnifiedPaymentData = async (userId, landlordId = null) => {
     const rentPayments = await prisma.rentPayment.findMany({
       where: {
         userId: userId,
-        status: 'SUCCEEDED'
+        status: 'SUCCEEDED',
+        ...(landlordId && {
+          user: {
+            rentalRequests: {
+              some: {
+                offers: { some: { landlordId } }
+              }
+            }
+          }
+        })
       },
       include: {
         user: true
@@ -97,20 +106,74 @@ export const getUnifiedPaymentData = async (userId, landlordId = null) => {
     const allPayments = [];
 
     // Add general payments (but exclude monthly rent payments to avoid duplicates)
-    filteredGeneralPayments.forEach(payment => {
+    for (const payment of filteredGeneralPayments) {
       // Skip general payments that are for monthly rent (these are handled by RentPayment table)
-      if (payment.purpose !== 'RENT') {
-        allPayments.push({
-          description: payment.purpose === 'DEPOSIT_AND_FIRST_MONTH' ? 'Deposit & First Month' : payment.purpose,
-          month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-          date: payment.createdAt,
-          amount: payment.amount,
-          status: 'paid',
-          purpose: payment.purpose,
-          type: 'general'
-        });
+      if (payment.purpose === 'RENT') continue;
+
+      // When viewing from landlord context, split DEPOSIT_AND_FIRST_MONTH into deposit and prorated first month
+      if (landlordId && payment.purpose === 'DEPOSIT_AND_FIRST_MONTH') {
+        try {
+          // Find the paid offer for this landlord tied to this rental request
+          const relatedOffer = await prisma.offer.findFirst({
+            where: {
+              landlordId: landlordId,
+              rentalRequestId: payment.rentalRequestId || undefined,
+              status: 'PAID'
+            },
+            select: {
+              depositAmount: true,
+              rentAmount: true,
+              rentalRequest: {
+                select: { moveInDate: true }
+              }
+            }
+          });
+
+          if (relatedOffer?.rentAmount && relatedOffer?.rentalRequest?.moveInDate) {
+            const proration = calculateFirstMonthPayment(
+              relatedOffer.rentAmount,
+              relatedOffer.rentalRequest.moveInDate
+            );
+
+            // Push deposit line
+            allPayments.push({
+              description: 'Security Deposit',
+              month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+              date: payment.createdAt,
+              amount: relatedOffer.depositAmount || Math.max(payment.amount - proration.proratedAmount, 0),
+              status: 'paid',
+              purpose: 'DEPOSIT',
+              type: 'general'
+            });
+
+            // Push first month prorated line
+            allPayments.push({
+              description: 'First Month (Prorated)',
+              month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+              date: payment.createdAt,
+              amount: proration.proratedAmount,
+              status: 'paid',
+              purpose: 'RENT_FIRST_MONTH_PRORATED',
+              type: 'rent'
+            });
+            continue; // handled
+          }
+        } catch (e) {
+          // Fall through to default push if anything goes wrong
+        }
       }
-    });
+
+      // Default push for general payments
+      allPayments.push({
+        description: payment.purpose === 'DEPOSIT_AND_FIRST_MONTH' ? 'Deposit & First Month' : payment.purpose,
+        month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        date: payment.createdAt,
+        amount: payment.amount,
+        status: 'paid',
+        purpose: payment.purpose,
+        type: 'general'
+      });
+    }
 
     // Add rent payments
     rentPayments.forEach(payment => {
@@ -145,6 +208,8 @@ export const getUnifiedPaymentData = async (userId, landlordId = null) => {
               status: 'SUCCEEDED'
             }
           ],
+          // Do not count general payments with purpose 'RENT' (those are represented in rentPayment)
+          purpose: { not: 'RENT' },
           // Apply landlord filter if provided
           ...(landlordId && {
             rentalRequest: {
@@ -160,7 +225,16 @@ export const getUnifiedPaymentData = async (userId, landlordId = null) => {
       const rentTotal = await tx.rentPayment.aggregate({
         where: {
           userId: userId,
-          status: 'SUCCEEDED'
+          status: 'SUCCEEDED',
+          ...(landlordId && {
+            user: {
+              rentalRequests: {
+                some: {
+                  offers: { some: { landlordId } }
+                }
+              }
+            }
+          })
         },
         _sum: { amount: true }
       });
@@ -308,23 +382,82 @@ export const getLandlordPaymentData = async (landlordId) => {
     });
 
     // Combine and format payments for landlord dashboard
-    const allPayments = [
-      ...recentPayments.map(payment => ({
+    const allPayments = [];
+
+    for (const payment of recentPayments) {
+      const base = {
         month: new Date(payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
         collectedDate: `Collected on ${new Date(payment.createdAt).toLocaleDateString('en-US', { 
           month: 'long', 
           day: 'numeric', 
           year: 'numeric' 
         })}`,
-        amount: payment.amount,
         status: 'Complete',
-        type: 'general',
         tenant: payment.rentalRequest?.tenant?.firstName 
           ? `${payment.rentalRequest.tenant.firstName} ${payment.rentalRequest.tenant.lastName}`
           : payment.rentalRequest?.tenant?.name || 'Tenant',
         property: payment.rentalRequest?.offers?.[0]?.property?.name || 'Property'
-      })),
-      ...recentRentPayments.map(payment => ({
+      };
+
+      // Skip general payments with purpose RENT to avoid duplication (rentPayment table covers them)
+      if (payment.purpose === 'RENT') {
+        continue;
+      }
+
+      // Expand DEPOSIT_AND_FIRST_MONTH into two lines: Deposit + First Month (Prorated)
+      if (payment.purpose === 'DEPOSIT_AND_FIRST_MONTH') {
+        try {
+          const relatedOffer = await prisma.offer.findFirst({
+            where: {
+              landlordId: landlordId,
+              rentalRequestId: payment.rentalRequestId || undefined,
+              status: 'PAID'
+            },
+            select: {
+              depositAmount: true,
+              rentAmount: true,
+              rentalRequest: { select: { moveInDate: true } }
+            }
+          });
+
+          if (relatedOffer?.rentAmount && relatedOffer?.rentalRequest?.moveInDate) {
+            const proration = calculateFirstMonthPayment(
+              relatedOffer.rentAmount,
+              relatedOffer.rentalRequest.moveInDate
+            );
+
+            // Deposit line
+            allPayments.push({
+              ...base,
+              amount: relatedOffer.depositAmount || Math.max(payment.amount - proration.proratedAmount, 0),
+              type: 'general',
+              label: 'Security Deposit'
+            });
+
+            // First month prorated line
+            allPayments.push({
+              ...base,
+              amount: proration.proratedAmount,
+              type: 'rent',
+              label: 'First Month (Prorated)'
+            });
+            continue;
+          }
+        } catch (e) {
+          // Fall through to default push
+        }
+      }
+
+      // Default: push as-is
+      allPayments.push({
+        ...base,
+        amount: payment.amount,
+        type: 'general'
+      });
+    }
+
+    for (const payment of recentRentPayments) {
+      allPayments.push({
         month: new Date(payment.paidDate || payment.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
         collectedDate: `Collected on ${new Date(payment.paidDate || payment.createdAt).toLocaleDateString('en-US', { 
           month: 'long', 
@@ -337,12 +470,16 @@ export const getLandlordPaymentData = async (landlordId) => {
         tenant: payment.user?.firstName 
           ? `${payment.user.firstName} ${payment.user.lastName}`
           : payment.user?.name || 'Tenant',
-        property: 'Monthly Rent'
-      }))
-    ].sort((a, b) => new Date(b.collectedDate.replace('Collected on ', '')) - new Date(a.collectedDate.replace('Collected on ', '')));
+        property: 'Monthly Rent',
+        label: 'Monthly Rent'
+      });
+    }
 
-    // Calculate total revenue
-    const totalRevenue = allPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    // Sort by collected date desc
+    allPayments.sort((a, b) => new Date(b.collectedDate.replace('Collected on ', '')) - new Date(a.collectedDate.replace('Collected on ', '')));
+
+    // Calculate total revenue (cash-collected, includes prorated first month where applicable)
+    const totalRevenue = allPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
 
     console.log('✅ getLandlordPaymentData returning:', {
       totalPayments: allPayments.length,
@@ -357,6 +494,80 @@ export const getLandlordPaymentData = async (landlordId) => {
   } catch (error) {
     console.error('❌ Error in getLandlordPaymentData:', error);
     throw error;
+  }
+};
+
+/**
+ * Compute landlord's collected revenue for the current month.
+ * Includes:
+ *  - RentPayments paid this month for this landlord's tenants
+ *  - Prorated portion of DEPOSIT_AND_FIRST_MONTH paid this month for this landlord
+ */
+export const getLandlordMonthlyRevenue = async (landlordId) => {
+  try {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    // Sum of rent payments collected this month for this landlord's tenants
+    const rentPayments = await prisma.rentPayment.findMany({
+      where: {
+        status: 'SUCCEEDED',
+        paidDate: { gte: startOfMonth, lt: startOfNextMonth },
+        user: {
+          rentalRequests: {
+            some: {
+              offers: { some: { landlordId } }
+            }
+          }
+        }
+      },
+      select: { amount: true }
+    });
+
+    const rentCollected = rentPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+    // Prorated portion from DEPOSIT_AND_FIRST_MONTH collected this month
+    const firstMonthCombos = await prisma.payment.findMany({
+      where: {
+        status: 'SUCCEEDED',
+        purpose: 'DEPOSIT_AND_FIRST_MONTH',
+        createdAt: { gte: startOfMonth, lt: startOfNextMonth },
+        rentalRequest: {
+          offers: { some: { landlordId } }
+        }
+      },
+      select: {
+        createdAt: true,
+        amount: true,
+        rentalRequestId: true
+      }
+    });
+
+    let proratedCollected = 0;
+    for (const payment of firstMonthCombos) {
+      const offer = await prisma.offer.findFirst({
+        where: {
+          landlordId,
+          rentalRequestId: payment.rentalRequestId,
+          status: 'PAID'
+        },
+        select: {
+          rentAmount: true,
+          rentalRequest: { select: { moveInDate: true } }
+        }
+      });
+
+      if (offer?.rentAmount && offer?.rentalRequest?.moveInDate) {
+        const proration = calculateFirstMonthPayment(offer.rentAmount, offer.rentalRequest.moveInDate);
+        proratedCollected += proration.proratedAmount;
+      }
+    }
+
+    return rentCollected + proratedCollected;
+  } catch (error) {
+    console.error('❌ Error computing landlord monthly revenue:', error);
+    return 0;
   }
 };
 

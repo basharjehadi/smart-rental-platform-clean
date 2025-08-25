@@ -546,7 +546,7 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
       compressionRatio: `${pdfResult.compressionRatio}%`
     });
 
-    // Create contract record in database
+    // Create contract record in database (schema supports SIGNED/COMPLETED/EXPIRED)
     const contract = await prisma.contract.create({
       data: {
         rentalRequestId: parseInt(rentalRequestId),

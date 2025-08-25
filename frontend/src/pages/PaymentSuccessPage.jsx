@@ -659,7 +659,41 @@ const PaymentSuccessPage = () => {
               <div className="bg-white border border-gray-200 rounded-xl p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Documents</h3>
                 <div className="space-y-3">
-                  <button className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        // Prefer offerId when available from state or rentalRequest context
+                        const offerId = location.state?.offerId || rentalRequest?.offerId || null;
+                        if (offerId) {
+                          const resp = await fetch(`/api/contracts/generate-by-offer/${offerId}`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                          });
+                          const data = await resp.json();
+                          if (data?.success && data.contract?.pdfUrl) {
+                            window.open(`http://localhost:3001${data.contract.pdfUrl}`, '_blank');
+                            return;
+                          }
+                        }
+                        if (rentalRequest?.id) {
+                          const resp = await fetch(`/api/contracts/generate/${rentalRequest.id}`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                          });
+                          const data = await resp.json();
+                          if (data?.success && data.contract?.pdfUrl) {
+                            window.open(`http://localhost:3001${data.contract.pdfUrl}`, '_blank');
+                            return;
+                          }
+                        }
+                        alert('Unable to generate contract right now. Please try from your dashboard.');
+                      } catch (e) {
+                        console.error('Error opening contract from success page:', e);
+                        alert('Unable to open contract. Please try from your dashboard.');
+                      }
+                    }}
+                    className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2"
+                  >
                     <FileText className="w-4 h-4" />
                     <span>View Rental Contract</span>
                   </button>

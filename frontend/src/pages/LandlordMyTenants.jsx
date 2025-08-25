@@ -132,9 +132,35 @@ const LandlordMyTenants = () => {
     navigate(`/landlord-tenant-profile/${tenantId}`);
   };
 
-  const handleViewContract = (tenantId) => {
-    // For now, navigate to tenant profile where contract viewing is available
-    navigate(`/landlord-tenant-profile/${tenantId}`);
+  const handleViewContract = async (tenantId) => {
+    try {
+      const t = tenants.find(x => x.id === tenantId);
+      if (!t?.rentalRequestId) {
+        alert('No rental request found to view contract.');
+        return;
+      }
+
+      // 1) Try open existing contract
+      const contractsResp = await api.get('/contracts/landlord-contracts');
+      const existing = contractsResp.data.contracts?.find(c => c.rentalRequest?.id === t.rentalRequestId);
+      if (existing?.pdfUrl && existing.pdfUrl !== 'null') {
+        window.open(`http://localhost:3001${existing.pdfUrl}`, '_blank');
+        return;
+      }
+
+      // 2) Generate on-the-fly
+      const genResp = await api.post(`/contracts/generate/${t.rentalRequestId}`);
+      if (genResp.data?.success && genResp.data.contract?.pdfUrl) {
+        window.open(`http://localhost:3001${genResp.data.contract.pdfUrl}`, '_blank');
+        return;
+      }
+
+      // 3) Fallback: go to tenant profile
+      navigate(`/landlord-tenant-profile/${tenantId}`);
+    } catch (e) {
+      console.error('Error opening contract from My Tenants:', e);
+      navigate(`/landlord-tenant-profile/${tenantId}`);
+    }
   };
 
   const handleSendMessage = (tenantId) => {

@@ -262,7 +262,7 @@ const LandlordDashboard = () => {
               <div className="flex-1">
                 <p className="text-sm font-medium text-gray-900">{payment.tenant || 'Tenant'}</p>
                 <p className="text-xs text-gray-500">{payment.collectedDate || 'Date'}</p>
-                <p className="text-xs text-blue-600">{payment.type === 'rent' ? 'Monthly Rent' : payment.type}</p>
+                <p className="text-xs text-blue-600">{payment.label || (payment.type === 'rent' ? 'Monthly Rent' : (payment.type === 'general' ? 'Security Deposit' : payment.type))}</p>
               </div>
               <div className="text-right">
                 <p className="text-sm font-semibold text-green-600">{payment.amount || '0 zł'}</p>

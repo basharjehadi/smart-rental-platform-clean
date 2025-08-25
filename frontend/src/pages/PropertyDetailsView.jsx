@@ -427,6 +427,11 @@ const PropertyDetailsView = () => {
                   <Shield className="w-4 h-4" />
                   <span className="font-medium">✅ Paid & Secured</span>
                 </div>
+              ) : offer?.status === 'ACCEPTED' ? (
+                <div className="flex items-center space-x-2 text-sm text-blue-600">
+                  <Shield className="w-4 h-4" />
+                  <span className="font-medium">✅ Offer Accepted - Complete Payment</span>
+                </div>
               ) : (
                 <>
                   <div className="flex items-center space-x-2 text-sm text-blue-600">
@@ -981,6 +986,36 @@ const PropertyDetailsView = () => {
                   className="btn-success"
                 >
                   Go to Dashboard
+                </button>
+                <button
+                  onClick={() => navigate('/my-offers')}
+                  className="btn-secondary"
+                >
+                  Back to Offers
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : offer?.status === 'ACCEPTED' ? (
+          <div className="fixed bottom-0 left-0 right-0 bg-blue-50 border-t border-blue-200 p-4">
+            <div className="flex items-center justify-between max-w-7xl mx-auto">
+              <div className="flex items-center text-blue-800">
+                <Shield className="w-5 h-5 mr-2" />
+                <span className="text-sm font-medium">
+                  ✅ Offer Accepted! Complete your payment to secure this property.
+                </span>
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => navigate(`/payment/${offerId}`, { 
+                    state: { 
+                      offer: offer,
+                      fromPropertyDetails: true 
+                    } 
+                  })}
+                  className="btn-success"
+                >
+                  Proceed to Payment
                 </button>
                 <button
                   onClick={() => navigate('/my-offers')}

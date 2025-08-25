@@ -1470,6 +1470,12 @@ const updateTenantOfferStatus = async (req, res) => {
         note: 'Your rental request remains active in the pool for other landlords to consider.'
         });
     } else if (status === 'PAID') {
+      // Block direct PAID status updates unless explicitly allowed for dev/manual flows
+      if (process.env.ALLOW_MANUAL_PAID !== 'true') {
+        return res.status(400).json({
+          error: 'Direct PAID status update is disabled. Complete payment via /api/payments endpoints.'
+        });
+      }
       // 🔧 DEV/Mock payment path: mark offer as PAID and perform all side effects
       const result = await prisma.$transaction(async (tx) => {
         // Update offer to PAID with payment timestamp
