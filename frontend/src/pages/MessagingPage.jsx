@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useRef } from 'react';
 import Chat from '../components/chat/Chat';
 import { ArrowLeft } from 'lucide-react';
 
@@ -19,7 +20,8 @@ const useConversationRefresh = (selectedConversationId) => {
 };
 
 const MessagingPage = () => {
-  const { user } = useAuth();
+  const { user, api } = useAuth();
+  const creatingRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { conversationId } = useParams();
@@ -64,6 +66,24 @@ const MessagingPage = () => {
       console.log('✅ Setting selected conversation from query param:', conversationIdParam);
       // Handle conversation ID from query parameter (fallback)
       setSelectedConversationId(conversationIdParam);
+    } else if (conversationIdParam === 'new' && propertyId) {
+      // Auto-create or fetch conversation by property, then select it
+      (async () => {
+        try {
+          if (creatingRef.current) return;
+          creatingRef.current = true;
+          console.log('🔧 Creating/finding conversation by property (once):', propertyId);
+          const res = await api.post(`/messaging/conversations/by-property/${propertyId}`);
+          const convId = res?.conversationId || res?.data?.conversationId;
+          if (convId) {
+            setSelectedConversationId(convId);
+          }
+        } catch (e) {
+          console.error('Failed to create conversation by property:', e);
+        } finally {
+          creatingRef.current = false;
+        }
+      })();
     } else {
       console.log('⚠️ No conversation parameters found');
     }

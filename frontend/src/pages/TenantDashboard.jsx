@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
@@ -14,6 +14,7 @@ const TenantDashboard = () => {
   const navigate = useNavigate();
   
   const { markByTypeAsRead } = useNotifications();
+  const didMarkReadRef = useRef(false);
   const [requests, setRequests] = useState([]);
   const [profileData, setProfileData] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -191,18 +192,21 @@ const TenantDashboard = () => {
     if (user) {
       console.log('✅ Dashboard: User is authenticated, fetching requests...');
       fetchRequests();
-      // Mark rental request notifications as read and refresh global badges
-      (async () => {
-        try {
-          await markByTypeAsRead('NEW_RENTAL_REQUEST');
-          try { window.dispatchEvent(new Event('notif-unread-refresh')); } catch {}
-        } catch {}
-      })();
+      // Mark rental request notifications as read once per mount
+      if (!didMarkReadRef.current) {
+        didMarkReadRef.current = true;
+        (async () => {
+          try {
+            await markByTypeAsRead('NEW_RENTAL_REQUEST');
+            try { window.dispatchEvent(new Event('notif-unread-refresh')); } catch {}
+          } catch {}
+        })();
+      }
     } else {
       console.log('❌ Dashboard: No user found, not fetching requests');
       setLoading(false);
     }
-  }, [user, markByTypeAsRead]);
+  }, [user]);
 
   // Separate useEffect for profile data fetching (like other working pages)
   useEffect(() => {

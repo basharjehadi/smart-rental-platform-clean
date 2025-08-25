@@ -472,12 +472,26 @@ export const getUpcomingPayments = async (userId) => {
     
     const monthlyRent = activeLease.rentAmount;
 
-    // First month: prorated from move-in date to end of month
+    // Determine if combined payment (deposit + first month) already exists for this lease
+    const combinedFirstMonthPayment = await prisma.payment.findFirst({
+      where: {
+        userId: userId,
+        status: 'SUCCEEDED',
+        purpose: 'DEPOSIT_AND_FIRST_MONTH',
+        OR: [
+          { offerId: activeLease.id },
+          { rentalRequestId: activeLease.rentalRequestId }
+        ]
+      }
+    });
+    const hasCombinedFirstMonth = !!combinedFirstMonthPayment;
+
+    // First month: prorated from move-in date to end of month (skip if combined payment already covers it)
     const firstMonthStart = new Date(startDate);
     const firstMonthEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0); // Last day of first month
     
     const firstMonthKey = `${firstMonthStart.getMonth() + 1}-${firstMonthStart.getFullYear()}`;
-    if (!paidMonths.has(firstMonthKey)) {
+    if (!paidMonths.has(firstMonthKey) && !hasCombinedFirstMonth) {
       const firstMonthAmount = calculateProratedRent(monthlyRent, firstMonthStart, firstMonthEnd);
       const firstMonthDueDate = new Date(startDate);
       firstMonthDueDate.setDate(10); // Due on 10th of move-in month (gives time to settle in)

@@ -142,6 +142,19 @@ const completeMockPayment = async (req, res) => {
     // Handle DEPOSIT_AND_FIRST_MONTH payments (deposit + first month)
     if (purpose === 'DEPOSIT_AND_FIRST_MONTH') {
       console.log('🔍 Processing DEPOSIT_AND_FIRST_MONTH payment...');
+      // Idempotency: avoid duplicate records if this endpoint is hit multiple times
+      const existing = await prisma.payment.findFirst({
+        where: {
+          userId: userId,
+          purpose: 'DEPOSIT_AND_FIRST_MONTH',
+          status: 'SUCCEEDED',
+          offerId: offerId || undefined
+        }
+      });
+      if (existing) {
+        console.log('ℹ️ Existing DEPOSIT_AND_FIRST_MONTH payment found, returning existing.');
+        return res.json({ success: true, message: 'Payment already recorded', payment: existing });
+      }
       
       // Create the main payment record with offerId for chat system
       const depositPayment = await prisma.payment.create({

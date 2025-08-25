@@ -124,10 +124,10 @@ const Chat: React.FC<ChatProps> = ({
   // Handle sending messages
   const handleSendMessage = async (content: string, file?: File) => {
     if (!content.trim() && !file) return;
-    
+
     try {
       // Simple hook: only supports text messages
-      sendMessage(content);
+        sendMessage(content);
     } catch (error) {
       console.error('Error sending message:', error);
     }
@@ -288,7 +288,7 @@ const Chat: React.FC<ChatProps> = ({
       {showPropertyPanel && ((activeConversation && activeConversation.property) || selectedConversationId) ? (
         <div className="w-80 border-l border-gray-200 bg-white">
           <div className="p-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Property</h3>
               <button 
                 onClick={() => setShowPropertyPanel(false)}

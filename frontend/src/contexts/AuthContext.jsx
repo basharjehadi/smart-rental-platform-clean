@@ -31,15 +31,16 @@ export const AuthProvider = ({ children }) => {
       const data = await res.json();
       return { data, ...data, status: res.status };
     },
-    post: async (url, body) => {
+    post: async (url, body, options = {}) => {
       const token = localStorage.getItem('token');
+      const isForm = (typeof FormData !== 'undefined') && body instanceof FormData;
+      const headers = isForm
+        ? { 'Authorization': `Bearer ${token}` }
+        : { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
       const res = await fetch(`${API_BASE}${url}`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
+        headers: { ...headers, ...(options.headers || {}) },
+        body: isForm ? body : JSON.stringify(body)
       });
       if (!res.ok) throw new Error(`POST ${url} failed: ${res.status}`);
       const data = await res.json();
@@ -56,6 +57,20 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify(body)
       });
       if (!res.ok) throw new Error(`PUT ${url} failed: ${res.status}`);
+      const data = await res.json().catch(() => ({}));
+      return { data, ...data, status: res.status };
+    },
+    patch: async (url, body) => {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}${url}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error(`PATCH ${url} failed: ${res.status}`);
       const data = await res.json().catch(() => ({}));
       return { data, ...data, status: res.status };
     },

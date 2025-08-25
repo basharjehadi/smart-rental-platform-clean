@@ -12,7 +12,8 @@ import {
   AlertTriangle,
   Download,
   Mail,
-  Home
+  Home,
+  Copy
 } from 'lucide-react';
 
 const PaymentSuccessPage = () => {

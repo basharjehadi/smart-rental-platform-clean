@@ -1508,19 +1508,30 @@ const updateTenantOfferStatus = async (req, res) => {
 
         const amountTotal = (updatedOffer.depositAmount || 0) + (proratedFirstMonth || 0);
 
-        // Create a successful general payment (deposit + prorated first month)
-        const payment = await tx.payment.create({
-          data: {
-            amount: amountTotal,
-            status: 'SUCCEEDED',
-            purpose: 'DEPOSIT_AND_FIRST_MONTH',
-            gateway: 'STRIPE',
+        // Create a successful general payment (deposit + prorated first month) - idempotent
+        const existingCombined = await tx.payment.findFirst({
+          where: {
             userId: req.user.id,
-            rentalRequestId: updatedOffer.rentalRequestId,
-            paymentIntentId: `mock_${Date.now()}_${updatedOffer.id}`,
-            createdAt: paidAt
+            purpose: 'DEPOSIT_AND_FIRST_MONTH',
+            status: 'SUCCEEDED',
+            offerId: updatedOffer.id
           }
         });
+        if (!existingCombined) {
+          await tx.payment.create({
+            data: {
+              amount: amountTotal,
+              status: 'SUCCEEDED',
+              purpose: 'DEPOSIT_AND_FIRST_MONTH',
+              gateway: 'STRIPE',
+              userId: req.user.id,
+              rentalRequestId: updatedOffer.rentalRequestId,
+              offerId: updatedOffer.id,
+              paymentIntentId: `mock_${Date.now()}_${updatedOffer.id}`,
+              createdAt: paidAt
+            }
+          });
+        }
 
         // Note: We don't create a separate RentPayment record for the first month
         // because it's already included in the combined DEPOSIT_AND_FIRST_MONTH payment above.

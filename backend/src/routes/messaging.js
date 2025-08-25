@@ -314,7 +314,20 @@ router.post('/conversations/:conversationId/messages', verifyToken, upload.singl
       const io = req.app.get('io');
       if (io) {
         const messageWithConversationId = { ...message, conversationId };
+        // 1) Emit to conversation room (participants who already joined the room)
         io.to(`conversation-${conversationId}`).emit('new-message', messageWithConversationId);
+
+        // 2) Emit to each participant's personal room to update global badges
+        const participants = await prisma.conversationParticipant.findMany({
+          where: { conversationId },
+          select: { userId: true }
+        });
+        const recipientIds = participants
+          .map(p => p.userId)
+          .filter(id => id !== req.user.id);
+        recipientIds.forEach(id => {
+          io.to(`user-${id}`).emit('new-message', messageWithConversationId);
+        });
       }
     } catch (_) {}
 
@@ -668,6 +681,8 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
     let hasAccess = false;
     let counterpartUserId = null;
     let property = null;
+    // Declare payment in outer scope so optional chaining later does not throw ReferenceError
+    let payment = null;
 
     if (req.user.role === 'TENANT') {
       console.log('🔍 Checking tenant access for property:', propertyId);
@@ -704,7 +719,7 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
       
       // Check if tenant has paid for this property
       // Primary path: find a payment that joins through offer -> property
-      let payment = await prisma.payment.findFirst({
+      payment = await prisma.payment.findFirst({
         where: {
           userId: userId,
           status: 'SUCCEEDED',
@@ -862,6 +877,15 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
           }
         });
         console.log('✅ Updated conversation with offerId:', conversation.offerId);
+      }
+      // Ensure conversation is ACTIVE after payment
+      if (conversation.status !== 'ACTIVE') {
+        conversation = await prisma.conversation.update({
+          where: { id: conversation.id },
+          data: { status: 'ACTIVE' },
+          include: { participants: true, offer: true }
+        });
+        console.log('✅ Updated conversation status to ACTIVE');
       }
     } else {
       console.log('🔍 Creating new conversation...');

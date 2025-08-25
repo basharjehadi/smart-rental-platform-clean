@@ -291,11 +291,8 @@ const LandlordAddProperty = () => {
           console.log(`${key}:`, value);
         }
         
-        const response = await api.post('/properties', submitData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        });
+        // Send FormData without manually setting Content-Type so the browser adds the boundary
+        const response = await api.post('/properties', submitData);
         
         if (response.data.success) {
           navigate('/landlord-my-property');
