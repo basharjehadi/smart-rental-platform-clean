@@ -5,6 +5,28 @@ import { prisma } from '../utils/prisma.js';
  */
 
 /**
+ * Calculate what the first month payment should have been (prorated)
+ * @param {number} monthlyRent - Full monthly rent amount
+ * @param {Date} moveInDate - Tenant's move-in date
+ * @returns {Object} First month payment details
+ */
+const calculateFirstMonthPayment = (monthlyRent, moveInDate) => {
+  const startDate = new Date(moveInDate);
+  const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0); // Last day of first month
+  
+  const daysInFirstMonth = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+  const proratedAmount = Math.round((monthlyRent * daysInFirstMonth) / 30);
+  
+  return {
+    daysInFirstMonth,
+    proratedAmount,
+    fullMonthAmount: monthlyRent,
+    startDate: startDate,
+    endDate: endDate
+  };
+};
+
+/**
  * Get unified payment data for a tenant
  * @param {string} userId - Tenant ID
  * @param {string} landlordId - Optional landlord ID for filtering
@@ -157,6 +179,47 @@ export const getUnifiedPaymentData = async (userId, landlordId = null) => {
       }
     });
 
+    // Calculate proration analysis for first month
+    let prorationAnalysis = null;
+    if (filteredGeneralPayments.length > 0) {
+      const firstMonthPayment = filteredGeneralPayments.find(p => p.purpose === 'DEPOSIT_AND_FIRST_MONTH');
+      if (firstMonthPayment) {
+        // Get tenant's lease details for proration calculation
+        const tenantLease = await prisma.offer.findFirst({
+          where: {
+            rentalRequest: {
+              tenantId: userId
+            },
+            status: 'PAID'
+          },
+          select: {
+            rentAmount: true,
+            rentalRequest: {
+              select: {
+                moveInDate: true
+              }
+            }
+          }
+        });
+
+        if (tenantLease) {
+          const prorationDetails = calculateFirstMonthPayment(
+            tenantLease.rentAmount,
+            tenantLease.rentalRequest.moveInDate
+          );
+          
+          prorationAnalysis = {
+            actualPaid: firstMonthPayment.amount,
+            shouldHaveBeen: prorationDetails.proratedAmount,
+            difference: firstMonthPayment.amount - prorationDetails.proratedAmount,
+            daysInFirstMonth: prorationDetails.daysInFirstMonth,
+            moveInDate: tenantLease.rentalRequest.moveInDate,
+            isCorrectlyProrated: Math.abs(firstMonthPayment.amount - prorationDetails.proratedAmount) < 100 // Allow small rounding differences
+          };
+        }
+      }
+    }
+
     console.log('✅ getUnifiedPaymentData returning:', {
       totalPayments: allPayments.length,
       totalPaid: totalPaid,
@@ -164,7 +227,8 @@ export const getUnifiedPaymentData = async (userId, landlordId = null) => {
       onTimePayments: onTimePayments,
       landlordId: landlordId,
       generalPaymentsCount: filteredGeneralPayments.length,
-      rentPaymentsCount: rentPayments.length
+      rentPaymentsCount: rentPayments.length,
+      prorationAnalysis: prorationAnalysis
     });
 
     return {
@@ -173,7 +237,8 @@ export const getUnifiedPaymentData = async (userId, landlordId = null) => {
       paymentStatus: paymentStatus,
       onTimePayments: onTimePayments,
       generalPayments: filteredGeneralPayments,
-      rentPayments: rentPayments
+      rentPayments: rentPayments,
+      prorationAnalysis: prorationAnalysis
     };
   } catch (error) {
     console.error('❌ Error in getUnifiedPaymentData:', error);
@@ -331,6 +396,26 @@ export const getPaymentStatus = async (userId) => {
 };
 
 /**
+ * Calculate prorated rent amount for partial months
+ * @param {number} monthlyRent - Full monthly rent amount
+ * @param {Date} startDate - Start date of the period
+ * @param {Date} endDate - End date of the period
+ * @returns {number} Prorated amount
+ */
+const calculateProratedRent = (monthlyRent, startDate, endDate) => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // Calculate days in the period
+  const daysInPeriod = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  
+  // Calculate prorated amount (30-day month basis)
+  const proratedAmount = Math.round((monthlyRent * daysInPeriod) / 30);
+  
+  return proratedAmount;
+};
+
+/**
  * Get upcoming payments for a tenant
  * @param {string} userId - Tenant ID
  * @returns {Array} Upcoming payments
@@ -374,9 +459,42 @@ export const getUpcomingPayments = async (userId) => {
 
     const upcoming = [];
     const startDate = new Date(activeLease.rentalRequest.moveInDate);
-    const endDate = activeLease.leaseEndDate ? new Date(activeLease.leaseEndDate) : new Date(startDate.getFullYear() + 1, startDate.getMonth(), startDate.getDate());
+    
+    // Calculate lease end date if not available
+    let endDate;
+    if (activeLease.leaseEndDate) {
+      endDate = new Date(activeLease.leaseEndDate);
+    } else {
+      // Fallback: calculate end date from start date + lease duration
+      endDate = new Date(startDate);
+      endDate.setMonth(endDate.getMonth() + (activeLease.leaseDuration || 12));
+    }
+    
     const monthlyRent = activeLease.rentAmount;
 
+    // First month: prorated from move-in date to end of month
+    const firstMonthStart = new Date(startDate);
+    const firstMonthEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0); // Last day of first month
+    
+    const firstMonthKey = `${firstMonthStart.getMonth() + 1}-${firstMonthStart.getFullYear()}`;
+    if (!paidMonths.has(firstMonthKey)) {
+      const firstMonthAmount = calculateProratedRent(monthlyRent, firstMonthStart, firstMonthEnd);
+      const firstMonthDueDate = new Date(startDate);
+      firstMonthDueDate.setDate(10); // Due on 10th of move-in month (gives time to settle in)
+      
+      upcoming.push({
+        month: firstMonthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        dueDate: firstMonthDueDate,
+        amount: firstMonthAmount,
+        status: 'PENDING',
+        type: 'monthly_rent',
+        description: 'First Month (Prorated)',
+        isFirstMonth: true,
+        daysInPeriod: Math.ceil((firstMonthEnd - firstMonthStart) / (1000 * 60 * 60 * 24)) + 1
+      });
+    }
+
+    // Regular months: Full monthly rent
     let currentDate = new Date(startDate);
     currentDate.setMonth(currentDate.getMonth() + 1);
     currentDate.setDate(1);
@@ -394,9 +512,19 @@ export const getUpcomingPayments = async (userId) => {
         let description = 'Monthly Rent';
 
         if (isLastMonth) {
-          const daysInLastMonth = endDate.getDate();
-          amount = Math.round((monthlyRent * daysInLastMonth) / 30);
-          description = 'Final Month (Prorated)';
+          // Last month: prorated from 1st to lease end date
+          const lastMonthStart = new Date(currentDate);
+          const lastMonthEnd = new Date(endDate);
+          
+          // Calculate exact days for final month (September 1-8 = 8 days)
+          const finalMonthDays = Math.ceil((lastMonthEnd - lastMonthStart) / (1000 * 60 * 60 * 24)) + 1;
+          
+          amount = calculateProratedRent(monthlyRent, lastMonthStart, lastMonthEnd);
+          description = `Final Month (Prorated) - ${finalMonthDays} days`;
+          
+          // Final month payment should be due on the 1st, not the 10th
+          // This gives tenant time to pay before moving out
+          dueDate.setDate(1);
         }
 
         upcoming.push({

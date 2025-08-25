@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
 
 const AuthContext = createContext();
 
@@ -12,77 +11,115 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  // console.log('AuthProvider is rendering');
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState(localStorage.getItem('token'));
 
-  // Initialize axios with base URL
-  const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
-    withCredentials: true,
-  });
-
-  // Add request interceptor to include token
-  api.interceptors.request.use(
-    (config) => {
+  // Minimal API wrapper returning axios-like shape for compatibility
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+  const api = {
+    baseURL: API_BASE,
+    get: async (url) => {
       const token = localStorage.getItem('token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
+      const res = await fetch(`${API_BASE}${url}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
+      const data = await res.json();
+      return { data, ...data, status: res.status };
     },
-    (error) => {
-      return Promise.reject(error);
+    post: async (url, body) => {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}${url}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error(`POST ${url} failed: ${res.status}`);
+      const data = await res.json();
+      return { data, ...data, status: res.status };
+    },
+    put: async (url, body) => {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}${url}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error(`PUT ${url} failed: ${res.status}`);
+      const data = await res.json().catch(() => ({}));
+      return { data, ...data, status: res.status };
+    },
+    delete: async (url) => {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}${url}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!res.ok) throw new Error(`DELETE ${url} failed: ${res.status}`);
+      const data = await res.json().catch(() => ({}));
+      return { data, ...data, status: res.status };
     }
-  );
-
-  // Add response interceptor to handle token expiration
-  api.interceptors.response.use(
-    (response) => response,
-    (error) => {
-      if (error.response?.status === 401) {
-        logout();
-      }
-      return Promise.reject(error);
-    }
-  );
+  };
 
   // Check if user is logged in on app start
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      // Verify token by calling /me endpoint
-      api.get('/auth/me')
-        .then(response => {
-          setUser(response.data.user);
-        })
-        .catch(() => {
+    const checkAuth = async () => {
+      const currentToken = localStorage.getItem('token');
+      console.log('🔍 AuthContext useEffect - Token exists:', !!currentToken);
+      
+      if (currentToken) {
+        setToken(currentToken);
+        console.log('🔍 Calling /auth/me endpoint...');
+        
+        try {
+          const response = await api.get('/auth/me');
+          console.log('✅ /auth/me response:', response);
+          setUser(response.user);
+        } catch (error) {
+          console.error('❌ /auth/me failed:', error);
           localStorage.removeItem('token');
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    } else {
+          setToken(null);
+        }
+      } else {
+        setToken(null);
+      }
+      
       setLoading(false);
-    }
+    };
+
+    checkAuth();
   }, []);
 
   const login = async (email, password) => {
     try {
       console.log('Attempting login with:', { email });
       const response = await api.post('/auth/login', { email, password });
-      console.log('Login response:', response.data);
-      const { token, user } = response.data;
+      console.log('Login response:', response);
+      const { token: newToken, user } = response;
       
-      localStorage.setItem('token', token);
+      localStorage.setItem('token', newToken);
+      setToken(newToken);
       setUser(user);
       
       return { success: true };
     } catch (error) {
-      console.error('Login error:', error.response?.data || error.message);
+      console.error('Login error:', error);
       return { 
         success: false, 
-        error: error.response?.data?.error || 'Login failed' 
+        error: error.message || 'Login failed' 
       };
     }
   };
@@ -91,19 +128,20 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('Attempting login with token');
       localStorage.setItem('token', token);
+      setToken(token);
       
-      // Verify token by calling /me endpoint
       const response = await api.get('/auth/me');
-      console.log('Token verification response:', response.data);
-      setUser(response.data.user);
+      console.log('Token verification response:', response);
+      setUser(response.user);
       
       return { success: true };
     } catch (error) {
-      console.error('Token login error:', error.response?.data || error.message);
+      console.error('Token login error:', error);
       localStorage.removeItem('token');
+      setToken(null);
       return { 
         success: false, 
-        error: error.response?.data?.error || 'Token login failed' 
+        error: error.message || 'Token login failed' 
       };
     }
   };
@@ -117,24 +155,26 @@ export const AuthProvider = ({ children }) => {
         password, 
         role 
       });
-      console.log('Registration response:', response.data);
-      const { token, user } = response.data;
+      console.log('Registration response:', response);
+      const { token: newToken, user } = response;
       
-      localStorage.setItem('token', token);
+      localStorage.setItem('token', newToken);
+      setToken(newToken);
       setUser(user);
       
       return { success: true };
     } catch (error) {
-      console.error('Registration error:', error.response?.data || error.message);
+      console.error('Registration error:', error);
       return { 
         success: false, 
-        error: error.response?.data?.error || 'Registration failed' 
+        error: error.message || 'Registration failed' 
       };
     }
   };
 
   const logout = () => {
     localStorage.removeItem('token');
+    setToken(null);
     setUser(null);
   };
 
@@ -145,7 +185,8 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     api,
-    loading
+    loading,
+    token
   };
 
   return (

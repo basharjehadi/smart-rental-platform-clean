@@ -127,9 +127,8 @@ class RequestPoolService {
           lte: maxBudget != null ? Math.round(maxBudget * 1.2) : 9999999,
           ...(minBudget != null ? { gte: minBudget } : {})
         },
-        ...(rentalRequest.propertyType ? { propertyType: { contains: rentalRequest.propertyType, mode: 'insensitive' } } : {}),
-        ...(reqBeds != null ? { bedrooms: { gte: Math.max(1, reqBeds - 1), lte: reqBeds + 1 } } : {}),
-        ...(hasMoveIn ? { availableFrom: { lte: availableCutoff } } : {})
+        // Soft-match propertyType and bedrooms in scoring only; don't exclude at query time
+        ...(hasMoveIn ? { OR: [ { availableFrom: { lte: availableCutoff } }, { availableFrom: null } ] } : {})
       };
 
       let props = await prisma.property.findMany({
@@ -159,7 +158,7 @@ class RequestPoolService {
             ].filter(Boolean)
           } : {}),
           monthlyRent: { lte: maxBudget != null ? Math.round(maxBudget * 2.0) : 9999999, ...(minBudget != null ? { gte: minBudget } : {}) },
-          ...(hasMoveIn ? { availableFrom: { lte: availableCutoff } } : {})
+          ...(hasMoveIn ? { OR: [ { availableFrom: { lte: availableCutoff } }, { availableFrom: null } ] } : {})
         };
         props = await prisma.property.findMany({ where: relaxedWhere, select: whereSelect(), take: 200 });
       }

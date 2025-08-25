@@ -383,7 +383,12 @@ const PaymentHistory = () => {
                           }`}>
                             Due on {formatDate(payment.dueDate)}
                             {payment.isLastMonth && (
-                              <span className="ml-1 text-blue-600">(Final month - 16 days)</span>
+                              <span className="ml-1 text-blue-600">
+                                {payment.description.includes('days') 
+                                  ? `(${payment.description.split(' - ')[1]})`
+                                  : '(Final month)'
+                                }
+                              </span>
                             )}
                             {isOverdue(payment.dueDate) && ' (Overdue)'}
                           </p>

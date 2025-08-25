@@ -105,18 +105,16 @@ const createRentalRequest = async (req, res) => {
         }
       });
 
-      // 🚀 SCALABILITY: Add to request pool asynchronously
-      setImmediate(async () => {
-        try {
-          const matchCount = await requestPoolService.addToPool(rentalRequest);
-          console.log(`🏊 Request ${rentalRequest.id} added to pool with ${matchCount} matches`);
-        } catch (error) {
-          console.error('❌ Error adding request to pool:', error);
-        }
-      });
-
       return rentalRequest;
     });
+
+    // 🚀 Run matching OUTSIDE the transaction to avoid cross-client conflicts
+    try {
+      const matchCount = await requestPoolService.addToPool(result);
+      console.log(`🏊 Request ${result.id} added to pool with ${matchCount} matches`);
+    } catch (error) {
+      console.error('❌ Error adding request to pool (post-tx):', error);
+    }
 
     res.status(201).json({
       message: 'Rental request created successfully and added to request pool.',
@@ -1494,9 +1492,24 @@ const updateTenantOfferStatus = async (req, res) => {
           }
         });
 
-        // Create a successful payment record (combined deposit + first month)
-        const amountTotal = (updatedOffer.rentAmount || 0) + (updatedOffer.depositAmount || 0);
-        await tx.payment.create({
+        // Compute prorated first-month amount based on move-in date
+        const reqRecord = await tx.rentalRequest.findUnique({
+          where: { id: updatedOffer.rentalRequestId },
+          select: { moveInDate: true, tenantId: true }
+        });
+
+        const moveInDate = reqRecord?.moveInDate ? new Date(reqRecord.moveInDate) : null;
+        let proratedFirstMonth = Number(updatedOffer.rentAmount) || 0;
+        if (moveInDate && Number.isFinite(proratedFirstMonth)) {
+          const endOfMonth = new Date(moveInDate.getFullYear(), moveInDate.getMonth() + 1, 0);
+          const days = Math.ceil((endOfMonth - moveInDate) / 86400000) + 1; // inclusive
+          proratedFirstMonth = Math.round((proratedFirstMonth * days) / 30);
+        }
+
+        const amountTotal = (updatedOffer.depositAmount || 0) + (proratedFirstMonth || 0);
+
+        // Create a successful general payment (deposit + prorated first month)
+        const payment = await tx.payment.create({
           data: {
             amount: amountTotal,
             status: 'SUCCEEDED',
@@ -1508,6 +1521,11 @@ const updateTenantOfferStatus = async (req, res) => {
             createdAt: paidAt
           }
         });
+
+        // Note: We don't create a separate RentPayment record for the first month
+        // because it's already included in the combined DEPOSIT_AND_FIRST_MONTH payment above.
+        // The first month's rent is covered by the prorated amount in the total payment.
+        // Future monthly payments will create RentPayment records as needed.
 
         // Invalidate all other offers for the same property (first-to-pay wins)
         if (updatedOffer.propertyId) {

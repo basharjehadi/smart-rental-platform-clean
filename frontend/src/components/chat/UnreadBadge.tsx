@@ -15,7 +15,7 @@ const UnreadBadge: React.FC<UnreadBadgeProps> = ({ conversationId, className = '
         const token = localStorage.getItem('token');
         if (!token) return;
 
-        const response = await fetch('/api/messaging/unread-count', {
+        const response = await fetch('http://localhost:3001/api/messaging/conversations/unread-count', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'

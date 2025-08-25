@@ -36,10 +36,20 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       return;
     }
 
-    // Create socket connection
+    // Avoid creating a new socket if an identical one already exists
+    if (socket && socket.connected) {
+      return;
+    }
+
+    // Create socket connection with conservative reconnection strategy
     const newSocket = io('http://localhost:3001', {
       auth: { token },
-      transports: ['websocket', 'polling']
+      transports: ['websocket'], // force websocket, avoid polling churn
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 5000,
+      timeout: 10000,
     });
 
     // Connection events
@@ -54,7 +64,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     });
 
     newSocket.on('connect_error', (error) => {
-      console.error('🔌 Socket connection error:', error);
+      console.error('🔌 Socket connection error:', error.message || error);
       setIsConnected(false);
     });
 

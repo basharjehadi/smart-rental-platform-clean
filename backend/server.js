@@ -17,8 +17,9 @@ import adminRoutes from './src/routes/adminRoutes.js';
 import landlordProfileRoutes from './src/routes/landlordProfileRoutes.js';
 import propertyRoutes from './src/routes/propertyRoutes.js';
 import tenantDashboardRoutes from './src/routes/tenantDashboardRoutes.js';
+import messagingRoutes from './src/routes/messaging.js';
 import prisma from './src/utils/prisma.js';
-import { dailyRentCheck } from './src/controllers/cronController.js';
+// import { dailyRentCheck } from './src/controllers/cronController.js';
 import { startContractMonitoring, stopContractMonitoring } from './src/controllers/contractController.js';
 import { errorHandler, notFoundHandler } from './src/middlewares/errorHandler.js';
 
@@ -146,6 +147,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/landlord-profile', landlordProfileRoutes);
 app.use('/api', propertyRoutes);
 app.use('/api/tenant-dashboard', tenantDashboardRoutes);
+app.use('/api/messaging', messagingRoutes);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -179,13 +181,13 @@ app.use(errorHandler);
 // Initialize cron jobs
 const initializeCronJobs = () => {
   // Daily rent check - runs at 9:00 AM every day
-  cron.schedule('0 9 * * *', async () => {
-    console.log('🕐 Running daily rent check cron job...');
-    await dailyRentCheck();
-  }, {
-    scheduled: true,
-    timezone: "Europe/Warsaw"
-  });
+  // cron.schedule('0 9 * * *', async () => {
+  //   console.log('🕐 Running daily rent check cron job...');
+  //   await dailyRentCheck();
+  // }, {
+  //   scheduled: true,
+  //   timezone: "Europe/Warsaw"
+  // });
 
   console.log('⏰ Cron jobs initialized:');
   console.log('   Daily rent check: 9:00 AM (Europe/Warsaw)');

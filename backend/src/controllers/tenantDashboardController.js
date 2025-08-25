@@ -404,10 +404,10 @@ export const getTenantPaymentHistory = async (req, res) => {
       }
     });
 
-          let upcomingPayments = [];
-      if (activeLease) {
+    let upcomingPayments = [];
+    if (activeLease) {
         upcomingPayments = await getUpcomingPayments(tenantId);
-      }
+    }
 
     res.json({
       payments: pastPayments,
@@ -459,26 +459,28 @@ export const getCurrentRental = async (req, res) => {
           }
         },
         property: {
-          include: {
-            landlord: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                phoneNumber: true,
-                profileImage: true,
-                createdAt: true,
-                averageRating: true,
-                totalReviews: true,
-                rank: true
-              }
-            }
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            district: true,
+            city: true,
+            zipCode: true,
+            propertyType: true,
+            bedrooms: true,
+            bathrooms: true,
+            size: true,
+            description: true,
+            images: true,
+            houseRules: true
           }
         },
         landlord: {
           select: {
             id: true,
             name: true,
+            firstName: true,
+            lastName: true,
             email: true,
             phoneNumber: true,
             profileImage: true,
@@ -497,10 +499,43 @@ export const getCurrentRental = async (req, res) => {
       });
     }
 
+    // Build complete address string
+    const buildCompleteAddress = (property) => {
+      if (!property) return 'Address not available';
+      
+      let addressParts = [];
+      if (property.address) addressParts.push(property.address);
+      if (property.district) addressParts.push(property.district);
+      if (property.zipCode) addressParts.push(property.zipCode);
+      if (property.city) addressParts.push(property.city);
+      
+      return addressParts.length > 0 ? addressParts.join(', ') : 'Address not available';
+    };
+
+    // Parse property images from JSON string
+    const parsePropertyImages = (propertyImagesString) => {
+      if (!propertyImagesString) return [];
+      try {
+        const parsed = JSON.parse(propertyImagesString);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        console.warn('Failed to parse property images:', propertyImagesString, error);
+        return [];
+      }
+    };
+
     // Format the response
     const rentalData = {
-      offerId: activeLease.id, // This is the actual offer ID (CUID string)
+      offerId: activeLease.id,
       rentalRequestId: activeLease.rentalRequestId,
+      rentalRequest: {
+        id: activeLease.rentalRequest.id,
+        moveInDate: activeLease.rentalRequest.moveInDate,
+        propertyType: activeLease.rentalRequest.propertyType,
+        bedrooms: activeLease.rentalRequest.bedrooms,
+        bathrooms: activeLease.rentalRequest.bathrooms,
+        budget: activeLease.rentalRequest.budget
+      },
       lease: {
         startDate: activeLease.rentalRequest.moveInDate,
         endDate: activeLease.leaseEndDate || (() => {
@@ -515,10 +550,26 @@ export const getCurrentRental = async (req, res) => {
       },
       property: activeLease.property ? {
         id: activeLease.property.id,
-        address: activeLease.propertyAddress || activeLease.property.address,
-        propertyType: activeLease.propertyType || activeLease.property.propertyType
+        title: activeLease.property.name || activeLease.property.propertyType || 'Property',
+        type: activeLease.property.propertyType || 'Apartment',
+        rooms: activeLease.property.bedrooms || activeLease.rentalRequest.bedrooms || 2,
+        address: buildCompleteAddress(activeLease.property),
+        district: activeLease.property.district,
+        city: activeLease.property.city,
+        zipCode: activeLease.property.zipCode,
+        images: parsePropertyImages(activeLease.property.images),
+        size: activeLease.property.size,
+        description: activeLease.property.description
       } : null,
-      landlord: activeLease.landlord
+      landlord: {
+        id: activeLease.landlord.id,
+        name: activeLease.landlord.firstName && activeLease.landlord.lastName ? 
+          `${activeLease.landlord.firstName} ${activeLease.landlord.lastName}` : 
+          activeLease.landlord.name || 'Landlord',
+        email: activeLease.landlord.email,
+        phone: activeLease.landlord.phoneNumber,
+        profileImage: activeLease.landlord.profileImage
+      }
     };
 
     console.log('🔍 Returning current rental data:', rentalData);

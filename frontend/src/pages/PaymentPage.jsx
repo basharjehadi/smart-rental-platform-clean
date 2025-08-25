@@ -133,12 +133,29 @@ const PaymentPage = () => {
       });
       console.log('Offer status update response:', response.data);
       
-      // Close modal and navigate to success page
+      // Create payment record for DEPOSIT_AND_FIRST_MONTH
+      console.log('Creating payment record...');
+      const paymentResponse = await api.post('/payments/complete-mock-payment', {
+        paymentId: `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        amount: totalAmount,
+        purpose: 'DEPOSIT_AND_FIRST_MONTH',
+        offerId: offer.id,
+        selectedPayments: [] // Not needed for deposit + first month
+      });
+      console.log('Payment record created:', paymentResponse.data);
+      
+      // Close modal and navigate to success page (first-time payment)
       setShowProcessingModal(false);
       console.log('Navigating to payment success page...');
       navigate('/payment-success', { 
         state: { 
-          offer: offer
+          paymentType: 'deposit_and_first_month',
+          paymentData: {
+            depositAmount: securityDeposit,
+            firstMonthRent: firstMonthRent,
+            paymentGateway: 'MOCK'
+          },
+          totalAmount: totalAmount
         } 
       });
     } catch (error) {

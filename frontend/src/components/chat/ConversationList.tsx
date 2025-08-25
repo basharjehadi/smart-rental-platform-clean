@@ -1,51 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { MessageCircle, Clock } from 'lucide-react';
-
-interface Conversation {
-  id: string;
-  title?: string;
-  type: 'DIRECT' | 'GROUP' | 'PROPERTY';
-  propertyId?: string;
-  offerId?: string;
-  status: 'PENDING' | 'ACTIVE' | 'ARCHIVED';
-  property?: {
-    id: string;
-    name: string;
-    address: string;
-  };
-  offer?: {
-    id: string;
-    status: 'PENDING' | 'ACCEPTED' | 'PAID' | 'REJECTED';
-  };
-  participants: {
-    id: string;
-    userId: string;
-    role: 'ADMIN' | 'MEMBER' | 'READONLY';
-    user: {
-      id: string;
-      name: string;
-      email: string;
-      profileImage?: string;
-      role: string;
-    };
-  }[];
-  messages: Array<{
-    id: string;
-    content: string;
-    messageType: 'TEXT' | 'IMAGE' | 'DOCUMENT' | 'SYSTEM';
-    createdAt: string;
-    sender: {
-      id: string;
-      name: string;
-    };
-  }>;
-  createdAt: string;
-  updatedAt: string;
-}
+import React from 'react';
+import { Conversation } from '../../hooks/useChatRealtime';
+import { Clock } from 'lucide-react';
 
 interface ConversationListProps {
   conversations: Conversation[];
-  selectedConversationId?: string;
+  selectedConversationId: string | null;
   onSelectConversation: (conversationId: string) => void;
   currentUserId: string;
 }
@@ -77,20 +36,40 @@ const ConversationList: React.FC<ConversationListProps> = ({
     }
   };
 
+  // Get conversation title (other participant's name)
   const getConversationTitle = (conversation: Conversation) => {
-    if (conversation.title) return conversation.title;
+    const other = conversation.participants.find(p => p.user.id !== currentUserId);
+    return other?.user?.name || 'Unknown User';
+  };
+
+  // Get conversation subtitle (property name)
+  const getConversationSubtitle = (conversation: Conversation) => {
+    return conversation.property?.name || 'No property';
+  };
+
+  const getAvatar = (conversation: Conversation) => {
+    const other = conversation.participants.find(p => p.user.id !== currentUserId);
+    const name = other?.user?.name || 'U';
+    const initial = name.charAt(0).toUpperCase();
     
-    const otherParticipants = conversation.participants.filter(
-      p => p.user.id !== currentUserId
-    );
-    
-    if (otherParticipants.length === 1) {
-      return otherParticipants[0].user.name;
-    } else if (otherParticipants.length > 1) {
-      return `${otherParticipants[0].user.name} +${otherParticipants.length - 1}`;
+    if (other?.user?.profileImage) {
+      const profileImage = other.user.profileImage;
+      
+      let src;
+      if (profileImage.startsWith('http')) {
+        src = profileImage;
+      } else if (profileImage.startsWith('/uploads/')) {
+        src = `http://localhost:3001${profileImage}`;
+      } else if (profileImage.startsWith('uploads/')) {
+        src = `http://localhost:3001/${profileImage}`;
+      } else {
+        src = `http://localhost:3001/uploads/profile_images/${profileImage}`;
+      }
+      
+      return src;
     }
     
-    return 'Unknown';
+    return null;
   };
 
   const getLastMessagePreview = (conversation: Conversation) => {
@@ -118,72 +97,99 @@ const ConversationList: React.FC<ConversationListProps> = ({
     return isOwnMessage ? `You: ${preview}` : preview;
   };
 
-  const isConversationLocked = (conversation: Conversation) => {
-    if (conversation.status !== 'ACTIVE') return true;
-    if (conversation.offer && conversation.offer.status !== 'PAID') return true;
-    return false;
+  const formatLastMessageTime = (dateString: string | null | undefined) => {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return '';
+    }
+    
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 24) {
+      return date.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+    } else if (diffInHours < 48) {
+      return 'Yesterday';
+    } else {
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    }
   };
 
   return (
-    <div className="w-full bg-white border-r border-gray-200">
-      <div className="p-4 border-b border-gray-200">
+    <div className="w-full bg-white border-r border-gray-200 flex flex-col h-full">
+      <div className="p-4 border-b border-gray-200 flex-shrink-0">
         <h2 className="text-lg font-semibold text-gray-900">Messages</h2>
       </div>
       
-      <div className="overflow-y-auto h-[calc(100vh-200px)]">
+      <div className="flex-1 overflow-y-auto">
         {conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-            <MessageCircle className="w-12 h-12 mb-4" />
-            <p className="text-center">No conversations yet</p>
-            <p className="text-sm text-gray-400">Start a conversation to begin messaging</p>
+            <p className="text-center text-lg font-medium mb-2">No conversations yet</p>
+            <p className="text-sm text-gray-400 text-center">Start a conversation to begin messaging with landlords or tenants</p>
+            <p className="text-xs text-gray-400 text-center mt-2">Use the "New Chat" button to get started</p>
           </div>
         ) : (
-          conversations.map((conversation) => (
-            <div
-              key={conversation.id}
-              className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
-                selectedConversationId === conversation.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
-              }`}
-              onClick={() => onSelectConversation(conversation.id)}
-            >
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0">
-                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-medium text-sm">
-                      {getConversationTitle(conversation).charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <h3 className="text-sm font-medium text-gray-900 truncate">
-                        {getConversationTitle(conversation)}
-                      </h3>
-                      {isConversationLocked(conversation) && (
-                        <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Chat locked until payment">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {conversation.messages && conversation.messages.length > 0 && (
-                        <span className="text-xs text-gray-500 flex items-center">
-                          <Clock className="w-3 h-3 mr-1" />
-                          {formatTime(conversation.messages[conversation.messages.length - 1].createdAt)}
+          conversations.map((conversation) => {
+            return (
+              <div
+                key={conversation.id}
+                className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
+                  selectedConversationId === conversation.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                }`}
+                onClick={() => onSelectConversation(conversation.id)}
+              >
+                <div className="flex items-start space-x-3">
+                  {/* User Avatar */}
+                  <div className="relative">
+                    <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center overflow-hidden">
+                      {getAvatar(conversation) ? (
+                        <img
+                          src={getAvatar(conversation)}
+                          alt={getConversationTitle(conversation)}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <span className="text-white font-medium text-lg">
+                          {getConversationTitle(conversation).charAt(0).toUpperCase()}
                         </span>
                       )}
                     </div>
                   </div>
                   
-                  <p className="text-sm text-gray-600 truncate mt-1">
-                    {getLastMessagePreview(conversation)}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {getConversationTitle(conversation)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {formatLastMessageTime(conversation.updatedAt) || 'No recent activity'}
+                      </p>
+                    </div>
+                    <p className="text-xs text-gray-500 truncate">
+                      {getConversationSubtitle(conversation)}
+                    </p>
+                    <p className="text-sm text-gray-600 truncate">
+                      {getLastMessagePreview(conversation)}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

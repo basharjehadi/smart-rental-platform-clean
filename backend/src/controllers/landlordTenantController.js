@@ -170,7 +170,13 @@ export const getLandlordTenantDetails = async (req, res) => {
           tenantId: tenantId
         }
       },
-      include: {
+      select: {
+        id: true,
+        rentAmount: true,
+        depositAmount: true,
+        leaseDuration: true,
+        leaseStartDate: true,
+        createdAt: true,
         rentalRequest: {
           include: {
             tenant: {
@@ -245,12 +251,37 @@ export const getLandlordTenantDetails = async (req, res) => {
     }
     
     // Calculate lease dates correctly (using months, not years)
-    const leaseStartDate = new Date(paidOffer.rentalRequest.moveInDate);
+    // Use offer's leaseStartDate if available, otherwise fall back to moveInDate
+    let leaseStartDate;
+    if (paidOffer.leaseStartDate) {
+      leaseStartDate = new Date(paidOffer.leaseStartDate);
+    } else if (paidOffer.rentalRequest.moveInDate) {
+      leaseStartDate = new Date(paidOffer.rentalRequest.moveInDate);
+    } else {
+      // Fallback to offer creation date if no other date is available
+      leaseStartDate = new Date(paidOffer.createdAt);
+    }
+
+    // Validate that lease start date is not in the future (unless it's a future lease)
+    const today = new Date();
+    if (leaseStartDate > today) {
+      console.log('⚠️ Warning: Lease start date is in the future:', leaseStartDate);
+    }
+
     const leaseEndDate = new Date(leaseStartDate);
     leaseEndDate.setMonth(leaseEndDate.getMonth() + (paidOffer.leaseDuration || 12));
 
+    // Log lease date calculations for debugging
+    console.log('🔍 Lease Date Debug Info:', {
+      offerLeaseStartDate: paidOffer.leaseStartDate,
+      moveInDate: paidOffer.rentalRequest.moveInDate,
+      calculatedLeaseStartDate: leaseStartDate,
+      calculatedLeaseEndDate: leaseEndDate,
+      leaseDuration: paidOffer.leaseDuration,
+      today: today
+    });
+
     // Calculate days rented
-    const today = new Date();
     const daysRented = Math.floor((today - leaseStartDate) / (1000 * 60 * 60 * 24));
 
     // Get next payment date using unified payment service

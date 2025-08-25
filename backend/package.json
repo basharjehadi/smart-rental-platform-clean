@@ -20,6 +20,7 @@
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset",
     "db:seed": "node scripts/seed.js",
+    "db:cleanup": "node cleanup-database.cjs",
     "logs": "tail -f logs/all.log",
     "logs:error": "tail -f logs/error.log",
     "translate:start": "docker-compose -f ../docker-compose.translate.yml up -d",

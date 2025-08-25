@@ -73,9 +73,16 @@ const completeMockPayment = async (req, res) => {
     console.log('🔍 Completing mock payment:', { paymentId, amount, purpose, offerId, selectedPayments });
     console.log('🔍 User ID:', userId);
 
-    if (!paymentId || !amount || !purpose || !offerId || !selectedPayments) {
+    if (!paymentId || !amount || !purpose || !offerId) {
       return res.status(400).json({
         error: 'Missing required payment information'
+      });
+    }
+
+    // For monthly rent payments, selectedPayments is required
+    if (purpose === 'MONTHLY_RENT' && (!selectedPayments || selectedPayments.length === 0)) {
+      return res.status(400).json({
+        error: 'Selected payments are required for monthly rent'
       });
     }
 
@@ -129,6 +136,50 @@ const completeMockPayment = async (req, res) => {
         message: 'Mock payment completed successfully',
         rentPayments: rentPayments,
         generalPayment: generalPayment
+      });
+    }
+
+    // Handle DEPOSIT_AND_FIRST_MONTH payments (deposit + first month)
+    if (purpose === 'DEPOSIT_AND_FIRST_MONTH') {
+      console.log('🔍 Processing DEPOSIT_AND_FIRST_MONTH payment...');
+      
+      // Create the main payment record with offerId for chat system
+      const depositPayment = await prisma.payment.create({
+        data: {
+          amount: amount,
+          status: 'SUCCEEDED',
+          purpose: 'DEPOSIT_AND_FIRST_MONTH',
+          gateway: 'PAYU',
+          userId: userId,
+          offerId: offerId, // This is crucial for chat system to work
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+
+      console.log('✅ Created DEPOSIT_AND_FIRST_MONTH payment record:', depositPayment.id);
+      console.log('✅ Payment linked to offerId:', offerId);
+
+      // Update offer status to PAID
+      if (offerId) {
+        try {
+          await prisma.offer.update({
+            where: { id: offerId },
+            data: { 
+              status: 'PAID',
+              paymentDate: new Date()
+            }
+          });
+          console.log('✅ Updated offer status to PAID:', offerId);
+        } catch (offerUpdateError) {
+          console.error('❌ Error updating offer status:', offerUpdateError);
+        }
+      }
+
+      return res.json({
+        success: true,
+        message: 'Mock DEPOSIT_AND_FIRST_MONTH payment completed successfully',
+        payment: depositPayment
       });
     }
 
@@ -404,6 +455,7 @@ const handlePaymentSucceeded = async (paymentIntent) => {
     }
 
     // Create payment record with the found rental request ID
+    // Ensure we also persist offerId so downstream checks (e.g., chat access by property) work
     const payment = await prisma.payment.create({
       data: {
         stripePaymentIntentId,
@@ -411,7 +463,9 @@ const handlePaymentSucceeded = async (paymentIntent) => {
         status: 'SUCCEEDED',
         purpose: metadata.purpose || 'RENT',
         userId: metadata.tenantId,
-        rentalRequestId: rentalRequestId
+        rentalRequestId: rentalRequestId,
+        // Persist offerId when available to enable joins by property later
+        ...(offerId ? { offerId } : {})
       }
     });
 

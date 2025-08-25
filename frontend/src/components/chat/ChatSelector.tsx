@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import api from '../../utils/api';
 import { MessageSquare, Lock, Building, User, Calendar } from 'lucide-react';
 
 interface EligibleTarget {
@@ -22,7 +22,6 @@ interface ChatSelectorProps {
 }
 
 const ChatSelector: React.FC<ChatSelectorProps> = ({ onClose, isOpen, propertyId }) => {
-  const { api } = useAuth();
   const navigate = useNavigate();
   const [eligibleTargets, setEligibleTargets] = useState<EligibleTarget[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,7 +32,7 @@ const ChatSelector: React.FC<ChatSelectorProps> = ({ onClose, isOpen, propertyId
       setLoading(true);
       setError(null);
       
-      const response = await api.get('/api/messaging/eligible');
+      const response = await api.get('/messaging/eligible');
       
       if (response.data.success) {
         setEligibleTargets(response.data.eligibleTargets || []);
@@ -50,20 +49,32 @@ const ChatSelector: React.FC<ChatSelectorProps> = ({ onClose, isOpen, propertyId
 
   const handleStartChat = async (targetPropertyId: string) => {
     try {
+      console.log('🔍 handleStartChat called with propertyId:', targetPropertyId);
       setLoading(true);
       setError(null);
 
-      const response = await api.post(`/api/messaging/conversations/by-property/${targetPropertyId}`);
+      const apiUrl = `/messaging/conversations/by-property/${targetPropertyId}`;
+      console.log('🔍 Calling API:', apiUrl);
+
+      const response = await api.post(apiUrl);
+      console.log('🔍 API response:', response.data);
       
       if (response.data.success) {
-        // Navigate to the conversation
-        navigate(`/messaging?conversationId=${response.data.conversationId}`);
+        console.log('✅ Chat started successfully, navigating to conversation');
+        console.log('🔍 Conversation ID:', response.data.conversationId);
+        console.log('🔍 Navigating to:', `/messaging/${response.data.conversationId}`);
+        
+        // Navigate to the conversation using the proper route format
+        navigate(`/messaging/${response.data.conversationId}`);
         onClose();
       } else {
+        console.log('❌ API returned success: false');
         setError('Failed to start chat');
       }
     } catch (error) {
-      console.error('Error starting chat:', error);
+      console.error('❌ Error starting chat:', error);
+      console.error('❌ Error response:', error.response?.data);
+      console.error('❌ Error status:', error.response?.status);
       setError('Failed to start chat');
     } finally {
       setLoading(false);
@@ -71,11 +82,17 @@ const ChatSelector: React.FC<ChatSelectorProps> = ({ onClose, isOpen, propertyId
   };
 
   useEffect(() => {
+    console.log('🔍 ChatSelector: useEffect triggered');
+    console.log('🔍 isOpen:', isOpen);
+    console.log('🔍 propertyId:', propertyId);
+    
     if (isOpen) {
       if (propertyId) {
+        console.log('✅ Starting chat immediately for property:', propertyId);
         // If we have a specific propertyId, start the chat immediately
         handleStartChat(propertyId);
       } else {
+        console.log('📋 Fetching all eligible targets');
         // Otherwise, fetch all eligible targets
         fetchEligibleTargets();
       }

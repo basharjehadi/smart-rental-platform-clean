@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Conversation, Message } from './useChatRealtime';
 
@@ -25,8 +25,10 @@ export const useChat = (): UseChatReturn => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const messagesPollRef = useRef<number | null>(null);
+  const conversationsPollRef = useRef<number | null>(null);
 
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+  const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
 
   // Load conversations from API
   const loadConversations = useCallback(async () => {
@@ -99,6 +101,21 @@ export const useChat = (): UseChatReturn => {
     }
   }, [token]);
 
+  // Load messages for active conversation
+  useEffect(() => {
+    if (messagesPollRef.current) {
+      clearInterval(messagesPollRef.current);
+      messagesPollRef.current = null;
+    }
+
+    if (!activeConversation || !token) return;
+
+    // Initial fetch only - no polling needed
+    loadMessages(activeConversation.id).catch(() => {});
+
+    // Removed polling - unnecessary backend calls
+  }, [activeConversation?.id, token, loadMessages]);
+
   // Load unread count
   const loadUnreadCount = useCallback(async () => {
     if (!token) return;
@@ -119,6 +136,22 @@ export const useChat = (): UseChatReturn => {
       console.error('Failed to load unread count:', err);
     }
   }, [token]);
+
+  // Load conversations and unread count
+  useEffect(() => {
+    if (conversationsPollRef.current) {
+      clearInterval(conversationsPollRef.current);
+      conversationsPollRef.current = null;
+    }
+
+    if (!token) return;
+
+    // Initial refresh only - no polling needed
+    loadConversations().catch(() => {});
+    loadUnreadCount().catch(() => {});
+
+    // Removed polling - unnecessary backend calls
+  }, [token, loadConversations, loadUnreadCount]);
 
   // Join a specific conversation
   const joinConversation = useCallback((conversationId: string) => {

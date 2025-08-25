@@ -75,7 +75,8 @@ router.get('/conversations', verifyToken, async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                address: true
+                address: true,
+                images: true
               }
             }
           }
@@ -211,7 +212,8 @@ router.post('/conversations', verifyToken, async (req, res) => {
           select: {
             id: true,
             name: true,
-            address: true
+            address: true,
+            images: true
           }
         }
       }
@@ -452,7 +454,8 @@ router.get('/conversations/:conversationId', verifyToken, async (req, res) => {
           select: {
             id: true,
             name: true,
-            address: true
+            address: true,
+            images: true
           }
         },
         offer: {
@@ -597,14 +600,67 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
     const userId = req.user.id;
     const { prisma } = await import('../utils/prisma.js');
 
+    console.log('🔍 Creating conversation for property:', propertyId);
+    console.log('🔍 User ID:', userId);
+    console.log('🔍 User role:', req.user.role);
+
+    // First, check if the property exists
+    const propertyExists = await prisma.property.findUnique({
+      where: { id: propertyId },
+      select: { id: true, name: true, landlordId: true }
+    });
+    
+    if (!propertyExists) {
+      console.log('❌ Property not found:', propertyId);
+      return res.status(404).json({
+        success: false,
+        error: 'Property not found'
+      });
+    }
+    
+    console.log('✅ Property found:', propertyExists.name);
+
     // Verify user has access to this property (either as tenant who paid or as landlord)
     let hasAccess = false;
     let counterpartUserId = null;
     let property = null;
 
     if (req.user.role === 'TENANT') {
+      console.log('🔍 Checking tenant access for property:', propertyId);
+      
+      // First, let's see what payments this user has
+      const allUserPayments = await prisma.payment.findMany({
+        where: {
+          userId: userId,
+          status: 'SUCCEEDED'
+        },
+        select: {
+          id: true,
+          purpose: true,
+          status: true,
+          offerId: true
+        }
+      });
+      
+      console.log('🔍 All user payments:', allUserPayments);
+      
+      // Let's also check what offers exist for this property
+      const propertyOffers = await prisma.offer.findMany({
+        where: {
+          propertyId: propertyId
+        },
+        select: {
+          id: true,
+          tenantId: true,
+          status: true
+        }
+      });
+      
+      console.log('🔍 Property offers:', propertyOffers);
+      
       // Check if tenant has paid for this property
-      const payment = await prisma.payment.findFirst({
+      // Primary path: find a payment that joins through offer -> property
+      let payment = await prisma.payment.findFirst({
         where: {
           userId: userId,
           status: 'SUCCEEDED',
@@ -626,10 +682,62 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
         }
       });
 
+      // Fallback path: some legacy payments might not have offerId set.
+      // In that case, allow chat when the tenant has a PAID offer for this property.
+      if (!payment) {
+        console.log('ℹ️ No payment joined by offerId; checking PAID offer fallback...');
+        const paidOffer = await prisma.offer.findFirst({
+          where: {
+            propertyId: propertyId,
+            tenantId: userId,
+            status: 'PAID'
+          },
+          include: {
+            property: {
+              include: { landlord: true }
+            }
+          }
+        });
+
+        if (paidOffer) {
+          // Synthesize a minimal payment-like object for downstream logic
+          payment = {
+            id: 'fallback-paid-offer',
+            purpose: 'DEPOSIT_AND_FIRST_MONTH',
+            status: 'SUCCEEDED',
+            offerId: paidOffer.id,
+            offer: paidOffer
+          };
+        }
+      }
+
+      console.log('🔍 Payment found:', payment ? 'YES' : 'NO');
+      if (payment) {
+        console.log('🔍 Payment details:', {
+          id: payment.id,
+          purpose: payment.purpose,
+          status: payment.status,
+          offerId: payment.offerId
+        });
+      }
+
       if (payment) {
         hasAccess = true;
         counterpartUserId = payment.offer.property.landlord.id;
         property = payment.offer.property;
+        console.log('✅ Tenant has access, counterpart user ID:', counterpartUserId);
+        console.log('🔍 Payment object structure:', {
+          paymentId: payment.id,
+          offerId: payment.offerId,
+          offerObject: payment.offer ? {
+            id: payment.offer.id,
+            status: payment.offer.status,
+            rentAmount: payment.offer.rentAmount,
+            depositAmount: payment.offer.depositAmount
+          } : 'NO OFFER OBJECT'
+        });
+      } else {
+        console.log('❌ No payment found for tenant');
       }
     } else if (req.user.role === 'LANDLORD') {
       // Check if landlord owns this property and has tenants who paid
@@ -661,13 +769,18 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
       }
     }
 
+    console.log('🔍 Final access check - hasAccess:', hasAccess);
+    
     if (!hasAccess) {
+      console.log('❌ Access denied for user:', userId);
       return res.status(403).json({
         success: false,
         error: 'Access denied. You must have paid for this property or own it with paying tenants.'
       });
     }
 
+    console.log('🔍 Looking for existing conversation...');
+    
     // Find existing conversation or create new one
     let conversation = await prisma.conversation.findFirst({
       where: {
@@ -679,17 +792,57 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
         }
       },
       include: {
-        participants: true
+        participants: true,
+        offer: true // Include offer data
       }
     });
 
-    if (!conversation) {
+    if (conversation) {
+      console.log('✅ Found existing conversation:', conversation.id);
+      console.log('🔍 Existing conversation data:', {
+        id: conversation.id,
+        propertyId: conversation.propertyId,
+        offerId: conversation.offerId,
+        hasOfferId: !!conversation.offerId
+      });
+      
+      // If conversation exists but doesn't have offerId, update it
+      if (!conversation.offerId && payment?.offerId) {
+        console.log('🔍 Updating existing conversation with offerId:', payment.offerId);
+        conversation = await prisma.conversation.update({
+          where: { id: conversation.id },
+          data: { offerId: payment.offerId },
+          include: {
+            participants: true,
+            offer: true
+          }
+        });
+        console.log('✅ Updated conversation with offerId:', conversation.offerId);
+      }
+    } else {
+      console.log('🔍 Creating new conversation...');
+      console.log('🔍 Property name:', property.name);
+      console.log('🔍 Counterpart user ID:', counterpartUserId);
+      
       // Create new conversation
+      console.log('🔍 Creating conversation with data:', {
+        title: `${property.name}`,
+        propertyId: propertyId,
+        offerId: payment?.offerId || null,
+        paymentOfferId: payment?.offer?.id || null,
+        paymentObject: payment ? {
+          id: payment.id,
+          offerId: payment.offerId,
+          hasOfferObject: !!payment.offer
+        } : 'NO PAYMENT'
+      });
+      
       conversation = await prisma.conversation.create({
         data: {
           title: `${property.name}`,
           type: 'PROPERTY',
           propertyId: propertyId,
+          offerId: payment?.offerId || null, // Link to the offer if available
           status: 'ACTIVE', // Always active after payment
           participants: {
             create: [
@@ -702,8 +855,18 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
           participants: true
         }
       });
+      
+      console.log('✅ New conversation created:', conversation.id);
+      console.log('✅ Conversation data:', {
+        id: conversation.id,
+        propertyId: conversation.propertyId,
+        offerId: conversation.offerId,
+        status: conversation.status
+      });
     }
 
+    console.log('✅ Sending success response with conversation ID:', conversation.id);
+    
     res.json({
       success: true,
       conversationId: conversation.id,
@@ -713,11 +876,31 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
     });
 
   } catch (error) {
-    console.error('Error creating conversation by property:', error);
+    console.error('❌ Error creating conversation by property:', error);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({
       success: false,
       error: 'Failed to create conversation'
     });
+  }
+});
+
+// Check if user has paid for a specific property (for frontend chat unlocking)
+router.get('/check-payment/:propertyId', verifyToken, async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+    const userId = req.user.id;
+    const { prisma } = await import('../utils/prisma.js');
+
+    // Import the checkPropertyPayment function from chatGuard
+    const { checkPropertyPayment } = await import('../utils/chatGuard.js');
+    
+    const hasPaid = await checkPropertyPayment(propertyId, userId);
+    
+    res.json({ hasPaid });
+  } catch (error) {
+    console.error('Error checking property payment:', error);
+    res.status(500).json({ error: 'Failed to check payment status' });
   }
 });
 

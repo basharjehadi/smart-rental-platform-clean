@@ -76,7 +76,11 @@ const cleanupRateLimit = (socketId) => {
 export function initializeSocket(server) {
   const io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_URL || "http://localhost:5173",
+      origin: [
+        process.env.FRONTEND_URL || 'http://localhost:5173',
+        'http://localhost:5173',
+        'http://localhost:3002'
+      ],
       methods: ["GET", "POST"],
       credentials: true
     }
@@ -119,9 +123,15 @@ export function initializeSocket(server) {
     // Join user's personal notification room
     socket.join(`user-${socket.data.user.id}`);
 
+    // Per-connection guard to avoid repeated heavy joins
+    socket.data.hasJoinedConversations = false;
+
     // Join user's conversations
     socket.on('join-conversations', async () => {
       try {
+        if (socket.data.hasJoinedConversations) {
+          return;
+        }
         const conversations = await prisma.conversationParticipant.findMany({
           where: { userId: socket.data.user.id },
           include: {
@@ -134,7 +144,8 @@ export function initializeSocket(server) {
                         id: true,
                         name: true,
                         email: true,
-                        profileImage: true
+                        profileImage: true,
+                        role: true
                       }
                     }
                   }
@@ -151,6 +162,32 @@ export function initializeSocket(server) {
                       }
                     }
                   }
+                },
+                property: {
+                  select: {
+                    id: true,
+                    name: true,
+                    address: true,
+                    city: true,
+                    district: true,
+                    zipCode: true,
+                    country: true,
+                    propertyType: true,
+                    monthlyRent: true,
+                    depositAmount: true,
+                    bedrooms: true,
+                    bathrooms: true,
+                    size: true,
+                    images: true
+                  }
+                },
+                offer: {
+                  select: {
+                    id: true,
+                    status: true,
+                    rentAmount: true,
+                    depositAmount: true
+                  }
                 }
               }
             }
@@ -162,6 +199,7 @@ export function initializeSocket(server) {
         });
 
         socket.emit('conversations-loaded', conversations.map(p => p.conversation));
+        socket.data.hasJoinedConversations = true;
       } catch (error) {
         console.error('Error joining conversations:', error);
       }
@@ -422,6 +460,7 @@ export function initializeSocket(server) {
     socket.on('disconnect', () => {
       console.log(`User ${socket.data.user.name} disconnected: ${socket.id}`);
       cleanupRateLimit(socket.id);
+      socket.data.hasJoinedConversations = false;
     });
   });
 

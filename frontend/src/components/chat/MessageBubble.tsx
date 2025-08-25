@@ -108,11 +108,36 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       <div className={`flex ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'} items-end space-x-2 max-w-xs lg:max-w-md`}>
         {!isOwnMessage && showSender && (
           <div className="flex-shrink-0">
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-xs font-medium">
-                {message.sender.name.charAt(0).toUpperCase()}
-              </span>
-            </div>
+            {message.sender.profileImage ? (
+              <img
+                src={(() => {
+                  const profileImage = message.sender.profileImage;
+                  console.log('Profile image path:', profileImage);
+                  
+                  if (profileImage.startsWith('http')) {
+                    return profileImage;
+                  } else if (profileImage.startsWith('/uploads/')) {
+                    return `http://localhost:3001${profileImage}`;
+                  } else if (profileImage.startsWith('uploads/')) {
+                    return `http://localhost:3001/${profileImage}`;
+                  } else {
+                    return `http://localhost:3001/uploads/profile_images/${profileImage}`;
+                  }
+                })()}
+                alt={message.sender.name}
+                className="w-8 h-8 rounded-full object-cover"
+                onError={(e) => {
+                  console.log('Failed to load avatar:', message.sender.profileImage);
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            ) : (
+              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-medium">
+                  {message.sender.name.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
           </div>
         )}
         
@@ -139,13 +164,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </span>
             
             {isOwnMessage && (
-              <span className="text-xs">
+              <div className="flex items-center space-x-1">
                 {message.isRead ? (
-                  <CheckCheck className="w-3 h-3 text-blue-500" />
+                  <div className="flex items-center space-x-1" title="Read">
+                    <CheckCheck className="w-3 h-3 text-blue-500" />
+                    <span className="text-xs text-blue-500">Read</span>
+                  </div>
                 ) : (
-                  <Check className="w-3 h-3 text-gray-400" />
+                  <div className="flex items-center space-x-1" title="Delivered">
+                    <Check className="w-3 h-3 text-gray-400" />
+                    <span className="text-xs text-gray-400">Delivered</span>
+                  </div>
                 )}
-              </span>
+              </div>
             )}
           </div>
         </div>

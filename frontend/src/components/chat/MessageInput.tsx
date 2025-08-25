@@ -112,7 +112,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   return (
-    <div className="border-t border-gray-200 p-4 bg-white">
+    <div className="space-y-3 pb-2">
       {/* Chat locked banner */}
       {disabled && (
         <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -173,7 +173,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
       )}
 
       {/* Message input */}
-      <div className="flex items-end space-x-2">
+      <div className="flex items-center space-x-2">
         <div className="flex-1">
           <textarea
             value={message}
@@ -192,7 +192,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled || isUploading}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-10 w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Attach file"
           >
             <Paperclip className="w-5 h-5" />
@@ -202,7 +202,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           <button
             onClick={handleSendMessage}
             disabled={disabled || isUploading || (!message.trim() && !selectedFile)}
-            className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-10 w-10 flex items-center justify-center bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Send message"
           >
             <Send className="w-5 h-5" />
