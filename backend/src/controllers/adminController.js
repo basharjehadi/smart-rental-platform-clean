@@ -821,6 +821,49 @@ export const adminDownloadContract = async (req, res) => {
   }
 };
 
+// Move-in issues listing for admin
+export const listMoveInIssues = async (req, res) => {
+  try {
+    const offers = await prisma.offer.findMany({
+      where: { moveInVerificationStatus: 'ISSUE_REPORTED' },
+      select: {
+        id: true,
+        cancellationReason: true,
+        cancellationEvidence: true,
+        tenantId: true,
+        tenant: {
+          select: { id: true, name: true, email: true, profileImage: true }
+        }
+      }
+    });
+    res.json({ success: true, offers });
+  } catch (error) {
+    console.error('listMoveInIssues error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load issues' });
+  }
+};
+
+// Get full offer details for admin review (includes property, landlord, tenant)
+export const getOfferDetails = async (req, res) => {
+  try {
+    const { offerId } = req.params;
+    const offer = await prisma.offer.findUnique({
+      where: { id: offerId },
+      include: {
+        property: true,
+        landlord: true,
+        tenant: true,
+        rentalRequest: true
+      }
+    });
+    if (!offer) return res.status(404).json({ error: 'Offer not found' });
+    res.json({ offer });
+  } catch (error) {
+    console.error('getOfferDetails error:', error);
+    res.status(500).json({ error: 'Failed to load offer details' });
+  }
+};
+
 // 🚀 SCALABILITY: Admin view contract details
 export const getContractDetails = async (req, res) => {
   try {

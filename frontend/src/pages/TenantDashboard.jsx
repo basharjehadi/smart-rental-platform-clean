@@ -8,6 +8,8 @@ import Chat from '../components/chat/Chat';
 import { LogOut } from 'lucide-react';
 import NotificationHeader from '../components/common/NotificationHeader';
 import { useNotifications } from '../contexts/NotificationContext';
+import dayjs from 'dayjs';
+import ReportMoveInIssueModal from '../components/ReportMoveInIssueModal.jsx';
 
 const TenantDashboard = () => {
   const { user, logout } = useAuth();
@@ -32,9 +34,11 @@ const TenantDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
+  const [verificationStatuses, setVerificationStatuses] = useState({}); // offerId -> status data
   
   // Chat states
   const [showChat, setShowChat] = useState(false);
+  const [reportOfferId, setReportOfferId] = useState(null);
 
   const fetchRequests = async () => {
     try {
@@ -45,6 +49,21 @@ const TenantDashboard = () => {
       console.log('✅ Dashboard: Requests response received:', response.data);
       console.log('✅ Dashboard: Rental requests:', response.data.rentalRequests);
       setRequests(response.data.rentalRequests || []);
+      // Fetch move-in verification status for locked requests with paid offers
+      const lockedWithOffers = (response.data.rentalRequests || [])
+        .filter(r => r.status === 'LOCKED' && Array.isArray(r.offers) && r.offers.some(o => o.status === 'PAID'));
+      const statusPromises = lockedWithOffers.map(async (r) => {
+        const paidOffer = r.offers.find(o => o.status === 'PAID');
+        try {
+          const s = await api.get(`/move-in/offers/${paidOffer.id}/status`);
+          return [paidOffer.id, s.data.data];
+        } catch {
+          return [paidOffer.id, null];
+        }
+      });
+      const entries = await Promise.all(statusPromises);
+      const map = Object.fromEntries(entries);
+      setVerificationStatuses(map);
     } catch (error) {
       console.error('❌ Dashboard: Error fetching requests:', error);
       console.error('❌ Dashboard: Error response:', error.response?.data);
@@ -53,6 +72,91 @@ const TenantDashboard = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const renderMoveInVerificationCard = (request) => {
+    if (request.status !== 'LOCKED' || !Array.isArray(request.offers)) return null;
+    const paidOffer = request.offers.find(o => o.status === 'PAID');
+    if (!paidOffer) return null;
+    const status = verificationStatuses[paidOffer.id];
+    const statusValue = status?.status || 'PENDING';
+    const deadline = status?.deadline ? dayjs(status.deadline) : (request.moveInDate ? dayjs(request.moveInDate).add(24, 'hour') : null);
+    const now = dayjs();
+    let remainingText = '—';
+    if (deadline) {
+      const diffMs = Math.max(0, deadline.diff(now));
+      const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const days = Math.floor(totalHours / 24);
+      const hours = totalHours % 24;
+      remainingText = `${days}d ${hours}h`;
+    }
+
+    // If admin rejected -> SUCCESS, show verified message and no actions
+    if (statusValue === 'SUCCESS') {
+      return (
+        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-green-900 font-medium">✅ Move-in verified</div>
+            {deadline && <div className="text-xs text-green-800">Finalized</div>}
+          </div>
+          <div className="mt-1 text-xs text-green-800">Your move-in has been confirmed. Enjoy your stay!</div>
+        </div>
+      );
+    }
+
+    // If tenant reported -> awaiting admin
+    if (statusValue === 'ISSUE_REPORTED') {
+      return (
+        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-yellow-900 font-medium">⚠️ Issue reported</div>
+            {deadline && <div className="text-xs text-yellow-800">Awaiting admin review</div>}
+          </div>
+          <div className="mt-1 text-xs text-yellow-800">Support is reviewing your report. We will notify you once a decision is made.</div>
+        </div>
+      );
+    }
+
+    // If admin approved cancellation
+    if (statusValue === 'CANCELLED') {
+      return (
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-red-900 font-medium">❌ Booking cancelled</div>
+          </div>
+          <div className="mt-1 text-xs text-red-800">Support approved your cancellation request.</div>
+        </div>
+      );
+    }
+
+    // Default PENDING view with actions
+    return (
+      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-blue-900 font-medium">🏠 Move-in verification</div>
+          <div className="text-xs text-blue-800">⏰ {remainingText} left</div>
+        </div>
+        <div className="mt-2 flex space-x-2">
+          <button
+            onClick={async () => {
+              try {
+                await api.post(`/move-in/offers/${paidOffer.id}/verify`);
+                fetchRequests();
+              } catch {}
+            }}
+            className="px-3 py-1 rounded-md text-sm bg-green-600 text-white hover:bg-green-700"
+          >
+            Move-in successful
+          </button>
+          <button
+            onClick={() => setReportOfferId(paidOffer.id)}
+            className="px-3 py-1 rounded-md text-sm bg-red-600 text-white hover:bg-red-700"
+          >
+            Report issue
+          </button>
+        </div>
+      </div>
+    );
   };
 
   const handleLogout = () => {
@@ -437,6 +541,9 @@ const TenantDashboard = () => {
                           </div>
                         </div>
                         
+                        {/* Move-in verification section for locked requests with paid offer */}
+                        {renderMoveInVerificationCard(request)}
+
                         {/* Created Date and Time */}
                         <div className="mt-4 pt-3 border-t border-gray-100">
                           <div className="text-xs text-gray-500">
@@ -496,6 +603,19 @@ const TenantDashboard = () => {
           </div>
         </main>
       </div>
+
+      {/* Report Issue Modal */}
+      {reportOfferId && (
+        <ReportMoveInIssueModal
+          open={true}
+          onClose={() => setReportOfferId(null)}
+          onSubmit={async (form) => {
+            await api.post(`/move-in/offers/${reportOfferId}/report-issue`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+            setReportOfferId(null);
+            fetchRequests();
+          }}
+        />
+      )}
 
       {/* Create Rental Request Modal */}
       <CreateRentalRequestModal

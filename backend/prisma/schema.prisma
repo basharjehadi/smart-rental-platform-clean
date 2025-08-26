@@ -238,6 +238,13 @@ model Offer {
   preferredPaymentGateway PaymentGateway?
   responseTime            Int?
   matchScore              Float?
+  // Move-in verification fields
+  moveInVerificationStatus   MoveInVerificationStatus @default(PENDING)
+  moveInVerificationDeadline DateTime?
+  moveInVerificationDate     DateTime?
+  cancellationReason         String?
+  cancellationEvidence       String[]
+  verificationNotes          String?
   createdAt               DateTime        @default(now())
   updatedAt               DateTime        @updatedAt
   rentalRequestId         Int
@@ -256,6 +263,13 @@ model Offer {
   @@index([status, createdAt])
   @@index([propertyId])
   @@map("offers")
+}
+
+enum MoveInVerificationStatus {
+  PENDING
+  SUCCESS
+  ISSUE_REPORTED
+  CANCELLED
 }
 
 model Payment {

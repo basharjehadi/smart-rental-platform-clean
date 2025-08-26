@@ -139,3 +139,18 @@ curl -X POST -H "Authorization: Bearer <token>" http://localhost:3001/api/messag
 3. **Landlord with paying tenant** → Should see tenant in eligible targets
 4. **Landlord without paying tenant** → Should not see property in targets
 5. **Payment verification** → Only SUCCEEDED payments unlock chat 
+
+## Refunds (Move‑in Cancellation)
+
+When support approves a tenant move‑in issue, the platform unwinds the booking and issues refunds.
+
+What happens:
+- Stripe: `refundOfferPayments(offerId)` calls Stripe’s Refund API per payment and marks our `Payment` as `CANCELLED` with the refund id recorded (in `errorMessage`, prefixed `REFUNDED:`).
+- Mock gateways (dev): Payments are marked `CANCELLED` to represent a refund; real gateway integrations should implement refund APIs similarly to Stripe.
+
+Key code:
+- `backend/src/controllers/moveInVerificationController.js` → `adminApproveCancellation()` orchestrates unwind then calls `refundOfferPayments`.
+- `backend/src/controllers/paymentController.js` → `refundOfferPayments()` performs provider‑aware refunds and emits realtime notifications.
+
+Environment for live refunds:
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` must be set.

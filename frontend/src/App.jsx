@@ -40,6 +40,8 @@ import MockPaymentPage from './pages/MockPaymentPage';
 import ReviewPage from './pages/ReviewPage';
 
 import AdminDashboard from './pages/AdminDashboard';
+import AdminMoveInIssues from './pages/AdminMoveInIssues.jsx';
+import AdminPropertyReview from './pages/AdminPropertyReview.jsx';
 import AuthCallback from './pages/AuthCallback';
 import TestPage from './pages/TestPage';
 import ProfilePage from './pages/ProfilePage';
@@ -244,6 +246,22 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <AdminDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/admin/move-in-issues" 
+          element={
+            <ProtectedRoute>
+              <AdminMoveInIssues />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/admin/property-review/:offerId" 
+          element={
+            <ProtectedRoute>
+              <AdminPropertyReview />
             </ProtectedRoute>
           } 
         />

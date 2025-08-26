@@ -26,8 +26,12 @@ const startServer = async () => {
     await prisma.$connect();
     logger.info('✅ Database connected successfully');
 
-    // Start contract generation scheduler
+    // Start contract generation scheduler (disabled)
     startContractMonitoring();
+
+    // Start move-in verification scheduler
+    const { startMoveInVerificationScheduler } = await import('./services/moveInVerificationService.js');
+    startMoveInVerificationScheduler();
 
     // Create HTTP server
     const server = createServer(app);

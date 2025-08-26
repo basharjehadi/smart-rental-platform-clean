@@ -604,10 +604,21 @@ const handlePaymentSucceeded = async (paymentIntent) => {
 
     // Update offer status to PAID if we have an offer ID
     if (offerId) {
-      await prisma.offer.update({
+      // Mark offer as PAID and set move-in verification deadline if available
+      const paidOffer = await prisma.offer.update({
         where: { id: offerId },
-        data: { status: 'PAID' }
+        data: { status: 'PAID' },
+        include: { rentalRequest: true }
       });
+      // Compute deadline: moveInDate + 24h if moveInDate exists
+      if (!paidOffer.moveInVerificationDeadline) {
+        const baseDate = paidOffer.rentalRequest?.moveInDate || new Date();
+        const deadline = new Date(new Date(baseDate).getTime() + 24 * 60 * 60 * 1000);
+        await prisma.offer.update({
+          where: { id: offerId },
+          data: { moveInVerificationDeadline: deadline }
+        });
+      }
 
       console.log('✅ Offer status updated to PAID:', offerId);
 
@@ -1031,3 +1042,77 @@ export {
   getMyPayments,
   completeMockPayment
 }; 
+
+// ===== Refunds =====
+/**
+ * Refund all booking-related payments for an offer (Stripe or Mock).
+ * Idempotent: safely skips already-cancelled payments.
+ */
+export const refundOfferPayments = async (offerId) => {
+  // Load identifiers
+  const offer = await prisma.offer.findUnique({
+    where: { id: offerId },
+    select: { id: true, rentalRequestId: true, tenantId: true, landlordId: true }
+  });
+  if (!offer) return { success: false, message: 'Offer not found' };
+
+  const payments = await prisma.payment.findMany({
+    where: {
+      status: 'SUCCEEDED',
+      OR: [ { offerId }, { rentalRequestId: offer.rentalRequestId } ]
+    }
+  });
+
+  const results = [];
+  const { getRefundProvider } = await import('../services/refundProviders/index.js');
+  for (const p of payments) {
+    try {
+      if (p.status !== 'SUCCEEDED') { results.push({ id: p.id, skipped: true }); continue; }
+      const provider = getRefundProvider(p.gateway || (p.stripePaymentIntentId ? 'STRIPE' : 'MOCK'));
+      const outcome = await provider.refund(p, prisma);
+      results.push({ id: p.id, ...outcome });
+    } catch (e) {
+      results.push({ id: p.id, error: e.message });
+    }
+  }
+
+  // Create a summary notification to tenant and landlord
+  try {
+    const summary = `Refunds processed for ${results.length} payment(s).`;
+    if (offer.tenantId) {
+      const notif = await prisma.notification.create({
+        data: {
+          userId: offer.tenantId,
+          type: 'SYSTEM_ANNOUNCEMENT',
+          entityId: offerId,
+          title: 'Refund processed',
+          body: summary
+        }
+      });
+      // Best-effort realtime emit (if available)
+      try {
+        const { default: createIO } = await import('../socket/socketServer.js');
+        const io = createIO?.io || global.io;
+        if (io?.emitNotification) await io.emitNotification(offer.tenantId, notif);
+      } catch {}
+    }
+    if (offer.landlordId) {
+      const notif = await prisma.notification.create({
+        data: {
+          userId: offer.landlordId,
+          type: 'SYSTEM_ANNOUNCEMENT',
+          entityId: offerId,
+          title: 'Refund processed',
+          body: summary
+        }
+      });
+      try {
+        const { default: createIO } = await import('../socket/socketServer.js');
+        const io = createIO?.io || global.io;
+        if (io?.emitNotification) await io.emitNotification(offer.landlordId, notif);
+      } catch {}
+    }
+  } catch {}
+
+  return { success: true, results };
+};

@@ -188,6 +188,38 @@ const LandlordMyProperty = () => {
     return ['RENTED'].includes(property.status);
   };
 
+  const [moveInStatusByProperty, setMoveInStatusByProperty] = useState({});
+
+  // Fetch latest paid offer verification status for each property
+  const loadMoveInStatuses = async () => {
+    try {
+      const entries = await Promise.all(properties.map(async (p) => {
+        try {
+          const res = await api.get(`/move-in/property/${p.id}/latest-paid-status`);
+          return [p.id, res.data?.data || null];
+        } catch {
+          return [p.id, null];
+        }
+      }));
+      setMoveInStatusByProperty(Object.fromEntries(entries));
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (properties.length > 0) {
+      loadMoveInStatuses();
+    }
+  }, [properties]);
+
+  // Light polling to reflect admin decisions without manual refresh
+  useEffect(() => {
+    if (properties.length === 0) return;
+    const id = setInterval(() => {
+      loadMoveInStatuses();
+    }, 10000); // every 10s
+    return () => clearInterval(id);
+  }, [properties]);
+
   const filteredProperties = filterAndSortProperties();
 
   return (
@@ -449,6 +481,52 @@ const LandlordMyProperty = () => {
                               <span className="mr-1">🔒</span>
                               This property is {property.status.toLowerCase()}. Edit and delete actions are disabled.
                             </p>
+                            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                              <div className="text-xs text-blue-900 font-medium">Tenant move-in verification</div>
+                              {(() => {
+                                const s = moveInStatusByProperty[property.id];
+                                if (s) {
+                                  const deadline = s.deadline ? new Date(s.deadline) : null;
+                                  const now = new Date();
+                                  let chip = 'PENDING';
+                                  if (s.status === 'SUCCESS') chip = 'SUCCESS';
+                                  else if (s.status === 'ISSUE_REPORTED') chip = 'ISSUE';
+                                  else if (s.status === 'CANCELLED') chip = 'CANCELLED';
+
+                                  // Format countdown d h
+                                  let countdown = '';
+                                  if (deadline) {
+                                    const diffMs = Math.max(0, deadline.getTime() - now.getTime());
+                                    const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+                                    const days = Math.floor(totalHours / 24);
+                                    const hours = totalHours % 24;
+                                    countdown = `${days}d ${hours}h left`;
+                                  }
+
+                                  return (
+                                    <div className="text-xs text-blue-800 mt-1 flex items-center space-x-2">
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                        chip === 'SUCCESS' ? 'bg-green-100 text-green-700' :
+                                        chip === 'ISSUE' ? 'bg-red-100 text-red-700' :
+                                        chip === 'CANCELLED' ? 'bg-gray-200 text-gray-700' :
+                                        'bg-yellow-100 text-yellow-700'
+                                      }`}>{chip}</span>
+                                      {countdown && <span>{countdown}</span>}
+                                    </div>
+                                  );
+                                }
+                                // Fallback: if property is RENTED but status unavailable, don't show misleading PENDING
+                                if (property.status === 'RENTED') {
+                                  return (
+                                    <div className="text-xs text-blue-800 mt-1">
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">SUCCESS</span>
+                                      <span className="ml-2">Move-in verified</span>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
                           </div>
                         )}
                       </div>

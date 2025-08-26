@@ -12,7 +12,9 @@ import {
   triggerSystemMaintenance,
   getAllContracts,
   adminDownloadContract,
-  getContractDetails
+  getContractDetails,
+  listMoveInIssues,
+  getOfferDetails
 } from '../controllers/adminController.js';
 import verifyToken from '../middlewares/verifyToken.js';
 import { requireAdmin } from '../middlewares/requireAdmin.js';
@@ -47,5 +49,9 @@ router.post('/maintenance', triggerSystemMaintenance);
 router.get('/contracts', getAllContracts);
 router.get('/contracts/:contractId', getContractDetails);
 router.get('/contracts/:contractId/download', adminDownloadContract);
+
+// Move-in issues
+router.get('/move-in/issues', listMoveInIssues);
+router.get('/move-in/offers/:offerId', getOfferDetails);
 
 export default router; 

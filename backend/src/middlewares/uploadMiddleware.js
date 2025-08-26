@@ -11,7 +11,8 @@ const createUploadDirs = () => {
     path.join(baseDir, 'uploads', 'property_videos'),
     path.join(baseDir, 'uploads', 'identity_documents'),
     path.join(baseDir, 'uploads', 'rules'),
-    path.join(baseDir, 'uploads', 'chat_attachments')
+    path.join(baseDir, 'uploads', 'chat_attachments'),
+    path.join(baseDir, 'uploads', 'move_in_evidence')
   ];
   
   dirs.forEach(dir => {
@@ -40,6 +41,8 @@ const storage = multer.diskStorage({
       uploadPath = path.join(uploadPath, 'rules');
     } else if (file.fieldname === 'attachment') {
       uploadPath = path.join(uploadPath, 'chat_attachments');
+    } else if (file.fieldname === 'moveInEvidence') {
+      uploadPath = path.join(uploadPath, 'move_in_evidence');
     }
     
     cb(null, uploadPath);

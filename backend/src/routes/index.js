@@ -19,6 +19,7 @@ import notificationRoutes from './notifications.js';
 import systemRoutes from './systemRoutes.js';
 import supportRoutes from './supportRoutes.js';
 import reviewRoutes from './reviewRoutes.js';
+import moveInVerificationRoutes from './moveInVerificationRoutes.js';
 
 const router = Router();
 
@@ -77,5 +78,8 @@ router.use('/support', supportRoutes);
 
 // Review routes
 router.use('/reviews', reviewRoutes);
+
+// Move-in verification routes
+router.use('/move-in', moveInVerificationRoutes);
 
 export default router; 
