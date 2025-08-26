@@ -774,6 +774,10 @@ const TenantDashboardNew = () => {
             {/* Lease Progress (moved into middle area) */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Lease Progress</h3>
+              {/* Empty when no active lease */}
+              {!leaseMeta?.id ? (
+                <p className="text-sm text-gray-600">No active lease yet.</p>
+              ) : (
               <div className="space-y-4">
                 <div>
                   <p className="text-sm text-gray-600">
@@ -912,6 +916,7 @@ const TenantDashboardNew = () => {
                   </div>
                 </div>
               </div>
+              )}
               {/* Renewal Request Modal */}
               <RenewalRequestModal
                 open={showRenewalModal}

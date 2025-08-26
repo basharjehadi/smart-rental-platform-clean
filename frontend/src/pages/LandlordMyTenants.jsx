@@ -42,6 +42,8 @@ const LandlordMyTenants = () => {
   const [showEndModal, setShowEndModal] = useState(false);
   const [endTenant, setEndTenant] = useState(null);
   const [sendingEnd, setSendingEnd] = useState(false);
+  const [leaseMetaByOffer, setLeaseMetaByOffer] = useState({});
+  const [renewalBadgeByLease, setRenewalBadgeByLease] = useState({});
 
   useEffect(() => {
     fetchTenants();
@@ -66,6 +68,39 @@ const LandlordMyTenants = () => {
       if (response.data.success) {
         const list = response.data.tenants || [];
         setTenants(list);
+        // Fetch lease meta and latest renewal for each tenant's booking (offer)
+        try {
+          const results = await Promise.all(
+            list.map(async (t) => {
+              const offerId = t?.offerId || t?.paidOfferId || t?.offer?.id;
+              if (!offerId) return null;
+              try {
+                const leaseRes = await api.get(`/leases/by-offer/${offerId}`);
+                const lease = leaseRes.data?.lease || null;
+                let latest = null;
+                if (lease?.id) {
+                  const renRes = await api.get(`/leases/${lease.id}/renewals`);
+                  const arr = renRes.data?.renewals || [];
+                  latest = arr.length > 0 ? arr[arr.length - 1] : null;
+                }
+                return { offerId, lease, latest };
+              } catch {
+                return { offerId, lease: null, latest: null };
+              }
+            })
+          );
+          const leaseMap = {};
+          const renewalMap = {};
+          for (const r of (results || [])) {
+            if (!r) continue;
+            if (r.lease) leaseMap[r.offerId] = r.lease;
+            if (r.lease?.id && r.latest) renewalMap[r.lease.id] = r.latest;
+          }
+          setLeaseMetaByOffer(leaseMap);
+          setRenewalBadgeByLease(renewalMap);
+        } catch (e) {
+          // non-fatal; badges just won't show
+        }
       } else {
         setError('Failed to fetch tenants');
       }
@@ -421,6 +456,36 @@ const LandlordMyTenants = () => {
                             {getStatusBadge(tenant.paymentStatus)}
                           </div>
 
+                          {/* Status chips under tenant profile info */}
+                          <div className="mt-3 mb-3 flex flex-wrap gap-3">
+                            {(() => {
+                              const offerId = tenant?.offerId || tenant?.paidOfferId || tenant?.offer?.id;
+                              const lease = leaseMetaByOffer?.[offerId];
+                              if (lease?.terminationEffectiveDate) {
+                                const d = new Date(lease.terminationEffectiveDate);
+                                return (
+                                  <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-1.5 shadow-sm">
+                                    Termination notice – effective {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                            {(() => {
+                              const offerId = tenant?.offerId || tenant?.paidOfferId || tenant?.offer?.id;
+                              const lease = leaseMetaByOffer?.[offerId];
+                              const latest = lease ? renewalBadgeByLease?.[lease.id] : null;
+                              if (latest && (latest.status === 'PENDING' || latest.status === 'COUNTERED')) {
+                                return (
+                                  <div className="text-xs text-indigo-800 bg-indigo-50 border border-indigo-200 rounded px-3 py-1.5 shadow-sm">
+                                    Renewal {latest.initiatorUserId === tenant.id ? 'requested by tenant' : 'proposal sent'} ({latest.status.toLowerCase()})
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+
                           {/* Property and Payment Info */}
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="flex items-center space-x-2">
@@ -513,35 +578,7 @@ const LandlordMyTenants = () => {
                             <AlertTriangle className="w-4 h-4" />
                             <span>End Lease</span>
                           </button>
-                        </div>
-                        {/* Status badges below actions */}
-                        <div className="mt-3 space-y-2">
-                          {(() => {
-                            const offerId = tenant?.offerId || tenant?.paidOfferId || tenant?.offer?.id;
-                            const lease = leaseMetaByOffer?.[offerId];
-                            if (lease?.terminationEffectiveDate) {
-                              const d = new Date(lease.terminationEffectiveDate);
-                              return (
-                                <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1 inline-block">
-                                  Termination notice – effective {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
-                          {(() => {
-                            const offerId = tenant?.offerId || tenant?.paidOfferId || tenant?.offer?.id;
-                            const lease = leaseMetaByOffer?.[offerId];
-                            const latest = lease ? renewalBadgeByLease?.[lease.id] : null;
-                            if (latest && (latest.status === 'PENDING' || latest.status === 'COUNTERED')) {
-                              return (
-                                <div className="text-xs text-indigo-800 bg-indigo-50 border border-indigo-200 rounded px-2 py-1 inline-block">
-                                  Renewal {latest.initiatorUserId === tenant.id ? 'requested by tenant' : 'proposal sent'} ({latest.status.toLowerCase()})
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
+                          {/* Chips displayed under tenant info (moved from actions column) */}
                         </div>
                       </div>
                     </div>

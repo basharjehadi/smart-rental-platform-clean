@@ -110,6 +110,7 @@ export const getLandlordTenants = async (req, res) => {
       const nextPayment = upcomingPayments.length > 0 ? upcomingPayments[0] : null;
 
       return {
+        offerId: offer.id,
         id: offer.rentalRequest.tenant.id,
         name: offer.rentalRequest.tenant.firstName && offer.rentalRequest.tenant.lastName 
           ? `${offer.rentalRequest.tenant.firstName} ${offer.rentalRequest.tenant.lastName}`
