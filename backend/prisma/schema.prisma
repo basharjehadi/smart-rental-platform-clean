@@ -154,11 +154,13 @@ model Property {
   landlordId        String
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
+  isMarketing       Boolean        @default(false)
   conversations     Conversation[] @relation("PropertyConversations")
   offers            Offer[]        @relation("PropertyOffers")
   matches           LandlordRequestMatch[]
   landlord          User           @relation("LandlordProperties", fields: [landlordId], references: [id], onDelete: Cascade)
   units             Unit[]         @relation("PropertyUnits")
+  leases            Lease[]        @relation("PropertyLeases")
 
   @@index([landlordId, status])
   @@index([city, status])
@@ -204,6 +206,7 @@ model RentalRequest {
   offers                 Offer[]                @relation("RequestOffer")
   payments               Payment[]              @relation("RequestPayments")
   tenant                 User                   @relation("TenantRequests", fields: [tenantId], references: [id], onDelete: Cascade)
+  leases                 Lease[]                @relation("RentalRequestLeases")
 
   @@index([location, status, poolStatus])
   @@index([budget, status])
@@ -257,6 +260,7 @@ model Offer {
   rentalRequest           RentalRequest   @relation("RequestOffer", fields: [rentalRequestId], references: [id], onDelete: Cascade)
   payments                Payment[]       @relation("OfferPayments")
   conversations           Conversation[]  @relation("ConversationOffer")
+  leases                  Lease[]         @relation("OfferLeases")
 
   @@index([landlordId, status])
   @@index([rentalRequestId, status])
@@ -427,18 +431,67 @@ model Lease {
   status              LeaseStatus          @default(ACTIVE)
   tenantId            String
   unitId              String               @unique
+  // Links back to booking context (optional for legacy compatibility)
+  rentalRequestId     Int?
+  offerId             String?
+  propertyId          String?
+  // Termination/renewal fields
+  terminationNoticeByUserId String?
+  terminationNoticeDate     DateTime?
+  terminationEffectiveDate  DateTime?
+  terminationReason         String?
+  renewalStatus             LeaseRenewalStatus @default(NONE)
+  renewalDeclinedAt         DateTime?
+  renewalDeclinedByUserId   String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   tenant              User                 @relation("TenantLeases", fields: [tenantId], references: [id], onDelete: Cascade)
   unit                Unit                 @relation("UnitLease", fields: [unitId], references: [id], onDelete: Cascade)
+  rentalRequest       RentalRequest?       @relation("RentalRequestLeases", fields: [rentalRequestId], references: [id])
+  offer               Offer?               @relation("OfferLeases", fields: [offerId], references: [id])
+  property            Property?            @relation("PropertyLeases", fields: [propertyId], references: [id])
   maintenanceRequests MaintenanceRequest[] @relation("LeaseMaintenance")
   payments            Payment[]            @relation("LeasePayments")
   reviews             Review[]             @relation("LeaseReviews")
+  renewalRequests     RenewalRequest[]
 
   @@index([tenantId])
   @@index([status])
   @@index([endDate])
+  @@index([offerId])
+  @@index([rentalRequestId])
+  @@index([propertyId])
   @@map("leases")
+}
+model RenewalRequest {
+  id                  String   @id @default(cuid())
+  leaseId             String
+  initiatorUserId     String
+  status              RenewalRequestStatus @default(PENDING)
+  proposedTermMonths  Int?
+  proposedStartDate   DateTime?
+  proposedMonthlyRent Float?
+  note                String?
+  counterOfId         String?
+  expiresAt           DateTime?
+  decidedByUserId     String?
+  decidedAt           DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  lease               Lease    @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+
+  @@index([leaseId, status])
+  @@index([expiresAt])
+  @@map("renewal_requests")
+}
+
+enum RenewalRequestStatus {
+  PENDING
+  COUNTERED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELLED
 }
 
 model Review {
@@ -699,6 +752,11 @@ enum LeaseStatus {
   EXPIRED
   TERMINATED
   PENDING
+}
+
+enum LeaseRenewalStatus {
+  NONE
+  DECLINED
 }
 
 enum MaintenancePriority {

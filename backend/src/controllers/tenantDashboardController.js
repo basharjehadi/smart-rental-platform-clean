@@ -313,7 +313,8 @@ export const getTenantActiveLease = async (req, res) => {
       return res.json({
         property: null,
         landlord: null,
-        lease: null
+        lease: null,
+        leaseMeta: null
       });
     }
 
@@ -381,10 +382,38 @@ export const getTenantActiveLease = async (req, res) => {
       securityDeposit: activeLease.depositAmount || activeLease.rentalRequest.budget || 0
     };
 
+    // Try to load Lease meta (termination/renewal)
+    let leaseMeta = null;
+    try {
+      const leaseRow = await prisma.lease.findFirst({
+        where: {
+          tenantId,
+          rentalRequestId: activeLease.rentalRequest.id
+        },
+        select: {
+          id: true,
+          status: true,
+          terminationNoticeDate: true,
+          terminationEffectiveDate: true,
+          terminationReason: true,
+          renewalStatus: true,
+          renewalDeclinedAt: true
+        }
+      });
+      if (leaseRow) {
+        leaseMeta = leaseRow;
+      }
+    } catch (e) {
+      console.warn('getTenantActiveLease: leaseMeta lookup failed:', e?.message);
+    }
+
     res.json({
       property: propertyDetails,
       landlord: landlordInfo,
-      lease: leaseInfo
+      lease: leaseInfo,
+      leaseMeta,
+      rentalRequestId: activeLease.rentalRequest.id,
+      offerId: activeLease.id
     });
 
   } catch (error) {

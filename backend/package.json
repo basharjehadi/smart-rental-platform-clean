@@ -26,7 +26,8 @@
     "translate:start": "docker-compose -f ../docker-compose.translate.yml up -d",
     "translate:stop": "docker-compose -f ../docker-compose.translate.yml down",
     "translate:logs": "docker-compose -f ../docker-compose.translate.yml logs -f",
-    "translate:test": "node test-libretranslate.js"
+    "translate:test": "node test-libretranslate.js",
+    "test:renewal": "node scripts/test-renewal-termination.js"
   },
   "keywords": [
     "rental",

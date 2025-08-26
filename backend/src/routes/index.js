@@ -20,6 +20,8 @@ import systemRoutes from './systemRoutes.js';
 import supportRoutes from './supportRoutes.js';
 import reviewRoutes from './reviewRoutes.js';
 import moveInVerificationRoutes from './moveInVerificationRoutes.js';
+import leaseRoutes from './leaseRoutes.js';
+import renewalRoutes from './renewalRoutes.js';
 
 const router = Router();
 
@@ -81,5 +83,11 @@ router.use('/reviews', reviewRoutes);
 
 // Move-in verification routes
 router.use('/move-in', moveInVerificationRoutes);
+
+// Lease lifecycle routes
+router.use('/leases', leaseRoutes);
+
+// Renewal routes
+router.use('/', renewalRoutes);
 
 export default router; 

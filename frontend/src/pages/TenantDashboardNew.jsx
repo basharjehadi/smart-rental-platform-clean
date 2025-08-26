@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import TenantSidebar from '../components/TenantSidebar';
-import { LogOut } from 'lucide-react';
+import { LogOut, AlertTriangle } from 'lucide-react';
+import RenewalRequestModal from '../components/RenewalRequestModal.jsx';
+import EndLeaseModal from '../components/EndLeaseModal.jsx';
 import { viewContract, downloadContract } from '../utils/contractGenerator.js';
 import NotificationHeader from '../components/common/NotificationHeader';
 import ReviewCard from '../components/ReviewCard';
@@ -36,6 +38,12 @@ const TenantDashboardNew = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [focusedOfferId, setFocusedOfferId] = useState(null);
+  const [leaseMeta, setLeaseMeta] = useState(null);
+  const [renewals, setRenewals] = useState([]);
+  const [showRenewalModal, setShowRenewalModal] = useState(false);
+  const [sendingRenewal, setSendingRenewal] = useState(false);
+  const [showEndModal, setShowEndModal] = useState(false);
+  const [sendingEnd, setSendingEnd] = useState(false);
 
   useEffect(() => {
     console.log('🔍 Frontend: User state changed:', user);
@@ -115,6 +123,24 @@ const TenantDashboardNew = () => {
       } else if (dashboardResponse.data?.offerId) {
         setFocusedOfferId(dashboardResponse.data.offerId);
       }
+      // Fetch lease meta for the focused or single offer
+      try {
+        const offerForMeta = (dashboardResponse.data?.leases?.[0]?.offerId) || dashboardResponse.data?.offerId;
+        if (offerForMeta) {
+          const metaResp = await api.get(`/leases/by-offer/${offerForMeta}`);
+          setLeaseMeta(metaResp.data?.lease || null);
+          const leaseId = metaResp.data?.lease?.id;
+          if (leaseId) {
+            const threadResp = await api.get(`/leases/${leaseId}/renewals`);
+            setRenewals(threadResp.data?.renewals || []);
+          } else {
+            setRenewals([]);
+          }
+        } else {
+          setLeaseMeta(null);
+          setRenewals([]);
+        }
+      } catch { setLeaseMeta(null); setRenewals([]); }
       console.log('✅ Frontend: Dashboard data set successfully');
       console.log('🔍 Frontend: Dashboard data after set:', dashboardResponse.data);
       console.log('🔍 Frontend: Offer ID in dashboard data:', dashboardResponse.data.offerId);
@@ -135,6 +161,9 @@ const TenantDashboardNew = () => {
   const currentProperty = currentLease?.property || dashboardData?.property;
   const currentLandlord = currentLease?.landlord || dashboardData?.landlord;
   const currentLeaseInfo = currentLease?.lease || dashboardData?.lease;
+  const currentOfferForMeta = currentLease?.offerId || dashboardData?.offerId;
+  const latestRenewal = renewals.length > 0 ? renewals[renewals.length - 1] : null;
+  const latestOpen = latestRenewal && (latestRenewal.status === 'PENDING' || latestRenewal.status === 'COUNTERED') ? latestRenewal : null;
 
   const formatArea = (areaVal) => {
     if (!areaVal && areaVal !== 0) return 'N/A';
@@ -696,48 +725,38 @@ const TenantDashboardNew = () => {
                   </div>
                 </div>
 
-                {/* Lease Progress */}
+                {/* Payments (compact) */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Lease Progress</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-sm text-gray-600">
-                        {formatDate(currentLeaseInfo?.startDate)} - {formatDate(currentLeaseInfo?.endDate)}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-gray-600">Lease Completion</span>
-                        <span className="font-medium">{Math.round(calculateLeaseProgress())}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${calculateLeaseProgress()}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                    <div className="bg-gray-100 rounded-lg p-3">
-                      <p className="text-sm text-orange-600 font-medium">
-                        {calculateDaysToRenewal()} days until lease renewal
-                      </p>
-                    </div>
-                    <div className="space-y-2">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Payments</h3>
+                  {dashboardData.payments && dashboardData.payments.length > 0 ? (
+                    <div className="space-y-3">
+                      {dashboardData.payments.slice(0, 2).map((payment, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {payment.purpose === 'DEPOSIT_AND_FIRST_MONTH' ? 'Deposit & First Month' : payment.purpose}
+                            </p>
+                            <p className="text-xs text-gray-600">Paid on {formatDate(payment.date)}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-gray-900">{formatCurrency(payment.amount)}</p>
+                            <p className="text-xs text-gray-600">{payment.status}</p>
+                          </div>
+                        </div>
+                      ))}
                       <button 
-                        onClick={handleViewContract}
+                        onClick={() => navigate('/payment-history')}
                         className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                       >
-                        View Lease Agreement
-                      </button>
-                      <button 
-                        onClick={handleDownloadContract}
-                        className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                      >
-                        Download Contract
+                        View Full Payment History
                       </button>
                     </div>
-                  </div>
+                  ) : (
+                    <p className="text-sm text-gray-600">No payments yet.</p>
+                  )}
                 </div>
+
+                
               </div>
             ) : (
               /* Empty State for Detailed Cards */
@@ -752,55 +771,199 @@ const TenantDashboardNew = () => {
               </div>
             )}
 
-            {/* Payment History */}
+            {/* Lease Progress (moved into middle area) */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment History</h3>
-              <p className="text-sm text-gray-600 mb-4">Your last 5 payments</p>
-              {dashboardData.payments && dashboardData.payments.length > 0 ? (
-                <div className="space-y-3">
-                  {dashboardData.payments.slice(0, 5).map((payment, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            {payment.purpose === 'DEPOSIT_AND_FIRST_MONTH' ? 'Deposit & First Month' : 
-                             payment.purpose === 'RENT' ? 'Monthly Rent' : payment.purpose}
-                          </p>
-                          <p className="text-xs text-gray-600">Paid on {formatDate(payment.date)}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">{formatCurrency(payment.amount)}</p>
-                        <p className="text-xs text-gray-600">{payment.status}</p>
-                      </div>
-                    </div>
-                  ))}
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Lease Progress</h3>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-gray-600">
+                    {formatDate(currentLeaseInfo?.startDate)} - {formatDate(currentLeaseInfo?.endDate)}
+                  </p>
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                    </svg>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">Lease Completion</span>
+                    <span className="font-medium">{Math.round(calculateLeaseProgress())}%</span>
                   </div>
-                  <p className="text-gray-600">No payment history available yet.</p>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${calculateLeaseProgress()}%` }}
+                    ></div>
+                  </div>
                 </div>
-              )}
-              {dashboardData.payments && dashboardData.payments.length > 0 && (
-                <div className="mt-4 text-center">
-                  <button 
-                    onClick={() => navigate('/payment-history')}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    View Full Payment History
-                  </button>
+                <div className="bg-gray-100 rounded-lg p-3">
+                  <p className="text-sm text-orange-600 font-medium">
+                    {calculateDaysToRenewal()} days until lease renewal
+                  </p>
                 </div>
-              )}
+                {leaseMeta && (
+                  <div className="space-y-2">
+                    {leaseMeta.terminationNoticeDate && (
+                      <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded p-2">
+                        Termination notice submitted • effective {new Date(leaseMeta.terminationEffectiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </div>
+                    )}
+                    {leaseMeta.renewalStatus === 'DECLINED' && (
+                      <div className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded p-2">
+                        Renewal declined
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Two-column layout: left stable actions, right renewal */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left column */}
+                  <div className="space-y-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <div className="text-sm font-semibold text-gray-800 mb-1">Current lease</div>
+                    <button 
+                      onClick={handleViewContract}
+                      className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      View Lease Agreement
+                    </button>
+                    <button 
+                      onClick={handleDownloadContract}
+                      className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      Download Contract
+                    </button>
+                    {!leaseMeta?.terminationNoticeDate && (
+                      <button
+                        onClick={() => setShowEndModal(true)}
+                        className="w-full bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center space-x-2"
+                        title="End lease (30-day notice)"
+                      >
+                        <AlertTriangle className="w-4 h-4" />
+                        <span>End Lease</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Right column */}
+                  <div className="space-y-2 bg-indigo-50/40 border border-indigo-200 rounded-lg p-3">
+                    <div className="text-sm font-semibold text-indigo-800 mb-1">Renewal</div>
+                    <button
+                      onClick={() => setShowRenewalModal(true)}
+                      className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+                      title="Request lease renewal"
+                    >
+                      Request Renewal
+                    </button>
+
+                    {renewals.length > 0 && (
+                      <div className="bg-white border border-indigo-200 rounded p-3">
+                        <div className="text-sm font-semibold text-indigo-800 mb-2">Renewal thread</div>
+                        <div className="space-y-2 max-h-48 overflow-auto pr-1">
+                          {renewals.slice().reverse().map(r => (
+                            <div key={r.id} className="text-xs text-gray-700 bg-white border border-gray-100 rounded p-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">{r.status}</span>
+                                <span className="text-[10px] text-gray-500">{new Date(r.createdAt).toLocaleDateString()}</span>
+                              </div>
+                              {r.proposedMonthlyRent != null && (
+                                <div className="mt-1">Proposed rent: {r.proposedMonthlyRent} zł</div>
+                              )}
+                              {r.proposedTermMonths && (
+                                <div>Term: {r.proposedTermMonths} months</div>
+                              )}
+                              {r.proposedStartDate && (
+                                <div>Start: {new Date(r.proposedStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                              )}
+                              {r.note && (<div className="mt-1 text-gray-600">Note: {r.note}</div>)}
+                            </div>
+                          ))}
+                        </div>
+                        {latestOpen && latestOpen.initiatorUserId !== user?.id && (
+                          <div className="mt-2 flex space-x-2">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await api.post(`/renewals/${latestOpen.id}/accept`, {});
+                                  if (leaseMeta?.id) {
+                                    const threadResp = await api.get(`/leases/${leaseMeta.id}/renewals`);
+                                    setRenewals(threadResp.data?.renewals || []);
+                                  }
+                                  alert('Renewal accepted. New lease created.');
+                                } catch (e) { alert('Failed to accept renewal'); }
+                              }}
+                              className="px-3 py-1 rounded text-xs bg-green-600 text-white hover:bg-green-700"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await api.post(`/renewals/${latestOpen.id}/decline`, {});
+                                  if (leaseMeta?.id) {
+                                    const threadResp = await api.get(`/leases/${leaseMeta.id}/renewals`);
+                                    setRenewals(threadResp.data?.renewals || []);
+                                  }
+                                } catch (e) { alert('Failed to decline renewal'); }
+                              }}
+                              className="px-3 py-1 rounded text-xs bg-red-600 text-white hover:bg-red-700"
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {/* Renewal Request Modal */}
+              <RenewalRequestModal
+                open={showRenewalModal}
+                defaultTerm={12}
+                submitting={sendingRenewal}
+                onClose={() => setShowRenewalModal(false)}
+                onSubmit={async ({ termMonths, note }) => {
+                  try {
+                    if (!currentOfferForMeta) { alert('No active booking found.'); return; }
+                    setSendingRenewal(true);
+                    const metaResp = await api.get(`/leases/by-offer/${currentOfferForMeta}`);
+                    const leaseId = metaResp.data?.lease?.id;
+                    if (!leaseId) { alert('No lease found for this booking.'); setSendingRenewal(false); return; }
+                    await api.post(`/leases/${leaseId}/renewals`, { proposedTermMonths: termMonths || 12, note: note || '' });
+                    const threadResp = await api.get(`/leases/${leaseId}/renewals`);
+                    setRenewals(threadResp.data?.renewals || []);
+                    setShowRenewalModal(false);
+                  } catch (e) {
+                    console.error('Request renewal error:', e);
+                    alert('Failed to create renewal request');
+                  } finally {
+                    setSendingRenewal(false);
+                  }
+                }}
+              />
+
+              {/* End Lease Modal */}
+              <EndLeaseModal
+                open={showEndModal}
+                submitting={sendingEnd}
+                effectiveDate={(() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString(); })()}
+                onClose={() => setShowEndModal(false)}
+                onSubmit={async ({ reason, effectiveDate }) => {
+                  try {
+                    if (!currentOfferForMeta) { alert('No active booking found.'); return; }
+                    setSendingEnd(true);
+                    const metaResp = await api.get(`/leases/by-offer/${currentOfferForMeta}`);
+                    const leaseId = metaResp.data?.lease?.id;
+                    if (!leaseId) { alert('No lease found for this booking.'); setSendingEnd(false); return; }
+                    await api.post(`/leases/${leaseId}/termination/notice`, { reason: reason || 'Tenant initiated termination', effectiveDate });
+                    const newMeta = await api.get(`/leases/by-offer/${currentOfferForMeta}`);
+                    setLeaseMeta(newMeta.data?.lease || null);
+                    await fetchDashboardData();
+                    setShowEndModal(false);
+                  } catch (e) {
+                    console.error('End lease (dashboard) error:', e);
+                    alert('Failed to submit termination notice');
+                  } finally {
+                    setSendingEnd(false);
+                  }
+                }}
+              />
             </div>
 
             {/* Review System */}

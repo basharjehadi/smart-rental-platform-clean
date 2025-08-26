@@ -33,6 +33,10 @@ const startServer = async () => {
     const { startMoveInVerificationScheduler } = await import('./services/moveInVerificationService.js');
     startMoveInVerificationScheduler();
 
+    // Start lease lifecycle scheduler (termination execution)
+    const { startLeaseLifecycleScheduler } = await import('./services/leaseLifecycleService.js');
+    startLeaseLifecycleScheduler();
+
     // Create HTTP server
     const server = createServer(app);
 

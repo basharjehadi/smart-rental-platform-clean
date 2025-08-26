@@ -35,6 +35,7 @@ const TenantDashboard = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [verificationStatuses, setVerificationStatuses] = useState({}); // offerId -> status data
+  const [leaseMetaByOffer, setLeaseMetaByOffer] = useState({}); // offerId -> leaseMeta
   
   // Chat states
   const [showChat, setShowChat] = useState(false);
@@ -64,6 +65,14 @@ const TenantDashboard = () => {
       const entries = await Promise.all(statusPromises);
       const map = Object.fromEntries(entries);
       setVerificationStatuses(map);
+
+      // Fetch lease meta (termination/renewal) for tenant active lease; best-effort
+      try {
+        const leaseRes = await api.get('/tenant-dashboard/active-lease');
+        if (leaseRes?.data?.offerId && leaseRes?.data?.leaseMeta) {
+          setLeaseMetaByOffer((prev) => ({ ...prev, [leaseRes.data.offerId]: leaseRes.data.leaseMeta }));
+        }
+      } catch {}
     } catch (error) {
       console.error('❌ Dashboard: Error fetching requests:', error);
       console.error('❌ Dashboard: Error response:', error.response?.data);
@@ -136,6 +145,28 @@ const TenantDashboard = () => {
           <div className="text-sm text-blue-900 font-medium">🏠 Move-in verification</div>
           <div className="text-xs text-blue-800">⏰ {remainingText} left</div>
         </div>
+        {/* Lease meta chips (termination / renewal decline) */}
+        {(() => {
+          const lm = leaseMetaByOffer[paidOffer.id];
+          if (!lm) return null;
+          const chips = [];
+          if (lm.terminationNoticeDate) {
+            const eff = lm.terminationEffectiveDate ? new Date(lm.terminationEffectiveDate) : null;
+            chips.push(
+              <span key="term" className="mt-2 inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 mr-2">
+                Termination notice{eff ? ` • effective ${eff.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
+              </span>
+            );
+          }
+          if (lm.renewalStatus === 'DECLINED') {
+            chips.push(
+              <span key="renew" className="mt-2 inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-800 mr-2">
+                Renewal declined
+              </span>
+            );
+          }
+          return chips.length > 0 ? <div className="mt-2">{chips}</div> : null;
+        })()}
         <div className="mt-2 flex space-x-2">
           <button
             onClick={async () => {
@@ -575,25 +606,39 @@ const TenantDashboard = () => {
                           <div className="flex space-x-2">
                             <button
                               onClick={() => handleEditClick(request)}
-                              disabled={request.status === 'LOCKED'}
+                              disabled={(() => {
+                                if (request.status === 'LOCKED') return true;
+                                const paidOffer = (request.offers || []).find(o => o.status === 'PAID');
+                                const lm = paidOffer ? leaseMetaByOffer[paidOffer.id] : null;
+                                if (lm?.terminationNoticeDate) return true;
+                                if (lm?.renewalStatus === 'DECLINED') return true;
+                                return false;
+                              })()}
                               className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                                request.status === 'LOCKED'
+                                (() => { const paidOffer = (request.offers || []).find(o => o.status === 'PAID'); const lm = paidOffer ? leaseMetaByOffer[paidOffer.id] : null; const dis = request.status === 'LOCKED' || lm?.terminationNoticeDate || lm?.renewalStatus === 'DECLINED'; return dis; })()
                                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 hover:bg-gray-50 hover:shadow-sm'
                                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 hover:shadow-sm'
                               }`}
-                              title={request.status === 'LOCKED' ? 'This request cannot be edited' : 'Edit this rental request'}
+                              title={'This request cannot be edited'}
                             >
                               Edit
                             </button>
                             <button
                               onClick={() => handleDeleteClick(request)}
-                              disabled={request.status === 'LOCKED'}
+                              disabled={(() => {
+                                if (request.status === 'LOCKED') return true;
+                                const paidOffer = (request.offers || []).find(o => o.status === 'PAID');
+                                const lm = paidOffer ? leaseMetaByOffer[paidOffer.id] : null;
+                                if (lm?.terminationNoticeDate) return true;
+                                if (lm?.renewalStatus === 'DECLINED') return true;
+                                return false;
+                              })()}
                               className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                                request.status === 'LOCKED'
+                                (() => { const paidOffer = (request.offers || []).find(o => o.status === 'PAID'); const lm = paidOffer ? leaseMetaByOffer[paidOffer.id] : null; const dis = request.status === 'LOCKED' || lm?.terminationNoticeDate || lm?.renewalStatus === 'DECLINED'; return dis; })()
                                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 hover:bg-gray-50 hover:shadow-sm'
                                   : 'bg-white text-red-700 border border-red-300 hover:bg-red-50 hover:border-red-400 hover:shadow-sm'
                               }`}
-                              title={request.status === 'LOCKED' ? 'This request cannot be deleted' : 'Delete this rental request'}
+                              title={'This request cannot be deleted'}
                             >
                               Delete
                             </button>
@@ -601,11 +646,17 @@ const TenantDashboard = () => {
                         )}
                         
                         {/* Show reason why buttons are disabled */}
-                        {request.status === 'LOCKED' && (
+                        {(() => {
+                          const paidOffer = (request.offers || []).find(o => o.status === 'PAID');
+                          const lm = paidOffer ? leaseMetaByOffer[paidOffer.id] : null;
+                          const isDisabled = request.status === 'LOCKED' || lm?.terminationNoticeDate || lm?.renewalStatus === 'DECLINED';
+                          if (!isDisabled) return null;
+                          return (
                           <div className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-md border border-gray-100 animate-pulse">
-                            {'🔒 Request locked - cannot be modified after offer acceptance'}
+                            {'🔒 Request locked - cannot be modified'}
                           </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>

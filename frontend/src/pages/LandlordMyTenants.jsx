@@ -20,8 +20,11 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  User
+  User,
+  AlertTriangle
 } from 'lucide-react';
+import ProposeRenewalModal from '../components/ProposeRenewalModal.jsx';
+import EndLeaseModal from '../components/EndLeaseModal.jsx';
 
 const LandlordMyTenants = () => {
   const { user, logout, api } = useAuth();
@@ -33,6 +36,12 @@ const LandlordMyTenants = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
+  const [showRenewalModal, setShowRenewalModal] = useState(false);
+  const [renewalTenant, setRenewalTenant] = useState(null);
+  const [sendingRenewal, setSendingRenewal] = useState(false);
+  const [showEndModal, setShowEndModal] = useState(false);
+  const [endTenant, setEndTenant] = useState(null);
+  const [sendingEnd, setSendingEnd] = useState(false);
 
   useEffect(() => {
     fetchTenants();
@@ -214,6 +223,11 @@ const LandlordMyTenants = () => {
     }
   };
 
+  const handleProposeRenewal = (tenant) => {
+    setRenewalTenant(tenant);
+    setShowRenewalModal(true);
+  };
+
   const filteredTenants = filterAndSortTenants();
 
   if (loading) {
@@ -243,6 +257,7 @@ const LandlordMyTenants = () => {
   }
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50 flex">
       {/* Left Sidebar */}
       <LandlordSidebar />
@@ -480,6 +495,53 @@ const LandlordMyTenants = () => {
                             <MessageSquare className="w-4 h-4" />
                             <span>Send Message</span>
                           </button>
+
+                          {/* Propose Renewal (landlord) */}
+                          <button
+                            onClick={() => handleProposeRenewal(tenant)}
+                            className="flex items-center space-x-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors duration-200"
+                          >
+                            <Calendar className="w-4 h-4" />
+                            <span>Propose Renewal</span>
+                          </button>
+
+                          {/* Landlord End Lease button (opens modal) */}
+                          <button
+                            onClick={() => { setEndTenant(tenant); setShowEndModal(true); }}
+                            className="flex items-center space-x-2 px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors duration-200"
+                          >
+                            <AlertTriangle className="w-4 h-4" />
+                            <span>End Lease</span>
+                          </button>
+                        </div>
+                        {/* Status badges below actions */}
+                        <div className="mt-3 space-y-2">
+                          {(() => {
+                            const offerId = tenant?.offerId || tenant?.paidOfferId || tenant?.offer?.id;
+                            const lease = leaseMetaByOffer?.[offerId];
+                            if (lease?.terminationEffectiveDate) {
+                              const d = new Date(lease.terminationEffectiveDate);
+                              return (
+                                <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1 inline-block">
+                                  Termination notice – effective {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                          {(() => {
+                            const offerId = tenant?.offerId || tenant?.paidOfferId || tenant?.offer?.id;
+                            const lease = leaseMetaByOffer?.[offerId];
+                            const latest = lease ? renewalBadgeByLease?.[lease.id] : null;
+                            if (latest && (latest.status === 'PENDING' || latest.status === 'COUNTERED')) {
+                              return (
+                                <div className="text-xs text-indigo-800 bg-indigo-50 border border-indigo-200 rounded px-2 py-1 inline-block">
+                                  Renewal {latest.initiatorUserId === tenant.id ? 'requested by tenant' : 'proposal sent'} ({latest.status.toLowerCase()})
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -508,6 +570,55 @@ const LandlordMyTenants = () => {
         </main>
       </div>
     </div>
+    {/* Modals */}
+    <ProposeRenewalModal
+      open={showRenewalModal}
+      submitting={sendingRenewal}
+      onClose={() => setShowRenewalModal(false)}
+      onSubmit={async ({ rent, termMonths, startDate, note }) => {
+        try {
+          if (!renewalTenant) return;
+          setSendingRenewal(true);
+          const offerId = renewalTenant?.offerId || renewalTenant?.paidOfferId || renewalTenant?.offer?.id;
+          const metaResp = await api.get(`/leases/by-offer/${offerId}`);
+          const leaseId = metaResp.data?.lease?.id;
+          if (!leaseId) { alert('No lease found for this booking.'); setSendingRenewal(false); return; }
+          await api.post(`/leases/${leaseId}/renewals`, { proposedMonthlyRent: rent, proposedTermMonths: termMonths, proposedStartDate: startDate, note: note || '' });
+          setShowRenewalModal(false);
+          await fetchTenants();
+        } catch (e) {
+          console.error('Propose renewal error:', e);
+          alert('Failed to propose renewal');
+        } finally {
+          setSendingRenewal(false);
+        }
+      }}
+    />
+    <EndLeaseModal
+      open={showEndModal}
+      submitting={sendingEnd}
+      effectiveDate={(() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString(); })()}
+      onClose={() => setShowEndModal(false)}
+      onSubmit={async ({ reason, effectiveDate }) => {
+        try {
+          if (!endTenant) return;
+          setSendingEnd(true);
+          const offerId = endTenant?.offerId || endTenant?.paidOfferId || endTenant?.offer?.id;
+          const metaResp = await api.get(`/leases/by-offer/${offerId}`);
+          const leaseId = metaResp.data?.lease?.id;
+          if (!leaseId) { alert('No lease found for this booking.'); setSendingEnd(false); return; }
+          await api.post(`/leases/${leaseId}/termination/notice`, { reason: reason || 'Landlord initiated termination', effectiveDate });
+          setShowEndModal(false);
+          await fetchTenants();
+        } catch (e) {
+          console.error('End lease error:', e);
+          alert('Failed to submit termination notice');
+        } finally {
+          setSendingEnd(false);
+        }
+      }}
+    />
+  </>
   );
 };
 
