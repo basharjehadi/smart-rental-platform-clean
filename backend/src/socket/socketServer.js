@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 // Helper function to get notification counts
 const getNotificationCounts = async (userId) => {
   try {
-    const [rentalRequests, offers] = await Promise.all([
+    const [rentalRequests, offers, allUnread] = await Promise.all([
       prisma.notification.count({
         where: {
           userId,
@@ -22,13 +22,20 @@ const getNotificationCounts = async (userId) => {
           type: 'NEW_OFFER',
           isRead: false
         }
+      }),
+      prisma.notification.count({
+        where: {
+          userId,
+          isRead: false
+        }
       })
     ]);
 
+    // total should represent ALL unread notifications
     return {
       rentalRequests,
       offers,
-      total: rentalRequests + offers
+      total: allUnread
     };
   } catch (error) {
     console.error('Error getting notification counts:', error);
@@ -476,6 +483,22 @@ export function initializeSocket(server) {
       console.log(`🔔 Notification sent to user ${userId}:`, notification.title);
     } catch (error) {
       console.error('Error emitting notification:', error);
+    }
+  };
+
+  // Function to emit move-in verification updates to landlords
+  io.emitMoveInVerificationUpdate = async (landlordId, offerId, status) => {
+    try {
+      // Emit to the specific landlord's room
+      io.to(`user-${landlordId}`).emit('movein-verification:update', {
+        offerId,
+        status,
+        timestamp: new Date()
+      });
+      
+      console.log(`🏠 Move-in verification update sent to landlord ${landlordId}: ${status}`);
+    } catch (error) {
+      console.error('Error emitting move-in verification update:', error);
     }
   };
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useSocket } from '../contexts/SocketContext';
 import { useTranslation } from 'react-i18next';
 import LandlordSidebar from '../components/LandlordSidebar';
 import TenantRequestCard from '../components/TenantRequestCard';
@@ -29,8 +30,10 @@ import {
 const LandlordRentalRequests = () => {
   const { user, logout } = useAuth();
   const { markByTypeAsRead } = useNotifications();
+  const { socket } = useSocket();
   const navigate = useNavigate();
   const [rentalRequests, setRentalRequests] = useState([]);
+  const [acceptedRequests, setAcceptedRequests] = useState([]);
   const [totalRequests, setTotalRequests] = useState(0);
   const [activeTab, setActiveTab] = useState('Pending'); // Pending | Offered | Accepted | Declined
   const [loading, setLoading] = useState(true);
@@ -57,10 +60,29 @@ const LandlordRentalRequests = () => {
 
   useEffect(() => {
     fetchRentalRequests();
+    fetchAcceptedRequests();
     fetchProfileData();
     // Mark rental request notifications as read when visiting the page
     markByTypeAsRead('NEW_RENTAL_REQUEST');
   }, []);
+
+  // Listen for move-in verification updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleMoveInVerificationUpdate = (data) => {
+      console.log('🏠 Move-in verification update received in rental requests:', data);
+      // Refresh rental requests data when move-in status changes
+      fetchRentalRequests();
+      fetchAcceptedRequests();
+    };
+
+    socket.on('movein-verification:update', handleMoveInVerificationUpdate);
+
+    return () => {
+      socket.off('movein-verification:update', handleMoveInVerificationUpdate);
+    };
+  }, [socket]);
 
   // Calculate total initial cost and pro-rated amounts when rent, deposit, or available date changes
   useEffect(() => {
@@ -111,73 +133,125 @@ const LandlordRentalRequests = () => {
   const fetchRentalRequests = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/pool/rental-requests');
- 
-       // New API shape: { pending, offered, accepted, declined }
-       const { pending = [], offered = [], accepted = [], declined = [] } = response.data || {};
- 
-       const mapOne = (request) => {
-         const tenant = request.tenant || {};
-         const budgetFrom = request.budgetFrom || request.budget;
-         const budgetTo = request.budgetTo || request.budget;
-         const budgetRange = budgetFrom === budgetTo 
-           ? `${formatCurrencyDisplay(budgetFrom)}`
-           : `${formatCurrencyDisplay(budgetFrom)} - ${formatCurrencyDisplay(budgetTo)}`;
- 
-         const initials = tenant.firstName && tenant.lastName 
-           ? `${tenant.firstName.charAt(0)}${tenant.lastName.charAt(0)}`
-           : tenant.firstName?.charAt(0) || 'T';
- 
-         const propertyMatch = request.propertyMatch || request.matchedProperty || {};
- 
-         return {
-           id: request.id,
-           name: `${tenant.firstName || 'Tenant'} ${tenant.lastName || ''}`.trim(),
-           initials,
-           profileImage: tenant.profileImage || null,
-           email: tenant.email || null,
-           phone: tenant.phoneNumber || null,
-           age: tenant.age || null,
-           occupation: tenant.profession || null,
-           verified: tenant.isVerified || false,
-           rating: tenant.rating ?? undefined,
-           reviews: tenant.reviews ?? undefined,
-           budgetRange,
-           budgetFrom,
-           budgetTo,
-           budget: request.budget,
-           moveInDate: request.moveInDate ? formatDate(request.moveInDate) : null,
-           location: request.location,
-           requirements: request.additionalRequirements || 'No specific requirements mentioned.',
-           interestCount: request.responseCount || 0,
-           status: request.status || 'pending',
-           propertyMatch: {
-             id: propertyMatch.id,
-             name: propertyMatch.name || 'Your Property',
-             address: propertyMatch.address || 'Address not specified',
-             rent: propertyMatch.monthlyRent ? `${formatCurrencyDisplay(propertyMatch.monthlyRent)} zł` : (propertyMatch.rent || 'Rent not specified'),
-             available: propertyMatch.availableFrom ? formatDate(propertyMatch.availableFrom) : (propertyMatch.available || 'Date not specified'),
-             propertyType: propertyMatch.propertyType || 'Apartment'
-           },
-           propertyType: request.propertyType
-         };
-       };
- 
-              const pendingMapped = pending.map(r => ({ ...mapOne(r), status: 'pending' }));
-       const offeredMapped  = offered.map(r => ({ ...mapOne(r), status: 'offered' }));
-       const acceptedMapped = accepted.map(r => ({ ...mapOne(r), status: 'accepted' }));
-       const declinedMapped = declined.map(r => ({ ...mapOne(r), status: 'declined' }));
-       
-       const all = [...pendingMapped, ...offeredMapped, ...acceptedMapped, ...declinedMapped];
-       setTotalRequests(all.length);
-       setRentalRequests(all);
-     } catch (error) {
-       console.error('Error fetching rental requests:', error);
-       setError('Failed to fetch rental requests');
-     } finally {
-       setLoading(false);
-     }
-   };
+      const response = await api.get('/rental-requests');
+      const raw = response.data.rentalRequests || [];
+
+      const mapToCard = (request) => {
+        const tenantUser = request.tenant || {};
+        const budgetFrom = request.budgetFrom || request.budget;
+        const budgetTo = request.budgetTo || request.budget;
+        const budgetRange = budgetFrom === budgetTo
+          ? `${formatCurrencyDisplay(budgetFrom)}`
+          : `${formatCurrencyDisplay(budgetFrom)} - ${formatCurrencyDisplay(budgetTo)}`;
+
+        const initials = tenantUser.firstName && tenantUser.lastName
+          ? `${tenantUser.firstName.charAt(0)}${tenantUser.lastName.charAt(0)}`
+          : (tenantUser.firstName?.charAt(0) || 'T');
+
+        const mp = request.matchedProperty || {};
+
+        return {
+          id: request.id,
+          name: `${tenantUser.firstName || 'Tenant'} ${tenantUser.lastName || ''}`.trim(),
+          initials,
+          profileImage: tenantUser.profileImage || null,
+          email: tenantUser.email || null,
+          phone: tenantUser.phoneNumber || null,
+          age: tenantUser.age || null,
+          occupation: tenantUser.profession || null,
+          verified: tenantUser.isVerified || false,
+          rating: tenantUser.rating ?? undefined,
+          reviews: tenantUser.reviews ?? undefined,
+          budgetRange,
+          budgetFrom,
+          budgetTo,
+          budget: request.budget,
+          moveInDate: request.moveInDate ? formatDate(request.moveInDate) : null,
+          location: request.location,
+          requirements: request.additionalRequirements || 'No specific requirements mentioned.',
+          interestCount: request.responseCount || 0,
+          status: (request.status || 'pending').toLowerCase(),
+          propertyMatch: {
+            id: mp.id,
+            name: mp.name || 'Your Property',
+            address: mp.address || 'Address not specified',
+            rent: mp.monthlyRent ? `${formatCurrencyDisplay(mp.monthlyRent)} zł` : (mp.rent || 'Rent not specified'),
+            available: mp.availableFrom ? formatDate(mp.availableFrom) : (mp.available || 'Date not specified'),
+            propertyType: mp.propertyType || 'Apartment'
+          },
+          propertyType: request.propertyType
+        };
+      };
+
+      const mapped = raw.map(mapToCard);
+      setRentalRequests(mapped);
+      setTotalRequests(mapped.length);
+    } catch (error) {
+      console.error('Error fetching rental requests:', error);
+      setError('Failed to load rental requests');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAcceptedRequests = async () => {
+    try {
+      const response = await api.get('/accepted-requests');
+      const raw = response.data.acceptedRequests || [];
+
+      const mapped = raw.map((req) => {
+        const tenantUser = req.tenant || {};
+        const budgetFrom = req.budgetFrom || req.budget;
+        const budgetTo = req.budgetTo || req.budget;
+        const budgetRange = budgetFrom === budgetTo
+          ? `${formatCurrencyDisplay(budgetFrom)}`
+          : `${formatCurrencyDisplay(budgetFrom)} - ${formatCurrencyDisplay(budgetTo)}`;
+
+        const initials = tenantUser.firstName && tenantUser.lastName
+          ? `${tenantUser.firstName.charAt(0)}${tenantUser.lastName.charAt(0)}`
+          : (tenantUser.firstName?.charAt(0) || 'T');
+
+        const mp = req.propertyMatch || {};
+
+        return {
+          id: req.id,
+          name: `${tenantUser.firstName || 'Tenant'} ${tenantUser.lastName || ''}`.trim(),
+          initials,
+          profileImage: tenantUser.profileImage || null,
+          email: tenantUser.email || null,
+          phone: tenantUser.phoneNumber || null,
+          age: tenantUser.age || null,
+          occupation: tenantUser.profession || null,
+          verified: tenantUser.isVerified || false,
+          rating: tenantUser.rating ?? undefined,
+          reviews: tenantUser.reviews ?? undefined,
+          budgetRange,
+          budgetFrom,
+          budgetTo,
+          budget: req.budget,
+          moveInDate: req.moveInDate ? formatDate(req.moveInDate) : null,
+          location: req.location,
+          requirements: req.additionalRequirements || 'No specific requirements mentioned.',
+          interestCount: req.responseCount || 0,
+          status: 'accepted',
+          propertyMatch: {
+            id: mp.id,
+            name: mp.name || 'Your Property',
+            address: mp.address || 'Address not specified',
+            rent: mp.rent || 'Rent not specified',
+            available: mp.available || 'Date not specified',
+            propertyType: mp.propertyType || 'Apartment'
+          },
+          propertyType: req.propertyType
+        };
+      });
+
+      setAcceptedRequests(mapped);
+    } catch (error) {
+      console.error('Error fetching accepted requests:', error);
+      // Don't set error for accepted requests as it's not critical
+    }
+  };
 
   const fetchProfileData = async () => {
     try {
@@ -842,7 +916,7 @@ const LandlordRentalRequests = () => {
                       return s === 'active' || s === 'pending';
                     }).length,
                     Offered: rentalRequests.filter(t => (t.status || '').toLowerCase() === 'offered').length,
-                    Accepted: rentalRequests.filter(t => (t.status || '').toLowerCase() === 'accepted').length,
+                    Accepted: acceptedRequests.length, // Use accepted requests for this tab
                     Declined: rentalRequests.filter(t => (t.status || '').toLowerCase() === 'declined').length
                   };
                   const count = counts[tab];
@@ -868,19 +942,19 @@ const LandlordRentalRequests = () => {
                   {activeTab} requests
                 </h2>
                 <span className="text-sm text-gray-500">
-                  {`Total: ${totalRequests}`}
+                  {`Total: ${activeTab === 'Accepted' ? acceptedRequests.length : totalRequests}`}
                 </span>
               </div>
             ) : null}
 
             {/* Tenant Profile Cards */}
             <div className="space-y-6">
-              {rentalRequests
+              {(activeTab === 'Accepted' ? acceptedRequests : rentalRequests)
                 .filter(t => {
                   const s = (t.status || 'active').toLowerCase();
                   if (activeTab === 'Pending') return s === 'active' || s === 'pending';
                   if (activeTab === 'Offered') return s === 'offered';
-                  if (activeTab === 'Accepted') return s === 'accepted';
+                  if (activeTab === 'Accepted') return true; // Show all accepted requests
                   if (activeTab === 'Declined') return s === 'declined';
                   return true;
                 })
@@ -902,11 +976,11 @@ const LandlordRentalRequests = () => {
             </div>
 
             {/* Empty State */}
-            {rentalRequests.filter(t => {
+            {(activeTab === 'Accepted' ? acceptedRequests : rentalRequests).filter(t => {
               const s = (t.status || 'active').toLowerCase();
               if (activeTab === 'Pending') return s === 'active' || s === 'pending';
               if (activeTab === 'Offered') return s === 'offered';
-              if (activeTab === 'Accepted') return s === 'accepted';
+              if (activeTab === 'Accepted') return true; // Show all accepted requests
               if (activeTab === 'Declined') return s === 'declined';
               return true;
             }).length === 0 && !error.includes('No properties found') && (

@@ -15,7 +15,8 @@ import {
   getMyOffers,
   getAllRentalRequests,
   declineRentalRequest,
-  getOfferDetails
+  getOfferDetails,
+  getLandlordAcceptedRequests
 } from '../controllers/rentalController.js';
 import { uploadRulesPdf } from '../middlewares/uploadMiddleware.js';
 import { verifyToken, requireLandlord, requireTenant, requireAdmin } from '../middlewares/authMiddleware.js';
@@ -35,6 +36,7 @@ router.patch('/tenant/offer/:offerId', verifyToken, requireTenant, updateTenantO
 
 // 🚀 SCALABILITY: Landlord routes with pool integration (MUST come after tenant routes)
 router.get('/rental-requests', verifyToken, requireLandlord, getAllRentalRequests);
+router.get('/accepted-requests', verifyToken, requireLandlord, getLandlordAcceptedRequests);
 router.get('/pool/rental-requests', verifyToken, requireLandlord, getAllActiveRequests);
 router.post('/rental-request/:requestId/view', verifyToken, requireLandlord, markRequestAsViewed);
 router.post('/rental-request/:requestId/offer', verifyToken, requireLandlord, uploadRulesPdf, createOffer);

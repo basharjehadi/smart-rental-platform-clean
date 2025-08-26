@@ -247,15 +247,14 @@ const TenantDashboard = () => {
     return `${baseUrl}${photoPath}`;
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, forceCancelled = false) => {
     const statusConfig = {
       ACTIVE: { text: 'Active', color: 'bg-green-100 text-green-800' },
       LOCKED: { text: 'Locked', color: 'bg-yellow-100 text-yellow-800' },
-      COMPLETED: { text: 'Completed', color: 'bg-blue-100 text-blue-800' },
-      CANCELLED: { text: 'Expired', color: 'bg-red-100 text-red-800' }
+      CANCELLED: { text: 'Cancelled', color: 'bg-red-100 text-red-800' }
     };
-    
-    const config = statusConfig[status] || statusConfig.CANCELLED;
+    const effective = forceCancelled ? 'CANCELLED' : status;
+    const config = statusConfig[effective] || statusConfig.CANCELLED;
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
         {config.text}
@@ -454,8 +453,8 @@ const TenantDashboard = () => {
                     <option value="all">All Statuses</option>
                     <option value="ACTIVE">Active</option>
                     <option value="LOCKED">Locked</option>
-                    <option value="COMPLETED">Completed</option>
-                    <option value="CANCELLED">Expired</option>
+                    <option value="CANCELLED">Cancelled</option>
+                    <option value="EXPIRED">Expired</option>
                   </select>
                 </div>
 
@@ -530,7 +529,12 @@ const TenantDashboard = () => {
                           <div>
                             <span className="text-gray-500">Status:</span>
                             <div className="mt-1">
-                              {getStatusBadge(request.status)}
+                              {(() => {
+                                const paidOffer = (request.offers || []).find(o => o.status === 'PAID');
+                                const v = paidOffer ? verificationStatuses[paidOffer.id] : null;
+                                const forceCancelled = v?.status === 'CANCELLED';
+                                return getStatusBadge(request.status, forceCancelled);
+                              })()}
                             </div>
                             {/* Show offer status if request is locked */}
                             {request.status === 'LOCKED' && getOfferStatusText(request) && (
@@ -544,6 +548,21 @@ const TenantDashboard = () => {
                         {/* Move-in verification section for locked requests with paid offer */}
                         {renderMoveInVerificationCard(request)}
 
+                        {/* Refund summary for cancelled bookings */}
+                        {request.status === 'CANCELLED' && request._refundSummary && request._refundSummary.count > 0 && (
+                          <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm text-green-900 font-medium">Refunds</div>
+                              <div className="text-sm text-green-800">
+                                {new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(request._refundSummary.totalRefunded || 0)}
+                              </div>
+                            </div>
+                            <div className="mt-1 text-xs text-green-800">
+                              {request._refundSummary.count} payment{request._refundSummary.count !== 1 ? 's' : ''} refunded via {request._refundSummary.gateways.join(', ')}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Created Date and Time */}
                         <div className="mt-4 pt-3 border-t border-gray-100">
                           <div className="text-xs text-gray-500">
@@ -552,46 +571,39 @@ const TenantDashboard = () => {
                         </div>
                       </div>
                       <div className="flex flex-col space-y-2 ml-4">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleEditClick(request)}
-                            disabled={request.status === 'CANCELLED' || request.status === 'LOCKED'}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                              request.status === 'CANCELLED' || request.status === 'LOCKED'
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 hover:bg-gray-50 hover:shadow-sm'
-                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 hover:shadow-sm'
-                            }`}
-                            title={request.status === 'CANCELLED' || request.status === 'LOCKED' 
-                              ? 'This request cannot be edited' 
-                              : 'Edit this rental request'
-                            }
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClick(request)}
-                            disabled={request.status === 'CANCELLED' || request.status === 'LOCKED'}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                              request.status === 'CANCELLED' || request.status === 'LOCKED'
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 hover:bg-gray-50 hover:shadow-sm'
-                                : 'bg-white text-red-700 border border-red-300 hover:bg-red-50 hover:border-red-400 hover:shadow-sm'
-                            }`}
-                            title={request.status === 'CANCELLED' || request.status === 'LOCKED' 
-                              ? 'This request cannot be deleted' 
-                              : 'Delete this rental request'
-                            }
-                          >
-                            Delete
-                          </button>
-                        </div>
+                        {request.status !== 'CANCELLED' && (
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleEditClick(request)}
+                              disabled={request.status === 'LOCKED'}
+                              className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                                request.status === 'LOCKED'
+                                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 hover:bg-gray-50 hover:shadow-sm'
+                                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 hover:shadow-sm'
+                              }`}
+                              title={request.status === 'LOCKED' ? 'This request cannot be edited' : 'Edit this rental request'}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClick(request)}
+                              disabled={request.status === 'LOCKED'}
+                              className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                                request.status === 'LOCKED'
+                                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 hover:bg-gray-50 hover:shadow-sm'
+                                  : 'bg-white text-red-700 border border-red-300 hover:bg-red-50 hover:border-red-400 hover:shadow-sm'
+                              }`}
+                              title={request.status === 'LOCKED' ? 'This request cannot be deleted' : 'Delete this rental request'}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
                         
                         {/* Show reason why buttons are disabled */}
-                        {(request.status === 'CANCELLED' || request.status === 'LOCKED') && (
+                        {request.status === 'LOCKED' && (
                           <div className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-md border border-gray-100 animate-pulse">
-                            {request.status === 'CANCELLED' 
-                              ? '⚠️ Request expired - cannot be modified'
-                              : '🔒 Request locked - cannot be modified after offer acceptance'
-                            }
+                            {'🔒 Request locked - cannot be modified after offer acceptance'}
                           </div>
                         )}
                       </div>

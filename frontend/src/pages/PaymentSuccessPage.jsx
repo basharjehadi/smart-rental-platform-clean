@@ -637,21 +637,7 @@ const PaymentSuccessPage = () => {
                     <span>Call</span>
                   </button>
                   
-                  {/* Test button */}
-                  <button
-                    onClick={() => {
-                      console.log('🔍 Test button clicked!');
-                      console.log('🔍 Testing handleMessageLandlord function...');
-                      if (typeof handleMessageLandlord === 'function') {
-                        handleMessageLandlord();
-                      } else {
-                        console.log('❌ handleMessageLandlord is not a function!');
-                      }
-                    }}
-                    className="w-full bg-yellow-500 text-white py-3 px-4 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center space-x-2"
-                  >
-                    <span>🧪 Test Message Function</span>
-                  </button>
+                  {/* Test button removed */}
                 </div>
               </div>
 

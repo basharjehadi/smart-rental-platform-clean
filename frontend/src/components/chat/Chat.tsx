@@ -287,6 +287,11 @@ const Chat: React.FC<ChatProps> = ({
               onTyping={handleTyping}
               disabled={isChatDisabled}
             />
+            {conversationStatus === 'ARCHIVED' && (
+              <div className="px-4 py-2 text-center text-xs text-gray-500 border-t border-gray-200 bg-gray-50">
+                Conversation archived. You can read past messages but cannot send new ones.
+              </div>
+            )}
           </>
         )}
       </div>

@@ -46,20 +46,20 @@ const generatePaymentSchedule = (offer) => {
 
   let paymentNumber = 2; // Start from payment #2 (first month already paid)
 
-  // Generate payments for each month until lease end (EXACTLY like payment history)
+  // Generate payments for each month until lease end
   while (currentDate < endDate) {
-    // Calculate due date (10th of the month)
-    const dueDate = new Date(currentDate);
-    dueDate.setDate(10);
-
-    // Check if this is the last month (EXACTLY like payment history)
+    // Determine if last month (potentially prorated)
     const isLastMonth = currentDate.getMonth() === endDate.getMonth() && currentDate.getFullYear() === endDate.getFullYear();
-    
+
+    // Due date: 10th normally, 1st only for the prorated last month
+    const dueDate = new Date(currentDate);
+    dueDate.setDate(isLastMonth ? 1 : 10);
+
     let amount = monthlyRent;
     
     if (isLastMonth) {
-      // Last month: prorated for August 1-16 (16 days) - EXACTLY like payment history
-      const daysInLastMonth = endDate.getDate(); // 16 days
+      // Last month: prorated for days up to lease end date; due on the 1st of that month
+      const daysInLastMonth = endDate.getDate();
       amount = Math.round((monthlyRent * daysInLastMonth) / 30);
     }
 

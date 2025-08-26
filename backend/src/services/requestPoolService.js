@@ -163,11 +163,10 @@ class RequestPoolService {
         props = await prisma.property.findMany({ where: relaxedWhere, select: whereSelect(), take: 200 });
       }
 
-      // Group by landlord and carry a bounded property set
+      // Group by landlord and carry a bounded property set (do NOT gate on landlord availability)
       const map = new Map();
       for (const p of props) {
-        const L = p.landlord;
-        if (!L || L.availability === false) continue;
+        const L = p.landlord || { id: p.landlordId, landlordProfile: null };
         if (!map.has(L.id)) map.set(L.id, { id: L.id, landlordProfile: L.landlordProfile, properties: [] });
         const entry = map.get(L.id);
         if (!entry.properties.some(x => x.id === p.id)) entry.properties.push(stripLandlord(p));

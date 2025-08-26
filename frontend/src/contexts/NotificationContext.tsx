@@ -52,14 +52,18 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   });
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  // Fetch initial notification counts
+  // Fetch initial notification counts (all unread)
   const fetchCounts = async () => {
     if (!user) return;
     
     try {
       const response = await api.get('/notifications/unread-counts');
       if (response.data.success) {
-        setCounts(response.data);
+        setCounts({
+          rentalRequests: response.data.rentalRequests,
+          offers: response.data.offers,
+          total: response.data.total
+        });
       }
     } catch (error) {
       console.error('Error fetching notification counts:', error);

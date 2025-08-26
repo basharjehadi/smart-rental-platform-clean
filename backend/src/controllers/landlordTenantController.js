@@ -20,7 +20,12 @@ export const getLandlordTenants = async (req, res) => {
     const paidOffers = await prisma.offer.findMany({
       where: {
         landlordId: landlordId,
-        status: 'PAID'
+        status: 'PAID',
+        // Exclude unwinded/cancelled bookings
+        moveInVerificationStatus: { not: 'CANCELLED' },
+        rentalRequest: {
+          NOT: { status: 'CANCELLED' }
+        }
       },
       include: {
         rentalRequest: {

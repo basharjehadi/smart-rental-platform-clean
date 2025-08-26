@@ -26,9 +26,9 @@ const getLandlordDashboard = async (req, res) => {
     // Calculate portfolio metrics based on offers
     const totalProperties = properties.length;
     const totalOffers = properties.reduce((sum, property) => sum + property.offers.length, 0);
-    // Only count PAID offers as occupied; ACCEPTED does not mean paid
+    // Only count PAID offers that were not cancelled via move-in review
     const activeOffers = properties.reduce((sum, property) => 
-      sum + property.offers.filter(offer => offer.status === 'PAID').length, 0
+      sum + property.offers.filter(offer => offer.status === 'PAID' && offer.moveInVerificationStatus !== 'CANCELLED').length, 0
     );
     const vacantProperties = totalProperties - activeOffers;
     const occupancyRate = totalProperties > 0 ? Math.round((activeOffers / totalProperties) * 100) : 0;
@@ -40,7 +40,8 @@ const getLandlordDashboard = async (req, res) => {
     const recentTenants = await prisma.offer.findMany({
       where: {
         landlordId,
-        status: 'PAID'
+        status: 'PAID',
+        moveInVerificationStatus: { not: 'CANCELLED' }
       },
       include: {
         property: true,
@@ -75,6 +76,7 @@ const getLandlordDashboard = async (req, res) => {
       where: {
         landlordId,
         status: 'PAID',
+        moveInVerificationStatus: { not: 'CANCELLED' },
         leaseEndDate: {
           gte: new Date(),
           lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Next 30 days

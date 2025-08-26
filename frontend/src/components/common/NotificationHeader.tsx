@@ -152,15 +152,11 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({ className = '' 
       >
         <Bell className="w-5 h-5" />
         
-        {/* Total Notification Badge - Show system notifications count */}
+        {/* Total Notification Badge - show ALL unread (business + system) */}
         {(() => {
-          // Calculate system notifications count (total - business notifications)
-          const businessNotificationsCount = counts.rentalRequests + counts.offers;
-          const systemNotificationsCount = counts.total - businessNotificationsCount;
-
-          return systemNotificationsCount > 0 ? (
+          return counts.total > 0 ? (
             <div className="absolute -top-1 -right-1">
-              <NotificationBadge count={systemNotificationsCount} />
+              <NotificationBadge count={counts.total} />
             </div>
           ) : null;
         })()}
@@ -175,11 +171,7 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({ className = '' 
               <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
               <div className="flex items-center space-x-2">
                 {(() => {
-                  // Calculate system notifications count (total - business notifications)
-                  const businessNotificationsCount = counts.rentalRequests + counts.offers;
-                  const systemNotificationsCount = counts.total - businessNotificationsCount;
-                  
-                  return systemNotificationsCount > 0 ? (
+                  return counts.total > 0 ? (
                     <button
                       onClick={markAllAsRead}
                       className="text-xs text-blue-600 hover:text-blue-700 font-medium"
@@ -199,18 +191,12 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({ className = '' 
             
             {/* System Notification Type Counts */}
             <div className="flex items-center space-x-4 mt-2 text-xs text-gray-600">
-              {(() => {
-                // Calculate system notifications count (total - business notifications)
-                const businessNotificationsCount = counts.rentalRequests + counts.offers;
-                const systemNotificationsCount = counts.total - businessNotificationsCount;
-                
-                return systemNotificationsCount > 0 ? (
-                  <span className="flex items-center space-x-1">
-                    <Bell className="w-3 h-3 text-purple-600" />
-                    <span>{systemNotificationsCount} system notifications</span>
-                  </span>
-                ) : null;
-              })()}
+              {counts.total > 0 ? (
+                <span className="flex items-center space-x-1">
+                  <Bell className="w-3 h-3 text-purple-600" />
+                  <span>{counts.total} unread notifications</span>
+                </span>
+              ) : null}
             </div>
           </div>
 

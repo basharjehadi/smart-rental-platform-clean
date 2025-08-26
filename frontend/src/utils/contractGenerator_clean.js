@@ -46,6 +46,7 @@ export const generateRentalContract = (offer, user = null) => {
 
     while (currentDate < endDate) {
       const dueDate = new Date(currentDate);
+      // Default due date is the 10th, but for the final prorated month it should be the 1st
       dueDate.setDate(10);
 
       const isLastMonth = currentDate.getMonth() === endDate.getMonth() && currentDate.getFullYear() === endDate.getFullYear();
@@ -56,6 +57,8 @@ export const generateRentalContract = (offer, user = null) => {
         const daysInLastMonth = endDate.getDate();
         amount = Math.round((monthlyRent * daysInLastMonth) / 30);
         description = 'Final Month (Prorated)';
+        // Final month payment date should be the 1st day of that month
+        dueDate.setDate(1);
       }
 
       schedule.push({

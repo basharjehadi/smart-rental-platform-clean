@@ -46,6 +46,8 @@ router.get('/conversations', verifyToken, async (req, res) => {
       include: {
         conversation: {
           include: {
+            // IMPORTANT: hide archived conversations from active list
+            // We'll filter after include due to Prisma include constraints
             participants: {
               include: {
                 user: {
@@ -108,7 +110,12 @@ router.get('/conversations', verifyToken, async (req, res) => {
       }
     });
 
-    res.json(conversations.map(p => p.conversation));
+    // Filter out archived conversations and return clean list
+    const activeConversations = conversations
+      .map(p => p.conversation)
+      .filter(c => c && c.status !== 'ARCHIVED');
+
+    res.json(activeConversations);
   } catch (error) {
     console.error('Error fetching conversations:', error);
     res.status(500).json({ error: 'Failed to fetch conversations' });
@@ -181,22 +188,71 @@ router.post('/conversations', verifyToken, async (req, res) => {
       ? participantIds 
       : [...participantIds, req.user.id];
 
-    // Check if conversation already exists between these participants
-    const existingConversation = await prisma.conversation.findFirst({
+    // Try to infer landlord/tenant and a paid offer to determine chat status/property context
+    let inferredPropertyId = propertyId || null;
+    let desiredStatus = 'PENDING';
+    try {
+      const users = await prisma.user.findMany({
+        where: { id: { in: allParticipantIds } },
+        select: { id: true, role: true }
+      });
+      const landlord = users.find(u => u.role === 'LANDLORD');
+      const tenant = users.find(u => u.role === 'TENANT');
+      if (landlord && tenant) {
+        const paidOffer = await prisma.offer.findFirst({
+          where: {
+            status: 'PAID',
+            landlordId: landlord.id,
+            tenantId: tenant.id
+          },
+          orderBy: { updatedAt: 'desc' },
+          select: { propertyId: true }
+        });
+        if (paidOffer) {
+          inferredPropertyId = inferredPropertyId || paidOffer.propertyId;
+          desiredStatus = 'ACTIVE';
+        }
+      }
+    } catch (e) {
+      // Non-fatal
+    }
+
+    // Check if conversation already exists between these participants (prefer same property when known)
+    let existingConversation = await prisma.conversation.findFirst({
       where: {
         type: 'DIRECT',
+        propertyId: inferredPropertyId || undefined,
         participants: {
           every: {
             userId: { in: allParticipantIds }
           }
         }
       },
-      include: {
-        participants: true
-      }
+      include: { participants: true, property: true }
     });
+    if (!existingConversation) {
+      existingConversation = await prisma.conversation.findFirst({
+        where: {
+          type: 'DIRECT',
+          participants: {
+            every: {
+              userId: { in: allParticipantIds }
+            }
+          }
+        },
+        include: { participants: true, property: true }
+      });
+    }
 
     if (existingConversation && existingConversation.participants.length === allParticipantIds.length) {
+      // If we detected a paid booking, ensure the conversation is ACTIVE
+      if (desiredStatus === 'ACTIVE' && existingConversation.status !== 'ACTIVE') {
+        existingConversation = await prisma.conversation.update({
+          where: { id: existingConversation.id },
+          data: { status: 'ACTIVE', propertyId: inferredPropertyId || existingConversation.propertyId },
+          include: { participants: true, property: true }
+        });
+      }
       return res.json(existingConversation);
     }
 
@@ -205,7 +261,8 @@ router.post('/conversations', verifyToken, async (req, res) => {
       data: {
         title,
         type: allParticipantIds.length > 2 ? 'GROUP' : 'DIRECT',
-        propertyId,
+        propertyId: inferredPropertyId,
+        status: desiredStatus,
         participants: {
           create: allParticipantIds.map(userId => ({
             userId,
@@ -535,6 +592,11 @@ router.get('/conversations/:conversationId', verifyToken, async (req, res) => {
         }
       }
     });
+
+    // If archived, return as-is; frontend will render read-only state
+    if (conversation?.status === 'ARCHIVED') {
+      return res.json(conversation);
+    }
 
     res.json(conversation);
   } catch (error) {

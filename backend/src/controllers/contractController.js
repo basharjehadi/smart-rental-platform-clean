@@ -25,15 +25,22 @@ const verifyPaymentStatus = async (rentalRequestId) => {
   try {
     console.log('🔍 Verifying payment status for rental request:', rentalRequestId);
 
-    // Get all successful payments for this rental request
+    // Find PAID offer for this rental request (some mock flows store payments by offerId only)
+    const paidOffer = await prisma.offer.findFirst({
+      where: { rentalRequestId: parseInt(rentalRequestId), status: 'PAID' },
+      select: { id: true }
+    });
+
+    // Get all successful payments linked to this request OR its paid offer
     const payments = await prisma.payment.findMany({
       where: {
-        rentalRequestId: parseInt(rentalRequestId),
-        status: 'SUCCEEDED'
+        status: 'SUCCEEDED',
+        OR: [
+          { rentalRequestId: parseInt(rentalRequestId) },
+          ...(paidOffer ? [{ offerId: paidOffer.id }] : [])
+        ]
       },
-      orderBy: {
-        createdAt: 'desc'
-      }
+      orderBy: { createdAt: 'desc' }
     });
 
     console.log('📊 Payment analysis:', {
@@ -60,7 +67,8 @@ const verifyPaymentStatus = async (rentalRequestId) => {
     );
 
     // Verify payment completion
-    const paymentComplete = hasCombinedPayment || (hasDepositPayment && hasFirstMonthPayment);
+    // Treat PAID offer as completion in mock/dev flows where the Payment row may not be written yet
+    const paymentComplete = (!!paidOffer) || hasCombinedPayment || (hasDepositPayment && hasFirstMonthPayment);
 
     console.log('✅ Payment verification result:', {
       hasCombinedPayment,
@@ -1008,6 +1016,10 @@ export const getMyContracts = async (req, res) => {
       where: {
         rentalRequest: {
           tenantId: userId
+        },
+        // Hide expired/terminated contracts from standard "my contracts" list
+        NOT: {
+          status: { in: ['EXPIRED', 'TERMINATED'] }
         }
       },
       include: {
@@ -1057,6 +1069,10 @@ export const getLandlordContracts = async (req, res) => {
               landlordId: userId
             }
           }
+        },
+        // Hide expired contracts from standard list (only EXPIRED is defined in enum)
+        NOT: {
+          status: { in: ['EXPIRED'] }
         }
       },
               include: {
@@ -1141,6 +1157,11 @@ export const downloadGeneratedContract = async (req, res) => {
 
     if (!contract) {
       return res.status(404).json({ error: 'Contract not found' });
+    }
+
+    // If contract is expired/terminated, block download
+    if (contract.status === 'EXPIRED' || contract.status === 'TERMINATED') {
+      return res.status(410).json({ error: 'Contract is no longer available (cancelled/expired)' });
     }
 
     // Verify the user is authorized (either tenant or landlord)
@@ -1232,6 +1253,11 @@ export const downloadSignedContract = async (req, res) => {
 
     if (!contract) {
       return res.status(404).json({ error: 'Contract not found' });
+    }
+
+    // If contract is expired/terminated, block download
+    if (contract.status === 'EXPIRED' || contract.status === 'TERMINATED') {
+      return res.status(410).json({ error: 'Contract is no longer available (cancelled/expired)' });
     }
 
     // Check if contract is signed

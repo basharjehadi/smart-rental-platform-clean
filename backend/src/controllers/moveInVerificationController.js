@@ -54,21 +54,29 @@ export const verifyMoveInSuccess = async (req, res) => {
         moveInVerificationStatus: 'SUCCESS',
         moveInVerificationDate: new Date(),
       },
-      select: { id: true, moveInVerificationStatus: true, moveInVerificationDate: true },
+      select: { id: true, moveInVerificationStatus: true, moveInVerificationDate: true, landlordId: true, propertyId: true, rentalRequestId: true },
     });
 
-    // Notify landlord
-    const offer = await prisma.offer.findUnique({ where: { id }, select: { landlordId: true } });
-    if (offer?.landlordId) {
+    // Notify landlord + emit realtime update for dashboards
+    if (updated?.landlordId) {
       await prisma.notification.create({
         data: {
-          userId: offer.landlordId,
+          userId: updated.landlordId,
           type: 'SYSTEM_ANNOUNCEMENT',
           entityId: id,
           title: 'Tenant confirmed move-in',
           body: 'The tenant confirmed successful move-in.'
         }
       });
+      
+      // Get the io instance from the Express app
+      const io = req.app.get('io');
+      if (io?.emitNotification) {
+        await io.emitNotification(updated.landlordId, { id: `movein-${id}`, type: 'SYSTEM_ANNOUNCEMENT', title: 'Tenant confirmed move-in', body: 'The tenant confirmed successful move-in.', createdAt: new Date(), isRead: false });
+      }
+      if (io?.emitMoveInVerificationUpdate) {
+        await io.emitMoveInVerificationUpdate(updated.landlordId, id, 'SUCCESS');
+      }
     }
 
     return res.json({ success: true, data: updated });
@@ -213,11 +221,14 @@ export const adminApproveCancellation = async (req, res) => {
         });
       }
 
-      // 4) Expire any generated contract for this request
-      await tx.contract.updateMany({
+      // 4) Delete any generated contracts for this request (hard delete per product decision)
+      const contractsToDelete = await tx.contract.findMany({
         where: { rentalRequestId: offer.rentalRequestId },
-        data: { status: 'EXPIRED' }
+        select: { id: true, pdfUrl: true }
       });
+      if (contractsToDelete.length > 0) {
+        await tx.contract.deleteMany({ where: { rentalRequestId: offer.rentalRequestId } });
+      }
 
       // 5) Refund related payments via gateway-specific handler after transaction
 
@@ -247,8 +258,27 @@ export const adminApproveCancellation = async (req, res) => {
         data: { userId: updatedOffer.landlordId, type: 'SYSTEM_ANNOUNCEMENT', entityId: id, title: 'Cancellation approved', body: 'The booking was cancelled; property unlocked and available again.' }
       });
 
-      return { updatedOffer, tenantNotif, landlordNotif };
+      return { updatedOffer, tenantNotif, landlordNotif, contractsToDelete };
     });
+
+    // Delete contract PDF files on disk (best-effort, after DB commit)
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const files = (result.contractsToDelete || []).map(c => c.pdfUrl).filter(Boolean);
+      for (const relPath of files) {
+        try {
+          const filePath = path.join(process.cwd(), relPath);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        } catch (fileErr) {
+          console.warn('Failed to delete contract PDF:', relPath, fileErr?.message);
+        }
+      }
+    } catch (e) {
+      console.warn('Contract file cleanup skipped:', e?.message);
+    }
 
     // Refund payments (Stripe or Mock)
     try {
@@ -258,10 +288,20 @@ export const adminApproveCancellation = async (req, res) => {
       console.warn('Refund processing failed or unavailable:', e.message);
     }
 
+    // Update landlord availability since property was unlocked
+    try {
+      const requestPoolService = (await import('../services/requestPoolService.js')).default;
+      const landlordId = result.updatedOffer?.landlordId || offer?.landlordId || null;
+      if (landlordId) {
+        await requestPoolService.updateLandlordAvailability(landlordId, true);
+      }
+    } catch (e) {
+      console.warn('Could not update landlord availability after cancellation:', e?.message);
+    }
+
     // Try to emit realtime notifications
     try {
-      const { default: createIO } = await import('../socket/socketServer.js');
-      const io = createIO?.io || global.io;
+      const io = req.app.get('io');
       if (io?.emitNotification) {
         await io.emitNotification(result.updatedOffer.tenantId, result.tenantNotif);
         await io.emitNotification(result.updatedOffer.landlordId, result.landlordNotif);
@@ -296,11 +336,13 @@ export const adminRejectCancellation = async (req, res) => {
       data: { userId: updated.landlordId, type: 'SYSTEM_ANNOUNCEMENT', entityId: id, title: 'Cancellation rejected', body: 'Support rejected the tenant cancellation request.' }
     });
     try {
-      const { default: createIO } = await import('../socket/socketServer.js');
-      const io = createIO?.io || global.io;
+      const io = req.app.get('io');
       if (io?.emitNotification) {
         await io.emitNotification(updated.tenantId, tenantNotif);
         await io.emitNotification(updated.landlordId, landlordNotif);
+      }
+      if (io?.emitMoveInVerificationUpdate) {
+        await io.emitMoveInVerificationUpdate(updated.landlordId, id, 'SUCCESS');
       }
     } catch (e) {
       console.warn('Socket emit not available for adminRejectCancellation');

@@ -96,9 +96,11 @@ const LandlordTenantProfile = () => {
     try {
       console.log('🔍 Landlord: Viewing contract for tenant:', tenant.name);
       
-      if (!tenant.rentalRequestId) {
-        console.log('❌ Landlord: No rental request ID found');
-        alert('No rental request found to view contract.');
+      const offerId = tenant.offerId || tenant.paidOfferId || tenant.offer?.id;
+      const requestId = tenant.rentalRequestId || tenant.rentalRequest?.id;
+      if (!offerId && !requestId) {
+        console.log('❌ Landlord: No booking identifiers found');
+        alert('No booking identifiers found to view contract.');
         return;
       }
 
@@ -110,84 +112,139 @@ const LandlordTenantProfile = () => {
         console.log('🔍 Landlord: Contract response:', contractResponse.data);
         
         if (contractResponse.data.contracts) {
-          console.log('🔍 Landlord: Found contracts, searching for rental request ID:', tenant.rentalRequestId);
-          existingContract = contractResponse.data.contracts.find(
-            contract => contract.rentalRequest.id === tenant.rentalRequestId
-          );
+          if (offerId) {
+            existingContract = contractResponse.data.contracts.find(
+              c => c.rentalRequest?.offers?.some(o => o.id === offerId)
+            );
+          }
+          if (!existingContract && requestId) {
+            existingContract = contractResponse.data.contracts.find(
+              c => c.rentalRequest?.id === requestId
+            );
+          }
           
           if (existingContract) {
-            console.log('✅ Landlord: Found existing contract, checking PDF URL:', existingContract.pdfUrl);
-            
-            // Check if PDF URL exists and is valid
             if (existingContract.pdfUrl && existingContract.pdfUrl !== 'null' && existingContract.pdfUrl !== null) {
-              console.log('✅ Landlord: Opening saved contract with URL:', `http://localhost:3001${existingContract.pdfUrl}`);
               window.open(`http://localhost:3001${existingContract.pdfUrl}`, '_blank');
               return;
-            } else {
-              console.log('⚠️ Landlord: Contract found but PDF URL is invalid, will generate on-the-fly');
             }
-          } else {
-            console.log('ℹ️ Landlord: No matching contract found for rental request ID:', tenant.rentalRequestId);
+            // Try details for updated pdfUrl
+            try {
+              const details = await api.get(`/contracts/${existingContract.id}`);
+              if (details.data?.success && details.data.contract?.pdfUrl) {
+                window.open(`http://localhost:3001${details.data.contract.pdfUrl}`, '_blank');
+                return;
+              }
+            } catch {}
           }
-        } else {
-          console.log('ℹ️ Landlord: No contracts in response');
         }
       } catch (contractError) {
         console.error('❌ Landlord: Error checking for existing contract:', contractError);
-        console.log('ℹ️ Landlord: Will generate on-the-fly due to error');
       }
 
-      // If no existing contract, generate on-the-fly using backend
-      console.log('🔍 Landlord: No existing contract found, generating via backend...');
-      
+      // If no existing contract, generate via backend
+      const genEndpoint = offerId ? `/contracts/generate-by-offer/${offerId}` : `/contracts/generate/${requestId}`;
       try {
-        // Call backend to generate contract
-        const generateResponse = await api.post(`/contracts/generate/${tenant.rentalRequestId}`);
-        
-        if (generateResponse.data.success) {
-          // Open the newly generated contract in a new tab
+        const generateResponse = await api.post(genEndpoint);
+        if (generateResponse.data?.success && generateResponse.data.contract?.pdfUrl) {
           const contractUrl = `http://localhost:3001${generateResponse.data.contract.pdfUrl}`;
           window.open(contractUrl, '_blank');
           return;
         }
       } catch (generateError) {
         console.error('❌ Landlord: Error generating contract via backend:', generateError);
-        console.log('⚠️ Landlord: Falling back to frontend generation');
-        
-        // Fallback to frontend generation
-        const response = await api.get(`/landlord/tenant-offer/${tenant.rentalRequestId}`);
-        const offerData = response.data;
-        
-        // If we found an existing contract but with invalid PDF, use its data for consistency
-        if (existingContract) {
-          console.log('🔍 Landlord: Using existing contract data for consistency:', {
-            contractNumber: existingContract.contractNumber,
-            createdAt: existingContract.createdAt,
-            paymentDate: existingContract.paymentDate
-          });
-          
-          // Add the original contract data to the offer
-          offerData.offer.originalContractNumber = existingContract.contractNumber;
-          offerData.offer.originalContractDate = existingContract.createdAt;
-          offerData.offer.originalPaymentDate = existingContract.paymentDate;
-        }
-        
-        console.log('🔍 Landlord: Offer data for contract:', offerData);
-        await viewContract(offerData.offer, user);
       }
+
+      // Fallback to frontend generation
+      const response = offerId
+        ? await api.get(`/tenant/offer/${offerId}`)
+        : await api.get(`/landlord/tenant-offer/${requestId}`);
+      const offerData = response.data;
+      if (existingContract) {
+        offerData.offer.originalContractNumber = existingContract.contractNumber;
+        offerData.offer.originalContractDate = existingContract.createdAt;
+        offerData.offer.originalPaymentDate = existingContract.paymentDate;
+      }
+      await viewContract(offerData.offer, user);
     } catch (error) {
       console.error('❌ Landlord: Error viewing contract:', error);
-      console.error('❌ Landlord: Error response:', error.response?.data);
       alert('Error viewing contract. Please try again.');
     }
   };
 
-  const handleSendMessage = () => {
-    // Navigate to messaging page with property-based chat
-    if (tenant?.propertyId) {
-      navigate(`/messaging?conversationId=new&propertyId=${tenant.propertyId}`);
-    } else {
-      alert('Property information not available');
+  const handleSendMessage = async () => {
+    try {
+      // 1) Load existing conversations and find a DIRECT one with this tenant
+      const list = await api.get('/messaging/conversations');
+      const conversations = Array.isArray(list.data) ? list.data : [];
+      const directWithTenant = conversations.find(c => {
+        if (c.status === 'ARCHIVED' || c.type !== 'DIRECT') return false;
+        const participantIds = (c.participants || []).map(p => p.user?.id);
+        return participantIds.includes(user?.id) && participantIds.includes(tenant.id);
+      });
+      if (directWithTenant) {
+        navigate(`/messaging?conversationId=${directWithTenant.id}`);
+        return;
+      }
+
+      // 2) Try property-scoped existing conversation first
+      const scoped = conversations.find(c => {
+        if (c.status === 'ARCHIVED') return false;
+        const participantIds = (c.participants || []).map(p => p.user?.id);
+        const samePeople = participantIds.includes(user?.id) && participantIds.includes(tenant.id);
+        const sameProperty = tenant.propertyId && c.property?.id === tenant.propertyId;
+        return samePeople && sameProperty;
+      });
+      if (scoped) {
+        navigate(`/messaging?conversationId=${scoped.id}`);
+        return;
+      }
+
+      // 3) Ask backend to reuse existing or create if none
+      const createResp = await api.post('/messaging/conversations', {
+        participantIds: [tenant.id],
+        title: `Chat with ${tenant.name}`,
+        propertyId: tenant.propertyId || null
+      });
+
+      const maybeNew = createResp.data?.conversation || createResp.data;
+      if (maybeNew?.id) {
+        navigate(`/messaging?conversationId=${maybeNew.id}`);
+        return;
+      }
+
+      // 4) Fallback: reload list (backend might have returned existing without id wrapping)
+      const reload = await api.get('/messaging/conversations');
+      const after = (reload.data || []).find(c => {
+        if (c.status === 'ARCHIVED') return false;
+        const participantIds = (c.participants || []).map(p => p.user?.id);
+        return participantIds.includes(user?.id) && participantIds.includes(tenant.id);
+      });
+      if (after?.id) {
+        navigate(`/messaging?conversationId=${after.id}`);
+        return;
+      }
+
+      // Last resort fallback (should rarely happen)
+      if (tenant?.propertyId) {
+        navigate(`/messaging?conversationId=new&propertyId=${tenant.propertyId}`);
+      } else {
+        alert('Unable to open chat. Please try again later.');
+      }
+    } catch (e) {
+      console.error('Open chat error:', e);
+      const list = await api.get('/messaging/conversations').catch(() => ({ data: [] }));
+      const conversations = Array.isArray(list.data) ? list.data : [];
+      const existing = conversations.find(c => (c.participants || []).some(p => p.user?.id === tenant.id) && c.status !== 'ARCHIVED');
+      if (existing?.id) {
+        navigate(`/messaging?conversationId=${existing.id}`);
+        return;
+      }
+      if (tenant?.propertyId) {
+        navigate(`/messaging?conversationId=new&propertyId=${tenant.propertyId}`);
+      } else {
+        alert('Unable to open chat. Please try again later.');
+      }
     }
   };
 
@@ -195,110 +252,117 @@ const LandlordTenantProfile = () => {
     try {
       console.log('🔍 Landlord: Downloading contract for tenant:', tenant.name);
       
-      if (!tenant.rentalRequestId) {
-        console.log('❌ Landlord: No rental request ID found');
-        alert('No rental request found to download contract.');
+      const offerId = tenant.offerId || tenant.paidOfferId || tenant.offer?.id;
+      const requestId = tenant.rentalRequestId || tenant.rentalRequest?.id;
+      if (!offerId && !requestId) {
+        alert('No booking identifiers found to download contract.');
         return;
       }
 
-      let existingContract = null; // Declare at function level
-      
-      // First, check if there's an existing contract in the database
+      let existingContract = null;
+
+      // 1) Check for existing contract and download PDF directly like tenant flow
       try {
-        console.log('🔍 Landlord: Checking for existing contract...');
         const contractResponse = await api.get(`/contracts/landlord-contracts`);
-        console.log('🔍 Landlord: Contract response:', contractResponse.data);
-        
-        if (contractResponse.data.contracts) {
-          console.log('🔍 Landlord: Found contracts, searching for rental request ID:', tenant.rentalRequestId);
-          existingContract = contractResponse.data.contracts.find(
-            contract => contract.rentalRequest.id === tenant.rentalRequestId
-          );
-          
-          if (existingContract) {
-            console.log('✅ Landlord: Found existing contract, downloading saved contract');
-            try {
-              // Try to download the saved contract
-              const downloadResponse = await api.get(`/contracts/download-generated/${existingContract.id}`, {
-                responseType: 'blob'
-              });
-              
-              const url = window.URL.createObjectURL(new Blob([downloadResponse.data]));
-              const link = document.createElement('a');
-              link.href = url;
-              link.setAttribute('download', `contract-${existingContract.contractNumber}.pdf`);
-              document.body.appendChild(link);
-              link.click();
-              link.remove();
-              window.URL.revokeObjectURL(url);
-              return;
-            } catch (downloadError) {
-              console.error('❌ Landlord: Error downloading saved contract:', downloadError);
-              console.log('⚠️ Landlord: Will generate on-the-fly due to download error');
-              // Continue to on-the-fly generation
-            }
-          } else {
-            console.log('ℹ️ Landlord: No matching contract found for rental request ID:', tenant.rentalRequestId);
+        if (contractResponse.data?.contracts) {
+          if (offerId) {
+            existingContract = contractResponse.data.contracts.find(
+              c => c.rentalRequest?.offers?.some(o => o.id === offerId)
+            );
           }
-        } else {
-          console.log('ℹ️ Landlord: No contracts in response');
+          if (!existingContract && requestId) {
+            existingContract = contractResponse.data.contracts.find(
+              c => c.rentalRequest?.id === requestId
+            );
+          }
+
+        if (existingContract?.pdfUrl && existingContract.pdfUrl !== 'null') {
+          const url = `http://localhost:3001${existingContract.pdfUrl}`;
+          const resp = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          });
+          if (resp.ok) {
+            const blob = await resp.blob();
+            const dl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = dl;
+            a.download = `rental-contract-${existingContract.contractNumber}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(dl);
+            return;
+          }
         }
-      } catch (contractError) {
-        console.error('❌ Landlord: Error checking for existing contract:', contractError);
-        console.log('ℹ️ Landlord: Will generate on-the-fly due to error');
+
+        // If contract exists but pdfUrl missing, try details
+        if (existingContract && (!existingContract.pdfUrl || existingContract.pdfUrl === 'null')) {
+          try {
+            const details = await api.get(`/contracts/${existingContract.id}`);
+            if (details.data?.success && details.data.contract?.pdfUrl) {
+              const url = `http://localhost:3001${details.data.contract.pdfUrl}`;
+              const resp = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+              });
+              if (resp.ok) {
+                const blob = await resp.blob();
+                const dl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = dl;
+                a.download = `rental-contract-${details.data.contract.contractNumber}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(dl);
+                return;
+              }
+            }
+          } catch {}
+        }
+      }
+      } catch (err) {
+        console.warn('⚠️ Landlord: error retrieving existing contract, will try generation', err);
       }
 
-      // If no existing contract, generate on-the-fly using backend
-      console.log('🔍 Landlord: No existing contract found, generating via backend...');
-      
+      // 2) Generate if not found, prefer offer-based endpoint
+      const genEndpoint = offerId ? `/contracts/generate-by-offer/${offerId}` : `/contracts/generate/${requestId}`;
       try {
-        // Call backend to generate contract
-        const generateResponse = await api.post(`/contracts/generate/${tenant.rentalRequestId}`);
-        
-        if (generateResponse.data.success) {
-          // Download the newly generated contract
-          const downloadResponse = await api.get(`/contracts/download-generated/${generateResponse.data.contract.id}`, {
-            responseType: 'blob'
+        const generateResponse = await api.post(genEndpoint);
+        if (generateResponse.data?.success && generateResponse.data.contract?.pdfUrl) {
+          const url = `http://localhost:3001${generateResponse.data.contract.pdfUrl}`;
+          const resp = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
           });
-          
-          const url = window.URL.createObjectURL(new Blob([downloadResponse.data]));
-          const link = document.createElement('a');
-          link.href = url;
-          link.setAttribute('download', `contract-${generateResponse.data.contract.contractNumber}.pdf`);
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          window.URL.revokeObjectURL(url);
-          return;
+          if (resp.ok) {
+            const blob = await resp.blob();
+            const dl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = dl;
+            a.download = `rental-contract-${generateResponse.data.contract.contractNumber}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(dl);
+            return;
+          }
         }
       } catch (generateError) {
         console.error('❌ Landlord: Error generating contract via backend:', generateError);
-        console.log('⚠️ Landlord: Falling back to frontend generation');
-        
-        // Fallback to frontend generation
-        const response = await api.get(`/landlord/tenant-offer/${tenant.rentalRequestId}`);
-        const offerData = response.data;
-        
-        // If we found an existing contract but with invalid PDF, use its data for consistency
-        if (existingContract) {
-          console.log('🔍 Landlord: Using existing contract data for download consistency:', {
-            contractNumber: existingContract.contractNumber,
-            createdAt: existingContract.createdAt,
-            paymentDate: existingContract.paymentDate
-          });
-          
-          // Add the original contract data to the offer
-          offerData.offer.originalContractNumber = existingContract.contractNumber;
-          offerData.offer.originalContractDate = existingContract.createdAt;
-          offerData.offer.originalPaymentDate = existingContract.paymentDate;
-        }
-        
-        console.log('🔍 Landlord: Offer data for download:', offerData);
-        await downloadContract(offerData.offer, user);
       }
+
+      // 3) Fallback to frontend generator (rare)
+      const response = offerId
+        ? await api.get(`/tenant/offer/${offerId}`)
+        : await api.get(`/landlord/tenant-offer/${requestId}`);
+      const offerData = response.data;
+      if (existingContract) {
+        offerData.offer.originalContractNumber = existingContract.contractNumber;
+        offerData.offer.originalContractDate = existingContract.createdAt;
+        offerData.offer.originalPaymentDate = existingContract.paymentDate;
+      }
+      await downloadContract(offerData.offer, user);
     } catch (error) {
       console.error('❌ Landlord: Error downloading contract:', error);
-      console.error('❌ Landlord: Error response:', error.response?.data);
       alert('Error downloading contract. Please try again.');
     }
   };
@@ -433,13 +497,7 @@ const LandlordTenantProfile = () => {
                     <span>Download Contract</span>
                   </button>
                   
-                  <button
-                    onClick={handleSendMessage}
-                    className="flex items-center space-x-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors duration-200"
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    <span>Send Message</span>
-                  </button>
+                  {/* Send Message button removed as requested */}
                 </div>
               </div>
             </div>

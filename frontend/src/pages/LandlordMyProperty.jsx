@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSocket } from '../contexts/SocketContext';
 import LandlordSidebar from '../components/LandlordSidebar';
 import { LogOut, Search, Filter, Plus, Eye, Edit, Trash2, Building, AlertTriangle } from 'lucide-react';
 
 const LandlordMyProperty = () => {
   const { user, logout, api } = useAuth();
+  const { socket } = useSocket();
   const navigate = useNavigate();
   const location = useLocation();
   const [properties, setProperties] = useState([]);
@@ -43,6 +45,23 @@ const LandlordMyProperty = () => {
     fetchProperties();
     fetchProfileData();
   }, []);
+
+  // Listen for move-in verification updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleMoveInVerificationUpdate = (data) => {
+      console.log('🏠 Move-in verification update received in properties:', data);
+      // Refresh properties data when move-in status changes
+      fetchProperties();
+    };
+
+    socket.on('movein-verification:update', handleMoveInVerificationUpdate);
+
+    return () => {
+      socket.off('movein-verification:update', handleMoveInVerificationUpdate);
+    };
+  }, [socket]);
 
   const fetchProperties = async () => {
     try {
@@ -484,7 +503,7 @@ const LandlordMyProperty = () => {
                             <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
                               <div className="text-xs text-blue-900 font-medium">Tenant move-in verification</div>
                               {(() => {
-                                const s = moveInStatusByProperty[property.id];
+                                const s = moveInStatusByProperty[property.id] || property._moveIn || null;
                                 if (s) {
                                   const deadline = s.deadline ? new Date(s.deadline) : null;
                                   const now = new Date();
@@ -493,9 +512,9 @@ const LandlordMyProperty = () => {
                                   else if (s.status === 'ISSUE_REPORTED') chip = 'ISSUE';
                                   else if (s.status === 'CANCELLED') chip = 'CANCELLED';
 
-                                  // Format countdown d h
+                                  // Only show countdown while waiting (PENDING)
                                   let countdown = '';
-                                  if (deadline) {
+                                  if (s.status === 'PENDING' && deadline) {
                                     const diffMs = Math.max(0, deadline.getTime() - now.getTime());
                                     const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
                                     const days = Math.floor(totalHours / 24);
@@ -515,16 +534,13 @@ const LandlordMyProperty = () => {
                                     </div>
                                   );
                                 }
-                                // Fallback: if property is RENTED but status unavailable, don't show misleading PENDING
-                                if (property.status === 'RENTED') {
-                                  return (
-                                    <div className="text-xs text-blue-800 mt-1">
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">SUCCESS</span>
-                                      <span className="ml-2">Move-in verified</span>
-                                    </div>
-                                  );
-                                }
-                                return null;
+                                // If no status payload, default to Pending until tenant confirms/admin decides/cron finalizes
+                                return (
+                                  <div className="text-xs text-blue-800 mt-1">
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-700">PENDING</span>
+                                    <span className="ml-2">Awaiting tenant move-in verification…</span>
+                                  </div>
+                                );
                               })()}
                             </div>
                           </div>

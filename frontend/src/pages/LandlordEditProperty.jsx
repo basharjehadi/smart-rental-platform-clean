@@ -43,6 +43,8 @@ const LandlordEditProperty = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  // Preserve original media (raw relative URLs) to prevent accidental loss on submit
+  const [originalMedia, setOriginalMedia] = useState({ imageUrls: [], videoUrl: null });
 
   // Convert relative URLs to absolute URLs (same as PropertyCard)
   const getAbsoluteUrl = (url) => {
@@ -204,6 +206,8 @@ const LandlordEditProperty = () => {
               url: getAbsoluteUrl(url),
               size: 0 // We don't have file size for existing images
             }));
+            // Save original raw (relative) URLs for safe retention on submit
+            setOriginalMedia(prev => ({ ...prev, imageUrls: Array.isArray(imageUrls) ? imageUrls : [] }));
           }
         } catch (error) {
           console.error('Error parsing images:', error);
@@ -225,6 +229,8 @@ const LandlordEditProperty = () => {
                 url: getAbsoluteUrl(videoUrls[0]),
                 size: 0 // We don't have file size for existing video
               };
+              // Save original raw (relative) video URL
+              setOriginalMedia(prev => ({ ...prev, videoUrl: videoUrls[0] }));
             }
           }
         } catch (error) {
@@ -249,7 +255,8 @@ const LandlordEditProperty = () => {
           smokingAllowed: property.smokingAllowed || false,
           availableFrom: property.availableFrom ? new Date(property.availableFrom).toISOString().split('T')[0] : '',
           description: property.description || '',
-          amenities: existingAmenities,
+          // Ensure amenities is always an array of strings
+          amenities: Array.isArray(existingAmenities) ? existingAmenities.filter(Boolean) : [],
           street: street,
           houseNumber: houseNumber,
           apartmentNumber: apartmentNumber,
@@ -442,11 +449,10 @@ const LandlordEditProperty = () => {
       submitData.append('description', formData.description || '');
       
       // Handle amenities (send as houseRules)
-      if (formData.amenities && formData.amenities.length > 0) {
-        submitData.append('houseRules', JSON.stringify(formData.amenities));
-      } else {
-        submitData.append('houseRules', '[]'); // Send empty array if no amenities selected
-      }
+      const safeAmenities = Array.isArray(formData.amenities)
+        ? formData.amenities.filter(a => typeof a === 'string' && a.trim().length > 0)
+        : [];
+      submitData.append('houseRules', JSON.stringify(safeAmenities));
       
       // Handle files: Separate new files from existing ones
       let newVideoFile = null;
@@ -455,7 +461,11 @@ const LandlordEditProperty = () => {
         if (formData.virtualTourVideo instanceof File) {
           newVideoFile = formData.virtualTourVideo;
         } else if (formData.virtualTourVideo.url) {
-          retainedVideoUrl = formData.virtualTourVideo.url;
+          // Convert absolute back to relative for backend storage consistency
+          const abs = formData.virtualTourVideo.url;
+          retainedVideoUrl = abs.startsWith('http://localhost:3001')
+            ? abs.replace('http://localhost:3001', '')
+            : abs;
         }
       }
 
@@ -466,9 +476,21 @@ const LandlordEditProperty = () => {
           if (photo instanceof File) {
             newPhotoFiles.push(photo);
           } else if (photo.url) {
-            retainedImageUrls.push(photo.url);
+            const abs = photo.url;
+            const rel = abs.startsWith('http://localhost:3001')
+              ? abs.replace('http://localhost:3001', '')
+              : abs;
+            retainedImageUrls.push(rel);
           }
         });
+      }
+
+      // Safety net: if user did not change media, retain originals
+      if (!newVideoFile && !retainedVideoUrl && originalMedia.videoUrl) {
+        retainedVideoUrl = originalMedia.videoUrl;
+      }
+      if (retainedImageUrls.length === 0 && newPhotoFiles.length === 0 && originalMedia.imageUrls.length > 0) {
+        retainedImageUrls = [...originalMedia.imageUrls];
       }
 
       // Append new files to FormData for Multer
@@ -492,13 +514,17 @@ const LandlordEditProperty = () => {
         console.log(pair[0]+ ', ' + pair[1]); 
       }
       
-      const response = await api.put(`/properties/${propertyId}`, submitData, {
+      // IMPORTANT: Use fetch directly for multipart PUT (api.put forces JSON)
+      const resp = await fetch(`${api.baseURL}/properties/${propertyId}`, {
+        method: 'PUT',
         headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+          'Authorization': `Bearer ${token}`
+        },
+        body: submitData
       });
+      const response = await resp.json();
       
-      if (response.data.success) {
+      if (response.success) {
         navigate('/landlord-my-property');
       }
     } catch (error) {

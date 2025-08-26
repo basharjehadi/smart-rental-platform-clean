@@ -25,13 +25,18 @@ export const getTenantDashboardData = async (req, res) => {
     const tenantId = req.user.id;
     console.log('🔍 Fetching dashboard data for tenant:', tenantId);
 
-    // Get tenant's active leases (paid offers represent active leases)
+    // Get tenant's active leases (paid offers that were NOT cancelled)
     const activeLeases = await prisma.offer.findMany({
       where: {
         rentalRequest: {
           tenantId: tenantId
         },
-        status: 'PAID'
+        status: 'PAID',
+        moveInVerificationStatus: { not: 'CANCELLED' },
+        rentalRequest: {
+          tenantId: tenantId,
+          NOT: { status: 'CANCELLED' }
+        }
       },
       include: {
         rentalRequest: {
@@ -282,7 +287,12 @@ export const getTenantActiveLease = async (req, res) => {
         rentalRequest: {
           tenantId: tenantId
         },
-        status: 'PAID'
+        status: 'PAID',
+        moveInVerificationStatus: { not: 'CANCELLED' },
+        rentalRequest: {
+          tenantId: tenantId,
+          NOT: { status: 'CANCELLED' }
+        }
       },
       include: {
         rentalRequest: {

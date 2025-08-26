@@ -435,19 +435,7 @@ const createOffer = async (req, res) => {
       });
     }
 
-    // Check landlord availability
-    const landlord = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { 
-        availability: true
-      }
-    });
-
-    if (!landlord || !landlord.availability) {
-      return res.status(400).json({
-        error: 'You are not available to accept new requests.'
-      });
-    }
+    // Note: Do NOT gate offer creation on landlord availability; property availability is sufficient
 
     // 🚀 SCALABILITY: Check if this landlord already sent an offer for this request
     const existingOffer = await prisma.offer.findFirst({
@@ -776,13 +764,20 @@ const getMyRequests = async (req, res) => {
     // First, auto-update expired requests
     await autoUpdateRequestStatus(tenantId);
 
-    const rentalRequests = await prisma.rentalRequest.findMany({
+    const rentalRequestsRaw = await prisma.rentalRequest.findMany({
       where: {
         tenantId: tenantId
       },
       include: {
         offers: {
-          include: {
+          select: {
+            id: true,
+            status: true,
+            moveInVerificationStatus: true,
+            payments: {
+              where: { status: { in: ['SUCCEEDED', 'CANCELLED'] } },
+              select: { id: true, amount: true, status: true, gateway: true, paidAt: true, errorMessage: true, purpose: true }
+            },
             landlord: {
               select: {
                 id: true,
@@ -796,6 +791,43 @@ const getMyRequests = async (req, res) => {
       orderBy: {
         createdAt: 'desc'
       }
+    });
+
+    // Build maps for refund aggregation
+    const rrIds = rentalRequestsRaw.map(r => r.id);
+    const offerIdToRrId = new Map();
+    rentalRequestsRaw.forEach(r => (r.offers || []).forEach(o => offerIdToRrId.set(o.id, r.id)));
+
+    // Fetch cancelled payments for these requests/offers
+    const cancelledPayments = await prisma.payment.findMany({
+      where: {
+        status: 'CANCELLED',
+        OR: [
+          { rentalRequestId: { in: rrIds } },
+          { offerId: { in: Array.from(offerIdToRrId.keys()) } }
+        ]
+      },
+      select: { id: true, amount: true, gateway: true, rentalRequestId: true, offerId: true }
+    });
+
+    const rrIdToRefundSummary = new Map();
+    cancelledPayments.forEach(p => {
+      const rrId = p.rentalRequestId || offerIdToRrId.get(p.offerId);
+      if (!rrId) return;
+      const cur = rrIdToRefundSummary.get(rrId) || { totalRefunded: 0, count: 0, gateways: new Set() };
+      cur.totalRefunded += p.amount || 0;
+      cur.count += 1;
+      cur.gateways.add(p.gateway || 'UNKNOWN');
+      rrIdToRefundSummary.set(rrId, cur);
+    });
+
+    // Derive status and attach refund summary
+    const rentalRequests = rentalRequestsRaw.map(rr => {
+      const hasCancelledOffer = (rr.offers || []).some(o => o.moveInVerificationStatus === 'CANCELLED');
+      const base = hasCancelledOffer && rr.status !== 'CANCELLED' ? { ...rr, status: 'CANCELLED' } : rr;
+      const aggr = rrIdToRefundSummary.get(rr.id);
+      const summary = aggr ? { totalRefunded: aggr.totalRefunded, count: aggr.count, gateways: Array.from(aggr.gateways) } : undefined;
+      return summary ? { ...base, _refundSummary: summary } : base;
     });
 
     res.json({
@@ -841,9 +873,8 @@ const autoUpdateRequestStatus = async (tenantId) => {
             status: { in: ['ACCEPTED', 'PAID'] }
           }
         },
-        status: {
-          not: 'LOCKED'
-        }
+        // Do not change status if the request has been cancelled via unwind
+        status: { notIn: ['LOCKED', 'CANCELLED'] }
       },
       data: {
         status: 'LOCKED',
@@ -1058,6 +1089,10 @@ const getMyOffers = async (req, res) => {
       where: {
         rentalRequest: {
           tenantId: tenantId
+        },
+        // Hide offers whose rental request has been cancelled via unwind
+        NOT: {
+          moveInVerificationStatus: 'CANCELLED'
         }
       },
       include: {
@@ -1799,6 +1834,99 @@ const getAllRentalRequests = async (req, res) => {
   }
 };
 
+// Get landlord's accepted offers and rental requests for dashboard
+const getLandlordAcceptedRequests = async (req, res) => {
+  try {
+    const landlordId = req.user.id;
+
+    // Get accepted/paid offers for this landlord
+    const acceptedOffers = await prisma.offer.findMany({
+      where: {
+        landlordId: landlordId,
+        status: 'PAID',
+        moveInVerificationStatus: { not: 'CANCELLED' }
+      },
+      include: {
+        rentalRequest: {
+          include: {
+            tenant: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                profileImage: true,
+                profession: true,
+                dateOfBirth: true,
+                phoneNumber: true,
+                pesel: true
+              }
+            }
+          }
+        },
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            district: true,
+            monthlyRent: true,
+            propertyType: true,
+            bedrooms: true,
+            bathrooms: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Transform accepted offers to match the expected format
+    const acceptedRequests = acceptedOffers.map(offer => ({
+      id: offer.rentalRequest.id,
+      title: offer.rentalRequest.title,
+      description: offer.rentalRequest.description,
+      location: offer.rentalRequest.location,
+      budgetFrom: offer.rentalRequest.budgetFrom,
+      budgetTo: offer.rentalRequest.budgetTo,
+      moveInDate: offer.rentalRequest.moveInDate,
+      propertyType: offer.rentalRequest.propertyType,
+      bedrooms: offer.rentalRequest.bedrooms,
+      status: 'accepted', // This will be used for the Accepted tab
+      offerId: offer.id,
+      offerStatus: offer.status,
+      moveInVerificationStatus: offer.moveInVerificationStatus,
+      tenant: offer.rentalRequest.tenant,
+      matchedProperty: offer.property,
+      // Format propertyMatch to match TenantRequestCard expectations
+      propertyMatch: {
+        id: offer.property.id,
+        name: offer.property.name || 'Your Property',
+        address: offer.property.address || 'Address not specified',
+        rent: offer.property.monthlyRent ? `${offer.property.monthlyRent} zł` : 'Rent not specified',
+        available: offer.property.availableFrom || 'Date not specified',
+        propertyType: offer.property.propertyType || 'Apartment'
+      },
+      createdAt: offer.rentalRequest.createdAt,
+      updatedAt: offer.rentalRequest.updatedAt
+    }));
+
+    res.json({
+      success: true,
+      acceptedRequests: acceptedRequests,
+      totalAccepted: acceptedRequests.length
+    });
+  } catch (error) {
+    console.error('Error fetching accepted requests:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch accepted requests'
+    });
+  }
+};
+
 // 🚀 SCALABILITY: Decline rental request - request stays in pool for other landlords
 const declineRentalRequest = async (req, res) => {
   try {
@@ -1902,5 +2030,6 @@ export {
   getMyOffers,
   getAllRentalRequests,
   declineRentalRequest,
-  getOfferDetails
+  getOfferDetails,
+  getLandlordAcceptedRequests
 }; 

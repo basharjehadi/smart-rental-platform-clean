@@ -10,14 +10,45 @@ export const getLandlordProperties = async (req, res) => {
       where: {
         landlordId: landlordId
       },
+      include: {
+        offers: {
+          where: { status: 'PAID' },
+          orderBy: { updatedAt: 'desc' },
+          select: {
+            id: true,
+            moveInVerificationStatus: true,
+            moveInVerificationDeadline: true,
+            moveInVerificationDate: true,
+            rentalRequest: { select: { moveInDate: true } }
+          }
+        }
+      },
       orderBy: {
         createdAt: 'desc'
       }
     });
 
+    // Shape with inline move-in status for quick UI
+    const shaped = properties.map(p => {
+      const latest = (p.offers && p.offers[0]) || null;
+      const deadline = latest?.moveInVerificationDeadline || (latest?.rentalRequest?.moveInDate
+        ? new Date(new Date(latest.rentalRequest.moveInDate).getTime() + 24 * 60 * 60 * 1000)
+        : null);
+      const { offers, ...rest } = p;
+      return {
+        ...rest,
+        _moveIn: latest ? {
+          offerId: latest.id,
+          status: latest.moveInVerificationStatus,
+          deadline,
+          verifiedAt: latest.moveInVerificationDate
+        } : null
+      };
+    });
+
     res.json({
       success: true,
-      properties: properties
+      properties: shaped
     });
 
   } catch (error) {
@@ -309,8 +340,12 @@ export const updateProperty = async (req, res) => {
       delete updateData.retainedVideoUrl; // Remove from updateData as it's handled
     }
 
-    // 2. Add newly uploaded files
+    // 2. Add newly uploaded files (multer field names: propertyVideo, propertyImages)
     if (req.files) {
+      // Some multer configs provide single file as req.file, ensure arrays exist
+      req.files.propertyVideo = req.files.propertyVideo || (req.files['propertyVideo'] || []);
+      req.files.propertyImages = req.files.propertyImages || (req.files['propertyImages'] || []);
+      
       if (req.files.propertyVideo && req.files.propertyVideo.length > 0) {
         // If a new video is uploaded, it replaces any retained/old video
         finalVideos = [`/uploads/property_videos/${req.files.propertyVideo[0].filename}`];
@@ -325,6 +360,14 @@ export const updateProperty = async (req, res) => {
     }
 
     // Update the images and videos fields in updateData
+    // Preserve existing arrays if nothing retained or uploaded
+    if (finalImages.length === 0 && existingProperty.images) {
+      try { finalImages = JSON.parse(existingProperty.images) || []; } catch {}
+    }
+    if (finalVideos.length === 0 && existingProperty.videos) {
+      try { finalVideos = JSON.parse(existingProperty.videos) || []; } catch {}
+    }
+
     updateData.images = finalImages.length > 0 ? JSON.stringify(finalImages) : null;
     updateData.videos = finalVideos.length > 0 ? JSON.stringify(finalVideos) : null;
     console.log('📸 Final images:', finalImages);

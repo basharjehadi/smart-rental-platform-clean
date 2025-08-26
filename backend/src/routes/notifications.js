@@ -10,7 +10,7 @@ router.get('/unread-counts', verifyToken, async (req, res) => {
     const { prisma } = await import('../utils/prisma.js');
 
     // Get counts by type
-    const [rentalRequests, offers] = await Promise.all([
+    const [rentalRequests, offers, allUnread] = await Promise.all([
       prisma.notification.count({
         where: {
           userId,
@@ -24,10 +24,18 @@ router.get('/unread-counts', verifyToken, async (req, res) => {
           type: 'NEW_OFFER',
           isRead: false
         }
+      }),
+      // Total unread (all types) to power the bell badge for system notifications too
+      prisma.notification.count({
+        where: {
+          userId,
+          isRead: false
+        }
       })
     ]);
 
-    const total = rentalRequests + offers;
+    // Total is ALL unread notifications (business + system)
+    const total = allUnread;
 
     res.json({
       success: true,

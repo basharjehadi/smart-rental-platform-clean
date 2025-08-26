@@ -26,6 +26,7 @@ const LandlordMyTenants = () => {
   const { user, logout, api } = useAuth();
   const navigate = useNavigate();
   const [tenants, setTenants] = useState([]);
+  const [monthlyRevenue, setMonthlyRevenue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,6 +35,17 @@ const LandlordMyTenants = () => {
 
   useEffect(() => {
     fetchTenants();
+    // Also pull monthly revenue from the same source as dashboard for accuracy
+    (async () => {
+      try {
+        const resp = await api.get('/landlord/dashboard');
+        if (resp.data && typeof resp.data.monthlyRevenue === 'number') {
+          setMonthlyRevenue(resp.data.monthlyRevenue);
+        }
+      } catch (e) {
+        // fallback computed once tenants load
+      }
+    })();
   }, []);
 
   const fetchTenants = async () => {
@@ -42,7 +54,13 @@ const LandlordMyTenants = () => {
       const response = await api.get('/landlord/tenants');
       
       if (response.data.success) {
-        setTenants(response.data.tenants || []);
+        const list = response.data.tenants || [];
+        setTenants(list);
+        // If dashboard fetch failed earlier, compute a fallback here
+        if (!monthlyRevenue || Number.isNaN(monthlyRevenue)) {
+          const fallback = list.reduce((sum, t) => sum + (t.monthlyRent || 0), 0);
+          setMonthlyRevenue(fallback);
+        }
       } else {
         setError('Failed to fetch tenants');
       }
@@ -135,21 +153,41 @@ const LandlordMyTenants = () => {
   const handleViewContract = async (tenantId) => {
     try {
       const t = tenants.find(x => x.id === tenantId);
-      if (!t?.rentalRequestId) {
-        alert('No rental request found to view contract.');
+      const offerId = t?.offerId || t?.paidOfferId || t?.offer?.id;
+      const requestId = t?.rentalRequestId || t?.rentalRequest?.id;
+      if (!offerId && !requestId) {
+        alert('No booking identifiers found to view contract.');
         return;
       }
 
       // 1) Try open existing contract
       const contractsResp = await api.get('/contracts/landlord-contracts');
-      const existing = contractsResp.data.contracts?.find(c => c.rentalRequest?.id === t.rentalRequestId);
-      if (existing?.pdfUrl && existing.pdfUrl !== 'null') {
-        window.open(`http://localhost:3001${existing.pdfUrl}`, '_blank');
-        return;
+      let existing = null;
+      if (offerId) {
+        existing = contractsResp.data.contracts?.find(c => c.rentalRequest?.offers?.some(o => o.id === offerId));
+      }
+      if (!existing && requestId) {
+        existing = contractsResp.data.contracts?.find(c => c.rentalRequest?.id === requestId);
+      }
+      if (existing) {
+        if (existing.pdfUrl && existing.pdfUrl !== 'null') {
+          window.open(`http://localhost:3001${existing.pdfUrl}`, '_blank');
+          return;
+        }
+        // Try fetch contract details in case PDF was generated later
+        try {
+          const detailsResp = await api.get(`/contracts/${existing.id}`);
+          if (detailsResp.data?.success && detailsResp.data.contract?.pdfUrl) {
+            window.open(`http://localhost:3001${detailsResp.data.contract.pdfUrl}`, '_blank');
+            return;
+          }
+        } catch {}
       }
 
       // 2) Generate on-the-fly
-      const genResp = await api.post(`/contracts/generate/${t.rentalRequestId}`);
+      const genResp = offerId
+        ? await api.post(`/contracts/generate-by-offer/${offerId}`)
+        : await api.post(`/contracts/generate/${requestId}`);
       if (genResp.data?.success && genResp.data.contract?.pdfUrl) {
         window.open(`http://localhost:3001${genResp.data.contract.pdfUrl}`, '_blank');
         return;
@@ -158,8 +196,8 @@ const LandlordMyTenants = () => {
       // 3) Fallback: go to tenant profile
       navigate(`/landlord-tenant-profile/${tenantId}`);
     } catch (e) {
-      console.error('Error opening contract from My Tenants:', e);
-      navigate(`/landlord-tenant-profile/${tenantId}`);
+      console.error('View contract error:', e);
+      alert('Failed to open contract');
     }
   };
 
@@ -290,7 +328,7 @@ const LandlordMyTenants = () => {
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Monthly Revenue</p>
                     <p className="text-2xl font-semibold text-gray-900">
-                      {formatCurrency(tenants.reduce((sum, t) => sum + (t.monthlyRent || 0), 0))}
+                      {formatCurrency(monthlyRevenue)}
                     </p>
                   </div>
                 </div>

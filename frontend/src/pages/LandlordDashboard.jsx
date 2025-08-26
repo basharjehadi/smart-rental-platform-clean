@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSocket } from '../contexts/SocketContext';
 import api from '../utils/api';
 import LandlordSidebar from '../components/LandlordSidebar';
 import NotificationHeader from '../components/common/NotificationHeader';
@@ -27,6 +28,7 @@ import {
 const LandlordDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { socket } = useSocket();
   
   // Dashboard data states
   const [dashboardData, setDashboardData] = useState(null);
@@ -36,11 +38,27 @@ const LandlordDashboard = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   
 
-
   useEffect(() => {
     fetchDashboardData();
     fetchProfileData();
   }, []);
+
+  // Listen for move-in verification updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleMoveInVerificationUpdate = (data) => {
+      console.log('🏠 Move-in verification update received:', data);
+      // Refresh dashboard data when move-in status changes
+      fetchDashboardData();
+    };
+
+    socket.on('movein-verification:update', handleMoveInVerificationUpdate);
+
+    return () => {
+      socket.off('movein-verification:update', handleMoveInVerificationUpdate);
+    };
+  }, [socket]);
 
   const fetchDashboardData = async () => {
     try {
