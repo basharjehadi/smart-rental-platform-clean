@@ -233,19 +233,42 @@ const RequestForm = () => {
     }).format(amount);
   };
 
-  const getStatusBadge = (request) => {
-    if (request.offer) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-          Offer Received
-        </span>
-      );
-    }
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      ACTIVE: { color: 'bg-green-100 text-green-800', text: 'Active' },
+      LOCKED: { color: 'bg-yellow-100 text-yellow-800', text: 'Locked' },
+      COMPLETED: { color: 'bg-blue-100 text-blue-800', text: 'Completed' },
+      CANCELLED: { color: 'bg-red-100 text-red-800', text: 'Expired' }
+    };
+    
+    const config = statusConfig[status] || statusConfig.CANCELLED;
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-        Active
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
+        {config.text}
       </span>
     );
+  };
+
+  // Helper function to check if request has accepted/paid offers
+  const hasAcceptedOrPaidOffer = (request) => {
+    return request.offers && request.offers.some(offer => 
+      offer.status === 'ACCEPTED' || offer.status === 'PAID'
+    );
+  };
+
+  // Helper function to get offer status text
+  const getOfferStatusText = (request) => {
+    if (!request.offers || request.offers.length === 0) return null;
+    
+    const acceptedOffer = request.offers.find(offer => 
+      offer.status === 'ACCEPTED' || offer.status === 'PAID'
+    );
+    
+    if (acceptedOffer) {
+      return acceptedOffer.status === 'PAID' ? 'Offer Paid' : 'Offer Accepted';
+    }
+    
+    return null;
   };
 
   return (
@@ -600,8 +623,14 @@ const RequestForm = () => {
                           <div className="flex-1">
                             <div className="flex items-center space-x-2 mb-1">
                               <h3 className="font-medium text-gray-900">{request.title}</h3>
-                              {getStatusBadge(request)}
+                              {getStatusBadge(request.status)}
                             </div>
+                            {/* Show offer status if request is locked */}
+                            {request.status === 'LOCKED' && getOfferStatusText(request) && (
+                              <div className="mb-2 text-xs text-gray-600">
+                                {getOfferStatusText(request)}
+                              </div>
+                            )}
                             <p className="text-sm text-gray-600 mb-2">{request.description}</p>
                             <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
                               <div>📍 {request.location}</div>
@@ -610,25 +639,53 @@ const RequestForm = () => {
                               {request.bedrooms && <div>🛏️ {request.bedrooms} bed</div>}
                             </div>
                           </div>
-                          <div className="flex space-x-1">
-                            <button
-                              onClick={() => handleEditClick(request)}
-                              className="p-1 text-gray-400 hover:text-blue-600"
-                              title="Edit"
-                            >
-                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteRequest(request.id)}
-                              className="p-1 text-gray-400 hover:text-red-600"
-                              title="Delete"
-                            >
-                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
+                          <div className="flex flex-col space-y-2">
+                            <div className="flex space-x-1">
+                              <button
+                                onClick={() => handleEditClick(request)}
+                                className={`p-1 transition-all duration-200 ${
+                                  request.status === 'CANCELLED' || request.status === 'LOCKED'
+                                    ? 'text-gray-300 cursor-not-allowed'
+                                    : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded'
+                                }`}
+                                title={request.status === 'CANCELLED' || request.status === 'LOCKED' 
+                                  ? 'This request cannot be edited' 
+                                  : 'Edit this rental request'
+                                }
+                                disabled={request.status === 'CANCELLED' || request.status === 'LOCKED'}
+                              >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRequest(request.id)}
+                                className={`p-1 transition-all duration-200 ${
+                                  request.status === 'CANCELLED' || request.status === 'LOCKED'
+                                    ? 'text-gray-300 cursor-not-allowed'
+                                    : 'text-gray-400 hover:text-red-600 hover:bg-red-50 rounded'
+                                }`}
+                                title={request.status === 'CANCELLED' || request.status === 'LOCKED' 
+                                  ? 'This request cannot be deleted' 
+                                  : 'Delete this rental request'
+                                }
+                                disabled={request.status === 'CANCELLED' || request.status === 'LOCKED'}
+                              >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                            
+                            {/* Show reason why buttons are disabled */}
+                            {(request.status === 'CANCELLED' || request.status === 'LOCKED') && (
+                              <div className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded border border-gray-100 animate-pulse">
+                                {request.status === 'CANCELLED' 
+                                  ? '⚠️ Expired'
+                                  : '🔒 Locked'
+                                }
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

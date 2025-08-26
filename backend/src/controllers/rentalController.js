@@ -832,21 +832,21 @@ const autoUpdateRequestStatus = async (tenantId) => {
       }
     });
 
-    // Update requests where tenant has accepted an offer
+    // Update requests where tenant has accepted or paid for an offer
     await prisma.rentalRequest.updateMany({
       where: {
         tenantId: tenantId,
         offers: {
           some: {
-            status: 'ACCEPTED'
+            status: { in: ['ACCEPTED', 'PAID'] }
           }
         },
         status: {
-          not: 'CANCELLED'
+          not: 'LOCKED'
         }
       },
       data: {
-        status: 'CANCELLED',
+        status: 'LOCKED',
         poolStatus: 'MATCHED'
       }
     });
@@ -879,6 +879,27 @@ const updateRentalRequest = async (req, res) => {
     if (!existingRequest) {
       return res.status(404).json({
         error: 'Rental request not found or you do not have permission to edit it.'
+      });
+    }
+
+    // Check if request is locked (has accepted or paid offers)
+    if (existingRequest.status === 'LOCKED') {
+      return res.status(400).json({
+        error: 'Cannot edit a rental request that has been accepted or paid for.'
+      });
+    }
+
+    // Check if request has any accepted or paid offers
+    const hasAcceptedOrPaidOffer = await prisma.offer.findFirst({
+      where: {
+        rentalRequestId: parseInt(id),
+        status: { in: ['ACCEPTED', 'PAID'] }
+      }
+    });
+    
+    if (hasAcceptedOrPaidOffer) {
+      return res.status(400).json({
+        error: 'Cannot edit a rental request that has been accepted or paid for.'
       });
     }
 
@@ -985,17 +1006,24 @@ const deleteRentalRequest = async (req, res) => {
       });
     }
 
-    // Check if request has an accepted offer
-    const hasAcceptedOffer = await prisma.offer.findFirst({
+    // Check if request has an accepted or paid offer
+    const hasAcceptedOrPaidOffer = await prisma.offer.findFirst({
       where: {
         rentalRequestId: parseInt(id),
-        status: 'ACCEPTED'
+        status: { in: ['ACCEPTED', 'PAID'] }
       }
     });
     
-    if (hasAcceptedOffer) {
+    if (hasAcceptedOrPaidOffer) {
       return res.status(400).json({
-        error: 'Cannot delete a request that has an accepted offer.'
+        error: 'Cannot delete a request that has been accepted or paid for.'
+      });
+    }
+
+    // Check if request is locked
+    if (existingRequest.status === 'LOCKED') {
+      return res.status(400).json({
+        error: 'Cannot delete a locked rental request.'
       });
     }
 
