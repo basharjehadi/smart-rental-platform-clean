@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import TenantSidebar from '../components/TenantSidebar';
+import NotificationHeader from '../components/common/NotificationHeader';
 import { LogOut, MessageSquare, FileText, Phone, Mail, Clock, AlertCircle } from 'lucide-react';
 import SupportTicketModal from '../components/support/SupportTicketModal';
 import LiveChatModal from '../components/LiveChatModal';
@@ -232,6 +233,7 @@ const TenantHelpCenter = () => {
             <h1 className="text-2xl font-bold text-gray-900">Help Center</h1>
             
             <div className="flex items-center space-x-4">
+              <NotificationHeader />
               <div className="flex items-center space-x-3">
                 <span className="text-sm font-medium text-gray-900">{user?.name || 'Tenant'}</span>
                 <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-md overflow-hidden">

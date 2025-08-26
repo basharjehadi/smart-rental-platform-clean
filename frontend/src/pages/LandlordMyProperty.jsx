@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import LandlordSidebar from '../components/LandlordSidebar';
+import NotificationHeader from '../components/common/NotificationHeader';
 import { LogOut, Search, Filter, Plus, Eye, Edit, Trash2, Building, AlertTriangle } from 'lucide-react';
 
 const LandlordMyProperty = () => {
@@ -254,6 +255,7 @@ const LandlordMyProperty = () => {
             <h1 className="text-xl font-semibold text-gray-900">My Properties</h1>
             
             <div className="flex items-center space-x-4">
+              <NotificationHeader />
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"

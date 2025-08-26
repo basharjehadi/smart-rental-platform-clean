@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LandlordSidebar from '../components/LandlordSidebar';
+import NotificationHeader from '../components/common/NotificationHeader';
 import { 
   LogOut, 
   Search, 
@@ -56,11 +57,6 @@ const LandlordMyTenants = () => {
       if (response.data.success) {
         const list = response.data.tenants || [];
         setTenants(list);
-        // If dashboard fetch failed earlier, compute a fallback here
-        if (!monthlyRevenue || Number.isNaN(monthlyRevenue)) {
-          const fallback = list.reduce((sum, t) => sum + (t.monthlyRent || 0), 0);
-          setMonthlyRevenue(fallback);
-        }
       } else {
         setError('Failed to fetch tenants');
       }
@@ -264,6 +260,8 @@ const LandlordMyTenants = () => {
             </div>
             
             <div className="flex items-center space-x-4">
+              {/* Header notification bell (hidden on messaging page; this page is not messaging) */}
+              <NotificationHeader />
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"

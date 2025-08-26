@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LandlordSidebar from '../components/LandlordSidebar';
+import NotificationHeader from '../components/common/NotificationHeader';
 import { LogOut, MessageSquare, FileText, Phone, Mail, Clock, AlertCircle } from 'lucide-react';
 import SupportTicketModal from '../components/support/SupportTicketModal';
 import LiveChatModal from '../components/LiveChatModal';
@@ -91,6 +92,7 @@ const LandlordHelpCenter = () => {
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-900">Help Center</h1>
             <div className="flex items-center space-x-4">
+              <NotificationHeader />
               <button onClick={handleLogout} className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200">
                 <LogOut className="w-4 h-4" />
                 <span>Logout</span>

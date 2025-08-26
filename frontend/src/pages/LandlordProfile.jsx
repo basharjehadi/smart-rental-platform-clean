@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LandlordSidebar from '../components/LandlordSidebar';
+import NotificationHeader from '../components/common/NotificationHeader';
 import { Lock, User, Camera, X, Check, Info, LogOut } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import Select from 'react-select';
@@ -1052,13 +1053,16 @@ const LandlordProfile = () => {
               <p className="text-gray-600 text-sm">Manage your account settings</p>
             </div>
             
-            <button
-              onClick={handleLogout}
-              className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Logout</span>
-            </button>
+            <div className="flex items-center space-x-4">
+              <NotificationHeader />
+              <button
+                onClick={handleLogout}
+                className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
         </header>
 

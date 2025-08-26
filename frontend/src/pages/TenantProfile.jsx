@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import NotificationHeader from '../components/common/NotificationHeader';
 import { useAuth } from '../contexts/AuthContext';
 import TenantSidebar from '../components/TenantSidebar';
 import { Lock, User, Camera, X, Check, Info, LogOut } from 'lucide-react';
@@ -1038,6 +1039,7 @@ const TenantProfile = () => {
             <h1 className="text-xl font-semibold text-gray-900">Profile</h1>
             
             <div className="flex items-center space-x-4">
+              <NotificationHeader />
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"

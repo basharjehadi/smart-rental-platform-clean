@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -7,6 +7,7 @@ import NotificationHeader from './common/NotificationHeader';
 const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
 
   const handleLogout = () => {
@@ -74,8 +75,10 @@ const Navbar = () => {
                 </div>
 
                 <div className="flex items-center space-x-4">
-                  {/* Notification Header */}
-                  <NotificationHeader />
+                  {/* Notification Header - hidden on messaging routes */}
+                  {!(location.pathname.startsWith('/messaging')) && (
+                    <NotificationHeader />
+                  )}
                   
                   <button
                     onClick={handleLogout}
