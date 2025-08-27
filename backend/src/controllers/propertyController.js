@@ -8,7 +8,12 @@ export const getLandlordProperties = async (req, res) => {
 
     const properties = await prisma.property.findMany({
       where: {
-        landlordId: landlordId
+        // Properties owned by an organization where the current user is a member
+        organization: {
+          members: {
+            some: { userId: landlordId }
+          }
+        }
       },
       include: {
         offers: {
@@ -71,7 +76,11 @@ export const getPropertyById = async (req, res) => {
     const property = await prisma.property.findFirst({
       where: {
         id: id,
-        landlordId: landlordId
+        organization: {
+          members: {
+            some: { userId: landlordId }
+          }
+        }
       }
     });
 
@@ -229,9 +238,42 @@ export const createProperty = async (req, res) => {
     console.log('🏠 Amenities/houseRules being saved:', houseRules);
     console.log('🏠 Amenities type:', typeof houseRules);
 
+    // Resolve the organization for this user; if none, auto-provision a personal org
+    let orgMember = await prisma.organizationMember.findFirst({
+      where: { userId: landlordId },
+      include: { organization: true }
+    });
+
+    if (!orgMember) {
+      const user = await prisma.user.findUnique({
+        where: { id: landlordId },
+        select: { id: true, name: true, email: true }
+      });
+
+      const orgName = user?.name ? `${user.name} Personal` : `Personal Organization (${user?.email || landlordId})`;
+      const organization = await prisma.organization.create({
+        data: {
+          name: orgName,
+          taxId: null,
+          regNumber: null,
+          address: null,
+          signatureBase64: null
+        }
+      });
+
+      orgMember = await prisma.organizationMember.create({
+        data: {
+          userId: landlordId,
+          organizationId: organization.id,
+          role: 'OWNER'
+        },
+        include: { organization: true }
+      });
+    }
+
     const property = await prisma.property.create({
       data: {
-        landlordId,
+        organizationId: orgMember.organization.id,
         name,
         address,
         city,
@@ -307,7 +349,11 @@ export const updateProperty = async (req, res) => {
     const existingProperty = await prisma.property.findFirst({
       where: {
         id: id,
-        landlordId: landlordId
+        organization: {
+          members: {
+            some: { userId: landlordId }
+          }
+        }
       }
     });
 
@@ -454,7 +500,11 @@ export const deleteProperty = async (req, res) => {
     const existingProperty = await prisma.property.findFirst({
       where: {
         id: id,
-        landlordId: landlordId
+        organization: {
+          members: {
+            some: { userId: landlordId }
+          }
+        }
       }
     });
 
@@ -505,7 +555,11 @@ export const updatePropertyStatus = async (req, res) => {
     const existingProperty = await prisma.property.findFirst({
       where: {
         id: id,
-        landlordId: landlordId
+        organization: {
+          members: {
+            some: { userId: landlordId }
+          }
+        }
       }
     });
 
@@ -557,7 +611,11 @@ export const updatePropertyAvailability = async (req, res) => {
     const existingProperty = await prisma.property.findFirst({
       where: {
         id: id,
-        landlordId: landlordId
+        organization: {
+          members: {
+            some: { userId: landlordId }
+          }
+        }
       }
     });
 

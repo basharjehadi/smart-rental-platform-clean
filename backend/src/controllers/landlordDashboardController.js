@@ -9,7 +9,11 @@ const getLandlordDashboard = async (req, res) => {
 
     // Get properties and calculate portfolio metrics
     const properties = await prisma.property.findMany({
-      where: { landlordId },
+      where: {
+        organization: {
+          members: { some: { userId: landlordId } }
+        }
+      },
       include: {
         offers: {
           include: {
@@ -39,7 +43,9 @@ const getLandlordDashboard = async (req, res) => {
     // Get recent tenants from PAID offers
     const recentTenants = await prisma.offer.findMany({
       where: {
-        landlordId,
+        organization: {
+          members: { some: { userId: landlordId } }
+        },
         status: 'PAID',
         moveInVerificationStatus: { not: 'CANCELLED' }
       },
@@ -74,7 +80,9 @@ const getLandlordDashboard = async (req, res) => {
     // Add lease renewals based on offer end dates
     const expiringOffers = await prisma.offer.findMany({
       where: {
-        landlordId,
+        organization: {
+          members: { some: { userId: landlordId } }
+        },
         status: 'PAID',
         moveInVerificationStatus: { not: 'CANCELLED' },
         leaseEndDate: {
@@ -153,7 +161,9 @@ const getLandlordDashboard = async (req, res) => {
     // Get upcoming renewals count - Fixed query to go through offers
     const upcomingRenewals = await prisma.offer.count({
       where: {
-        landlordId,
+        organization: {
+          members: { some: { userId: landlordId } }
+        },
         status: 'PAID',
         leaseEndDate: {
           gte: new Date(),

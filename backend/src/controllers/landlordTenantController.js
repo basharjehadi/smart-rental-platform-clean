@@ -19,7 +19,9 @@ export const getLandlordTenants = async (req, res) => {
     
     const paidOffers = await prisma.offer.findMany({
       where: {
-        landlordId: landlordId,
+        organization: {
+          members: { some: { userId: landlordId } }
+        },
         status: 'PAID',
         // Exclude unwinded/cancelled bookings
         moveInVerificationStatus: { not: 'CANCELLED' },
@@ -69,7 +71,7 @@ export const getLandlordTenants = async (req, res) => {
     // Also check all offers for this landlord
     const allOffersForLandlord = await prisma.offer.findMany({
       where: {
-        landlordId: landlordId
+        organization: { members: { some: { userId: landlordId } } }
       },
       include: {
         rentalRequest: {
@@ -170,7 +172,7 @@ export const getLandlordTenantDetails = async (req, res) => {
     // Get the specific tenant's paid offer
     const paidOffer = await prisma.offer.findFirst({
       where: {
-        landlordId: landlordId,
+        organization: { members: { some: { userId: landlordId } } },
         status: 'PAID',
         rentalRequest: {
           tenantId: tenantId
@@ -382,7 +384,7 @@ export const getLandlordTenantOffer = async (req, res) => {
     const paidOffer = await prisma.offer.findFirst({
       where: {
         rentalRequestId: parseInt(rentalRequestId),
-        landlordId: landlordId,
+        organization: { members: { some: { userId: landlordId } } },
         status: 'PAID'
       },
       include: {

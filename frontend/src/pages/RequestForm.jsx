@@ -61,11 +61,22 @@ const RequestForm = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   
-  // Check if user is acting on behalf of a business
-  const isBusinessUser = user?.organizationMembers && user.organizationMembers.length > 0;
+  // Check if user is acting on behalf of a business: require org with company identifiers
+  const [isBusinessUser, setIsBusinessUser] = useState(false);
 
   useEffect(() => {
     fetchMyRequests();
+    // Determine if user is business (org with taxId/regNumber)
+    const checkBusiness = async () => {
+      try {
+        const res = await api.get('/organizations/my-organization');
+        const org = res.data?.organization;
+        setIsBusinessUser(Boolean(org?.taxId || org?.regNumber));
+      } catch (_) {
+        setIsBusinessUser(false);
+      }
+    };
+    checkBusiness();
   }, []);
 
   const fetchMyRequests = async () => {

@@ -17,9 +17,16 @@ export const runMoveInReminders = async () => {
     },
     select: {
       id: true,
-      tenantId: true,
-      landlordId: true,
+      tenantGroupId: true,
+      organizationId: true,
       moveInVerificationDeadline: true
+    },
+    include: {
+      tenantGroup: {
+        include: {
+          members: { select: { userId: true, isPrimary: true } }
+        }
+      }
     }
   });
 
@@ -37,28 +44,20 @@ export const runMoveInReminders = async () => {
     for (const h of THRESHOLDS_HOURS) {
       if (withinWindow(diffMs, h)) {
         const title = `Move-in verification reminder (${h}h)`;
-        const existing = await prisma.notification.findFirst({
-          where: { userId: offer.tenantId, entityId: offer.id, title }
-        });
+        const primaryMember = offer.tenantGroup?.members?.find(m => m.isPrimary) || offer.tenantGroup?.members?.[0];
+        const tenantUserId = primaryMember?.userId;
+        const existing = tenantUserId ? await prisma.notification.findFirst({
+          where: { userId: tenantUserId, entityId: offer.id, title }
+        }) : null;
         if (!existing) {
-          const n = await prisma.notification.create({
-            data: {
-              userId: offer.tenantId,
-              type: 'SYSTEM_ANNOUNCEMENT',
-              entityId: offer.id,
-              title,
-              body: 'Please confirm your move-in or report an issue within the 24h window.'
-            }
-          });
-          // landlord heads-up at 1h
-          if (h === 1) {
+          if (tenantUserId) {
             await prisma.notification.create({
               data: {
-                userId: offer.landlordId,
+                userId: tenantUserId,
                 type: 'SYSTEM_ANNOUNCEMENT',
                 entityId: offer.id,
-                title: 'Tenant move-in verification pending',
-                body: 'The tenant has 1 hour left to confirm move-in.'
+                title,
+                body: 'Please confirm your move-in or report an issue within the 24h window.'
               }
             });
           }
@@ -75,7 +74,8 @@ export const runMoveInFinalization = async () => {
       moveInVerificationStatus: 'PENDING',
       moveInVerificationDeadline: { lte: now }
     },
-    select: { id: true, tenantId: true, landlordId: true }
+    select: { id: true, tenantGroupId: true },
+    include: { tenantGroup: { include: { members: { select: { userId: true, isPrimary: true } } } } }
   });
 
   for (const offer of expired) {
@@ -93,25 +93,20 @@ export const runMoveInFinalization = async () => {
       continue;
     }
 
-    // Notify both parties
-    await prisma.notification.create({
-      data: {
-        userId: offer.tenantId,
-        type: 'SYSTEM_ANNOUNCEMENT',
-        entityId: offer.id,
-        title: 'Move-in auto-confirmed',
-        body: 'Your move-in was automatically confirmed after 24h.'
-      }
-    });
-    await prisma.notification.create({
-      data: {
-        userId: offer.landlordId,
-        type: 'SYSTEM_ANNOUNCEMENT',
-        entityId: offer.id,
-        title: 'Tenant move-in auto-confirmed',
-        body: 'The tenant move-in was automatically confirmed after 24h.'
-      }
-    });
+    // Notify tenant primary member
+    const primaryMember = offer.tenantGroup?.members?.find(m => m.isPrimary) || offer.tenantGroup?.members?.[0];
+    const tenantUserId = primaryMember?.userId;
+    if (tenantUserId) {
+      await prisma.notification.create({
+        data: {
+          userId: tenantUserId,
+          type: 'SYSTEM_ANNOUNCEMENT',
+          entityId: offer.id,
+          title: 'Move-in auto-confirmed',
+          body: 'Your move-in was automatically confirmed after 24h.'
+        }
+      });
+    }
   }
 };
 

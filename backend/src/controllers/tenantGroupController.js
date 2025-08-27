@@ -301,7 +301,7 @@ class TenantGroupController {
                   email: true,
                   role: true,
                   phoneNumber: true,
-                  profilePicture: true
+                  profileImage: true
                 }
               }
             },
@@ -387,7 +387,7 @@ class TenantGroupController {
                 select: {
                   id: true,
                   propertyId: true,
-                  monthlyRent: true,
+                  rentAmount: true,
                   status: true,
                   createdAt: true
                 }
@@ -398,7 +398,7 @@ class TenantGroupController {
                   propertyId: true,
                   startDate: true,
                   endDate: true,
-                  monthlyRent: true,
+                  rentAmount: true,
                   status: true,
                   createdAt: true
                 }

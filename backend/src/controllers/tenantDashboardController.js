@@ -40,19 +40,13 @@ export const getTenantDashboardData = async (req, res) => {
       },
       include: {
         rentalRequest: true,
-        landlord: {
+        organization: {
           select: {
             id: true,
             name: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            phoneNumber: true,
-            street: true,
-            city: true,
-            zipCode: true,
-            country: true,
-            profileImage: true
+            taxId: true,
+            address: true,
+            signatureBase64: true
           }
         },
         property: {
@@ -142,11 +136,11 @@ export const getTenantDashboardData = async (req, res) => {
           })()
         },
         landlord: {
-          name: offer.landlord.firstName && offer.landlord.lastName ? `${offer.landlord.firstName} ${offer.landlord.lastName}` : (offer.landlord.name || 'Landlord'),
-          email: offer.landlord.email,
-          phone: offer.landlord.phoneNumber || 'Not provided',
-          address: offer.landlord.street && offer.landlord.city ? `${offer.landlord.street}, ${offer.landlord.city} ${offer.landlord.zipCode}, ${offer.landlord.country}` : 'Not provided',
-          profileImage: offer.landlord.profileImage || null
+          name: offer.organization?.name || 'Organization',
+          email: null,
+          phone: null,
+          address: offer.organization?.address || 'Not provided',
+          profileImage: null
         },
         lease: {
           startDate: leaseStartDate,
@@ -207,16 +201,12 @@ export const getTenantDashboardData = async (req, res) => {
         })(),
       },
       landlord: {
-        name: activeLease.landlord.firstName && activeLease.landlord.lastName ? 
-          `${activeLease.landlord.firstName} ${activeLease.landlord.lastName}` : 
-          activeLease.landlord.name || 'Landlord',
-        company: 'Individual Landlord',
-        email: activeLease.landlord.email,
-        phone: activeLease.landlord.phoneNumber || 'Not provided',
-        address: activeLease.landlord.street && activeLease.landlord.city ? 
-          `${activeLease.landlord.street}, ${activeLease.landlord.city} ${activeLease.landlord.zipCode}, ${activeLease.landlord.country}` : 
-          'Not provided',
-        profileImage: activeLease.landlord.profileImage || null
+        name: activeLease.organization?.name || 'Organization',
+        company: 'Business Landlord',
+        email: null,
+        phone: null,
+        address: activeLease.organization?.address || 'Not provided',
+        profileImage: null
       },
       lease: {
         startDate: activeLease.rentalRequest.moveInDate,
@@ -292,11 +282,7 @@ export const getTenantActiveLease = async (req, res) => {
       },
       include: {
         rentalRequest: true,
-        landlord: {
-          include: {
-            properties: true
-          }
-        },
+        organization: true,
         property: true
       }
     });
@@ -356,13 +342,11 @@ export const getTenantActiveLease = async (req, res) => {
     };
 
     const landlordInfo = {
-      name: activeLease.landlord.firstName + ' ' + activeLease.landlord.lastName,
-      company: activeLease.landlord.company || 'Individual Landlord',
-      email: activeLease.landlord.email,
-      phone: activeLease.landlord.phoneNumber || 'Not provided',
-      address: activeLease.landlord.street && activeLease.landlord.city ? 
-        `${activeLease.landlord.street}, ${activeLease.landlord.city} ${activeLease.landlord.zipCode}, ${activeLease.landlord.country}` : 
-        'Not provided'
+      name: activeLease.organization?.name || 'Organization',
+      company: 'Business Landlord',
+      email: null,
+      phone: null,
+      address: activeLease.organization?.address || 'Not provided'
     };
 
     const leaseInfo = {
@@ -496,21 +480,7 @@ export const getCurrentRental = async (req, res) => {
             houseRules: true
           }
         },
-        landlord: {
-          select: {
-            id: true,
-            name: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phoneNumber: true,
-            profileImage: true,
-            createdAt: true,
-            averageRating: true,
-            totalReviews: true,
-            rank: true
-          }
-        }
+        organization: true
       }
     });
 
@@ -583,13 +553,11 @@ export const getCurrentRental = async (req, res) => {
         description: activeLease.property.description
       } : null,
       landlord: {
-        id: activeLease.landlord.id,
-        name: activeLease.landlord.firstName && activeLease.landlord.lastName ? 
-          `${activeLease.landlord.firstName} ${activeLease.landlord.lastName}` : 
-          activeLease.landlord.name || 'Landlord',
-        email: activeLease.landlord.email,
-        phone: activeLease.landlord.phoneNumber,
-        profileImage: activeLease.landlord.profileImage
+        id: activeLease.organization?.id || '',
+        name: activeLease.organization?.name || 'Organization',
+        email: null,
+        phone: null,
+        profileImage: null
       }
     };
 

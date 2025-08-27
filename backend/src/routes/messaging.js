@@ -202,7 +202,7 @@ router.post('/conversations', verifyToken, async (req, res) => {
         const paidOffer = await prisma.offer.findFirst({
           where: {
             status: 'PAID',
-            landlordId: landlord.id,
+            organization: { members: { some: { userId: landlord.id } } },
             tenantId: tenant.id
           },
           orderBy: { updatedAt: 'desc' },
@@ -671,7 +671,7 @@ router.get('/eligible', verifyToken, async (req, res) => {
       // For landlords: get properties they own where tenants have paid
       const landlordProperties = await prisma.property.findMany({
         where: {
-          landlordId: userId
+          organization: { members: { some: { userId: userId } } }
         },
         include: {
           offers: {
@@ -736,7 +736,7 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
     // First, check if the property exists
     const propertyExists = await prisma.property.findUnique({
       where: { id: propertyId },
-      select: { id: true, name: true, landlordId: true }
+      select: { id: true, name: true, organizationId: true }
     });
     
     if (!propertyExists) {
@@ -875,7 +875,7 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
       property = await prisma.property.findFirst({
         where: {
           id: propertyId,
-          landlordId: userId
+          organization: { members: { some: { userId } } }
         },
         include: {
           offers: {

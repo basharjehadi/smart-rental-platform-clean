@@ -60,7 +60,7 @@ import TenantGroupManagement from './pages/TenantGroupManagement';
 // Component to conditionally render Navbar
 const AppContent = () => {
   const location = useLocation();
-  const hideNavbarRoutes = ['/', '/login', '/register', '/dashboard', '/tenant-dashboard', '/tenant-help-center', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/property', '/contracts', '/payments', '/payment', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details', '/landlord-help-center', '/landlord-my-tenants', '/landlord-tenant-profile', '/admin', '/payment-success', '/payment-history', '/monthly-rent-payment', '/mock-payment', '/reviews', '/messaging'];
+  const hideNavbarRoutes = ['/', '/login', '/register', '/dashboard', '/tenant-dashboard', '/tenant-help-center', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/property', '/contracts', '/payments', '/payment', '/my-rents', '/my-requests', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details', '/landlord-help-center', '/landlord-my-tenants', '/landlord-tenant-profile', '/admin', '/payment-success', '/payment-history', '/monthly-rent-payment', '/mock-payment', '/reviews', '/messaging', '/tenant-group-management', '/business-upgrade'];
   
   // Check if current path should hide navbar (including parameterized routes)
   const shouldHideNavbar = hideNavbarRoutes.some(route => {

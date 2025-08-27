@@ -24,17 +24,18 @@ class PropertyAvailabilityService {
         where: { id: propertyId },
         data: updateData,
         include: {
-          landlord: {
-            select: {
-              id: true,
-              availability: true
-            }
-          }
+          organization: true
         }
       });
       
-      // Update landlord availability based on whether they have any available properties
-      await this.updateLandlordAvailability(property.landlordId);
+      // Update landlord availability for all members of the owning organization
+      if (property.organizationId) {
+        const members = await prisma.organizationMember.findMany({
+          where: { organizationId: property.organizationId },
+          select: { userId: true }
+        });
+        await Promise.all(members.map(m => this.updateLandlordAvailability(m.userId)));
+      }
       
       console.log(`✅ Property ${propertyId} availability updated to ${availability}`);
       return property;
@@ -82,7 +83,9 @@ class PropertyAvailabilityService {
     try {
       return await prisma.property.findMany({
         where: {
-          landlordId,
+          organization: {
+            members: { some: { userId: landlordId } }
+          },
           status: 'AVAILABLE',
           availability: true
         },
@@ -102,19 +105,19 @@ class PropertyAvailabilityService {
    */
   async getPropertyAvailabilitySummary(landlordId) {
     try {
-      const summary = await prisma.property.groupBy({
-        by: ['status', 'availability'],
-        where: { landlordId },
-        _count: {
-          id: true
-        }
+      const props = await prisma.property.findMany({
+        where: {
+          organization: { members: { some: { userId: landlordId } } }
+        },
+        select: { status: true, availability: true }
       });
+      const summary = {};
+      for (const p of props) {
+        const key = `${p.status}_${p.availability}`;
+        summary[key] = (summary[key] || 0) + 1;
+      }
       
-      return summary.reduce((acc, item) => {
-        const key = `${item.status}_${item.availability}`;
-        acc[key] = item._count.id;
-        return acc;
-      }, {});
+      return summary;
       
     } catch (error) {
       console.error('❌ Error getting property availability summary:', error);
@@ -129,13 +132,10 @@ class PropertyAvailabilityService {
     try {
       const result = await prisma.property.updateMany({
         where: {
-          landlordId,
-          status: 'AVAILABLE'
+          status: 'AVAILABLE',
+          organization: { members: { some: { userId: landlordId } } }
         },
-        data: {
-          availability,
-          updatedAt: new Date()
-        }
+        data: { availability, updatedAt: new Date() }
       });
       
       // Update landlord availability
@@ -157,9 +157,9 @@ class PropertyAvailabilityService {
     try {
       const availableProperties = await prisma.property.count({
         where: {
-          landlordId,
           status: 'AVAILABLE',
-          availability: true
+          availability: true,
+          organization: { members: { some: { userId: landlordId } } }
         }
       });
       

@@ -10,7 +10,7 @@ export const runLeaseTerminations = async () => {
       status: { in: ['ACTIVE', 'PENDING'] },
       terminationEffectiveDate: { not: null, lte: now }
     },
-    select: { id: true, tenantId: true, offerId: true, propertyId: true }
+    select: { id: true, tenantGroupId: true, offerId: true, propertyId: true }
   });
 
   for (const l of due) {
@@ -22,7 +22,7 @@ export const runLeaseTerminations = async () => {
     // Contract cleanup based on offer/rentalRequest linkage (best-effort)
     try {
       if (l.offerId) {
-        const off = await prisma.offer.findUnique({ where: { id: l.offerId }, select: { rentalRequestId: true, tenantId: true, landlordId: true } });
+        const off = await prisma.offer.findUnique({ where: { id: l.offerId }, select: { rentalRequestId: true } });
         if (off?.rentalRequestId) {
           const contracts = await prisma.contract.findMany({ where: { rentalRequestId: off.rentalRequestId }, select: { id: true, pdfUrl: true } });
           if (contracts.length > 0) {
@@ -58,13 +58,7 @@ export const runLeaseTerminations = async () => {
 
     // Notifications
     try {
-      const offer = l.offerId ? await prisma.offer.findUnique({ where: { id: l.offerId }, select: { tenantId: true, landlordId: true } }) : null;
-      const targets = [offer?.tenantId, offer?.landlordId].filter(Boolean);
-      for (const t of targets) {
-        await prisma.notification.create({
-          data: { userId: t, type: 'SYSTEM_ANNOUNCEMENT', entityId: updated.id, title: 'Lease terminated', body: 'Lease termination executed. Data cleaned up.' }
-        });
-      }
+      // Notify nothing specific now (group/org level). Could notify group primary member if needed.
     } catch {}
   }
 };

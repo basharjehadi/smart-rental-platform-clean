@@ -882,13 +882,7 @@ const getMyRequests = async (req, res) => {
               where: { status: { in: ['SUCCEEDED', 'CANCELLED'] } },
               select: { id: true, amount: true, status: true, gateway: true, paidAt: true, errorMessage: true, purpose: true }
             },
-            landlord: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            }
+            organizationId: true
           }
         }
       },
@@ -1204,13 +1198,13 @@ const getMyOffers = async (req, res) => {
             status: true
           }
         },
-        landlord: {
+        organization: {
           select: {
             id: true,
             name: true,
-            email: true,
-            phoneNumber: true,
-            profileImage: true
+            taxId: true,
+            address: true,
+            signatureBase64: true
           }
         },
         property: {
@@ -1822,8 +1816,10 @@ const getAllRentalRequests = async (req, res) => {
     // First, get all properties owned by this landlord
     const landlordProperties = await prisma.property.findMany({
       where: {
-        landlordId: landlordId,
-        status: 'AVAILABLE' // Only available properties
+        status: 'AVAILABLE', // Only available properties
+        organization: {
+          members: { some: { userId: landlordId } }
+        }
       },
       select: {
         id: true,
@@ -1909,7 +1905,7 @@ const getAllRentalRequests = async (req, res) => {
         },
         offers: {
           where: {
-            landlordId: landlordId
+            organization: { members: { some: { userId: landlordId } } }
           },
           select: {
             id: true,
@@ -1968,7 +1964,7 @@ const getLandlordAcceptedRequests = async (req, res) => {
     // Get accepted/paid offers for this landlord
     const acceptedOffers = await prisma.offer.findMany({
       where: {
-        landlordId: landlordId,
+        organization: { members: { some: { userId: landlordId } } },
         status: 'PAID',
         moveInVerificationStatus: { not: 'CANCELLED' }
       },
