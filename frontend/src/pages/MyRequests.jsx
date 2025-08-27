@@ -419,7 +419,7 @@ const MyRequests = () => {
                         {/* Show reason why buttons are disabled */}
                         {request.status === 'LOCKED' && (
                           <div className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-md border border-gray-100 animate-pulse">
-                            {'🔒 Request locked - cannot be modified after offer acceptance'}
+                            {'\uD83D\uDD12 Request locked - cannot be modified after offer acceptance'}
                           </div>
                         )}
                       </div>
@@ -500,7 +500,7 @@ const MyRequests = () => {
         onChoice={(choice) => {
           if (choice === 'individual') {
             setGroupChoiceModalOpen(false);
-            navigate('/request-form');
+            setShowCreateModal(true);
           } else if (choice === 'group') {
             setGroupChoiceModalOpen(false);
             navigate('/tenant-group-management');

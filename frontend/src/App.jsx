@@ -15,7 +15,6 @@ import TenantDashboard from './pages/TenantDashboard';
 import TenantDashboardNew from './pages/TenantDashboardNew';
 import TenantHelpCenter from './pages/TenantHelpCenter';
 import TenantProfile from './pages/TenantProfile';
-import RequestForm from './pages/RequestForm';
 import MyRequests from './pages/MyRequests';
 import LandlordDashboard from './pages/LandlordDashboard';
 import LandlordProfile from './pages/LandlordProfile';
@@ -44,7 +43,6 @@ import AdminMoveInIssues from './pages/AdminMoveInIssues.jsx';
 import AdminPropertyReview from './pages/AdminPropertyReview.jsx';
 import AuthCallback from './pages/AuthCallback';
 import TestPage from './pages/TestPage';
-import ProfilePage from './pages/ProfilePage';
 
 
 import PropertyMediaUpload from './components/PropertyMediaUpload';
@@ -121,16 +119,6 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <TenantProfile />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/post-request" 
-          element={
-            <ProtectedRoute>
-              <ProfileCompletionGuard required={true}>
-                <RequestForm />
-              </ProfileCompletionGuard>
             </ProtectedRoute>
           } 
         />
@@ -268,14 +256,6 @@ const AppContent = () => {
           } 
         />
 
-        <Route 
-          path="/profile" 
-          element={
-            <ProtectedRoute>
-              <ProfilePage />
-            </ProtectedRoute>
-          } 
-        />
         <Route 
           path="/landlord-profile" 
           element={

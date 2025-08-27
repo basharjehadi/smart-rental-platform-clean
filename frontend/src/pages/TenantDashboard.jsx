@@ -772,7 +772,7 @@ const TenantDashboard = () => {
         onChoice={(choice) => {
           if (choice === 'individual') {
             setGroupChoiceModalOpen(false);
-            navigate('/request-form');
+            setShowCreateModal(true);
           } else if (choice === 'group') {
             setGroupChoiceModalOpen(false);
             navigate('/tenant-group-management');

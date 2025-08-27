@@ -1,12 +1,39 @@
 import React from 'react';
 import { Users, User, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const TenantGroupChoiceModal = ({ isOpen, onClose, onChoice }) => {
   if (!isOpen) return null;
 
+  const navigate = useNavigate();
+  const { api } = useAuth();
+
   const handleChoice = (choice) => {
-    onChoice(choice);
+    if (onChoice) {
+      onChoice(choice);
+      onClose();
+      return;
+    }
     onClose();
+  };
+
+  const handleSoloRequest = async () => {
+    // If parent supplied onChoice, let parent drive the flow (e.g., open inline modal)
+    if (onChoice) {
+      onClose();
+      onChoice('individual');
+      return;
+    }
+    // Fallback: create solo group then navigate to post-request
+    try {
+      await api.post('/tenant-groups', { name: 'Solo Group' });
+    } catch (err) {
+      // If group already exists or any non-critical error, proceed anyway
+    } finally {
+      onClose();
+      navigate('/post-request');
+    }
   };
 
   return (
@@ -24,7 +51,7 @@ const TenantGroupChoiceModal = ({ isOpen, onClose, onChoice }) => {
         <div className="space-y-4">
           {/* Just Me Option */}
           <button
-            onClick={() => handleChoice('individual')}
+            onClick={handleSoloRequest}
             className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 text-left group"
           >
             <div className="flex items-center justify-between">
