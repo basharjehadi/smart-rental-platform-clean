@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import CreateRentalRequestModal from '../components/CreateRentalRequestModal';
+import TenantGroupChoiceModal from '../components/TenantGroupChoiceModal';
 
 const MyRequests = () => {
+  const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -13,6 +15,7 @@ const MyRequests = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [requestToEdit, setRequestToEdit] = useState(null);
   const [requestToDelete, setRequestToDelete] = useState(null);
+  const [isGroupChoiceModalOpen, setGroupChoiceModalOpen] = useState(false);
   
   // Filter and sort state
   const [sortBy, setSortBy] = useState('newest');
@@ -196,7 +199,7 @@ const MyRequests = () => {
               </p>
             </div>
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => setGroupChoiceModalOpen(true)}
               className="btn-primary inline-flex items-center px-4 py-2"
             >
               <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -283,10 +286,10 @@ const MyRequests = () => {
             </p>
             {!searchTerm && statusFilter === 'all' && (
               <button
-                onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-            >
-              Create Your First Request
+                onClick={() => setGroupChoiceModalOpen(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+              >
+                Create Your First Request
               </button>
             )}
           </div>
@@ -489,6 +492,21 @@ const MyRequests = () => {
           </div>
         </div>
       )}
+
+      {/* Tenant Group Choice Modal for new request entry */}
+      <TenantGroupChoiceModal
+        isOpen={isGroupChoiceModalOpen}
+        onClose={() => setGroupChoiceModalOpen(false)}
+        onChoice={(choice) => {
+          if (choice === 'individual') {
+            setGroupChoiceModalOpen(false);
+            navigate('/request-form');
+          } else if (choice === 'group') {
+            setGroupChoiceModalOpen(false);
+            navigate('/tenant-group-management');
+          }
+        }}
+      />
     </div>
   );
 };

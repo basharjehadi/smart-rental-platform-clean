@@ -10,6 +10,7 @@ import NotificationHeader from '../components/common/NotificationHeader';
 import { useNotifications } from '../contexts/NotificationContext';
 import dayjs from 'dayjs';
 import ReportMoveInIssueModal from '../components/ReportMoveInIssueModal.jsx';
+import TenantGroupChoiceModal from '../components/TenantGroupChoiceModal.jsx';
 
 const TenantDashboard = () => {
   const { user, logout } = useAuth();
@@ -40,6 +41,7 @@ const TenantDashboard = () => {
   // Chat states
   const [showChat, setShowChat] = useState(false);
   const [reportOfferId, setReportOfferId] = useState(null);
+  const [isGroupChoiceModalOpen, setGroupChoiceModalOpen] = useState(false);
 
   const fetchRequests = async () => {
     try {
@@ -448,7 +450,7 @@ const TenantDashboard = () => {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-gray-900">Your rental requests</h2>
               <button
-                onClick={() => setShowCreateModal(true)}
+                onClick={() => setGroupChoiceModalOpen(true)}
                 className="btn-primary"
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -526,7 +528,7 @@ const TenantDashboard = () => {
                   <p className="text-gray-500 mb-4">Try adjusting your search or filter criteria.</p>
                 ) : (
                   <button
-                    onClick={() => setShowCreateModal(true)}
+                    onClick={() => setGroupChoiceModalOpen(true)}
                     className="btn-primary"
                   >
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -762,6 +764,21 @@ const TenantDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Tenant Group Choice Modal for request creation entry */}
+      <TenantGroupChoiceModal
+        isOpen={isGroupChoiceModalOpen}
+        onClose={() => setGroupChoiceModalOpen(false)}
+        onChoice={(choice) => {
+          if (choice === 'individual') {
+            setGroupChoiceModalOpen(false);
+            navigate('/request-form');
+          } else if (choice === 'group') {
+            setGroupChoiceModalOpen(false);
+            navigate('/tenant-group-management');
+          }
+        }}
+      />
     </div>
   );
 };

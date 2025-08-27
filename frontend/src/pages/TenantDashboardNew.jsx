@@ -648,20 +648,7 @@ const TenantDashboardNew = () => {
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">No Active Rental</h3>
                 <p className="text-gray-600 mb-6">You don't have any active rental properties yet. To create a rental request, please go to the My Requests page from the sidebar.</p>
                 
-                {/* Quick Actions */}
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <button
-                    onClick={() => navigate('/request-form')}
-                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center"
-                  >
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Create Rental Request
-                  </button>
-                  
-                  {/* Removed direct navigation to Tenant Group Management to enforce modal-only entry */}
-                </div>
+                {/* Quick Actions section removed - no create request button */}
               </div>
             )}
 
@@ -984,6 +971,8 @@ const TenantDashboardNew = () => {
                   }
                 }}
               />
+
+              {/* Tenant Group Choice Modal removed - no create request functionality */}
             </div>
 
             {/* Review System */}
