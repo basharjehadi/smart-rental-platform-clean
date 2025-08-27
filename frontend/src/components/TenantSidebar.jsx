@@ -8,8 +8,7 @@ import {
   User, 
   MessageCircle,
   Menu,
-  X,
-  Users
+  X
 } from 'lucide-react';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useChatBadge } from '../contexts/ChatBadgeContext';
@@ -98,11 +97,6 @@ const TenantSidebar = () => {
       to: '/tenant-profile',
       icon: User,
       label: 'Profile'
-    },
-    {
-      to: '/tenant-group-management',
-      icon: Users,
-      label: 'Tenant Group'
     }
   ];
 

@@ -695,18 +695,7 @@ const RequestForm = () => {
               </button>
               
               {/* Info about group rentals */}
-              <div className="text-center">
-                <p className="text-sm text-gray-600">
-                  Want to rent with friends or family? 
-                  <button
-                    type="button"
-                    onClick={() => navigate('/tenant-group-management')}
-                    className="text-blue-600 hover:text-blue-800 font-medium ml-1 underline"
-                  >
-                    Manage your tenant group
-                  </button>
-                </p>
-              </div>
+              {/* Removed direct link to Tenant Group Management; access via modal on submit */}
             </form>
           </div>
 
