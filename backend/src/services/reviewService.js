@@ -23,7 +23,7 @@ class ReviewService {
           comment: 'New user - Initial rating',
           isAnonymous: false,
           reviewerId: userId,
-          targetUserId: userId, // Self-review initially
+          targetTenantGroupId: null,
           leaseId: null, // No lease yet
           reviewStage: 'INITIAL',
           isSystemGenerated: true
@@ -43,7 +43,7 @@ class ReviewService {
    */
   async createStageReview(data) {
     try {
-      const { reviewerId, targetUserId, leaseId, rating, comment, stage, isAnonymous = false } = data;
+      const { reviewerId, targetTenantGroupId, leaseId, rating, comment, stage, isAnonymous = false } = data;
       
       console.log(`📝 Creating ${stage} review from ${reviewerId} to ${targetUserId}, lease ${leaseId}`);
       
@@ -56,7 +56,7 @@ class ReviewService {
       // Check if review already exists for this stage
       const existingReview = await prisma.review.findFirst({
         where: {
-          targetUserId,
+          targetTenantGroupId,
           leaseId,
           reviewStage: stage
         }
@@ -73,7 +73,7 @@ class ReviewService {
           comment,
           isAnonymous,
           reviewerId,
-          targetUserId,
+          targetTenantGroupId,
           leaseId,
           reviewStage: stage,
           isSystemGenerated: false
@@ -81,10 +81,10 @@ class ReviewService {
       });
 
              // Update target user's average rating
-       await this.updateUserAverageRating(targetUserId);
+       // Average rating now computed at tenant-group level or skipped in this flow
        
        // Calculate and update user rank
-       await rankService.calculateUserRank(targetUserId);
+       // Rank calc may be adapted later for groups
        
        console.log(`✅ ${stage} review created successfully`);
        return review;
@@ -103,7 +103,7 @@ class ReviewService {
       
       // Get all reviews received by the user
       const reviews = await prisma.review.findMany({
-        where: { targetUserId: userId },
+        where: { reviewerId: userId },
         select: { rating: true, reviewStage: true, isSystemGenerated: true }
       });
 
@@ -173,7 +173,12 @@ class ReviewService {
   async getUserReviewSummary(userId) {
     try {
       const reviews = await prisma.review.findMany({
-        where: { targetUserId: userId },
+        where: {
+          OR: [
+            { reviewerId: userId },
+            { targetTenantGroup: { members: { some: { userId } } } }
+          ]
+        },
         include: {
           lease: {
             select: {

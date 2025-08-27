@@ -363,7 +363,7 @@ class TenantGroupController {
                       email: true,
                       role: true,
                       phoneNumber: true,
-                      profilePicture: true
+                      profileImage: true
                     }
                   }
                 },

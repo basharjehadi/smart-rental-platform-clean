@@ -29,21 +29,17 @@ export const getTenantDashboardData = async (req, res) => {
     const activeLeases = await prisma.offer.findMany({
       where: {
         rentalRequest: {
-          tenantId: tenantId
+          tenantGroup: { members: { some: { userId: tenantId } } }
         },
         status: 'PAID',
         moveInVerificationStatus: { not: 'CANCELLED' },
         rentalRequest: {
-          tenantId: tenantId,
+          tenantGroup: { members: { some: { userId: tenantId } } },
           NOT: { status: 'CANCELLED' }
         }
       },
       include: {
-        rentalRequest: {
-          include: {
-            tenant: true
-          }
-        },
+        rentalRequest: true,
         landlord: {
           select: {
             id: true,
@@ -285,21 +281,17 @@ export const getTenantActiveLease = async (req, res) => {
     const activeLease = await prisma.offer.findFirst({
       where: {
         rentalRequest: {
-          tenantId: tenantId
+          tenantGroup: { members: { some: { userId: tenantId } } }
         },
         status: 'PAID',
         moveInVerificationStatus: { not: 'CANCELLED' },
         rentalRequest: {
-          tenantId: tenantId,
+          tenantGroup: { members: { some: { userId: tenantId } } },
           NOT: { status: 'CANCELLED' }
         }
       },
       include: {
-        rentalRequest: {
-          include: {
-            tenant: true
-          }
-        },
+        rentalRequest: true,
         landlord: {
           include: {
             properties: true
@@ -434,7 +426,7 @@ export const getTenantPaymentHistory = async (req, res) => {
     const activeLease = await prisma.offer.findFirst({
       where: {
         rentalRequest: {
-          tenantId: tenantId
+          tenantGroup: { members: { some: { userId: tenantId } } }
         },
         status: 'PAID'
       },
@@ -481,22 +473,12 @@ export const getCurrentRental = async (req, res) => {
     const activeLease = await prisma.offer.findFirst({
       where: {
         rentalRequest: {
-          tenantId: tenantId
+          tenantGroup: { members: { some: { userId: tenantId } } }
         },
         status: 'PAID'
       },
       include: {
-        rentalRequest: {
-          include: {
-            tenant: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            }
-          }
-        },
+        rentalRequest: true,
         property: {
           select: {
             id: true,

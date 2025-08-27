@@ -1,6 +1,6 @@
 import express from 'express';
 import organizationController from '../controllers/organizationController.js';
-import { verifyToken } from '../middlewares/verifyToken.js';
+import verifyToken from '../middlewares/verifyToken.js';
 import { requireAdmin } from '../middlewares/requireAdmin.js';
 
 const router = express.Router();

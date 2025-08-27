@@ -1,6 +1,6 @@
 import express from 'express';
 import tenantGroupController from '../controllers/tenantGroupController.js';
-import { verifyToken } from '../middlewares/verifyToken.js';
+import verifyToken from '../middlewares/verifyToken.js';
 
 const router = express.Router();
 

@@ -742,13 +742,7 @@ const updateOfferStatus = async (req, res) => {
       include: {
         rentalRequest: {
           include: {
-            tenant: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            }
+            tenantGroup: true
           }
         },
         landlord: {
@@ -768,7 +762,10 @@ const updateOfferStatus = async (req, res) => {
     }
 
     // Verify tenant owns the request
-    if (offer.rentalRequest.tenant.id !== req.user.id) {
+    const isMember = await prisma.tenantGroupMember.findFirst({
+      where: { tenantGroupId: offer.rentalRequest.tenantGroupId, userId: req.user.id }
+    });
+    if (!isMember) {
       return res.status(403).json({
         error: 'You can only update offers for your own rental requests.'
       });
@@ -871,7 +868,9 @@ const getMyRequests = async (req, res) => {
 
     const rentalRequestsRaw = await prisma.rentalRequest.findMany({
       where: {
-        tenantId: tenantId
+        tenantGroup: {
+          members: { some: { userId: tenantId } }
+        }
       },
       include: {
         offers: {
@@ -955,13 +954,9 @@ const autoUpdateRequestStatus = async (tenantId) => {
     // Update requests where move-in date is in the past
     await prisma.rentalRequest.updateMany({
       where: {
-        tenantId: tenantId,
-        moveInDate: {
-          lt: now
-        },
-        status: {
-          not: 'CANCELLED'
-        }
+        tenantGroup: { members: { some: { userId: tenantId } } },
+        moveInDate: { lt: now },
+        status: { not: 'CANCELLED' }
       },
       data: {
         status: 'CANCELLED',
@@ -972,13 +967,8 @@ const autoUpdateRequestStatus = async (tenantId) => {
     // Update requests where tenant has accepted or paid for an offer
     await prisma.rentalRequest.updateMany({
       where: {
-        tenantId: tenantId,
-        offers: {
-          some: {
-            status: { in: ['ACCEPTED', 'PAID'] }
-          }
-        },
-        // Do not change status if the request has been cancelled via unwind
+        tenantGroup: { members: { some: { userId: tenantId } } },
+        offers: { some: { status: { in: ['ACCEPTED', 'PAID'] } } },
         status: { notIn: ['LOCKED', 'CANCELLED'] }
       },
       data: {
@@ -1008,7 +998,7 @@ const updateRentalRequest = async (req, res) => {
     const existingRequest = await prisma.rentalRequest.findFirst({
       where: {
         id: parseInt(id),
-        tenantId: tenantId
+        tenantGroup: { members: { some: { userId: tenantId } } }
       }
     });
 
@@ -1132,7 +1122,7 @@ const deleteRentalRequest = async (req, res) => {
     const existingRequest = await prisma.rentalRequest.findFirst({
       where: {
         id: parseInt(id),
-        tenantId: tenantId
+        tenantGroup: { members: { some: { userId: tenantId } } }
       }
     });
 
@@ -1193,7 +1183,7 @@ const getMyOffers = async (req, res) => {
     const offers = await prisma.offer.findMany({
       where: {
         rentalRequest: {
-          tenantId: tenantId
+          tenantGroup: { members: { some: { userId: tenantId } } }
         },
         // Hide offers whose rental request has been cancelled via unwind
         NOT: {
@@ -1700,7 +1690,7 @@ const updateTenantOfferStatus = async (req, res) => {
         // Compute prorated first-month amount based on move-in date
         const reqRecord = await tx.rentalRequest.findUnique({
           where: { id: updatedOffer.rentalRequestId },
-          select: { moveInDate: true, tenantId: true }
+          select: { moveInDate: true }
         });
 
         const moveInDate = reqRecord?.moveInDate ? new Date(reqRecord.moveInDate) : null;
