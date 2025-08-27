@@ -31,12 +31,31 @@ class OrganizationController {
         include: { organization: true }
       });
 
+      let personalOrgId = null;
       if (existingMembership) {
-        return res.status(400).json({
-          success: false,
-          message: 'User is already associated with an organization',
-          organization: existingMembership.organization
+        if (existingMembership.organization?.isPersonal) {
+          // User has a personal org; we will upgrade by creating a business org and migrating
+          personalOrgId = existingMembership.organization.id;
+        } else {
+          // Already a business org member
+          return res.status(400).json({
+            success: false,
+            message: 'User is already associated with a business organization',
+            organization: existingMembership.organization
+          });
+        }
+      }
+
+      // Resolve signature: prefer provided; else copy from user's saved signature
+      let orgSignature = signatureBase64 || null;
+      if (!orgSignature) {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { signatureBase64: true }
         });
+        if (user?.signatureBase64) {
+          orgSignature = user.signatureBase64;
+        }
       }
 
       // Create new organization
@@ -46,7 +65,7 @@ class OrganizationController {
           taxId: taxId || null,
           regNumber: regNumber || null,
           address,
-          signatureBase64: signatureBase64 || null
+          signatureBase64: orgSignature || null
         }
       });
 
@@ -101,6 +120,40 @@ class OrganizationController {
 
           migratedProperties.push(property.id);
         }
+      }
+
+      // If user had a personal organization, migrate ALL assets from it to the new business organization
+      if (personalOrgId) {
+        // 1) Properties
+        const personalProperties = await prisma.property.findMany({
+          where: { organizationId: personalOrgId },
+          select: { id: true }
+        });
+        if (personalProperties.length > 0) {
+          await prisma.property.updateMany({
+            where: { organizationId: personalOrgId },
+            data: { organizationId: organization.id }
+          });
+          migratedProperties.push(...personalProperties.map(p => p.id));
+        }
+
+        // 2) Offers (landlord side context)
+        await prisma.offer.updateMany({
+          where: { organizationId: personalOrgId },
+          data: { organizationId: organization.id }
+        });
+
+        // 3) Landlord request matches
+        await prisma.landlordRequestMatch.updateMany({
+          where: { organizationId: personalOrgId },
+          data: { organizationId: organization.id }
+        });
+
+        // 4) Leases (if any associated to organization as landlord)
+        await prisma.lease.updateMany({
+          where: { organizationId: personalOrgId },
+          data: { organizationId: organization.id }
+        });
       }
 
       // Get updated organization with member details

@@ -11,6 +11,10 @@ const BusinessUpgradePage = () => {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [signaturePad, setSignaturePad] = useState(null);
+  const [useNewSignature, setUseNewSignature] = useState(false);
+  const [savedSignature, setSavedSignature] = useState(null);
+  const [hasSavedSignature, setHasSavedSignature] = useState(false);
+  const [confirmAuthority, setConfirmAuthority] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -33,6 +37,7 @@ const BusinessUpgradePage = () => {
 
   useEffect(() => {
     checkExistingOrganization();
+    fetchUserProfile();
   }, []);
 
   const checkExistingOrganization = async () => {
@@ -45,6 +50,21 @@ const BusinessUpgradePage = () => {
     } catch (error) {
       // User doesn't have an organization yet, which is fine
       console.log('No existing organization found');
+    }
+  };
+
+  const fetchUserProfile = async () => {
+    try {
+      const res = await api.get('/users/profile');
+      const sig = res?.data?.user?.signatureBase64 || null;
+      setSavedSignature(sig);
+      setHasSavedSignature(!!sig);
+      // Default to using saved signature when present
+      setUseNewSignature(!sig);
+    } catch (e) {
+      setSavedSignature(null);
+      setHasSavedSignature(false);
+      setUseNewSignature(true);
     }
   };
 
@@ -89,8 +109,16 @@ const BusinessUpgradePage = () => {
       newErrors.zipCode = 'ZIP code is required';
     }
     
-    if (!signaturePad || signaturePad.isEmpty()) {
-      newErrors.signature = 'Company signature is required';
+    // Signature requirement: if user has saved signature and isn't drawing a new one,
+    // we will reuse the saved signature after confirmation. Otherwise require drawing.
+    if (useNewSignature || !hasSavedSignature) {
+      if (!signaturePad || signaturePad.isEmpty()) {
+        newErrors.signature = 'Company signature is required';
+      }
+    }
+
+    if (!confirmAuthority) {
+      newErrors.authority = 'You must confirm you are an authorized signatory.';
     }
     
     setErrors(newErrors);
@@ -109,13 +137,18 @@ const BusinessUpgradePage = () => {
     setSuccess('');
     
     try {
-      // Get signature data
-      const signatureData = signaturePad.toDataURL();
+      // Determine which signature to send
+      let signatureData = null;
+      if (useNewSignature || !hasSavedSignature) {
+        signatureData = signaturePad.toDataURL();
+      }
       
       const upgradeData = {
-        ...formData,
-        signature: signatureData
+        ...formData
       };
+      if (signatureData) {
+        upgradeData.signature = signatureData;
+      }
       
       const response = await api.post('/organizations/upgrade-to-business', upgradeData);
       
@@ -390,34 +423,84 @@ const BusinessUpgradePage = () => {
               </h2>
               
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
-                <div className="text-center mb-4">
-                  <p className="text-sm text-gray-600 mb-2">
-                    Draw your company's authorized signature below
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    This signature will be used on all business contracts and documents
-                  </p>
-                </div>
-                
-                <SignatureCanvas
-                  ref={(ref) => setSignaturePad(ref)}
-                  canvasProps={{
-                    className: 'w-full h-32 border border-gray-300 rounded mx-auto'
-                  }}
-                />
-                
-                <div className="flex justify-center space-x-3 mt-4">
-                  <button
-                    type="button"
-                    onClick={handleSignatureClear}
-                    className="btn-secondary"
-                  >
-                    Clear Signature
-                  </button>
-                </div>
-                
-                {errors.signature && (
-                  <p className="mt-2 text-sm text-red-600 text-center">{errors.signature}</p>
+                {!useNewSignature && hasSavedSignature ? (
+                  <div>
+                    <div className="text-center mb-4">
+                      <p className="text-sm text-gray-600 mb-2">Your saved signature will be used for company contracts</p>
+                      <p className="text-xs text-gray-500">You may switch to a different signature if needed</p>
+                    </div>
+                    <div className="flex justify-center mb-4">
+                      <img
+                        src={savedSignature}
+                        alt="Saved signature"
+                        className="max-w-full h-24 object-contain border border-gray-300 rounded"
+                      />
+                    </div>
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        onClick={() => setUseNewSignature(true)}
+                        className="btn-secondary"
+                      >
+                        Use a Different Signature
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="text-center mb-4">
+                      <p className="text-sm text-gray-600 mb-2">Draw your company's authorized signature below</p>
+                      <p className="text-xs text-gray-500">This signature will be used on all business contracts and documents</p>
+                    </div>
+                    <SignatureCanvas
+                      ref={(ref) => setSignaturePad(ref)}
+                      canvasProps={{
+                        className: 'w-full h-32 border border-gray-300 rounded mx-auto'
+                      }}
+                    />
+                    <div className="flex justify-center space-x-3 mt-4">
+                      {hasSavedSignature && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUseNewSignature(false);
+                            handleSignatureClear();
+                          }}
+                          className="btn-secondary"
+                        >
+                          Use Saved Signature
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleSignatureClear}
+                        className="btn-secondary"
+                      >
+                        Clear Signature
+                      </button>
+                    </div>
+                    {errors.signature && (
+                      <p className="mt-2 text-sm text-red-600 text-center">{errors.signature}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Authority confirmation */}
+              <div className="mt-4">
+                <label className="flex items-start space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={confirmAuthority}
+                    onChange={(e) => setConfirmAuthority(e.target.checked)}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="text-sm text-gray-800">
+                    I confirm I am an authorized signatory for this business and approve the use of my saved signature for all company contracts.
+                  </span>
+                </label>
+                {errors.authority && (
+                  <p className="mt-1 text-sm text-red-600">{errors.authority}</p>
                 )}
               </div>
             </div>

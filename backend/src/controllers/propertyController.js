@@ -257,7 +257,8 @@ export const createProperty = async (req, res) => {
           taxId: null,
           regNumber: null,
           address: null,
-          signatureBase64: null
+          signatureBase64: null,
+          isPersonal: true
         }
       });
 

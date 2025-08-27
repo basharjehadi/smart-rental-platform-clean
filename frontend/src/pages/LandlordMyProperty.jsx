@@ -445,6 +445,11 @@ const LandlordMyProperty = () => {
                         <div className="flex items-start justify-between mb-3">
                           <h3 className="text-lg font-semibold text-gray-900 truncate flex-1 mr-3">{property.title}</h3>
                         </div>
+                        {property.organization && (
+                          <div className="text-xs text-gray-500 mb-2">
+                            Owner: {property.organization.isPersonal ? (profileData?.name || user?.name || 'You') : (property.organization.name)}
+                          </div>
+                        )}
                         
                         <p className="text-gray-600 mb-4 text-sm">{property.address}, {property.city}</p>
                         

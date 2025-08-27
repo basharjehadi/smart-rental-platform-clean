@@ -126,6 +126,7 @@ const generateContractData = async (offer, user = null) => {
   
   // 1. Check if landlord is a business (has organization)
   const isLandlordBusiness = !!offer.property?.organization;
+  const isPersonalOrg = Boolean(offer.property?.organization?.isPersonal);
   console.log('🏢 Is landlord business?', isLandlordBusiness);
   
   // 2. Check if tenant is a business (organization on the rental request)
@@ -139,7 +140,7 @@ const generateContractData = async (offer, user = null) => {
   // Prepare landlord data based on scenario
   let landlordData = {};
   
-  if (isLandlordBusiness) {
+  if (isLandlordBusiness && !isPersonalOrg) {
     // Business landlord - use organization data
     const org = offer.property.organization;
     landlordData = {
@@ -295,6 +296,7 @@ const generateContractData = async (offer, user = null) => {
     contractDate,
     // Scenario flags
     isLandlordBusiness,
+    isLandlordPersonal: isPersonalOrg,
     isTenantBusiness,
     isTenantGroup,
     // Landlord information

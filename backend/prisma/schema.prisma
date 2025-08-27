@@ -702,6 +702,7 @@ model Organization {
   regNumber       String?  // KRS/REGON number
   address         String
   signatureBase64 String?  // Pre-saved signature
+  isPersonal      Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   members         OrganizationMember[]
