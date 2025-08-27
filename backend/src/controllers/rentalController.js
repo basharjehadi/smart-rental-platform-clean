@@ -27,7 +27,8 @@ const createRentalRequest = async (req, res) => {
       preferredNeighborhood,
       maxCommuteTime,
       mustHaveFeatures,
-      flexibleOnMoveInDate
+      flexibleOnMoveInDate,
+      occupants // Array of {name, role} for business tenants
     } = req.body;
 
     // Validate required fields
@@ -69,6 +70,89 @@ const createRentalRequest = async (req, res) => {
 
     // 🚀 SCALABILITY: Create rental request with transaction
     const result = await prisma.$transaction(async (tx) => {
+      let tenantGroupId;
+      let organizationId = null;
+
+      // Check if user is a business tenant (has organization membership)
+      const organizationMembership = await tx.organizationMember.findFirst({
+        where: { userId: req.user.id },
+        include: { organization: true }
+      });
+
+      if (organizationMembership) {
+        // Business tenant - validate occupants and use organization
+        if (!occupants || !Array.isArray(occupants) || occupants.length === 0) {
+          throw new Error('Business tenants must provide occupants array with at least one occupant');
+        }
+
+        // Validate occupants structure
+        for (const occupant of occupants) {
+          if (!occupant.name || typeof occupant.name !== 'string') {
+            throw new Error('Each occupant must have a valid name');
+          }
+        }
+
+        organizationId = organizationMembership.organization.id;
+
+        // Check if user already has a tenant group for this organization
+        const existingTenantGroup = await tx.tenantGroupMember.findFirst({
+          where: { userId: req.user.id },
+          include: { tenantGroup: true }
+        });
+
+        if (existingTenantGroup) {
+          // Use existing tenant group
+          tenantGroupId = existingTenantGroup.tenantGroup.id;
+        } else {
+          // Create new tenant group for business tenant
+          const newTenantGroup = await tx.tenantGroup.create({
+            data: {
+              name: `Business Group - ${organizationMembership.organization.name}`
+            }
+          });
+
+          // Add user as primary member
+          await tx.tenantGroupMember.create({
+            data: {
+              userId: req.user.id,
+              tenantGroupId: newTenantGroup.id,
+              isPrimary: true
+            }
+          });
+
+          tenantGroupId = newTenantGroup.id;
+        }
+      } else {
+        // Private tenant - check if already has a tenant group
+        const existingTenantGroup = await tx.tenantGroupMember.findFirst({
+          where: { userId: req.user.id },
+          include: { tenantGroup: true }
+        });
+
+        if (existingTenantGroup) {
+          // Use existing tenant group
+          tenantGroupId = existingTenantGroup.tenantGroup.id;
+        } else {
+          // Create new tenant group for private tenant
+          const newTenantGroup = await tx.tenantGroup.create({
+            data: {
+              name: `Private Group - ${req.user.name || req.user.email}`
+            }
+          });
+
+          // Add user as primary member
+          await tx.tenantGroupMember.create({
+            data: {
+              userId: req.user.id,
+              tenantGroupId: newTenantGroup.id,
+              isPrimary: true
+            }
+          });
+
+          tenantGroupId = newTenantGroup.id;
+        }
+      }
+
       // Create rental request
       const rentalRequest = await tx.rentalRequest.create({
         data: {
@@ -91,34 +175,45 @@ const createRentalRequest = async (req, res) => {
           maxCommuteTime: maxCommuteTime || null,
           mustHaveFeatures: mustHaveFeatures || null,
           flexibleOnMoveInDate: flexibleOnMoveInDate || false,
-          tenantId: req.user.id,
+          tenantGroupId, // Link to tenant group instead of tenantId
           poolStatus: 'ACTIVE' // Start in active pool
         },
         include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true,
-              email: true
+          tenantGroup: {
+            include: {
+              members: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                      role: true
+                    }
+                  }
+                }
+              }
             }
           }
         }
       });
 
-      return rentalRequest;
+      return { rentalRequest, tenantGroupId, organizationId };
     });
 
     // 🚀 Run matching OUTSIDE the transaction to avoid cross-client conflicts
     try {
-      const matchCount = await requestPoolService.addToPool(result);
-      console.log(`🏊 Request ${result.id} added to pool with ${matchCount} matches`);
+      const matchCount = await requestPoolService.addToPool(result.rentalRequest);
+      console.log(`🏊 Request ${result.rentalRequest.id} added to pool with ${matchCount} matches`);
     } catch (error) {
       console.error('❌ Error adding request to pool (post-tx):', error);
     }
 
     res.status(201).json({
       message: 'Rental request created successfully and added to request pool.',
-      rentalRequest: result,
+      rentalRequest: result.rentalRequest,
+      tenantGroupId: result.tenantGroupId,
+      organizationId: result.organizationId,
       poolStatus: 'ACTIVE'
     });
   } catch (error) {
@@ -517,8 +612,8 @@ const createOffer = async (req, res) => {
         propertyDescription: propertyDescription || null,
         rulesText: rulesText || null,
         rulesPdf: rulesPdf || null,
-        // Prisma strict relations: connect tenant by ID
-        tenant: { connect: { id: rentalRequest.tenantId } }
+        // Prisma strict relations: connect tenant group by ID
+        tenantGroup: { connect: { id: rentalRequest.tenantGroupId } }
       }
     });
 
@@ -534,31 +629,41 @@ const createOffer = async (req, res) => {
       }
     });
 
-    // 🚀 NOTIFICATION: Create notification for the tenant about the new offer
+    // 🚀 NOTIFICATION: Create notification for the tenant group members about the new offer
     try {
-      const tenant = await prisma.user.findUnique({
-        where: { id: rentalRequest.tenantId },
-        select: { name: true, email: true }
+      // Get all members of the tenant group to notify them
+      const tenantGroupMembers = await prisma.tenantGroupMember.findMany({
+        where: { tenantGroupId: rentalRequest.tenantGroupId },
+        include: {
+          user: {
+            select: { name: true, email: true }
+          }
+        }
       });
 
-      if (tenant) {
-        // Send email notification
-        await sendOfferNotification(
-          tenant.email,
-          tenant.name,
-          req.user.name || 'Landlord',
-          property.name || 'Property',
-          rentAmount,
-          offer.id
-        );
+      if (tenantGroupMembers.length > 0) {
+        // Send notifications to all group members
+        for (const member of tenantGroupMembers) {
+          if (member.user.email) {
+            // Send email notification
+            await sendOfferNotification(
+              member.user.email,
+              member.user.name || 'Tenant',
+              req.user.name || 'Landlord',
+              property.name || 'Property',
+              rentAmount,
+              offer.id
+            );
 
-        // Create database notification for real-time updates
-        await NotificationService.createOfferNotification(
-          rentalRequest.tenantId,
-          offer.id,
-          req.user.name || 'Landlord',
-          property.address || 'Property'
-        );
+            // Create database notification for real-time updates
+            await NotificationService.createOfferNotification(
+              member.user.id,
+              offer.id,
+              req.user.name || 'Landlord',
+              property.address || 'Property'
+            );
+          }
+        }
       }
     } catch (notificationError) {
       console.error('Warning: Failed to send offer notification:', notificationError);
@@ -1230,33 +1335,52 @@ const getOfferDetails = async (req, res) => {
     
     console.log('🔍 GetOfferDetails called with:', { offerId, tenantId });
 
+    // Check if user is a member of any tenant group
+    const userMembership = await prisma.tenantGroupMember.findFirst({
+      where: { userId: tenantId }
+    });
+
+    if (!userMembership) {
+      return res.status(404).json({
+        error: 'You are not a member of any tenant group.'
+      });
+    }
+
     const offer = await prisma.offer.findFirst({
       where: {
         id: offerId,
         rentalRequest: {
-          tenantId: tenantId
+          tenantGroupId: userMembership.tenantGroupId
         }
       },
       include: {
         rentalRequest: {
           include: {
-            tenant: {
-              select: {
-                id: true,
-                name: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                signatureBase64: true,
-                pesel: true,
-                passportNumber: true,
-                kartaPobytuNumber: true,
-                phoneNumber: true,
-                street: true,
-                city: true,
-                zipCode: true,
-                country: true,
-                address: true
+            tenantGroup: {
+              include: {
+                members: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        signatureBase64: true,
+                        pesel: true,
+                        passportNumber: true,
+                        kartaPobytuNumber: true,
+                        phoneNumber: true,
+                        street: true,
+                        city: true,
+                        zipCode: true,
+                        country: true,
+                        address: true
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -1311,7 +1435,7 @@ const getOfferDetails = async (req, res) => {
     });
 
     if (!offer) {
-      console.log('❌ Offer not found for:', { offerId, tenantId });
+      console.log('❌ Offer not found for:', { offerId, tenantId, tenantGroupId: userMembership.tenantGroupId });
       return res.status(404).json({
         error: 'Offer not found or you do not have permission to view it.'
       });
@@ -1399,23 +1523,27 @@ const getOfferDetails = async (req, res) => {
       // Include property data if available
       property: offer.property,
       
-      // Include tenant data
-      tenant: {
-        id: offer.rentalRequest.tenantId,
-        name: offer.rentalRequest.tenant?.firstName && offer.rentalRequest.tenant?.lastName ? 
-          `${offer.rentalRequest.tenant.firstName} ${offer.rentalRequest.tenant.lastName}` : 
-          offer.rentalRequest.tenant?.name || 'Tenant',
-        email: offer.rentalRequest.tenant?.email || 'tenant@email.com',
-        signatureBase64: offer.rentalRequest.tenant?.signatureBase64 || null,
-        pesel: offer.rentalRequest.tenant?.pesel || null,
-        passportNumber: offer.rentalRequest.tenant?.passportNumber || null,
-        kartaPobytuNumber: offer.rentalRequest.tenant?.kartaPobytuNumber || null,
-        phoneNumber: offer.rentalRequest.tenant?.phoneNumber || null,
-        street: offer.rentalRequest.tenant?.street || null,
-        city: offer.rentalRequest.tenant?.city || null,
-        zipCode: offer.rentalRequest.tenant?.zipCode || null,
-        country: offer.rentalRequest.tenant?.country || null,
-        address: offer.rentalRequest.tenant?.address || null
+      // Include tenant group data
+      tenantGroup: {
+        id: offer.rentalRequest.tenantGroupId,
+        members: offer.rentalRequest.tenantGroup?.members?.map(member => ({
+          id: member.user.id,
+          name: member.user.firstName && member.user.lastName ? 
+            `${member.user.firstName} ${member.user.lastName}` : 
+            member.user.name || 'Tenant',
+            email: member.user.email || 'tenant@email.com',
+            signatureBase64: member.user.signatureBase64 || null,
+            pesel: member.user.pesel || null,
+            passportNumber: member.user.passportNumber || null,
+            kartaPobytuNumber: member.user.kartaPobytuNumber || null,
+            phoneNumber: member.user.phoneNumber || null,
+            street: member.user.street || null,
+            city: member.user.city || null,
+            zipCode: member.user.zipCode || null,
+            country: member.user.country || null,
+            address: member.user.address || null,
+            isPrimary: member.isPrimary
+        })) || []
       }
     };
 
@@ -1468,9 +1596,17 @@ const updateTenantOfferStatus = async (req, res) => {
       });
     }
 
-    if (offer.rentalRequest.tenantId !== req.user.id) {
+    // Check if user is a member of the tenant group that owns this rental request
+    const userMembership = await prisma.tenantGroupMember.findFirst({
+      where: {
+        userId: req.user.id,
+        tenantGroupId: offer.rentalRequest.tenantGroupId
+      }
+    });
+
+    if (!userMembership) {
       return res.status(403).json({
-        error: 'You can only update your own offers.'
+        error: 'You can only update offers for your own rental requests.'
       });
     }
 

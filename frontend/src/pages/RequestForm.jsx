@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+import TenantGroupChoiceModal from '../components/TenantGroupChoiceModal';
 
 const RequestForm = () => {
   const [formData, setFormData] = useState({
@@ -45,10 +46,23 @@ const RequestForm = () => {
     mustHaveFeatures: '',
     flexibleOnMoveInDate: false
   });
+  
+  // Tenant group choice modal state
+  const [showGroupChoiceModal, setShowGroupChoiceModal] = useState(false);
+  const [rentalType, setRentalType] = useState(null); // 'individual' or 'group'
+  
+  // Business occupant management state
+  const [occupants, setOccupants] = useState([]);
+  const [showOccupantForm, setShowOccupantForm] = useState(false);
+  const [currentOccupant, setCurrentOccupant] = useState({ name: '', role: '', email: '' });
+  const [editingOccupantIndex, setEditingOccupantIndex] = useState(null);
 
-  const { api } = useAuth();
+  const { api, user } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  
+  // Check if user is acting on behalf of a business
+  const isBusinessUser = user?.organizationMembers && user.organizationMembers.length > 0;
 
   useEffect(() => {
     fetchMyRequests();
@@ -108,6 +122,48 @@ const RequestForm = () => {
     }
   };
 
+  // Occupant management functions
+  const addOccupant = () => {
+    if (!currentOccupant.name.trim() || !currentOccupant.role.trim()) {
+      setError('Name and role are required for occupants');
+      return;
+    }
+    
+    if (editingOccupantIndex !== null) {
+      // Editing existing occupant
+      const updatedOccupants = [...occupants];
+      updatedOccupants[editingOccupantIndex] = { ...currentOccupant };
+      setOccupants(updatedOccupants);
+      setEditingOccupantIndex(null);
+    } else {
+      // Adding new occupant
+      setOccupants([...occupants, { ...currentOccupant }]);
+    }
+    
+    // Reset form
+    setCurrentOccupant({ name: '', role: '', email: '' });
+    setShowOccupantForm(false);
+    setError('');
+  };
+
+  const editOccupant = (index) => {
+    setCurrentOccupant({ ...occupants[index] });
+    setEditingOccupantIndex(index);
+    setShowOccupantForm(true);
+  };
+
+  const removeOccupant = (index) => {
+    const updatedOccupants = occupants.filter((_, i) => i !== index);
+    setOccupants(updatedOccupants);
+  };
+
+  const cancelOccupantEdit = () => {
+    setCurrentOccupant({ name: '', role: '', email: '' });
+    setEditingOccupantIndex(null);
+    setShowOccupantForm(false);
+    setError('');
+  };
+
   const handleCancelEdit = () => {
     setEditingRequest(null);
     setEditForm({
@@ -146,6 +202,19 @@ const RequestForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate business user requirements
+    if (isBusinessUser && occupants.length === 0) {
+      setError('Business users must add at least one employee occupant before creating a rental request.');
+      return;
+    }
+    
+    // Show the tenant group choice modal first
+    setShowGroupChoiceModal(true);
+  };
+
+  const handleGroupChoice = async (choice) => {
+    setRentalType(choice);
     setLoading(true);
     setError('');
     setSuccess('');
@@ -158,7 +227,7 @@ const RequestForm = () => {
         budget: parseFloat(formData.budget),
         moveInDate: formData.moveInDate,
         bedrooms: parseInt(formData.bedrooms),
-        bathrooms: parseInt(formData.bathrooms),
+        bathrooms: parseInt(formData.bedrooms),
         furnished: formData.furnished,
         parking: formData.parking,
         petsAllowed: formData.petsAllowed,
@@ -166,7 +235,9 @@ const RequestForm = () => {
         preferredNeighborhood: formData.preferredNeighborhood.trim(),
         maxCommuteTime: formData.maxCommuteTime.trim(),
         mustHaveFeatures: formData.mustHaveFeatures.trim(),
-        flexibleOnMoveInDate: formData.flexibleOnMoveInDate
+        flexibleOnMoveInDate: formData.flexibleOnMoveInDate,
+        rentalType: choice, // Add the rental type to the request
+        occupants: isBusinessUser ? occupants : [] // Add occupants for business users
       };
 
       const response = await api.post('/rental-request', requestData);
@@ -193,6 +264,11 @@ const RequestForm = () => {
           mustHaveFeatures: '',
           flexibleOnMoveInDate: false
         });
+        
+        // Clear occupants for business users
+        if (isBusinessUser) {
+          setOccupants([]);
+        }
         
         // Refresh the requests list
         fetchMyRequests();
@@ -510,6 +586,95 @@ const RequestForm = () => {
                 </div>
               </div>
 
+              {/* Business Occupants Section */}
+              {isBusinessUser && (
+                <div className="border-t border-gray-200 pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900">
+                        Employee Occupants <span className="text-red-500">*</span>
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Add the names and roles of employees who will be occupying this property
+                      </p>
+                      <p className="text-sm text-red-600 mt-1">
+                        At least one occupant is required for business rental requests
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowOccupantForm(true)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                    >
+                      + Add Occupant
+                    </button>
+                  </div>
+
+                                    {/* Occupants List */}
+                  {occupants.length > 0 ? (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-700">
+                          {occupants.length} occupant{occupants.length !== 1 ? 's' : ''} added
+                        </span>
+                      </div>
+                      <div className="space-y-3">
+                        {occupants.map((occupant, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div>
+                              <p className="font-medium text-gray-900">{occupant.name}</p>
+                              <p className="text-sm text-gray-600">{occupant.role}</p>
+                              {occupant.email && (
+                                <p className="text-xs text-gray-500">{occupant.email}</p>
+                              )}
+                            </div>
+                            <div className="flex space-x-2">
+                              <button
+                                type="button"
+                                onClick={() => editOccupant(index)}
+                                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeOccupant(index)}
+                                className="text-red-600 hover:text-red-800 text-sm font-medium"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                      <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <p className="text-gray-600 mb-2">No occupants added yet</p>
+                      <p className="text-sm text-gray-500">Click "Add Occupant" to get started</p>
+                    </div>
+                  )}
+
+                  {/* Business User Notice */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start">
+                      <svg className="w-5 h-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm text-blue-800">
+                          <strong>Business Account:</strong> You are creating this rental request on behalf of your organization. 
+                          All occupants must be added to comply with business rental requirements.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}
@@ -517,6 +682,20 @@ const RequestForm = () => {
               >
                 {loading ? 'Creating...' : 'Create Rental Request'}
               </button>
+              
+              {/* Info about group rentals */}
+              <div className="text-center">
+                <p className="text-sm text-gray-600">
+                  Want to rent with friends or family? 
+                  <button
+                    type="button"
+                    onClick={() => navigate('/tenant-group-management')}
+                    className="text-blue-600 hover:text-blue-800 font-medium ml-1 underline"
+                  >
+                    Manage your tenant group
+                  </button>
+                </p>
+              </div>
             </form>
           </div>
 
@@ -697,6 +876,96 @@ const RequestForm = () => {
           </div>
         </div>
       </div>
+      
+      {/* Tenant Group Choice Modal */}
+      <TenantGroupChoiceModal
+        isOpen={showGroupChoiceModal}
+        onClose={() => setShowGroupChoiceModal(false)}
+        onChoice={handleGroupChoice}
+      />
+
+      {/* Occupant Form Modal */}
+      {showOccupantForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {editingOccupantIndex !== null ? 'Edit Occupant' : 'Add Occupant'}
+              </h3>
+              <button
+                onClick={cancelOccupantEdit}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); addOccupant(); }} className="space-y-4">
+              <div>
+                <label htmlFor="occupantName" className="block text-sm font-medium text-gray-700 mb-1">
+                  Employee Name *
+                </label>
+                <input
+                  type="text"
+                  id="occupantName"
+                  value={currentOccupant.name}
+                  onChange={(e) => setCurrentOccupant({...currentOccupant, name: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter employee name"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="occupantRole" className="block text-sm font-medium text-gray-700 mb-1">
+                  Employee Role *
+                </label>
+                <input
+                  type="text"
+                  id="occupantRole"
+                  value={currentOccupant.role}
+                  onChange={(e) => setCurrentOccupant({...currentOccupant, role: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="e.g., Manager, Employee, Intern"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="occupantEmail" className="block text-sm font-medium text-gray-700 mb-1">
+                  Email (Optional)
+                </label>
+                <input
+                  type="email"
+                  id="occupantEmail"
+                  value={currentOccupant.email}
+                  onChange={(e) => setCurrentOccupant({...currentOccupant, email: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="employee@company.com"
+                />
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={cancelOccupantEdit}
+                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 font-medium rounded-md hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  {editingOccupantIndex !== null ? 'Update' : 'Add'} Occupant
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

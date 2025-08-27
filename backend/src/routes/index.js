@@ -22,6 +22,8 @@ import reviewRoutes from './reviewRoutes.js';
 import moveInVerificationRoutes from './moveInVerificationRoutes.js';
 import leaseRoutes from './leaseRoutes.js';
 import renewalRoutes from './renewalRoutes.js';
+import organizationRoutes from './organizationRoutes.js';
+import tenantGroupRoutes from './tenantGroupRoutes.js';
 
 const router = Router();
 
@@ -65,6 +67,12 @@ router.use('/landlord', landlordDashboardRoutes);
 
 // Landlord tenant management routes
 router.use('/landlord', landlordTenantRoutes);
+
+// Organization management routes
+router.use('/organizations', organizationRoutes);
+
+// Tenant group management routes
+router.use('/tenant-groups', tenantGroupRoutes);
 
 // Messaging routes
 router.use('/messaging', messagingRoutes);

@@ -52,6 +52,8 @@ import ContractManagementPage from './pages/ContractManagementPage';
 import PaymentManagementPage from './pages/PaymentManagementPage';
 import MessagingPage from './pages/MessagingPage';
 import TenantDashboardRedirect from './components/TenantDashboardRedirect';
+import BusinessUpgradePage from './pages/BusinessUpgradePage';
+import TenantGroupManagement from './pages/TenantGroupManagement';
 // import PaymentDemo from './pages/PaymentDemo';
 // import PaymentExample from './pages/PaymentExample';
 
@@ -379,6 +381,22 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <MessagingPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/business-upgrade" 
+          element={
+            <ProtectedRoute>
+              <BusinessUpgradePage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/tenant-group-management" 
+          element={
+            <ProtectedRoute>
+              <TenantGroupManagement />
             </ProtectedRoute>
           } 
         />

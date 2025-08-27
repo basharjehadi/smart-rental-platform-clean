@@ -62,21 +62,16 @@ model User {
   updatedAt                DateTime                  @updatedAt
   conversationParticipants ConversationParticipant[] @relation("UserConversations")
   landlordProfile          LandlordProfile?          @relation("LandlordProfile")
-  landlordRequestMatches   LandlordRequestMatch[]    @relation("LandlordMatches")
-  leases                   Lease[]                   @relation("TenantLeases")
   sentMessages             Message[]                 @relation("SentMessages")
-  offers                   Offer[]                   @relation("LandlordOffers")
-  tenantOffers             Offer[]                   @relation("TenantOffers")
   payments                 Payment[]                 @relation("UserPayments")
-  properties               Property[]                @relation("LandlordProperties")
   rentPayments             RentPayment[]             @relation("TenantRentPayments")
-  rentalRequests           RentalRequest[]           @relation("TenantRequests")
   reviewsGiven            Review[]                  @relation("UserReviewsGiven")
-  reviewsReceived         Review[]                  @relation("UserReviewsReceived")
   notifications            Notification[]            @relation("UserNotifications")
   supportTickets          SupportTicket[]           @relation("UserSupportTickets")
   ticketMessages          TicketMessage[]           @relation("UserTicketMessages")
   chatSessions            ChatSession[]             @relation("UserChatSessions")
+  organizationMembers      OrganizationMember[]      @relation("UserOrganizations")
+  tenantGroups             TenantGroupMember[]      @relation("UserTenantGroups")
 
   @@index([role, availability, autoAvailability, currentTenants])
   @@index([email])
@@ -151,18 +146,18 @@ model Property {
   videos            String?
   latitude          Float?
   longitude         Float?
-  landlordId        String
+  organizationId    String
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   isMarketing       Boolean        @default(false)
   conversations     Conversation[] @relation("PropertyConversations")
   offers            Offer[]        @relation("PropertyOffers")
   matches           LandlordRequestMatch[]
-  landlord          User           @relation("LandlordProperties", fields: [landlordId], references: [id], onDelete: Cascade)
+  organization      Organization   @relation("OrganizationProperties", fields: [organizationId], references: [id], onDelete: Cascade)
   units             Unit[]         @relation("PropertyUnits")
   leases            Lease[]        @relation("PropertyLeases")
 
-  @@index([landlordId, status])
+  @@index([organizationId, status])
   @@index([city, status])
   @@index([propertyType, status])
   @@index([monthlyRent, status])
@@ -197,7 +192,7 @@ model RentalRequest {
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
   expiresAt              DateTime?
-  tenantId               String
+  tenantGroupId          String
   parking                Boolean?               @default(false)
   petsAllowed            Boolean?               @default(false)
   contractSignature      ContractSignature?     @relation("ContractSignature")
@@ -205,13 +200,13 @@ model RentalRequest {
   landlordRequestMatches LandlordRequestMatch[] @relation("RequestMatches")
   offers                 Offer[]                @relation("RequestOffer")
   payments               Payment[]              @relation("RequestPayments")
-  tenant                 User                   @relation("TenantRequests", fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantGroup            TenantGroup            @relation("TenantGroupRequests", fields: [tenantGroupId], references: [id], onDelete: Cascade)
   leases                 Lease[]                @relation("RentalRequestLeases")
 
   @@index([location, status, poolStatus])
   @@index([budget, status])
   @@index([createdAt, poolStatus])
-  @@index([tenantId, status])
+  @@index([tenantGroupId, status])
   @@map("rental_requests")
 }
 
@@ -251,18 +246,19 @@ model Offer {
   createdAt               DateTime        @default(now())
   updatedAt               DateTime        @updatedAt
   rentalRequestId         Int
-  tenantId                String
-  landlordId              String
+  tenantGroupId           String
+  organizationId          String
   propertyId              String?
-  tenant                  User            @relation("TenantOffers", fields: [tenantId], references: [id], onDelete: Cascade)
-  landlord                User            @relation("LandlordOffers", fields: [landlordId], references: [id], onDelete: Cascade)
+  tenantGroup             TenantGroup    @relation("TenantGroupOffers", fields: [tenantGroupId], references: [id], onDelete: Cascade)
+  organization            Organization    @relation("OrganizationOffers", fields: [organizationId], references: [id], onDelete: Cascade)
   property                Property?       @relation("PropertyOffers", fields: [propertyId], references: [id])
   rentalRequest           RentalRequest   @relation("RequestOffer", fields: [rentalRequestId], references: [id], onDelete: Cascade)
   payments                Payment[]       @relation("OfferPayments")
   conversations           Conversation[]  @relation("ConversationOffer")
   leases                  Lease[]         @relation("OfferLeases")
 
-  @@index([landlordId, status])
+  @@index([tenantGroupId, status])
+  @@index([organizationId, status])
   @@index([rentalRequestId, status])
   @@index([status, createdAt])
   @@index([propertyId])
@@ -290,41 +286,47 @@ model Payment {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   paidAt          DateTime?
-  userId          String
+  userId          String         // User who made the payment
+  tenantGroupId   String
   rentalRequestId Int?
   offerId         String?
   leaseId         String?
+  user            User           @relation("UserPayments", fields: [userId], references: [id], onDelete: Cascade)
   lease           Lease?         @relation("LeasePayments", fields: [leaseId], references: [id])
   offer           Offer?         @relation("OfferPayments", fields: [offerId], references: [id])
   rentalRequest   RentalRequest? @relation("RequestPayments", fields: [rentalRequestId], references: [id])
-  user            User           @relation("UserPayments", fields: [userId], references: [id], onDelete: Cascade)
+  tenantGroup     TenantGroup    @relation("TenantGroupPayments", fields: [tenantGroupId], references: [id], onDelete: Cascade)
   rentPayments    RentPayment[]  @relation("PaymentRentPayments")
 
   @@index([userId, status])
+  @@index([tenantGroupId, status])
   @@index([status, createdAt])
   @@index([paymentIntentId])
   @@map("payments")
 }
 
 model RentPayment {
-  id          String        @id @default(cuid())
-  amount      Float
-  status      PaymentStatus @default(PENDING)
-  dueDate     DateTime
-  paidDate    DateTime?
-  month       Int
-  year        Int
-  lateFee     Float         @default(0)
-  gracePeriod Int           @default(5)
-  isOverdue   Boolean       @default(false)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  userId      String
-  paymentId   String?
-  payment     Payment?      @relation("PaymentRentPayments", fields: [paymentId], references: [id])
-  user        User          @relation("TenantRentPayments", fields: [userId], references: [id], onDelete: Cascade)
+  id            String        @id @default(cuid())
+  amount        Float
+  status        PaymentStatus @default(PENDING)
+  dueDate       DateTime
+  paidDate      DateTime?
+  month         Int
+  year          Int
+  lateFee       Float         @default(0)
+  gracePeriod   Int           @default(5)
+  isOverdue     Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  userId        String        // User who is responsible for this rent payment
+  tenantGroupId String
+  paymentId     String?
+  user          User          @relation("TenantRentPayments", fields: [userId], references: [id], onDelete: Cascade)
+  payment       Payment?      @relation("PaymentRentPayments", fields: [paymentId], references: [id])
+  tenantGroup   TenantGroup   @relation("TenantGroupRentPayments", fields: [tenantGroupId], references: [id], onDelete: Cascade)
 
   @@index([userId, month, year])
+  @@index([tenantGroupId, month, year])
   @@index([status, dueDate])
   @@index([isOverdue, dueDate])
   @@map("rent_payments")
@@ -384,19 +386,19 @@ model LandlordRequestMatch {
   status          String        @default("ACTIVE")
   isViewed        Boolean       @default(false)
   isResponded     Boolean       @default(false)
-  landlordId      String
+  organizationId  String
   rentalRequestId Int
   /// Property anchoring: optional specific property this match refers to
   propertyId      String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
-  landlord        User          @relation("LandlordMatches", fields: [landlordId], references: [id], onDelete: Cascade)
+  organization   Organization  @relation("LandlordMatches", fields: [organizationId], references: [id], onDelete: Cascade)
   rentalRequest   RentalRequest @relation("RequestMatches", fields: [rentalRequestId], references: [id], onDelete: Cascade)
   property        Property?     @relation(fields: [propertyId], references: [id])
 
-  // Allow multiple matches per landlord/request by property
-  @@unique([landlordId, rentalRequestId, propertyId])
-  @@index([landlordId, matchScore])
+  // Allow multiple matches per organization/request by property
+  @@unique([organizationId, rentalRequestId, propertyId])
+  @@index([organizationId, matchScore])
   @@index([rentalRequestId, matchScore])
   @@index([isViewed, isResponded])
   @@index([propertyId])
@@ -429,12 +431,14 @@ model Lease {
   rentAmount          Float
   depositAmount       Float
   status              LeaseStatus          @default(ACTIVE)
-  tenantId            String
+  tenantGroupId       String
   unitId              String               @unique
   // Links back to booking context (optional for legacy compatibility)
   rentalRequestId     Int?
   offerId             String?
   propertyId          String?
+  // Business tenant support
+  organizationId      String?
   // Termination/renewal fields
   terminationNoticeByUserId String?
   terminationNoticeDate     DateTime?
@@ -445,24 +449,43 @@ model Lease {
   renewalDeclinedByUserId   String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
-  tenant              User                 @relation("TenantLeases", fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantGroup         TenantGroup          @relation("TenantGroupLeases", fields: [tenantGroupId], references: [id], onDelete: Cascade)
   unit                Unit                 @relation("UnitLease", fields: [unitId], references: [id], onDelete: Cascade)
   rentalRequest       RentalRequest?       @relation("RentalRequestLeases", fields: [rentalRequestId], references: [id])
   offer               Offer?               @relation("OfferLeases", fields: [offerId], references: [id])
   property            Property?            @relation("PropertyLeases", fields: [propertyId], references: [id])
+  organization        Organization?        @relation("OrganizationLeases", fields: [organizationId], references: [id])
   maintenanceRequests MaintenanceRequest[] @relation("LeaseMaintenance")
   payments            Payment[]            @relation("LeasePayments")
   reviews             Review[]             @relation("LeaseReviews")
   renewalRequests     RenewalRequest[]
+  occupants           Occupant[]
 
-  @@index([tenantId])
+  @@index([tenantGroupId])
   @@index([status])
   @@index([endDate])
   @@index([offerId])
   @@index([rentalRequestId])
   @@index([propertyId])
+  @@index([organizationId])
   @@map("leases")
 }
+
+model Occupant {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phoneNumber String?
+  leaseId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lease     Lease    @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+
+  @@index([leaseId])
+  @@index([email])
+  @@map("occupants")
+}
+
 model RenewalRequest {
   id                  String   @id @default(cuid())
   leaseId             String
@@ -500,7 +523,7 @@ model Review {
   comment               String
   isAnonymous           Boolean  @default(false)
   reviewerId            String   // Who is giving the review
-  targetUserId          String   // Who is being reviewed
+  targetTenantGroupId   String   // Which tenant group is being reviewed
   leaseId               String?
   reviewStage           ReviewStage @default(INITIAL)
   isSystemGenerated     Boolean  @default(false)
@@ -508,13 +531,13 @@ model Review {
   updatedAt             DateTime @updatedAt
   lease                 Lease?   @relation("LeaseReviews", fields: [leaseId], references: [id], onDelete: Cascade)
   reviewer              User     @relation("UserReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
-  targetUser            User     @relation("UserReviewsReceived", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetTenantGroup     TenantGroup @relation("TenantGroupReviewsReceived", fields: [targetTenantGroupId], references: [id], onDelete: Cascade)
 
   @@index([leaseId])
   @@index([rating])
   @@index([reviewStage])
   @@index([reviewerId])
-  @@index([targetUserId])
+  @@index([targetTenantGroupId])
   @@map("reviews")
 }
 
@@ -670,6 +693,78 @@ model ChatMessage {
 
   @@index([sessionId, timestamp])
   @@map("chat_messages")
+}
+
+model Organization {
+  id              String   @id @default(cuid())
+  name            String
+  taxId           String?  // NIP number
+  regNumber       String?  // KRS/REGON number
+  address         String
+  signatureBase64 String?  // Pre-saved signature
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  members         OrganizationMember[]
+  properties      Property[] @relation("OrganizationProperties")
+  leases          Lease[]  @relation("OrganizationLeases")
+  offers          Offer[]  @relation("OrganizationOffers")
+  landlordRequestMatches LandlordRequestMatch[] @relation("LandlordMatches")
+
+  @@index([name])
+  @@index([taxId])
+  @@index([regNumber])
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String           @id @default(cuid())
+  userId         String
+  organizationId String
+  role           MemberRole       @default(AGENT)
+  joinedAt       DateTime         @default(now())
+  leftAt         DateTime?
+  user           User             @relation("UserOrganizations", fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([role])
+  @@map("organization_members")
+}
+
+model TenantGroup {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  members   TenantGroupMember[]
+  rentalRequests RentalRequest[] @relation("TenantGroupRequests")
+  offers    Offer[] @relation("TenantGroupOffers")
+  leases    Lease[] @relation("TenantGroupLeases")
+  payments  Payment[] @relation("TenantGroupPayments")
+  rentPayments RentPayment[] @relation("TenantGroupRentPayments")
+  reviews   Review[] @relation("TenantGroupReviewsReceived")
+
+  @@index([name])
+  @@map("tenant_groups")
+}
+
+model TenantGroupMember {
+  id            String      @id @default(cuid())
+  userId        String
+  tenantGroupId String
+  isPrimary     Boolean     @default(false) // Designates the group lead
+  joinedAt      DateTime    @default(now())
+  leftAt        DateTime?
+  user          User        @relation("UserTenantGroups", fields: [userId], references: [id], onDelete: Cascade)
+  tenantGroup   TenantGroup @relation(fields: [tenantGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantGroupId])
+  @@index([userId])
+  @@index([tenantGroupId])
+  @@index([isPrimary])
+  @@map("tenant_group_members")
 }
 
 enum UserRole {
@@ -846,6 +941,12 @@ enum ChatSessionStatus {
   WAITING
   ACTIVE
   ENDED
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  AGENT
 }
 
 enum UserRank {

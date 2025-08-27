@@ -127,6 +127,65 @@
             margin-bottom: 5pt;
         }
         
+        .party-detail-separator {
+            margin: 8pt 0;
+            text-align: center;
+            color: #666;
+            font-size: 9pt;
+            border-top: 1pt solid #ddd;
+            padding-top: 5pt;
+        }
+        
+        /* Occupants section styles */
+        .occupants-list {
+            margin-top: 10pt;
+        }
+        
+        .occupant-item {
+            margin-bottom: 8pt;
+            padding: 8pt;
+            background-color: #f9f9f9;
+            border-left: 3pt solid #007bff;
+            border-radius: 3pt;
+        }
+        
+        .occupant-separator {
+            height: 1pt;
+            background-color: #ddd;
+            margin: 8pt 0;
+        }
+        
+        /* Group signatures styles */
+        .group-signatures-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15pt;
+            margin-top: 15pt;
+            justify-content: center;
+        }
+        
+        .group-signature-box {
+            width: 180pt;
+            text-align: center;
+            padding: 10pt;
+            border: 1pt solid #ccc;
+            border-radius: 5pt;
+            background-color: #f9f9f9;
+            margin-bottom: 10pt;
+        }
+        
+        .primary-badge {
+            background-color: #007bff;
+            color: white;
+            padding: 2pt 6pt;
+            border-radius: 10pt;
+            font-size: 8pt;
+            font-weight: bold;
+            margin-left: 5pt;
+        }
+        
+
+        
         .payment-table {
             width: 100%;
             border-collapse: collapse;
@@ -232,20 +291,36 @@
 
         <div class="parties-section">
             <div class="section-title">§1. Parties / Strony</div>
+            
+            <!-- LANDLORD SECTION -->
             <div class="bilingual-content">
                 <div class="english-content">
                     <div class="party-info">
                         <div class="party-title">LANDLORD:</div>
                         <div class="party-details">
-                            <div class="party-detail">First Name: {{landlordFirstName}}</div>
-                            <div class="party-detail">Last Name: {{landlordLastName}}</div>
-                            <div class="party-detail">Address: {{landlordAddress}}</div>
-                            <div class="party-detail">PESEL: {{landlordPESEL}}</div>
-                            <div class="party-detail">ID Card Number: {{landlordIdNumber}}</div>
-                                                         <div class="party-detail">Citizenship: {{landlordCitizenship}}</div>
-                             <div class="party-detail">Date of Birth: {{landlordDateOfBirth}}</div>
-                             <div class="party-detail">Phone: {{landlordPhone}}</div>
-                            <div class="party-detail">Email: {{landlordEmail}}</div>
+                            {{#if isLandlordBusiness}}
+                                <!-- Business Landlord -->
+                                <div class="party-detail">Company Name: {{landlordName}}</div>
+                                <div class="party-detail">Tax ID: {{landlordTaxId}}</div>
+                                <div class="party-detail">Registration Number: {{landlordRegNumber}}</div>
+                                <div class="party-detail">Address: {{landlordAddress}}</div>
+                                {{#if landlordFirstName}}
+                                <div class="party-detail">Contact Person: {{landlordFirstName}} {{landlordLastName}}</div>
+                                <div class="party-detail">Phone: {{landlordPhone}}</div>
+                                <div class="party-detail">Email: {{landlordEmail}}</div>
+                                {{/if}}
+                            {{else}}
+                                <!-- Individual Landlord -->
+                                <div class="party-detail">First Name: {{landlordFirstName}}</div>
+                                <div class="party-detail">Last Name: {{landlordLastName}}</div>
+                                <div class="party-detail">Address: {{landlordAddress}}</div>
+                                <div class="party-detail">PESEL: {{landlordPESEL}}</div>
+                                <div class="party-detail">ID Card Number: {{landlordIdNumber}}</div>
+                                <div class="party-detail">Citizenship: {{landlordCitizenship}}</div>
+                                <div class="party-detail">Date of Birth: {{landlordDateOfBirth}}</div>
+                                <div class="party-detail">Phone: {{landlordPhone}}</div>
+                                <div class="party-detail">Email: {{landlordEmail}}</div>
+                            {{/if}}
                         </div>
                     </div>
                 </div>
@@ -253,35 +328,71 @@
                     <div class="party-info">
                         <div class="party-title">WYNAJMUJĄCY:</div>
                         <div class="party-details">
-                            <div class="party-detail">Imię: {{landlordFirstName}}</div>
-                            <div class="party-detail">Nazwisko: {{landlordLastName}}</div>
-                            <div class="party-detail">Adres: {{landlordAddress}}</div>
-                            <div class="party-detail">PESEL: {{landlordPESEL}}</div>
-                            <div class="party-detail">Numer dowodu osobistego: {{landlordIdNumber}}</div>
-                                                         <div class="party-detail">Obywatelstwo: {{landlordCitizenship}}</div>
-                             <div class="party-detail">Data urodzenia: {{landlordDateOfBirth}}</div>
-                             <div class="party-detail">Telefon: {{landlordPhone}}</div>
-                            <div class="party-detail">Email: {{landlordEmail}}</div>
+                            {{#if isLandlordBusiness}}
+                                <!-- Business Landlord -->
+                                <div class="party-detail">Nazwa firmy: {{landlordName}}</div>
+                                <div class="party-detail">NIP: {{landlordTaxId}}</div>
+                                <div class="party-detail">Numer rejestrowy: {{landlordRegNumber}}</div>
+                                <div class="party-detail">Adres: {{landlordAddress}}</div>
+                                {{#if landlordFirstName}}
+                                <div class="party-detail">Osoba kontaktowa: {{landlordFirstName}} {{landlordLastName}}</div>
+                                <div class="party-detail">Telefon: {{landlordPhone}}</div>
+                                <div class="party-detail">Email: {{landlordEmail}}</div>
+                                {{/if}}
+                            {{else}}
+                                <!-- Individual Landlord -->
+                                <div class="party-detail">Imię: {{landlordFirstName}}</div>
+                                <div class="party-detail">Nazwisko: {{landlordLastName}}</div>
+                                <div class="party-detail">Adres: {{landlordAddress}}</div>
+                                <div class="party-detail">PESEL: {{landlordPESEL}}</div>
+                                <div class="party-detail">Numer dowodu osobistego: {{landlordIdNumber}}</div>
+                                <div class="party-detail">Obywatelstwo: {{landlordCitizenship}}</div>
+                                <div class="party-detail">Data urodzenia: {{landlordDateOfBirth}}</div>
+                                <div class="party-detail">Telefon: {{landlordPhone}}</div>
+                                <div class="party-detail">Email: {{landlordEmail}}</div>
+                            {{/if}}
                         </div>
                     </div>
                 </div>
             </div>
             
+            <!-- TENANT SECTION -->
             <div class="bilingual-content">
                 <div class="english-content">
                     <div class="party-info">
                         <div class="party-title">TENANT:</div>
                         <div class="party-details">
-                            <div class="party-detail">First Name: {{tenantFirstName}}</div>
-                            <div class="party-detail">Last Name: {{tenantLastName}}</div>
-                            <div class="party-detail">Address: {{tenantAddress}}</div>
-                                                         <div class="party-detail">PESEL: {{tenantPESEL}}</div>
-                             <div class="party-detail">Passport Number: {{tenantPassportNumber}}</div>
-                             <div class="party-detail">Citizenship: {{tenantCitizenship}}</div>
-                            <div class="party-detail">Date of Birth: {{tenantDateOfBirth}}</div>
-                            <div class="party-detail">Profession: {{tenantProfession}}</div>
-                            <div class="party-detail">Phone: {{tenantPhone}}</div>
-                            <div class="party-detail">Email: {{tenantEmail}}</div>
+                            {{#if isTenantBusiness}}
+                                <!-- Business Tenant -->
+                                <div class="party-detail">Company Name: {{tenantName}}</div>
+                                <div class="party-detail">Tax ID: {{tenantTaxId}}</div>
+                                <div class="party-detail">Registration Number: {{tenantRegNumber}}</div>
+                                <div class="party-detail">Address: {{tenantAddress}}</div>
+                                {{#if tenantFirstName}}
+                                <div class="party-detail">Contact Person: {{tenantFirstName}} {{tenantLastName}}</div>
+                                <div class="party-detail">Phone: {{tenantPhone}}</div>
+                                <div class="party-detail">Email: {{tenantEmail}}</div>
+                                {{/if}}
+                            {{else if isTenantGroup}}
+                                <!-- Group Tenant -->
+                                <div class="party-detail">Group Name: {{tenantGroupName}}</div>
+                                <div class="party-detail">Primary Member: {{tenantFirstName}} {{tenantLastName}}</div>
+                                <div class="party-detail">Address: {{tenantAddress}}</div>
+                                <div class="party-detail">Phone: {{tenantPhone}}</div>
+                                <div class="party-detail">Email: {{tenantEmail}}</div>
+                            {{else}}
+                                <!-- Individual Tenant -->
+                                <div class="party-detail">First Name: {{tenantFirstName}}</div>
+                                <div class="party-detail">Last Name: {{tenantLastName}}</div>
+                                <div class="party-detail">Address: {{tenantAddress}}</div>
+                                <div class="party-detail">PESEL: {{tenantPESEL}}</div>
+                                <div class="party-detail">Passport Number: {{tenantPassportNumber}}</div>
+                                <div class="party-detail">Citizenship: {{tenantCitizenship}}</div>
+                                <div class="party-detail">Date of Birth: {{tenantDateOfBirth}}</div>
+                                <div class="party-detail">Profession: {{tenantProfession}}</div>
+                                <div class="party-detail">Phone: {{tenantPhone}}</div>
+                                <div class="party-detail">Email: {{tenantEmail}}</div>
+                            {{/if}}
                         </div>
                     </div>
                 </div>
@@ -289,20 +400,107 @@
                     <div class="party-info">
                         <div class="party-title">NAJEMCA:</div>
                         <div class="party-details">
-                            <div class="party-detail">Imię: {{tenantFirstName}}</div>
-                            <div class="party-detail">Nazwisko: {{tenantLastName}}</div>
-                            <div class="party-detail">Adres: {{tenantAddress}}</div>
-                                                         <div class="party-detail">PESEL: {{tenantPESEL}}</div>
-                             <div class="party-detail">Numer paszportu: {{tenantPassportNumber}}</div>
-                             <div class="party-detail">Obywatelstwo: {{tenantCitizenship}}</div>
-                            <div class="party-detail">Data urodzenia: {{tenantDateOfBirth}}</div>
-                            <div class="party-detail">Zawód: {{tenantProfession}}</div>
-                            <div class="party-detail">Telefon: {{tenantPhone}}</div>
-                            <div class="party-detail">Email: {{tenantEmail}}</div>
+                            {{#if isTenantBusiness}}
+                                <!-- Business Tenant -->
+                                <div class="party-detail">Nazwa firmy: {{tenantName}}</div>
+                                <div class="party-detail">NIP: {{tenantTaxId}}</div>
+                                <div class="party-detail">Numer rejestrowy: {{tenantRegNumber}}</div>
+                                <div class="party-detail">Adres: {{tenantAddress}}</div>
+                                {{#if tenantFirstName}}
+                                <div class="party-detail">Osoba kontaktowa: {{tenantFirstName}} {{tenantLastName}}</div>
+                                <div class="party-detail">Telefon: {{tenantPhone}}</div>
+                                <div class="party-detail">Email: {{tenantEmail}}</div>
+                                {{/if}}
+                            {{else if isTenantGroup}}
+                                <!-- Group Tenant -->
+                                <div class="party-detail">Nazwa grupy: {{tenantGroupName}}</div>
+                                <div class="party-detail">Członek główny: {{tenantFirstName}} {{tenantLastName}}</div>
+                                <div class="party-detail">Adres: {{tenantAddress}}</div>
+                                <div class="party-detail">Telefon: {{tenantPhone}}</div>
+                                <div class="party-detail">Email: {{tenantEmail}}</div>
+                            {{else}}
+                                <!-- Individual Tenant -->
+                                <div class="party-detail">Imię: {{tenantFirstName}}</div>
+                                <div class="party-detail">Nazwisko: {{tenantLastName}}</div>
+                                <div class="party-detail">Adres: {{tenantAddress}}</div>
+                                <div class="party-detail">PESEL: {{tenantPESEL}}</div>
+                                <div class="party-detail">Numer paszportu: {{tenantPassportNumber}}</div>
+                                <div class="party-detail">Obywatelstwo: {{tenantCitizenship}}</div>
+                                <div class="party-detail">Data urodzenia: {{tenantDateOfBirth}}</div>
+                                <div class="party-detail">Zawód: {{tenantProfession}}</div>
+                                <div class="party-detail">Telefon: {{tenantPhone}}</div>
+                                <div class="party-detail">Email: {{tenantEmail}}</div>
+                            {{/if}}
                         </div>
                     </div>
                 </div>
             </div>
+            
+            <!-- OCCUPANTS SECTION (for business tenants) -->
+            {{#if occupants.length}}
+            <div class="bilingual-content">
+                <div class="english-content">
+                    <div class="party-info">
+                        <div class="party-title">OCCUPANTS:</div>
+                        <div class="party-details">
+                            {{#each occupants}}
+                            <div class="party-detail">Name: {{name}}</div>
+                            {{#if role}}<div class="party-detail">Role: {{role}}</div>{{/if}}
+                            {{#if email}}<div class="party-detail">Email: {{email}}</div>{{/if}}
+                            {{#if phone}}<div class="party-detail">Phone: {{phone}}</div>{{/if}}
+                            {{#unless @last}}<div class="party-detail-separator">---</div>{{/unless}}
+                            {{/each}}
+                        </div>
+                    </div>
+                </div>
+                <div class="polish-content">
+                    <div class="party-info">
+                        <div class="party-title">OSOBY ZAMIESZKUJĄCE:</div>
+                        <div class="party-details">
+                            {{#each occupants}}
+                            <div class="party-detail">Imię i nazwisko: {{name}}</div>
+                            {{#if role}}<div class="party-detail">Rola: {{role}}</div>{{/if}}
+                            {{#if email}}<div class="party-detail">Email: {{email}}</div>{{/if}}
+                            {{#if phone}}<div class="party-detail">Telefon: {{phone}}</div>{{/if}}
+                            {{#unless @last}}<div class="party-detail-separator">---</div>{{/unless}}
+                            {{/each}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {{/if}}
+            
+            <!-- GROUP MEMBERS SECTION (for tenant groups) -->
+            {{#if tenantGroupMembers.length}}
+            <div class="bilingual-content">
+                <div class="english-content">
+                    <div class="party-info">
+                        <div class="party-title">GROUP MEMBERS:</div>
+                        <div class="party-details">
+                            {{#each tenantGroupMembers}}
+                            <div class="party-detail">{{#if isPrimary}}[PRIMARY] {{/if}}{{name}}</div>
+                            <div class="party-detail">Email: {{email}}</div>
+                            {{#if phone}}<div class="party-detail">Phone: {{phone}}</div>{{/if}}
+                            {{#unless @last}}<div class="party-detail-separator">---</div>{{/unless}}
+                            {{/each}}
+                        </div>
+                    </div>
+                </div>
+                <div class="polish-content">
+                    <div class="party-info">
+                        <div class="party-title">CZŁONKOWIE GRUPY:</div>
+                        <div class="party-details">
+                            {{#each tenantGroupMembers}}
+                            <div class="party-detail">{{#if isPrimary}}[GŁÓWNY] {{/if}}{{name}}</div>
+                            <div class="party-detail">Email: {{email}}</div>
+                            {{#if phone}}<div class="party-detail">Telefon: {{phone}}</div>{{/if}}
+                            {{#unless @last}}<div class="party-detail-separator">---</div>{{/unless}}
+                            {{/each}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {{/if}}
         </div>
 
         <div class="section">
@@ -545,12 +743,92 @@
         </div>
         {{/if}}
 
+        <!-- AUTHORIZED OCCUPANTS SECTION (for business tenants only) -->
+        {{#if isTenantBusiness}}
+        <div class="section">
+            <div class="section-title">§13. Authorized Occupants / Autoryzowani Mieszkańcy</div>
+            <div class="bilingual-content">
+                <div class="english-content">
+                    <div class="content">
+                        The following individuals are authorized to occupy the property under this agreement:
+                        <div class="occupants-list">
+                            {{#each occupants}}
+                            <div class="occupant-item">
+                                <strong>{{name}}</strong>{{#if role}} - {{role}}{{/if}}
+                                {{#if email}}<br>Email: {{email}}{{/if}}
+                                {{#if phone}}<br>Phone: {{phone}}{{/if}}
+                            </div>
+                            {{#unless @last}}<div class="occupant-separator"></div>{{/unless}}
+                            {{/each}}
+                        </div>
+                    </div>
+                </div>
+                <div class="polish-content">
+                    <div class="content">
+                        Następujące osoby są upoważnione do zamieszkiwania w nieruchomości na podstawie niniejszej umowy:
+                        <div class="occupants-list">
+                            {{#each occupants}}
+                            <div class="occupant-item">
+                                <strong>{{name}}</strong>{{#if role}} - {{role}}{{/if}}
+                                {{#if email}}<br>Email: {{email}}{{/if}}
+                                {{#if phone}}<br>Telefon: {{phone}}{{/if}}
+                            </div>
+                            {{#unless @last}}<div class="occupant-separator"></div>{{/unless}}
+                            {{/each}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {{/if}}
+
+        <!-- GROUP MEMBER SIGNATURES SECTION (for tenant groups only) -->
+        {{#if isTenantGroup}}
+        <div class="section">
+            <div class="section-title">§{{#if isTenantBusiness}}14{{else}}13{{/if}}. Group Member Signatures / Podpisy Członków Grupy</div>
+            <div class="bilingual-content">
+                <div class="english-content">
+                    <div class="content">
+                        All group members acknowledge and agree to the terms of this lease agreement:
+                    </div>
+                </div>
+                <div class="polish-content">
+                    <div class="content">
+                        Wszyscy członkowie grupy potwierdzają i zgadzają się z warunkami niniejszej umowy najmu:
+                    </div>
+                </div>
+            </div>
+            
+            <div class="group-signatures-container">
+                {{#each tenantGroupMembers}}
+                <div class="group-signature-box">
+                    <div class="signature-name">{{name}}{{#if isPrimary}} <span class="primary-badge">[PRIMARY]</span>{{/if}}</div>
+                    <div class="signature-title">Group Member / Członek Grupy</div>
+                    {{#if signature}}
+                    <img src="{{signature}}" class="signature-image" alt="Group Member Signature" 
+                         width="160" height="80">
+                    {{else}}
+                    <div class="signature-line"></div>
+                    {{/if}}
+                    <div class="signature-date">Date: {{../contractDate}}</div>
+                </div>
+                {{/each}}
+            </div>
+        </div>
+        {{/if}}
+
         <div class="signatures-section">
-            <div class="section-title">§13. Signatures / Podpisy</div>
+            <div class="section-title">§{{#if isTenantBusiness}}{{#if isTenantGroup}}15{{else}}14{{/if}}{{else}}{{#if isTenantGroup}}14{{else}}13{{/if}}{{/if}}. Main Contract Signatures / Główne Podpisy Umowy</div>
             <div class="signature-container">
                 <div class="signature-box">
                     <div class="signature-name">{{landlordName}}</div>
-                    <div class="signature-title">Landlord / Wynajmujący</div>
+                    <div class="signature-title">
+                        {{#if isLandlordBusiness}}
+                        Business Landlord / Wynajmujący Biznesowy
+                        {{else}}
+                        Landlord / Wynajmujący
+                        {{/if}}
+                    </div>
                     {{#if landlordSignature}}
                     <img src="{{landlordSignature}}" class="signature-image" alt="Landlord Signature" 
                          width="{{landlordSignatureWidth}}" height="{{landlordSignatureHeight}}">
@@ -561,7 +839,15 @@
                 </div>
                 <div class="signature-box">
                     <div class="signature-name">{{tenantName}}</div>
-                    <div class="signature-title">Tenant / Najemca</div>
+                    <div class="signature-title">
+                        {{#if isTenantBusiness}}
+                        Business Tenant / Najemca Biznesowy
+                        {{else if isTenantGroup}}
+                        Primary Group Member / Główny Członek Grupy
+                        {{else}}
+                        Tenant / Najemca
+                        {{/if}}
+                    </div>
                     {{#if tenantSignature}}
                     <img src="{{tenantSignature}}" class="signature-image" alt="Tenant Signature" 
                          width="{{tenantSignatureWidth}}" height="{{tenantSignatureHeight}}">

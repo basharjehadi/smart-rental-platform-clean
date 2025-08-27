@@ -83,9 +83,6 @@ const generatePaymentSchedule = (offer) => {
 
 // Generate contract data from offer with image optimization
 const generateContractData = async (offer, user = null) => {
-  // Get tenant data from the correct source
-  const tenantData = offer.rentalRequest?.tenant || offer.tenant || user;
-  
   // Use original payment date for legal consistency
   const paymentDate = offer.originalPaymentDate ? new Date(offer.originalPaymentDate) : new Date();
   const contractDate = paymentDate.toLocaleDateString('en-US', {
@@ -111,9 +108,7 @@ const generateContractData = async (offer, user = null) => {
   // Debug signature data
   console.log('🔍 Debug signature data:');
   console.log('Landlord signature exists:', !!offer.landlord?.signatureBase64);
-  console.log('Tenant signature exists:', !!tenantData?.signatureBase64);
-  console.log('Landlord data keys:', Object.keys(offer.landlord || {}));
-  console.log('Tenant data keys:', Object.keys(tenantData || {}));
+  console.log('Tenant data keys:', Object.keys(offer.tenantGroup || {}));
   
   // Use original signatures - check if they already have data URL prefix
   const landlordSignature = offer.landlord?.signatureBase64 ? 
@@ -122,59 +117,229 @@ const generateContractData = async (offer, user = null) => {
   // Translate additional terms with automatic language detection
   const additionalTermsText = offer.description || offer.additionalTerms || '';
   const translatedTerms = await translateAdditionalTerms(additionalTermsText);
-  const tenantSignature = tenantData?.signatureBase64 ? 
-    (tenantData.signatureBase64.startsWith('data:') ? tenantData.signatureBase64 : `data:image/png;base64,${tenantData.signatureBase64}`) : null;
   
   // Use larger, more realistic dimensions for signature images
   const landlordSignatureDimensions = landlordSignature ? { width: 400, height: 150 } : { width: 0, height: 0 };
-  const tenantSignatureDimensions = tenantSignature ? { width: 400, height: 150 } : { width: 0, height: 0 };
   
-  return {
+  // 🔍 SCENARIO DETECTION: Determine contract type and prepare data
+  console.log('🔍 Detecting contract scenario...');
+  
+  // 1. Check if landlord is a business (has organization)
+  const isLandlordBusiness = !!offer.property?.organization;
+  console.log('🏢 Is landlord business?', isLandlordBusiness);
+  
+  // 2. Check if tenant is a business (has organization)
+  const isTenantBusiness = !!offer.organization;
+  console.log('🏢 Is tenant business?', isTenantBusiness);
+  
+  // 3. Check if tenant is a group (has multiple members)
+  const isTenantGroup = !!offer.tenantGroup && offer.tenantGroup.members && offer.tenantGroup.members.length > 0;
+  console.log('👥 Is tenant group?', isTenantGroup);
+  
+  // Prepare landlord data based on scenario
+  let landlordData = {};
+  
+  if (isLandlordBusiness) {
+    // Business landlord - use organization data
+    const org = offer.property.organization;
+    landlordData = {
+      type: 'business',
+      name: org.name || 'Business Landlord',
+      taxId: org.taxId || 'N/A',
+      regNumber: org.regNumber || 'N/A',
+      address: org.address || 'N/A',
+      signature: org.signatureBase64 ? 
+        (org.signatureBase64.startsWith('data:') ? org.signatureBase64 : `data:image/png;base64,${org.signatureBase64}`) : null,
+      // Individual contact person (if available)
+      contactPerson: offer.landlord ? {
+        name: `${offer.landlord.firstName || ''} ${offer.landlord.lastName || ''}`.trim() || offer.landlord.name || 'Contact Person',
+        firstName: offer.landlord.firstName || 'N/A',
+        lastName: offer.landlord.lastName || 'N/A',
+        phone: offer.landlord.phoneNumber || 'N/A',
+        email: offer.landlord.email || 'N/A'
+      } : null
+    };
+  } else {
+    // Individual landlord - use user data
+    landlordData = {
+      type: 'individual',
+      name: `${offer.landlord?.firstName || ''} ${offer.landlord?.lastName || ''}`.trim() || offer.landlord?.name || 'Landlord',
+      firstName: offer.landlord?.firstName || 'N/A',
+      lastName: offer.landlord?.lastName || 'N/A',
+      address: offer.landlord?.address || 
+        (offer.landlord?.street && offer.landlord?.city ? 
+          `${offer.landlord.street}, ${offer.landlord.city}, ${offer.landlord.zipCode || ''}, ${offer.landlord.country || ''}`.replace(/,\s*,/g, ',').replace(/,\s*$/g, '') : 
+          'N/A'),
+      pesel: offer.landlord?.pesel || 'N/A',
+      idNumber: offer.landlord?.dowodOsobistyNumber || 'N/A',
+      phone: offer.landlord?.phoneNumber || 'N/A',
+      email: offer.landlord?.email || 'N/A',
+      citizenship: offer.landlord?.citizenship || 'N/A',
+      dateOfBirth: offer.landlord?.dateOfBirth ? new Date(offer.landlord.dateOfBirth).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }) : 'N/A',
+      signature: landlordSignature
+    };
+  }
+  
+  // Prepare tenant data based on scenario
+  let tenantData = {};
+  
+  if (isTenantBusiness) {
+    // Business tenant - use organization data
+    const org = offer.organization;
+    tenantData = {
+      type: 'business',
+      name: org.name || 'Business Tenant',
+      taxId: org.taxId || 'N/A',
+      regNumber: org.regNumber || 'N/A',
+      address: org.address || 'N/A',
+      signature: org.signatureBase64 ? 
+        (org.signatureBase64.startsWith('data:') ? org.signatureBase64 : `data:image/png;base64,${org.signatureBase64}`) : null,
+      // Individual contact person (if available)
+      contactPerson: offer.tenantGroup?.members?.[0]?.user ? {
+        name: `${offer.tenantGroup.members[0].user.firstName || ''} ${offer.tenantGroup.members[0].user.lastName || ''}`.trim() || offer.tenantGroup.members[0].user.name || 'Contact Person',
+        firstName: offer.tenantGroup.members[0].user.firstName || 'N/A',
+        lastName: offer.tenantGroup.members[0].user.lastName || 'N/A',
+        phone: offer.tenantGroup.members[0].user.phoneNumber || 'N/A',
+        email: offer.tenantGroup.members[0].user.email || 'N/A'
+      } : null
+    };
+  } else if (isTenantGroup) {
+    // Group tenant - use tenant group data
+    const group = offer.tenantGroup;
+    tenantData = {
+      type: 'group',
+      groupName: group.name || 'Tenant Group',
+      members: group.members.map(member => ({
+        id: member.user.id,
+        name: `${member.user.firstName || ''} ${member.user.lastName || ''}`.trim() || member.user.name || 'Group Member',
+        firstName: member.user.firstName || 'N/A',
+        lastName: member.user.lastName || 'N/A',
+        address: member.user.address || 
+          (member.user.street && member.user.city ? 
+            `${member.user.street}, ${member.user.city}, ${member.user.zipCode || ''}, ${member.user.country || ''}`.replace(/,\s*,/g, ',').replace(/,\s*$/g, '') : 
+            'N/A'),
+        pesel: member.user.pesel || 'N/A',
+        passportNumber: member.user.passportNumber || 'N/A',
+        phone: member.user.phoneNumber || 'N/A',
+        email: member.user.email || 'N/A',
+        citizenship: member.user.citizenship || 'N/A',
+        dateOfBirth: member.user.dateOfBirth ? new Date(member.user.dateOfBirth).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }) : 'N/A',
+        profession: member.user.profession || 'N/A',
+        signature: member.user.signatureBase64 ? 
+          (member.user.signatureBase64.startsWith('data:') ? member.user.signatureBase64 : `data:image/png;base64,${member.user.signatureBase64}`) : null,
+        isPrimary: member.isPrimary
+      })),
+      // Primary member signature for contract
+      primarySignature: group.members.find(m => m.isPrimary)?.user.signatureBase64 ? 
+        (group.members.find(m => m.isPrimary).user.signatureBase64.startsWith('data:') ? 
+          group.members.find(m => m.isPrimary).user.signatureBase64 : 
+          `data:image/png;base64,${group.members.find(m => m.isPrimary).user.signatureBase64}`) : null
+    };
+  } else {
+    // Individual tenant - use user data (fallback)
+    const userData = offer.tenantGroup?.members?.[0]?.user || user;
+    tenantData = {
+      type: 'individual',
+      name: `${userData?.firstName || ''} ${userData?.lastName || ''}`.trim() || userData?.name || 'Tenant',
+      firstName: userData?.firstName || 'N/A',
+      lastName: userData?.lastName || 'N/A',
+      address: userData?.address || 
+        (userData?.street && userData?.city ? 
+          `${userData.street}, ${userData.city}, ${userData.zipCode || ''}, ${userData.country || ''}`.replace(/,\s*,/g, ',').replace(/,\s*$/g, '') : 
+          'N/A'),
+      pesel: userData?.pesel || 'N/A',
+      passportNumber: userData?.passportNumber || 'N/A',
+      phone: userData?.phoneNumber || 'N/A',
+      email: userData?.email || 'N/A',
+      citizenship: userData?.citizenship || 'N/A',
+      dateOfBirth: userData?.dateOfBirth ? new Date(userData.dateOfBirth).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }) : 'N/A',
+      profession: userData?.profession || 'N/A',
+      signature: userData?.signatureBase64 ? 
+        (userData.signatureBase64.startsWith('data:') ? userData.signatureBase64 : `data:image/png;base64,${userData.signatureBase64}`) : null
+    };
+  }
+  
+  // Prepare occupants data for business tenants
+  let occupantsData = [];
+  if (isTenantBusiness && offer.rentalRequest?.occupants) {
+    // If we have occupants from the rental request, use them
+    occupantsData = offer.rentalRequest.occupants;
+  } else if (isTenantGroup) {
+    // For tenant groups, create occupants from group members
+    occupantsData = tenantData.members.map(member => ({
+      name: member.name,
+      role: member.profession || 'Tenant',
+      email: member.email,
+      phone: member.phone
+    }));
+  }
+  
+  // Calculate signature dimensions
+  const tenantSignatureDimensions = tenantData.signature || tenantData.primarySignature ? { width: 400, height: 150 } : { width: 0, height: 0 };
+  
+  // Build the final contract data object
+  const contractData = {
     contractNumber,
     contractDate,
-    // Landlord information with proper name construction and all identity fields
-    landlordName: `${offer.landlord?.firstName || ''} ${offer.landlord?.lastName || ''}`.trim() || offer.landlord?.name || 'Landlord',
-    landlordFirstName: offer.landlord?.firstName || 'N/A',
-    landlordLastName: offer.landlord?.lastName || 'N/A',
-    landlordAddress: offer.landlord?.address || 
-      (offer.landlord?.street && offer.landlord?.city ? 
-        `${offer.landlord.street}, ${offer.landlord.city}, ${offer.landlord.zipCode || ''}, ${offer.landlord.country || ''}`.replace(/,\s*,/g, ',').replace(/,\s*$/g, '') : 
-        'N/A'),
-    landlordPESEL: offer.landlord?.pesel || 'N/A',
-    landlordIdNumber: offer.landlord?.dowodOsobistyNumber || 'N/A',
-    landlordPhone: offer.landlord?.phoneNumber || 'N/A',
-    landlordEmail: offer.landlord?.email || 'N/A',
-    landlordCitizenship: offer.landlord?.citizenship || 'N/A',
-    landlordDateOfBirth: offer.landlord?.dateOfBirth ? new Date(offer.landlord.dateOfBirth).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }) : 'N/A',
-    landlordSignature,
+    // Scenario flags
+    isLandlordBusiness,
+    isTenantBusiness,
+    isTenantGroup,
+    // Landlord information
+    landlordType: landlordData.type,
+    landlordName: landlordData.name,
+    landlordTaxId: landlordData.taxId || 'N/A',
+    landlordRegNumber: landlordData.regNumber || 'N/A',
+    landlordAddress: landlordData.address,
+    landlordSignature: landlordData.signature,
     landlordSignatureWidth: landlordSignatureDimensions.width,
     landlordSignatureHeight: landlordSignatureDimensions.height,
-    // Tenant information with proper name construction and all identity fields
-    tenantName: `${tenantData?.firstName || ''} ${tenantData?.lastName || ''}`.trim() || tenantData?.name || 'Tenant',
-    tenantFirstName: tenantData?.firstName || 'N/A',
-    tenantLastName: tenantData?.lastName || 'N/A',
-    tenantAddress: tenantData?.address || 
-      (tenantData?.street && tenantData?.city ? 
-        `${tenantData.street}, ${tenantData.city}, ${tenantData.zipCode || ''}, ${tenantData.country || ''}`.replace(/,\s*,/g, ',').replace(/,\s*$/g, '') : 
-        'N/A'),
-    tenantPESEL: tenantData?.pesel || 'N/A',
-    tenantPassportNumber: tenantData?.passportNumber || 'N/A',
-    tenantPhone: tenantData?.phoneNumber || 'N/A',
-    tenantEmail: tenantData?.email || 'N/A',
-    tenantCitizenship: tenantData?.citizenship || 'N/A',
-    tenantDateOfBirth: tenantData?.dateOfBirth ? new Date(tenantData.dateOfBirth).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }) : 'N/A',
-    tenantProfession: tenantData?.profession || 'N/A',
-    tenantSignature,
+    // Individual landlord fields (for business landlords with contact person)
+    landlordFirstName: landlordData.firstName || landlordData.contactPerson?.firstName || 'N/A',
+    landlordLastName: landlordData.lastName || landlordData.contactPerson?.lastName || 'N/A',
+    landlordPESEL: landlordData.pesel || 'N/A',
+    landlordIdNumber: landlordData.idNumber || 'N/A',
+    landlordPhone: landlordData.phone || landlordData.contactPerson?.phone || 'N/A',
+    landlordEmail: landlordData.email || landlordData.contactPerson?.email || 'N/A',
+    landlordCitizenship: landlordData.citizenship || 'N/A',
+    landlordDateOfBirth: landlordData.dateOfBirth || 'N/A',
+    // Tenant information
+    tenantType: tenantData.type,
+    tenantName: tenantData.name,
+    tenantGroupName: tenantData.groupName || 'N/A',
+    tenantTaxId: tenantData.taxId || 'N/A',
+    tenantRegNumber: tenantData.regNumber || 'N/A',
+    tenantAddress: tenantData.address,
+    tenantSignature: tenantData.signature || tenantData.primarySignature,
     tenantSignatureWidth: tenantSignatureDimensions.width,
     tenantSignatureHeight: tenantSignatureDimensions.height,
+    // Individual tenant fields (for group tenants or individual tenants)
+    tenantFirstName: tenantData.firstName || 'N/A',
+    tenantLastName: tenantData.lastName || 'N/A',
+    tenantPESEL: tenantData.pesel || 'N/A',
+    tenantPassportNumber: tenantData.passportNumber || 'N/A',
+    tenantPhone: tenantData.phone || 'N/A',
+    tenantEmail: tenantData.email || 'N/A',
+    tenantCitizenship: tenantData.citizenship || 'N/A',
+    tenantDateOfBirth: tenantData.dateOfBirth || 'N/A',
+    tenantProfession: tenantData.profession || 'N/A',
+    // Group members (for tenant groups)
+    tenantGroupMembers: tenantData.members || [],
+    // Occupants (for business tenants)
+    occupants: occupantsData,
+    // Property information
     propertyAddress: offer.property?.address || 'N/A',
     monthlyRent: offer.rentAmount,
     securityDeposit: offer.depositAmount,
@@ -193,6 +358,15 @@ const generateContractData = async (offer, user = null) => {
     additionalTermsPolish: translatedTerms.polish,
     paymentSchedule: generatePaymentSchedule(offer)
   };
+  
+  console.log('🔍 Contract data prepared for scenario:', {
+    landlordType: landlordData.type,
+    tenantType: tenantData.type,
+    hasOccupants: occupantsData.length > 0,
+    groupMembers: tenantData.members?.length || 0
+  });
+  
+  return contractData;
 };
 
 // Generate HTML from template
