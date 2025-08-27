@@ -1,7 +1,28 @@
 import { PrismaClient } from '@prisma/client';
+import crypto from 'crypto';
 const prisma = new PrismaClient();
 
 class TenantGroupController {
+  // Helper to ensure invitations table exists (raw SQL to avoid schema migration)
+  async ensureInvitationsTable() {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS tenant_group_invitations (
+        id TEXT PRIMARY KEY,
+        token TEXT UNIQUE NOT NULL,
+        tenant_group_id TEXT NOT NULL,
+        invited_user_id TEXT NOT NULL,
+        inviter_user_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        expires_at TIMESTAMP WITH TIME ZONE NULL
+      );
+    `);
+  }
+
+  generateToken() {
+    return crypto.randomBytes(24).toString('hex');
+  }
+
   /**
    * Create a new tenant group
    * Creates group and adds current user as primary member
@@ -35,13 +56,11 @@ class TenantGroupController {
 
       // Create new tenant group
       const tenantGroup = await prisma.tenantGroup.create({
-        data: {
-          name
-        }
+        data: { name }
       });
 
       // Add user as primary member
-      const groupMember = await prisma.tenantGroupMember.create({
+      await prisma.tenantGroupMember.create({
         data: {
           userId,
           tenantGroupId: tenantGroup.id,
@@ -55,14 +74,7 @@ class TenantGroupController {
         include: {
           members: {
             include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                  role: true
-                }
-              }
+              user: { select: { id: true, name: true, email: true, role: true } }
             }
           }
         }
@@ -76,11 +88,7 @@ class TenantGroupController {
 
     } catch (error) {
       console.error('Error creating tenant group:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to create tenant group',
-        error: error.message
-      });
+      res.status(500).json({ success: false, message: 'Failed to create tenant group', error: error.message });
     }
   }
 
@@ -94,173 +102,186 @@ class TenantGroupController {
       const { tenantGroupId } = req.params;
       const { email, message } = req.body;
 
-      // Validate required fields
       if (!email) {
-        return res.status(400).json({
-          success: false,
-          message: 'Email is required to send invitation'
-        });
+        return res.status(400).json({ success: false, message: 'Email is required to send invitation' });
       }
 
-      // Check if current user is a member of this tenant group
-      const currentMembership = await prisma.tenantGroupMember.findFirst({
-        where: {
-          userId,
-          tenantGroupId
-        }
-      });
-
+      // Check membership
+      const currentMembership = await prisma.tenantGroupMember.findFirst({ where: { userId, tenantGroupId } });
       if (!currentMembership) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied. You are not a member of this tenant group.'
-        });
+        return res.status(403).json({ success: false, message: 'Access denied. You are not a member of this tenant group.' });
       }
 
       // Find user by email
-      const invitedUser = await prisma.user.findUnique({
-        where: { email }
-      });
-
+      const invitedUser = await prisma.user.findUnique({ where: { email } });
       if (!invitedUser) {
-        return res.status(404).json({
-          success: false,
-          message: 'User with this email not found'
-        });
+        return res.status(404).json({ success: false, message: 'User with this email not found' });
       }
 
-      // Check if user is already a member
-      const existingMembership = await prisma.tenantGroupMember.findFirst({
-        where: {
-          userId: invitedUser.id,
-          tenantGroupId
-        }
-      });
-
+      // Already member?
+      const existingMembership = await prisma.tenantGroupMember.findFirst({ where: { userId: invitedUser.id, tenantGroupId } });
       if (existingMembership) {
-        return res.status(400).json({
-          success: false,
-          message: 'User is already a member of this tenant group'
-        });
+        return res.status(400).json({ success: false, message: 'User is already a member of this tenant group' });
       }
 
-      // Check if user already has a tenant group
-      const userExistingGroup = await prisma.tenantGroupMember.findFirst({
-        where: { userId: invitedUser.id }
-      });
+      // Ensure invitations table exists
+      await this.ensureInvitationsTable();
 
-      if (userExistingGroup) {
-        return res.status(400).json({
-          success: false,
-          message: 'User is already a member of another tenant group'
-        });
-      }
-
-      // For now, we'll just return success without creating notifications
-      // In a real implementation, you would:
-      // 1. Create an invitation record in a separate Invitation model
-      // 2. Send email notifications
-      // 3. Create system notifications when the notification system supports tenant group invitations
+      // Create or reuse pending invitation
+      const token = this.generateToken();
+      const id = this.generateToken();
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO tenant_group_invitations (id, token, tenant_group_id, invited_user_id, inviter_user_id, status)
+         VALUES ($1, $2, $3, $4, $5, 'PENDING')`,
+        id, token, tenantGroupId, invitedUser.id, userId
+      );
 
       res.status(200).json({
         success: true,
-        message: 'Invitation prepared successfully',
+        message: 'Invitation created successfully',
         data: {
-          invitedUser: {
-            id: invitedUser.id,
-            name: invitedUser.name,
-            email: invitedUser.email
-          },
+          token,
           tenantGroupId,
-          message: message || null,
-          note: 'Invitation system will be implemented with proper notification support'
+          invitedUser: { id: invitedUser.id, name: invitedUser.name, email: invitedUser.email },
+          inviterUserId: userId,
+          note: message || null
         }
       });
 
     } catch (error) {
       console.error('Error inviting user to group:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to send invitation',
-        error: error.message
-      });
+      res.status(500).json({ success: false, message: 'Failed to send invitation', error: error.message });
     }
   }
 
   /**
-   * Accept invitation to join tenant group
-   * Adds user to the group
+   * Accept invitation by token (adds user to group, removes invitation)
+   */
+  async acceptInvitationByToken(req, res) {
+    try {
+      const userId = req.user.id;
+      const { token } = req.body;
+      if (!token) return res.status(400).json({ success: false, message: 'Token is required' });
+
+      await this.ensureInvitationsTable();
+      const invitation = await prisma.$queryRawUnsafe(
+        `SELECT token, tenant_group_id AS "tenantGroupId", invited_user_id AS "invitedUserId", status
+         FROM tenant_group_invitations WHERE token = $1 LIMIT 1`,
+        token
+      );
+      const invite = Array.isArray(invitation) ? invitation[0] : null;
+      if (!invite) return res.status(404).json({ success: false, message: 'Invitation not found or already handled' });
+      if (invite.invitedUserId !== userId) return res.status(403).json({ success: false, message: 'This invitation is not for the current user' });
+      if (invite.status !== 'PENDING') return res.status(400).json({ success: false, message: 'Invitation is not pending' });
+
+      // Check not already a member
+      const existingMembership = await prisma.tenantGroupMember.findFirst({ where: { userId, tenantGroupId: invite.tenantGroupId } });
+      if (existingMembership) {
+        await prisma.$executeRawUnsafe(`DELETE FROM tenant_group_invitations WHERE token = $1`, token);
+        return res.status(200).json({ success: true, message: 'Already a member. Invitation removed.' });
+      }
+
+      await prisma.tenantGroupMember.create({ data: { userId, tenantGroupId: invite.tenantGroupId, isPrimary: false } });
+      await prisma.$executeRawUnsafe(`DELETE FROM tenant_group_invitations WHERE token = $1`, token);
+
+      const group = await prisma.tenantGroup.findUnique({ where: { id: invite.tenantGroupId } });
+      return res.status(200).json({ success: true, message: 'Invitation accepted', data: { tenantGroup: group } });
+    } catch (error) {
+      console.error('Error accepting invitation by token:', error);
+      return res.status(500).json({ success: false, message: 'Failed to accept invitation', error: error.message });
+    }
+  }
+
+  /**
+   * Decline invitation by token (deletes the invitation)
+   */
+  async declineInvitationByToken(req, res) {
+    try {
+      const userId = req.user.id;
+      const { token } = req.body;
+      if (!token) return res.status(400).json({ success: false, message: 'Token is required' });
+
+      await this.ensureInvitationsTable();
+      const invitation = await prisma.$queryRawUnsafe(
+        `SELECT token, invited_user_id AS "invitedUserId" FROM tenant_group_invitations WHERE token = $1 LIMIT 1`,
+        token
+      );
+      const invite = Array.isArray(invitation) ? invitation[0] : null;
+      if (!invite) return res.status(404).json({ success: false, message: 'Invitation not found' });
+      if (invite.invitedUserId !== userId) return res.status(403).json({ success: false, message: 'This invitation is not for the current user' });
+
+      await prisma.$executeRawUnsafe(`DELETE FROM tenant_group_invitations WHERE token = $1`, token);
+      return res.status(200).json({ success: true, message: 'Invitation declined' });
+    } catch (error) {
+      console.error('Error declining invitation by token:', error);
+      return res.status(500).json({ success: false, message: 'Failed to decline invitation', error: error.message });
+    }
+  }
+
+  /**
+   * List pending invitations for current user
+   */
+  async getMyInvitations(req, res) {
+    try {
+      const userId = req.user.id;
+      await this.ensureInvitationsTable();
+      const rows = await prisma.$queryRawUnsafe(
+        `SELECT i.token,
+                i.created_at AS "createdAt",
+                tg.id AS "tenantGroupId",
+                tg.name AS "groupName",
+                u.id AS "inviterUserId",
+                u.name AS "inviterName"
+         FROM tenant_group_invitations i
+         JOIN tenant_groups tg ON tg.id = i.tenant_group_id
+         JOIN users u ON u.id = i.inviter_user_id
+         WHERE i.invited_user_id = $1 AND i.status = 'PENDING'
+         ORDER BY i.created_at DESC`,
+        userId
+      );
+      return res.status(200).json({ success: true, invitations: rows });
+    } catch (error) {
+      console.error('Error fetching invitations:', error);
+      return res.status(500).json({ success: false, message: 'Failed to fetch invitations', error: error.message });
+    }
+  }
+
+  /**
+   * Accept invitation to join tenant group (by group id) - legacy
    */
   async acceptGroupInvitation(req, res) {
     try {
       const userId = req.user.id;
       const { tenantGroupId } = req.params;
 
-      // Check if user already has a tenant group
-      const existingMembership = await prisma.tenantGroupMember.findFirst({
-        where: { userId }
-      });
-
+      const existingMembership = await prisma.tenantGroupMember.findFirst({ where: { userId } });
       if (existingMembership) {
-        return res.status(400).json({
-          success: false,
-          message: 'User is already a member of a tenant group'
-        });
+        return res.status(400).json({ success: false, message: 'User is already a member of a tenant group' });
       }
 
-      // Verify the tenant group exists
-      const tenantGroup = await prisma.tenantGroup.findUnique({
-        where: { id: tenantGroupId }
-      });
-
+      const tenantGroup = await prisma.tenantGroup.findUnique({ where: { id: tenantGroupId } });
       if (!tenantGroup) {
-        return res.status(404).json({
-          success: false,
-          message: 'Tenant group not found'
-        });
+        return res.status(404).json({ success: false, message: 'Tenant group not found' });
       }
 
-      // Add user to the tenant group
-      const groupMember = await prisma.tenantGroupMember.create({
-        data: {
-          userId,
-          tenantGroupId,
-          isPrimary: false // New members are not primary by default
-        }
-      });
+      await prisma.tenantGroupMember.create({ data: { userId, tenantGroupId, isPrimary: false } });
 
-      // Get updated tenant group with all members
       const updatedTenantGroup = await prisma.tenantGroup.findUnique({
         where: { id: tenantGroupId },
         include: {
           members: {
             include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                  role: true
-                }
-              }
+              user: { select: { id: true, name: true, email: true, role: true } }
             }
           }
         }
       });
 
-      res.status(200).json({
-        success: true,
-        message: 'Successfully joined tenant group',
-        data: updatedTenantGroup
-      });
+      res.status(200).json({ success: true, message: 'Successfully joined tenant group', data: updatedTenantGroup });
 
     } catch (error) {
       console.error('Error accepting group invitation:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to join tenant group',
-        error: error.message
-      });
+      res.status(500).json({ success: false, message: 'Failed to join tenant group', error: error.message });
     }
   }
 

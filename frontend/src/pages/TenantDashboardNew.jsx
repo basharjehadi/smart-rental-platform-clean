@@ -44,17 +44,52 @@ const TenantDashboardNew = () => {
   const [sendingRenewal, setSendingRenewal] = useState(false);
   const [showEndModal, setShowEndModal] = useState(false);
   const [sendingEnd, setSendingEnd] = useState(false);
+  const [isGroupChoiceModalOpen, setGroupChoiceModalOpen] = useState(false);
+  const [invitations, setInvitations] = useState([]);
+  const [invitationMsg, setInvitationMsg] = useState('');
 
   useEffect(() => {
     console.log('🔍 Frontend: User state changed:', user);
     if (user) {
       console.log('✅ Frontend: User is authenticated, fetching dashboard data...');
       fetchDashboardData();
+      fetchInvitations();
     } else {
       console.log('❌ Frontend: No user found, not fetching dashboard data');
       setLoading(false);
     }
   }, [user]);
+
+  const fetchInvitations = async () => {
+    try {
+      const res = await api.get('/tenant-groups/my-invitations');
+      setInvitations(res.data?.invitations || []);
+    } catch (e) {
+      setInvitations([]);
+    }
+  };
+
+  const acceptInvitation = async (token) => {
+    try {
+      await api.post('/tenant-groups/accept-invitation', { token });
+      setInvitations((prev) => prev.filter((i) => i.token !== token));
+      setInvitationMsg('Invitation accepted');
+      setTimeout(() => setInvitationMsg(''), 1500);
+      // Optionally refresh my group data
+    } catch (e) {
+      setInvitationMsg(e?.response?.data?.message || 'Failed to accept invitation');
+      setTimeout(() => setInvitationMsg(''), 2000);
+    }
+  };
+
+  const declineInvitation = async (token) => {
+    try {
+      await api.post('/tenant-groups/decline-invitation', { token });
+      setInvitations((prev) => prev.filter((i) => i.token !== token));
+    } catch (e) {
+      // ignore
+    }
+  };
 
   // Separate useEffect for profile data fetching (like other working pages)
   useEffect(() => {
@@ -563,6 +598,29 @@ const TenantDashboardNew = () => {
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+
+            {invitations.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Pending Group Invitations</h3>
+                  {invitationMsg && <span className="text-sm text-green-700">{invitationMsg}</span>}
+                </div>
+                <div className="space-y-3">
+                  {invitations.map((inv) => (
+                    <div key={inv.token} className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
+                      <div>
+                        <p className="font-medium text-gray-900">{inv.groupName}</p>
+                        <p className="text-sm text-gray-600">Invited by {inv.inviterName}</p>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button onClick={() => acceptInvitation(inv.token)} className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700">Accept</button>
+                        <button onClick={() => declineInvitation(inv.token)} className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700">Decline</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

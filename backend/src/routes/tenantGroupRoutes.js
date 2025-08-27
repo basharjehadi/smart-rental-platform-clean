@@ -22,6 +22,27 @@ router.post('/', tenantGroupController.createTenantGroup);
 router.get('/my-group', tenantGroupController.getMyTenantGroup);
 
 /**
+ * @route   GET /api/tenant-groups/my-invitations
+ * @desc    Get pending invitations for current user
+ * @access  Private (authenticated users)
+ */
+router.get('/my-invitations', tenantGroupController.getMyInvitations);
+
+/**
+ * @route   POST /api/tenant-groups/accept-invitation
+ * @desc    Accept invitation by token
+ * @access  Private (authenticated users)
+ */
+router.post('/accept-invitation', tenantGroupController.acceptInvitationByToken);
+
+/**
+ * @route   POST /api/tenant-groups/decline-invitation
+ * @desc    Decline invitation by token
+ * @access  Private (authenticated users)
+ */
+router.post('/decline-invitation', tenantGroupController.declineInvitationByToken);
+
+/**
  * @route   POST /api/tenant-groups/:tenantGroupId/invite
  * @desc    Invite user to tenant group by email
  * @access  Private (group members)
@@ -30,7 +51,7 @@ router.post('/:tenantGroupId/invite', tenantGroupController.inviteUserToGroup);
 
 /**
  * @route   POST /api/tenant-groups/:tenantGroupId/accept
- * @desc    Accept invitation to join tenant group
+ * @desc    Accept invitation to join tenant group (legacy by group id)
  * @access  Private (authenticated users)
  */
 router.post('/:tenantGroupId/accept', tenantGroupController.acceptGroupInvitation);

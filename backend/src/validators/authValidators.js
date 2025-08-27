@@ -1,11 +1,9 @@
 import Joi from 'joi';
 
 export const registerSchema = Joi.object({
-  name: Joi.string().min(2).max(50).required().messages({
-    'string.min': 'Name must be at least 2 characters long',
-    'string.max': 'Name cannot exceed 50 characters',
-    'any.required': 'Name is required'
-  }),
+  name: Joi.string().min(2).max(50).optional().allow(''),
+  firstName: Joi.string().min(1).max(50).optional().allow(''),
+  lastName: Joi.string().min(1).max(50).optional().allow(''),
   email: Joi.string().email().required().messages({
     'string.email': 'Please provide a valid email address',
     'any.required': 'Email is required'
@@ -17,7 +15,14 @@ export const registerSchema = Joi.object({
   role: Joi.string().valid('TENANT', 'LANDLORD', 'ADMIN').default('TENANT').messages({
     'any.only': 'Role must be one of: TENANT, LANDLORD, ADMIN'
   })
-});
+}).custom((value, helpers) => {
+  const hasFullName = value.name && value.name.trim().length > 0;
+  const hasFirstLast = value.firstName && value.lastName && value.firstName.trim().length > 0 && value.lastName.trim().length > 0;
+  if (!hasFullName && !hasFirstLast) {
+    return helpers.error('any.custom', 'Provide either name or firstName and lastName');
+  }
+  return value;
+}, 'name validation');
 
 export const loginSchema = Joi.object({
   email: Joi.string().email().required().messages({

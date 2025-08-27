@@ -19,11 +19,9 @@ export const runMoveInReminders = async () => {
       id: true,
       tenantGroupId: true,
       organizationId: true,
-      moveInVerificationDeadline: true
-    },
-    include: {
+      moveInVerificationDeadline: true,
       tenantGroup: {
-        include: {
+        select: {
           members: { select: { userId: true, isPrimary: true } }
         }
       }
@@ -74,8 +72,11 @@ export const runMoveInFinalization = async () => {
       moveInVerificationStatus: 'PENDING',
       moveInVerificationDeadline: { lte: now }
     },
-    select: { id: true, tenantGroupId: true },
-    include: { tenantGroup: { include: { members: { select: { userId: true, isPrimary: true } } } } }
+    select: {
+      id: true,
+      tenantGroupId: true,
+      tenantGroup: { select: { members: { select: { userId: true, isPrimary: true } } } }
+    }
   });
 
   for (const offer of expired) {

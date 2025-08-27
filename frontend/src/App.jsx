@@ -52,6 +52,7 @@ import MessagingPage from './pages/MessagingPage';
 import TenantDashboardRedirect from './components/TenantDashboardRedirect';
 import BusinessUpgradePage from './pages/BusinessUpgradePage';
 import TenantGroupManagement from './pages/TenantGroupManagement';
+import AcceptInvitationPage from './pages/AcceptInvitationPage.jsx';
 // import PaymentDemo from './pages/PaymentDemo';
 // import PaymentExample from './pages/PaymentExample';
 
@@ -95,6 +96,14 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <TenantDashboardNew />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/accept-invitation/:token" 
+          element={
+            <ProtectedRoute>
+              <AcceptInvitationPage />
             </ProtectedRoute>
           } 
         />

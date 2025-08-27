@@ -7,15 +7,17 @@ import rankService from '../services/rankService.js';
 // Register new user
 const register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, firstName, lastName, email, password, role } = req.body;
 
     console.log('Registration attempt for:', { name, email, role });
 
-    // Validate required fields
-    if (!name || !email || !password) {
-      console.log('Missing required fields:', { name: !!name, email: !!email, password: !!password });
+    // Validate required fields (support either name OR first/last)
+    const hasFullName = Boolean(name && name.trim().length > 0);
+    const hasFirstLast = Boolean((firstName && firstName.trim().length > 0) && (lastName && lastName.trim().length > 0));
+    if ((!hasFullName && !hasFirstLast) || !email || !password) {
+      console.log('Missing required fields:', { name: !!name, firstName: !!firstName, lastName: !!lastName, email: !!email, password: !!password });
       return res.status(400).json({
-        error: 'Name, email, and password are required.'
+        error: 'First and last name (or full name), email, and password are required.'
       });
     }
 
@@ -54,10 +56,22 @@ const register = async (req, res) => {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Create user
+    // Determine canonical first/last/name
+    let canonicalFirstName = (firstName || '').trim();
+    let canonicalLastName = (lastName || '').trim();
+    if (!canonicalFirstName || !canonicalLastName) {
+      const parts = (name || '').trim().split(/\s+/);
+      if (!canonicalFirstName && parts.length > 0) canonicalFirstName = parts[0] || '';
+      if (!canonicalLastName && parts.length > 1) canonicalLastName = parts.slice(1).join(' ');
+    }
+    const canonicalName = (name && name.trim()) || `${canonicalFirstName} ${canonicalLastName}`.trim();
+
+    // Create user with firstName/lastName populated
     const user = await prisma.user.create({
       data: {
-        name,
+        name: canonicalName,
+        firstName: canonicalFirstName || null,
+        lastName: canonicalLastName || null,
         email,
         password: hashedPassword,
         role: role || 'TENANT' // Default to TENANT if no role provided
@@ -65,6 +79,8 @@ const register = async (req, res) => {
       select: {
         id: true,
         name: true,
+        firstName: true,
+        lastName: true,
         email: true,
         role: true,
         createdAt: true
