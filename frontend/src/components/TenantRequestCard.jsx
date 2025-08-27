@@ -18,6 +18,52 @@ const TenantRequestCard = ({
   const [tenantReviews, setTenantReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
 
+  // Check if this is a business request or group request
+  const isBusinessRequest = tenant.isBusinessRequest;
+  const isGroupRequest = tenant.isGroupRequest;
+  const organization = tenant.organization;
+  const tenantGroupMembers = tenant.tenantGroupMembers || [];
+
+  // Get request type display info
+  const getRequestTypeInfo = () => {
+    if (isBusinessRequest && organization) {
+      return {
+        icon: (
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2V6" />
+          </svg>
+        ),
+        title: organization.name,
+        subtitle: 'Business Request',
+        type: 'business'
+      };
+    } else if (isGroupRequest && tenantGroupMembers.length > 1) {
+      return {
+        icon: (
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+          </svg>
+        ),
+        title: tenant.tenantGroup?.name || 'Group Request',
+        subtitle: `${tenantGroupMembers.length} occupants`,
+        type: 'group'
+      };
+    } else {
+      return {
+        icon: (
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        ),
+        title: tenant.name,
+        subtitle: 'Individual Request',
+        type: 'individual'
+      };
+    }
+  };
+
+  const requestTypeInfo = getRequestTypeInfo();
+
   // Fetch tenant rank information
   useEffect(() => {
     const fetchTenantRank = async () => {
@@ -347,35 +393,17 @@ const TenantRequestCard = ({
       {/* Tenant Information */}
       <div className="p-6">
         <div className="flex items-start space-x-3 mb-4">
-          {/* Avatar (show profile photo if provided) */}
+          {/* Request Type Icon and Title */}
           <div className="flex-shrink-0">
-            {tenant.profileImage ? (
-              <img
-                src={(function () {
-                  const p = tenant.profileImage;
-                  if (!p) return '';
-                  if (p.startsWith('http://') || p.startsWith('https://')) return p;
-                  // If backend returns just a filename, build full URL
-                  if (!p.startsWith('/')) return `http://localhost:3001/uploads/profile_images/${p}`;
-                  // If it starts with /uploads/, prepend base
-                  if (p.startsWith('/uploads/')) return `http://localhost:3001${p}`;
-                  // Fallback
-                  return `http://localhost:3001${p}`;
-                })()}
-                alt="Tenant"
-                className="h-12 w-12 rounded-full object-cover"
-              />
-            ) : (
-              <div className="h-12 w-12 bg-blue-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-semibold text-lg">{tenant.initials}</span>
-              </div>
-            )}
+            <div className="h-12 w-12 bg-blue-600 rounded-full flex items-center justify-center text-white">
+              {requestTypeInfo.icon}
+            </div>
           </div>
 
-          {/* Tenant Details */}
+          {/* Request Details */}
           <div className="flex-1">
             <div className="flex items-center space-x-3 mb-2">
-              <h3 className="text-lg font-semibold text-gray-900">{maskLastName(tenant.name)}</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{requestTypeInfo.title}</h3>
               {tenant.verified && (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                   <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -386,65 +414,126 @@ const TenantRequestCard = ({
               )}
             </div>
 
-            {/* Rating and Rank */}
-            <div className="flex items-center space-x-2 mb-3">
-              <div className="flex items-center">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <svg
-                    key={star}
-                    className={`h-4 w-4 ${
-                      star <= Math.floor(tenant.rating || 0)
-                        ? 'text-yellow-400 fill-current'
-                        : 'text-gray-300'
-                    }`}
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                ))}
-              </div>
-              <span className="text-sm text-gray-600">
-                {tenant.rating ? `${tenant.rating} (${tenant.reviews || 0} reviews)` : 'No rating yet'}
+            {/* Request Type Subtitle */}
+            <div className="mb-3">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                {requestTypeInfo.subtitle}
               </span>
-              {/* Rank Badge */}
-              {tenantRank && tenantRank.rankInfo ? (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {tenantRank.rankInfo.icon || '⭐'} {tenantRank.rankInfo.name || 'New User'}
-                </span>
-              ) : tenant.rank ? (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {tenant.rank.icon || '⭐'} {tenant.rank.name || 'New User'}
-                </span>
-              ) : rankLoading ? (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                  <div className="animate-spin rounded-full h-3 w-3 border-b border-gray-600 mr-1"></div>
-                  Loading...
-                </span>
-              ) : (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                  ⭐ New User
-                </span>
-              )}
             </div>
 
-            {/* Simple Review Link */}
-            <div className="mb-4">
-              <button 
-                onClick={() => {
-                  setShowReviewsModal(true);
-                  fetchTenantReviews();
-                }}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium underline flex items-center space-x-1"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-                <span>View reviews from previous landlords</span>
-              </button>
-            </div>
+            {/* For Business Requests: Show occupants */}
+            {isBusinessRequest && organization && (
+              <div className="mb-3">
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">Company:</span> {organization.name}
+                </p>
+                {tenantGroupMembers.length > 0 && (
+                  <p className="text-sm text-gray-600">
+                    <span className="font-medium">Occupants:</span> {tenantGroupMembers.map(member => 
+                      `${member.user?.firstName || ''} ${member.user?.lastName || ''}`.trim()
+                    ).filter(name => name).join(', ')}
+                  </p>
+                )}
+              </div>
+            )}
 
+            {/* For Group Requests: Show member profiles */}
+            {isGroupRequest && tenantGroupMembers.length > 1 && (
+              <div className="mb-3">
+                <p className="text-sm text-gray-600 mb-2">
+                  <span className="font-medium">Group Members:</span>
+                </p>
+                <div className="flex items-center space-x-2">
+                  {tenantGroupMembers.slice(0, 3).map((member, index) => (
+                    <div key={member.id} className="flex items-center space-x-1">
+                      {member.user?.profileImage ? (
+                        <img
+                          src={member.user.profileImage.startsWith('http') ? member.user.profileImage : `http://localhost:3001/uploads/profile_images/${member.user.profileImage}`}
+                          alt={`${member.user?.firstName || 'Member'} ${member.user?.lastName || ''}`}
+                          className="h-8 w-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-8 w-8 bg-gray-300 rounded-full flex items-center justify-center">
+                          <span className="text-xs text-gray-600">
+                            {member.user?.firstName?.charAt(0) || 'M'}
+                          </span>
+                        </div>
+                      )}
+                      {index < 2 && <span className="text-gray-400">•</span>}
+                    </div>
+                  ))}
+                  {tenantGroupMembers.length > 3 && (
+                    <span className="text-sm text-gray-500 font-medium">
+                      +{tenantGroupMembers.length - 3} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* For Individual Requests: Show traditional tenant info */}
+            {!isBusinessRequest && !isGroupRequest && (
+              <>
+                {/* Rating and Rank */}
+                <div className="flex items-center space-x-2 mb-3">
+                  <div className="flex items-center">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <svg
+                        key={star}
+                        className={`h-4 w-4 ${
+                          star <= Math.floor(tenant.rating || 0)
+                            ? 'text-yellow-400 fill-current'
+                            : 'text-gray-300'
+                        }`}
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
+                  </div>
+                  <span className="text-sm text-gray-600">
+                    {tenant.rating ? `${tenant.rating} (${tenant.reviews || 0} reviews)` : 'No rating yet'}
+                  </span>
+                  {/* Rank Badge */}
+                  {tenantRank && tenantRank.rankInfo ? (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {tenantRank.rankInfo.icon || '⭐'} {tenantRank.rankInfo.name || 'New User'}
+                    </span>
+                  ) : tenant.rank ? (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {tenant.rank.icon || '⭐'} {tenant.rank.name || 'New User'}
+                    </span>
+                  ) : rankLoading ? (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                      <div className="animate-spin rounded-full h-3 w-3 border-b border-gray-600 mr-1"></div>
+                      Loading...
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                      ⭐ New User
+                    </span>
+                  )}
+                </div>
+
+                {/* Simple Review Link */}
+                <div className="mb-4">
+                  <button 
+                    onClick={() => {
+                      setShowReviewsModal(true);
+                      fetchTenantReviews();
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium underline flex items-center space-x-1"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    <span>View reviews from previous landlords</span>
+                  </button>
+                </div>
+              </>
+            )}
 
 
             {/* Contact Details (Masked) */}
@@ -459,18 +548,58 @@ const TenantRequestCard = ({
                 <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                 </svg>
-                Phone: {maskPhone(tenant.phone)} {/* Debug: tenant.phone = {JSON.stringify(tenant.phone)} */}
+                Phone: {maskPhone(tenant.phone)}
               </div>
             </div>
+
+            {/* For Business Requests: Show additional company info */}
+            {isBusinessRequest && organization && (
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2V6" />
+                  </svg>
+                  <span className="text-sm font-medium text-blue-800">Company Information</span>
+                </div>
+                <p className="text-sm text-blue-700">
+                  <span className="font-medium">Company:</span> {organization.name}
+                </p>
+                {tenantGroupMembers.length > 0 && (
+                  <p className="text-sm text-blue-700">
+                    <span className="font-medium">Primary Contact:</span> {tenantGroupMembers.find(m => m.isPrimary)?.user?.firstName || ''} {tenantGroupMembers.find(m => m.isPrimary)?.user?.lastName || ''}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* For Group Requests: Show group leader info */}
+            {isGroupRequest && tenantGroupMembers.length > 1 && (
+              <div className="bg-purple-50 border border-purple-100 rounded-lg p-3 mb-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <svg className="h-4 w-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                  </svg>
+                  <span className="text-sm font-medium text-purple-800">Group Information</span>
+                </div>
+                <p className="text-sm text-purple-700">
+                  <span className="font-medium">Group Leader:</span> {tenantGroupMembers.find(m => m.isPrimary)?.user?.firstName || ''} {tenantGroupMembers.find(m => m.isPrimary)?.user?.lastName || ''}
+                </p>
+                <p className="text-sm text-purple-700">
+                  <span className="font-medium">Total Members:</span> {tenantGroupMembers.length}
+                </p>
+              </div>
+            )}
 
             {/* Demographics and Preferences */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-sm">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Age & Occupation</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">
+                  {isBusinessRequest ? 'Company Type' : isGroupRequest ? 'Group Size' : 'Age & Occupation'}
+                </p>
                 <p className="text-sm font-medium text-gray-900">
-                  {getDisplayAge(tenant.age)}
-                  {tenant.age && tenant.occupation && ', '}
-                  {getDisplayOccupation(tenant.occupation)}
+                  {isBusinessRequest ? 'Business' : 
+                   isGroupRequest ? `${tenantGroupMembers.length} members` :
+                   `${getDisplayAge(tenant.age)}${tenant.age && tenant.occupation && ', '}${getDisplayOccupation(tenant.occupation)}`}
                 </p>
               </div>
               <div>

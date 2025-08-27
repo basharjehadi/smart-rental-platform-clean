@@ -32,15 +32,24 @@ export const getLandlordTenants = async (req, res) => {
       include: {
         rentalRequest: {
           include: {
-            tenant: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                phoneNumber: true,
-                profileImage: true
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        firstName: true,
+                        lastName: true,
+                        phoneNumber: true,
+                        profileImage: true
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -76,7 +85,24 @@ export const getLandlordTenants = async (req, res) => {
       include: {
         rentalRequest: {
           include: {
-            tenant: true
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        firstName: true,
+                        lastName: true
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         property: true
@@ -85,7 +111,9 @@ export const getLandlordTenants = async (req, res) => {
     
     console.log('📊 All offers for this landlord:', allOffersForLandlord.length);
     allOffersForLandlord.forEach(offer => {
-      console.log(`Offer ID: ${offer.id}, Status: ${offer.status}, Tenant: ${offer.rentalRequest?.tenant?.name}`);
+      const primaryMember = offer.rentalRequest?.tenantGroup?.members?.[0];
+      const tenant = primaryMember?.user;
+      console.log(`Offer ID: ${offer.id}, Status: ${offer.status}, Tenant: ${tenant?.name}`);
     });
 
     // Now let's process the data and return real tenants
@@ -93,8 +121,12 @@ export const getLandlordTenants = async (req, res) => {
 
     // Transform data to tenant format
     const tenants = await Promise.all(paidOffers.map(async (offer) => {
+      // Get the primary tenant from the tenant group
+      const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
+      const tenant = primaryMember?.user;
+      
       // Use unified payment service for consistent data
-      const paymentData = await getUnifiedPaymentData(offer.rentalRequest.tenant.id, landlordId);
+      const paymentData = await getUnifiedPaymentData(tenant.id, landlordId);
       
       // Calculate payment status based on unified data
       let paymentStatus = 'paid';
@@ -108,18 +140,18 @@ export const getLandlordTenants = async (req, res) => {
       const daysRented = Math.floor((today - moveInDate) / (1000 * 60 * 60 * 24));
 
       // Get next payment date from upcoming payments
-      const upcomingPayments = await getUpcomingPayments(offer.rentalRequest.tenant.id);
+      const upcomingPayments = await getUpcomingPayments(tenant.id);
       const nextPayment = upcomingPayments.length > 0 ? upcomingPayments[0] : null;
 
       return {
         offerId: offer.id,
-        id: offer.rentalRequest.tenant.id,
-        name: offer.rentalRequest.tenant.firstName && offer.rentalRequest.tenant.lastName 
-          ? `${offer.rentalRequest.tenant.firstName} ${offer.rentalRequest.tenant.lastName}`
-          : offer.rentalRequest.tenant.name,
-        email: offer.rentalRequest.tenant.email,
-        phone: offer.rentalRequest.tenant.phoneNumber,
-        profileImage: offer.rentalRequest.tenant.profileImage || null,
+        id: tenant.id,
+        name: tenant.firstName && tenant.lastName 
+          ? `${tenant.firstName} ${tenant.lastName}`
+          : tenant.name,
+        email: tenant.email,
+        phone: tenant.phoneNumber,
+        profileImage: tenant.profileImage || null,
         moveInDate: offer.rentalRequest.moveInDate,
         monthlyRent: offer.rentAmount,
         securityDeposit: offer.depositAmount,
@@ -187,15 +219,24 @@ export const getLandlordTenantDetails = async (req, res) => {
         createdAt: true,
         rentalRequest: {
           include: {
-            tenant: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                phoneNumber: true,
-                profileImage: true
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        firstName: true,
+                        lastName: true,
+                        phoneNumber: true,
+                        profileImage: true
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -293,7 +334,7 @@ export const getLandlordTenantDetails = async (req, res) => {
     const daysRented = Math.floor((today - leaseStartDate) / (1000 * 60 * 60 * 24));
 
     // Get next payment date using unified payment service
-    const upcomingPayments = await getUpcomingPayments(paidOffer.rentalRequest.tenant.id);
+    const upcomingPayments = await getUpcomingPayments(tenant.id);
     const nextPayment = upcomingPayments.length > 0 ? upcomingPayments[0] : null;
     const nextPaymentDate = nextPayment ? nextPayment.dueDate : null;
 
@@ -319,14 +360,18 @@ export const getLandlordTenantDetails = async (req, res) => {
       });
     }
 
-    const tenant = {
-      id: paidOffer.rentalRequest.tenant.id,
-      name: paidOffer.rentalRequest.tenant.firstName && paidOffer.rentalRequest.tenant.lastName 
-        ? `${paidOffer.rentalRequest.tenant.firstName} ${paidOffer.rentalRequest.tenant.lastName}`
-        : paidOffer.rentalRequest.tenant.name,
-      email: paidOffer.rentalRequest.tenant.email,
-      phone: paidOffer.rentalRequest.tenant.phoneNumber,
-      profileImage: paidOffer.rentalRequest.tenant.profileImage,
+    // Get the primary tenant from the tenant group
+    const primaryMember = paidOffer.rentalRequest.tenantGroup?.members?.[0];
+    const tenant = primaryMember?.user;
+
+    const tenantData = {
+      id: tenant.id,
+      name: tenant.firstName && tenant.lastName 
+        ? `${tenant.firstName} ${tenant.lastName}`
+        : tenant.name,
+      email: tenant.email,
+      phone: tenant.phoneNumber,
+      profileImage: tenant.profileImage,
       moveInDate: paidOffer.rentalRequest.moveInDate,
       leaseStartDate: leaseStartDate,
       leaseEndDate: leaseEndDate,
@@ -360,7 +405,7 @@ export const getLandlordTenantDetails = async (req, res) => {
 
     res.json({
       success: true,
-      tenant: tenant
+      tenant: tenantData
     });
 
   } catch (error) {

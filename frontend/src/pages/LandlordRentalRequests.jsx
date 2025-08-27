@@ -150,6 +150,16 @@ const LandlordRentalRequests = () => {
 
         const mp = request.matchedProperty || {};
 
+        // Check if this is a business request (has organization) or group request (multiple members)
+        const isBusinessRequest = request.offers && request.offers.some(offer => offer.organization && !offer.organization.isPersonal);
+        const isGroupRequest = request.tenantGroup && request.tenantGroup.members && request.tenantGroup.members.length > 1;
+        
+        // Get organization info if it's a business request
+        const organization = request.offers?.find(offer => offer.organization && !offer.organization.isPersonal)?.organization;
+        
+        // Get all tenant group members for group requests
+        const tenantGroupMembers = request.tenantGroup?.members || [];
+
         return {
           id: request.id,
           name: `${tenantUser.firstName || 'Tenant'} ${tenantUser.lastName || ''}`.trim(),
@@ -179,7 +189,13 @@ const LandlordRentalRequests = () => {
             available: mp.availableFrom ? formatDate(mp.availableFrom) : (mp.available || 'Date not specified'),
             propertyType: mp.propertyType || 'Apartment'
           },
-          propertyType: request.propertyType
+          propertyType: request.propertyType,
+          // New fields for business and group requests
+          isBusinessRequest,
+          isGroupRequest,
+          organization,
+          tenantGroup: request.tenantGroup,
+          tenantGroupMembers
         };
       };
 
@@ -213,6 +229,13 @@ const LandlordRentalRequests = () => {
 
         const mp = req.propertyMatch || {};
 
+        // Check if this is a business request (has organization) or group request (multiple members)
+        const isBusinessRequest = req.organization && !req.organization.isPersonal;
+        const isGroupRequest = req.tenantGroup && req.tenantGroup.members && req.tenantGroup.members.length > 1;
+        
+        // Get all tenant group members for group requests
+        const tenantGroupMembers = req.tenantGroup?.members || [];
+
         return {
           id: req.id,
           name: `${tenantUser.firstName || 'Tenant'} ${tenantUser.lastName || ''}`.trim(),
@@ -242,7 +265,13 @@ const LandlordRentalRequests = () => {
             available: mp.available || 'Date not specified',
             propertyType: mp.propertyType || 'Apartment'
           },
-          propertyType: req.propertyType
+          propertyType: req.propertyType,
+          // New fields for business and group requests
+          isBusinessRequest,
+          isGroupRequest,
+          organization: req.organization,
+          tenantGroup: req.tenantGroup,
+          tenantGroupMembers
         };
       });
 

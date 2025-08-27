@@ -185,25 +185,34 @@ export const generateContract = async (req, res) => {
     const rentalRequest = await prisma.rentalRequest.findUnique({
       where: { id: parseInt(rentalRequestId) },
       include: {
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            pesel: true,
-            passportNumber: true,
-            kartaPobytuNumber: true,
-            phoneNumber: true,
-            signatureBase64: true,
-            street: true,
-            city: true,
-            zipCode: true,
-            country: true,
-            citizenship: true,
-            dateOfBirth: true,
-            profession: true
+        tenantGroup: {
+          include: {
+            members: {
+              where: { isPrimary: true },
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    firstName: true,
+                    lastName: true,
+                    pesel: true,
+                    passportNumber: true,
+                    kartaPobytuNumber: true,
+                    phoneNumber: true,
+                    signatureBase64: true,
+                    street: true,
+                    city: true,
+                    zipCode: true,
+                    country: true,
+                    citizenship: true,
+                    dateOfBirth: true,
+                    profession: true
+                  }
+                }
+              }
+            }
           }
         },
         offers: {
@@ -405,25 +414,34 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
     const rentalRequest = await prisma.rentalRequest.findUnique({
       where: { id: parseInt(rentalRequestId) },
       include: {
-        tenant: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            pesel: true,
-            passportNumber: true,
-            kartaPobytuNumber: true,
-            phoneNumber: true,
-            signatureBase64: true,
-            street: true,
-            city: true,
-            zipCode: true,
-            country: true,
-            citizenship: true,
-            dateOfBirth: true,
-            profession: true
+        tenantGroup: {
+          include: {
+            members: {
+              where: { isPrimary: true },
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    firstName: true,
+                    lastName: true,
+                    pesel: true,
+                    passportNumber: true,
+                    kartaPobytuNumber: true,
+                    phoneNumber: true,
+                    signatureBase64: true,
+                    street: true,
+                    city: true,
+                    zipCode: true,
+                    country: true,
+                    citizenship: true,
+                    dateOfBirth: true,
+                    profession: true
+                  }
+                }
+              }
+            }
           }
         },
         offers: {
@@ -498,15 +516,15 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
         signature: paidOffer.landlord.signatureBase64 || null
       },
       tenant: {
-        name: rentalRequest.tenant.name,
-        firstName: rentalRequest.tenant.firstName || 'Tenant',
-        lastName: rentalRequest.tenant.lastName || 'Name',
-        email: rentalRequest.tenant.email,
-        pesel: rentalRequest.tenant.pesel || 'N/A',
-        passportNumber: rentalRequest.tenant.passportNumber || 'N/A',
-        kartaPobytuNumber: rentalRequest.tenant.kartaPobytuNumber || 'N/A',
-        phoneNumber: rentalRequest.tenant.phoneNumber || 'N/A',
-        signature: rentalRequest.tenant.signatureBase64 || null
+        name: rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.name || 'Tenant',
+        firstName: rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.firstName || 'Tenant',
+        lastName: rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.lastName || 'Name',
+        email: rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.email || 'N/A',
+        pesel: rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.pesel || 'N/A',
+        passportNumber: rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.passportNumber || 'N/A',
+        kartaPobytuNumber: rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.kartaPobytuNumber || 'N/A',
+        phoneNumber: rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.phoneNumber || 'N/A',
+        signature: rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.signatureBase64 || null
       },
       propertyAddress: paidOffer.propertyAddress || rentalRequest.location,
       leaseStartDate,
@@ -534,7 +552,7 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
     const offerForContract = {
       ...paidOffer,
       rentalRequest: {
-        tenant: rentalRequest.tenant
+        tenant: rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user
       },
       property: {
         address: paidOffer.propertyAddress || rentalRequest.location
@@ -546,7 +564,7 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
     };
 
     // Generate and save PDF using the new server-side approach
-    const pdfResult = await saveContractPDF(offerForContract, rentalRequest.tenant, contractNumber);
+    const pdfResult = await saveContractPDF(offerForContract, rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user, contractNumber);
     console.log('📄 PDF generated and saved:', {
       filename: pdfResult.filename,
       originalSize: `${(pdfResult.originalSize / 1024 / 1024).toFixed(2)} MB`,
@@ -798,25 +816,34 @@ export const previewContract = async (req, res) => {
       include: {
         rentalRequest: {
           include: {
-            tenant: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                pesel: true,
-                passportNumber: true,
-                kartaPobytuNumber: true,
-                phoneNumber: true,
-                signatureBase64: true,
-                street: true,
-                city: true,
-                zipCode: true,
-                country: true,
-                citizenship: true,
-                dateOfBirth: true,
-                profession: true
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        firstName: true,
+                        lastName: true,
+                        pesel: true,
+                        passportNumber: true,
+                        kartaPobytuNumber: true,
+                        phoneNumber: true,
+                        signatureBase64: true,
+                        street: true,
+                        city: true,
+                        zipCode: true,
+                        country: true,
+                        citizenship: true,
+                        dateOfBirth: true,
+                        profession: true
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -849,8 +876,12 @@ export const previewContract = async (req, res) => {
       return res.status(404).json({ error: 'Offer not found' });
     }
 
+    // Get the primary tenant from the tenant group
+    const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
+    const tenant = primaryMember?.user;
+
     // Verify the tenant is requesting their own offer
-    if (offer.rentalRequest.tenant.id !== userId) {
+    if (tenant.id !== userId) {
       return res.status(403).json({ error: 'Access denied. You can only preview contracts for your own offers.' });
     }
 
@@ -878,14 +909,14 @@ export const previewContract = async (req, res) => {
         signature: null // No signature in preview
       },
       tenant: {
-        name: offer.rentalRequest.tenant.name,
-        firstName: offer.rentalRequest.tenant.firstName || 'Tenant',
-        lastName: offer.rentalRequest.tenant.lastName || 'Name',
-        email: offer.rentalRequest.tenant.email,
-        pesel: offer.rentalRequest.tenant.pesel || 'N/A',
-        passportNumber: offer.rentalRequest.tenant.passportNumber || 'N/A',
-        kartaPobytuNumber: offer.rentalRequest.tenant.kartaPobytuNumber || 'N/A',
-        phoneNumber: offer.rentalRequest.tenant.phoneNumber || 'N/A',
+        name: offer.rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.name || 'Tenant',
+        firstName: offer.rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.firstName || 'Tenant',
+        lastName: offer.rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.lastName || 'Name',
+        email: offer.rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.email || 'N/A',
+        pesel: offer.rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.pesel || 'N/A',
+        passportNumber: offer.rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.passportNumber || 'N/A',
+        kartaPobytuNumber: offer.rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.kartaPobytuNumber || 'N/A',
+        phoneNumber: offer.rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.phoneNumber || 'N/A',
         signature: null // No signature in preview
       },
       propertyAddress: offer.propertyAddress || offer.rentalRequest.location,
@@ -936,7 +967,22 @@ export const signContract = async (req, res) => {
       include: {
         rentalRequest: {
           include: {
-            tenant: true,
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true
+                      }
+                    }
+                  }
+                }
+              }
+            },
             offer: {
               include: {
                 landlord: true
@@ -951,8 +997,12 @@ export const signContract = async (req, res) => {
       return res.status(404).json({ error: 'Contract not found' });
     }
 
+    // Get the primary tenant from the tenant group
+    const primaryMember = contract.rentalRequest.tenantGroup?.members?.[0];
+    const tenant = primaryMember?.user;
+
     // Verify the tenant is signing their own contract
-    if (contract.rentalRequest.tenant.id !== userId) {
+    if (tenant.id !== userId) {
       return res.status(403).json({ error: 'Access denied. You can only sign your own contracts.' });
     }
 
@@ -991,7 +1041,7 @@ export const signContract = async (req, res) => {
     console.log('✅ Contract signed successfully:', {
       contractId,
       signedAt: updatedContract.signedAt,
-      tenantName: contract.rentalRequest.tenant.name
+      tenantName: contract.rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.name
     });
 
     res.json({

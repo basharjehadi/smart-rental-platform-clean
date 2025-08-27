@@ -404,20 +404,28 @@ class RequestPoolService {
         include: {
           rentalRequest: {
             include: {
-              tenant: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                  firstName: true,
-                  lastName: true,
-                  profileImage: true,
-                  phoneNumber: true,
-                  profession: true,
-                  dateOfBirth: true,
-                  averageRating: true,
-                  totalReviews: true,
-                  rank: true
+              tenantGroup: {
+                include: {
+                  members: {
+                    include: {
+                      user: {
+                        select: {
+                          id: true,
+                          name: true,
+                          email: true,
+                          firstName: true,
+                          lastName: true,
+                          profileImage: true,
+                          phoneNumber: true,
+                          profession: true,
+                          dateOfBirth: true,
+                          averageRating: true,
+                          totalReviews: true,
+                          rank: true
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -462,8 +470,23 @@ class RequestPoolService {
         }
       });
 
+      // Map the tenant data from tenant group to match the expected format
+      const mappedRequests = requests.map(match => {
+        // Get the primary tenant from the tenant group
+        const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
+        const tenant = primaryMember?.user;
+
+        return {
+          ...match,
+          rentalRequest: {
+            ...match.rentalRequest,
+            tenant: tenant // Map the primary tenant group member's user as the tenant
+          }
+        };
+      });
+
       const result = {
-        requests,
+        requests: mappedRequests,
         pagination: {
           page,
           limit,

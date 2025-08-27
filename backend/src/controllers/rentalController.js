@@ -261,30 +261,36 @@ const getAllActiveRequests = async (req, res) => {
        };
      };
  
-     const normalizePending = poolRequests.requests.map((match) => ({
-       ...match.rentalRequest,
-       matchScore: match.matchScore,
-       matchReason: match.matchReason,
-       tenant: {
-         id: match.rentalRequest.tenant?.id,
-         name: match.rentalRequest.tenant?.name,
-         email: match.rentalRequest.tenant?.email,
-         firstName: match.rentalRequest.tenant?.firstName,
-         lastName: match.rentalRequest.tenant?.lastName,
-         profileImage: match.rentalRequest.tenant?.profileImage,
-         phoneNumber: match.rentalRequest.tenant?.phoneNumber,
-         profession: match.rentalRequest.tenant?.profession,
-         age: match.rentalRequest.tenant?.dateOfBirth
-           ? Math.max(18, Math.floor((Date.now() - new Date(match.rentalRequest.tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
-           : null,
-         rating: match.rentalRequest.tenant?.averageRating ?? 5.0,
-         reviews: match.rentalRequest.tenant?.totalReviews ?? 1,
-         rank: match.rentalRequest.tenant?.rank
-       },
-       landlord: null, // RentalRequest doesn't have landlord field
-       propertyMatch: mapBestProperty(match),
-       status: 'pending'
-     }));
+     const normalizePending = poolRequests.requests.map((match) => {
+       // Get the primary tenant from the tenant group
+       const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
+       const tenant = primaryMember?.user;
+       
+       return {
+         ...match.rentalRequest,
+         matchScore: match.matchScore,
+         matchReason: match.matchReason,
+         tenant: {
+           id: tenant?.id,
+           name: tenant?.name,
+           email: tenant?.email,
+           firstName: tenant?.firstName,
+           lastName: tenant?.lastName,
+           profileImage: tenant?.profileImage,
+           phoneNumber: tenant?.phoneNumber,
+           profession: tenant?.profession,
+           age: tenant?.dateOfBirth
+             ? Math.max(18, Math.floor((Date.now() - new Date(tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
+             : null,
+           rating: tenant?.averageRating ?? 5.0,
+           reviews: tenant?.totalReviews ?? 1,
+           rank: tenant?.rank
+         },
+         landlord: null, // RentalRequest doesn't have landlord field
+         propertyMatch: mapBestProperty(match),
+         status: 'pending'
+       };
+     });
  
      // 2) Offered (responded=true and an offer from this landlord exists)
      const offeredMatchesRaw = await prisma.landlordRequestMatch.findMany({
@@ -297,8 +303,43 @@ const getAllActiveRequests = async (req, res) => {
        include: {
          rentalRequest: {
            include: {
-             tenant: { select: { id: true, name: true, email: true, firstName: true, lastName: true, profileImage: true, phoneNumber: true, profession: true, dateOfBirth: true, averageRating: true, totalReviews: true, rank: true } },
-             offers: { where: { landlordId: req.user.id }, select: { id: true } }
+             tenantGroup: {
+               include: {
+                 members: {
+                   include: {
+                     user: {
+                       select: {
+                         id: true,
+                         name: true,
+                         email: true,
+                         firstName: true,
+                         lastName: true,
+                         profileImage: true,
+                         phoneNumber: true,
+                         profession: true,
+                         dateOfBirth: true,
+                         averageRating: true,
+                         totalReviews: true,
+                         rank: true
+                       }
+                     }
+                   }
+                 }
+               }
+             },
+             offers: { 
+               where: { landlordId: req.user.id }, 
+               include: {
+                 organization: {
+                   select: {
+                     id: true,
+                     name: true,
+                     isPersonal: true
+                   }
+                 }
+               },
+               select: { id: true } 
+             }
            }
          },
          property: {
@@ -310,29 +351,35 @@ const getAllActiveRequests = async (req, res) => {
      });
  
      const offeredMatches = offeredMatchesRaw.filter(m => (m.rentalRequest.offers || []).length > 0);
-     const normalizeOffered = offeredMatches.map((match) => ({
-       ...match.rentalRequest,
-       matchScore: match.matchScore,
-       matchReason: match.matchReason,
-       tenant: {
-         id: match.rentalRequest.tenant?.id,
-         name: match.rentalRequest.tenant?.name,
-         email: match.rentalRequest.tenant?.email,
-         firstName: match.rentalRequest.tenant?.firstName,
-         lastName: match.rentalRequest.tenant?.lastName,
-         profileImage: match.rentalRequest.tenant?.profileImage,
-         phoneNumber: match.rentalRequest.tenant?.phoneNumber,
-         profession: match.rentalRequest.tenant?.profession,
-         age: match.rentalRequest.tenant?.dateOfBirth
-           ? Math.max(18, Math.floor((Date.now() - new Date(match.rentalRequest.tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
-           : null,
-         rating: match.rentalRequest.tenant?.averageRating ?? 5.0,
-         reviews: match.rentalRequest.tenant?.totalReviews ?? 1,
-         rank: match.rentalRequest.tenant?.rank
-       },
-       propertyMatch: mapBestProperty(match),
-       status: 'offered'
-     }));
+     const normalizeOffered = offeredMatches.map((match) => {
+       // Get the primary tenant from the tenant group
+       const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
+       const tenant = primaryMember?.user;
+       
+       return {
+         ...match.rentalRequest,
+         matchScore: match.matchScore,
+         matchReason: match.matchReason,
+         tenant: {
+           id: tenant?.id,
+           name: tenant?.name,
+           email: tenant?.email,
+           firstName: tenant?.firstName,
+           lastName: tenant?.lastName,
+           profileImage: tenant?.profileImage,
+           phoneNumber: tenant?.phoneNumber,
+           profession: tenant?.profession,
+           age: tenant?.dateOfBirth
+             ? Math.max(18, Math.floor((Date.now() - new Date(tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
+             : null,
+           rating: tenant?.averageRating ?? 5.0,
+           reviews: tenant?.totalReviews ?? 1,
+           rank: tenant?.rank
+         },
+         propertyMatch: mapBestProperty(match),
+         status: 'offered'
+       };
+     });
  
           // 3) Accepted (property rented - request accepted)
      // Find rental requests where this landlord has a PAID offer and the property is RENTED
@@ -344,7 +391,37 @@ const getAllActiveRequests = async (req, res) => {
        include: {
          rentalRequest: {
            include: {
-             tenant: { select: { id: true, name: true, email: true, firstName: true, lastName: true, profileImage: true, phoneNumber: true, profession: true, dateOfBirth: true, averageRating: true, totalReviews: true, rank: true } }
+             tenantGroup: {
+               include: {
+                 members: {
+                   include: {
+                     user: {
+                       select: {
+                         id: true,
+                         name: true,
+                         email: true,
+                         firstName: true,
+                         lastName: true,
+                         profileImage: true,
+                         phoneNumber: true,
+                         profession: true,
+                         dateOfBirth: true,
+                         averageRating: true,
+                         totalReviews: true,
+                         rank: true
+                       }
+                     }
+                   }
+                 }
+               }
+             }
+           }
+         },
+         organization: {
+           select: {
+             id: true,
+             name: true,
+             isPersonal: true
            }
          },
          property: {
@@ -360,36 +437,42 @@ const getAllActiveRequests = async (req, res) => {
        offer.property && offer.property.status === 'RENTED'
      );
 
-     const normalizeAccepted = acceptedOffersFiltered.map((offer) => ({
-       ...offer.rentalRequest,
-       matchScore: offer.matchScore || 0,
-       matchReason: 'Property rented - request accepted',
-       tenant: {
-         id: offer.rentalRequest.tenant?.id,
-         name: offer.rentalRequest.tenant?.name,
-         email: offer.rentalRequest.tenant?.email,
-         firstName: offer.rentalRequest.tenant?.firstName,
-         lastName: offer.rentalRequest.tenant?.lastName,
-         profileImage: offer.rentalRequest.tenant?.profileImage,
-         phoneNumber: offer.rentalRequest.tenant?.phoneNumber,
-         profession: offer.rentalRequest.tenant?.profession,
-         age: offer.rentalRequest.tenant?.dateOfBirth
-           ? Math.max(18, Math.floor((Date.now() - new Date(offer.rentalRequest.tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
-           : null,
-         rating: offer.rentalRequest.tenant?.averageRating ?? 5.0,
-         reviews: offer.rentalRequest.tenant?.totalReviews ?? 1,
-         rank: offer.rentalRequest.tenant?.rank
-       },
-       propertyMatch: {
-         id: offer.property?.id,
-         name: offer.property?.name || 'Your Property',
-         address: offer.property?.address || 'Address not specified',
-         rent: offer.property?.monthlyRent ? `${offer.property.monthlyRent.toLocaleString('pl-PL')} zł` : 'Rent not specified',
-         available: offer.property?.availableFrom ? new Date(offer.property.availableFrom).toISOString() : 'Date not specified',
-         propertyType: offer.property?.propertyType || 'Apartment'
-       },
-       status: 'accepted'
-     }));
+     const normalizeAccepted = acceptedOffersFiltered.map((offer) => {
+       // Get the primary tenant from the tenant group
+       const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
+       const tenant = primaryMember?.user;
+       
+       return {
+         ...offer.rentalRequest,
+         matchScore: offer.matchScore || 0,
+         matchReason: 'Property rented - request accepted',
+         tenant: {
+           id: tenant?.id,
+           name: tenant?.name,
+           email: tenant?.email,
+           firstName: tenant?.firstName,
+           lastName: tenant?.lastName,
+           profileImage: tenant?.profileImage,
+           phoneNumber: tenant?.phoneNumber,
+           profession: tenant?.profession,
+           age: tenant?.dateOfBirth
+             ? Math.max(18, Math.floor((Date.now() - new Date(tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
+             : null,
+           rating: tenant?.averageRating ?? 5.0,
+           reviews: tenant?.totalReviews ?? 1,
+           rank: tenant?.rank
+         },
+         propertyMatch: {
+           id: offer.property?.id,
+           name: offer.property?.name || 'Your Property',
+           address: offer.property?.address || 'Address not specified',
+           rent: offer.property?.monthlyRent ? `${offer.property.monthlyRent.toLocaleString('pl-PL')} zł` : 'Rent not specified',
+           available: offer.property?.availableFrom ? new Date(offer.property.availableFrom).toISOString() : 'Date not specified',
+           propertyType: offer.property?.propertyType || 'Apartment'
+         },
+         status: 'accepted'
+       };
+     });
 
      // 4) Declined (by this landlord)
      const declinedMatches = await prisma.landlordRequestMatch.findMany({
@@ -400,7 +483,30 @@ const getAllActiveRequests = async (req, res) => {
        include: {
          rentalRequest: {
            include: {
-             tenant: { select: { id: true, name: true, email: true, firstName: true, lastName: true, profileImage: true, phoneNumber: true, profession: true, dateOfBirth: true, averageRating: true, totalReviews: true, rank: true } }
+             tenantGroup: {
+               include: {
+                 members: {
+                   include: {
+                     user: {
+                       select: {
+                         id: true,
+                         name: true,
+                         email: true,
+                         firstName: true,
+                         lastName: true,
+                         profileImage: true,
+                         phoneNumber: true,
+                         profession: true,
+                         dateOfBirth: true,
+                         averageRating: true,
+                         totalReviews: true,
+                         rank: true
+                       }
+                     }
+                   }
+                 }
+               }
+             }
            }
          },
          property: {
@@ -411,29 +517,35 @@ const getAllActiveRequests = async (req, res) => {
        take: parseInt(limit)
      });
 
-     const normalizeDeclined = declinedMatches.map((match) => ({
-       ...match.rentalRequest,
-       matchScore: match.matchScore,
-       matchReason: match.matchReason,
-       tenant: {
-         id: match.rentalRequest.tenant?.id,
-         name: match.rentalRequest.tenant?.name,
-         email: match.rentalRequest.tenant?.email,
-         firstName: match.rentalRequest.tenant?.firstName,
-         lastName: match.rentalRequest.tenant?.lastName,
-         profileImage: match.rentalRequest.tenant?.profileImage,
-         phoneNumber: match.rentalRequest.tenant?.phoneNumber,
-         profession: match.rentalRequest.tenant?.profession,
-         age: match.rentalRequest.tenant?.dateOfBirth
-           ? Math.max(18, Math.floor((Date.now() - new Date(match.rentalRequest.tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
-           : null,
-         rating: match.rentalRequest.tenant?.averageRating ?? 5.0,
-         reviews: match.rentalRequest.tenant?.totalReviews ?? 1,
-         rank: match.rentalRequest.tenant?.rank
-       },
-       propertyMatch: mapBestProperty(match),
-       status: 'declined'
-     }));
+     const normalizeDeclined = declinedMatches.map((match) => {
+       // Get the primary tenant from the tenant group
+       const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
+       const tenant = primaryMember?.user;
+       
+       return {
+         ...match.rentalRequest,
+         matchScore: match.matchScore,
+         matchReason: match.matchReason,
+         tenant: {
+           id: tenant?.id,
+           name: tenant?.name,
+           email: tenant?.email,
+           firstName: tenant?.firstName,
+           lastName: tenant?.lastName,
+           profileImage: tenant?.profileImage,
+           phoneNumber: tenant?.phoneNumber,
+           profession: tenant?.profession,
+           age: tenant?.dateOfBirth
+             ? Math.max(18, Math.floor((Date.now() - new Date(tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
+             : null,
+           rating: tenant?.averageRating ?? 5.0,
+           reviews: tenant?.totalReviews ?? 1,
+           rank: tenant?.rank
+         },
+         propertyMatch: mapBestProperty(match),
+         status: 'declined'
+       };
+     });
  
      return res.json({
        pending: normalizePending,
@@ -546,7 +658,7 @@ const createOffer = async (req, res) => {
       });
     }
 
-    // 🚀 SCALABILITY: Check if the rental request is still active and not expired
+    // �� SCALABILITY: Check if the rental request is still active and not expired
     const rentalRequest = await prisma.rentalRequest.findUnique({
       where: { id: parseInt(requestId) },
       select: {
@@ -1534,7 +1646,31 @@ const getOfferDetails = async (req, res) => {
             address: member.user.address || null,
             isPrimary: member.isPrimary
         })) || []
-      }
+      },
+      
+      // Include tenant data for backward compatibility (primary member)
+      tenant: (() => {
+        const primaryMember = offer.rentalRequest.tenantGroup?.members?.find(m => m.isPrimary);
+        if (!primaryMember) return null;
+        
+        return {
+          id: primaryMember.user.id,
+          name: primaryMember.user.firstName && primaryMember.user.lastName ? 
+            `${primaryMember.user.firstName} ${primaryMember.user.lastName}` : 
+            primaryMember.user.name || 'Tenant',
+          email: primaryMember.user.email || 'tenant@email.com',
+          signatureBase64: primaryMember.user.signatureBase64 || null,
+          pesel: primaryMember.user.pesel || null,
+          passportNumber: primaryMember.user.passportNumber || null,
+          kartaPobytuNumber: primaryMember.user.kartaPobytuNumber || null,
+          phoneNumber: primaryMember.user.phoneNumber || null,
+          street: primaryMember.user.street || null,
+          city: primaryMember.user.city || null,
+          zipCode: primaryMember.user.zipCode || null,
+          country: primaryMember.user.country || null,
+          address: primaryMember.user.address || null
+        };
+      })()
     };
 
     console.log('✅ Transformation completed successfully');
@@ -1896,22 +2032,40 @@ const getAllRentalRequests = async (req, res) => {
         ]
       },
       include: {
-        tenant: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            profileImage: true,
-            profession: true,
-            dateOfBirth: true,
-            phoneNumber: true,
-            pesel: true
+        tenantGroup: {
+          include: {
+            members: {
+              where: { isPrimary: true },
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    profileImage: true,
+                    profession: true,
+                    dateOfBirth: true,
+                    phoneNumber: true,
+                    pesel: true
+                  }
+                }
+              }
+            }
           }
         },
         offers: {
           where: {
             organization: { members: { some: { userId: landlordId } } }
+          },
+          include: {
+            organization: {
+              select: {
+                id: true,
+                name: true,
+                isPersonal: true
+              }
+            }
           },
           select: {
             id: true,
@@ -1925,13 +2079,13 @@ const getAllRentalRequests = async (req, res) => {
       }
     });
 
-    // For each rental request, find the best matching property
+    // For each rental request, find the best matching property and map tenant data
     const requestsWithMatchedProperties = requests.map(request => {
       // Find the best matching property for this request
       const matchedProperty = landlordProperties.find(property => {
         const locationMatch = request.location.toLowerCase().includes(property.city.toLowerCase());
         const budgetMatch = request.budgetFrom <= property.monthlyRent * 1.2 && 
-                           request.budgetTo >= property.monthlyRent * 0.8;
+                       request.budgetTo >= property.monthlyRent * 0.8;
         const typeMatch = request.propertyType === property.propertyType;
         const dateMatch = new Date(request.moveInDate) >= (property.availableFrom || new Date());
         
@@ -1942,8 +2096,13 @@ const getAllRentalRequests = async (req, res) => {
       // If no specific match found, use the first available property as fallback
       const finalMatchedProperty = matchedProperty || landlordProperties[0];
 
+      // Get the primary tenant from the tenant group
+      const primaryMember = request.tenantGroup?.members?.[0];
+      const tenant = primaryMember?.user;
+
       return {
         ...request,
+        tenant, // Map the primary tenant group member's user as the tenant
         matchedProperty: finalMatchedProperty
       };
     });
@@ -1977,19 +2136,34 @@ const getLandlordAcceptedRequests = async (req, res) => {
       include: {
         rentalRequest: {
           include: {
-            tenant: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                profileImage: true,
-                profession: true,
-                dateOfBirth: true,
-                phoneNumber: true,
-                pesel: true
+            tenantGroup: {
+              include: {
+                members: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        profileImage: true,
+                        profession: true,
+                        dateOfBirth: true,
+                        phoneNumber: true,
+                        pesel: true
+                      }
+                    }
+                  }
+                }
               }
             }
+          }
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            isPersonal: true
           }
         },
         property: {
@@ -2012,34 +2186,40 @@ const getLandlordAcceptedRequests = async (req, res) => {
     });
 
     // Transform accepted offers to match the expected format
-    const acceptedRequests = acceptedOffers.map(offer => ({
-      id: offer.rentalRequest.id,
-      title: offer.rentalRequest.title,
-      description: offer.rentalRequest.description,
-      location: offer.rentalRequest.location,
-      budgetFrom: offer.rentalRequest.budgetFrom,
-      budgetTo: offer.rentalRequest.budgetTo,
-      moveInDate: offer.rentalRequest.moveInDate,
-      propertyType: offer.rentalRequest.propertyType,
-      bedrooms: offer.rentalRequest.bedrooms,
-      status: 'accepted', // This will be used for the Accepted tab
-      offerId: offer.id,
-      offerStatus: offer.status,
-      moveInVerificationStatus: offer.moveInVerificationStatus,
-      tenant: offer.rentalRequest.tenant,
-      matchedProperty: offer.property,
-      // Format propertyMatch to match TenantRequestCard expectations
-      propertyMatch: {
-        id: offer.property.id,
-        name: offer.property.name || 'Your Property',
-        address: offer.property.address || 'Address not specified',
-        rent: offer.property.monthlyRent ? `${offer.property.monthlyRent} zł` : 'Rent not specified',
-        available: offer.property.availableFrom || 'Date not specified',
-        propertyType: offer.property.propertyType || 'Apartment'
-      },
-      createdAt: offer.rentalRequest.createdAt,
-      updatedAt: offer.rentalRequest.updatedAt
-    }));
+    const acceptedRequests = acceptedOffers.map(offer => {
+      // Get the primary tenant from the tenant group
+      const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
+      const tenant = primaryMember?.user;
+
+      return {
+        id: offer.rentalRequest.id,
+        title: offer.rentalRequest.title,
+        description: offer.rentalRequest.description,
+        location: offer.rentalRequest.location,
+        budgetFrom: offer.rentalRequest.budgetFrom,
+        budgetTo: offer.rentalRequest.budgetTo,
+        moveInDate: offer.rentalRequest.moveInDate,
+        propertyType: offer.rentalRequest.propertyType,
+        bedrooms: offer.rentalRequest.bedrooms,
+        status: 'accepted', // This will be used for the Accepted tab
+        offerId: offer.id,
+        offerStatus: offer.status,
+        moveInVerificationStatus: offer.moveInVerificationStatus,
+        tenant: tenant, // Use the mapped tenant from tenant group
+        matchedProperty: offer.property,
+        // Format propertyMatch to match TenantRequestCard expectations
+        propertyMatch: {
+          id: offer.property.id,
+          name: offer.property.name || 'Your Property',
+          address: offer.property.address || 'Address not specified',
+          rent: offer.property.monthlyRent ? `${offer.property.monthlyRent} zł` : 'Rent not specified',
+          available: offer.property.availableFrom || 'Date not specified',
+          propertyType: offer.property.propertyType || 'Apartment'
+        },
+        createdAt: offer.rentalRequest.createdAt,
+        updatedAt: offer.rentalRequest.updatedAt
+      };
+    });
 
     res.json({
       success: true,

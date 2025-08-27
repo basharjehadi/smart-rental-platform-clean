@@ -666,16 +666,29 @@ const handlePaymentSucceeded = async (paymentIntent) => {
                 const tenantRequest = await prisma.rentalRequest.findUnique({
                   where: { id: rejectedOffer.rentalRequestId },
                   include: {
-                    tenant: {
-                      select: { email: true, name: true }
+                    tenantGroup: {
+                      include: {
+                        members: {
+                          where: { isPrimary: true },
+                          include: {
+                            user: {
+                              select: { email: true, name: true }
+                            }
+                          }
+                        }
+                      }
                     }
                   }
                 });
 
-                if (tenantRequest?.tenant?.email) {
-                  console.log(`📧 Sending rejection notification to ${tenantRequest.tenant.email}`);
+                // Get the primary tenant from the tenant group
+                const primaryMember = tenantRequest?.tenantGroup?.members?.[0];
+                const tenant = primaryMember?.user;
+
+                if (tenant?.email) {
+                  console.log(`📧 Sending rejection notification to ${tenant.email}`);
                   // You can implement email notification here
-                  // await sendOfferRejectedNotification(tenantRequest.tenant.email, tenantRequest.tenant.name);
+                  // await sendOfferRejectedNotification(tenant.email, tenant.name);
                 }
               } catch (notificationError) {
                 console.error(`❌ Error sending rejection notification for offer ${rejectedOffer.id}:`, notificationError);
@@ -800,6 +813,10 @@ const handlePaymentSucceeded = async (paymentIntent) => {
           }
         });
 
+        // Get the primary tenant from the tenant group
+        const primaryMember = offer?.rentalRequest?.tenantGroup?.members?.[0];
+        const tenant = primaryMember?.user;
+
         // Send payment success notification to landlord
         if (offer?.landlord?.email) {
           console.log('📧 Sending payment success notification to landlord');
@@ -809,7 +826,7 @@ const handlePaymentSucceeded = async (paymentIntent) => {
           await sendPaymentSuccess(
             offer.landlord.email,
             offer.landlord.name,
-            offer.rentalRequest.tenant.name,
+            tenant?.name || 'Tenant',
             offer.rentalRequest.title,
             amount / 100,
             new Date().toLocaleDateString(),

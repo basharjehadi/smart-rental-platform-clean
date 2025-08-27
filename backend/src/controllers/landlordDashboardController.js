@@ -94,16 +94,36 @@ const getLandlordDashboard = async (req, res) => {
         property: true,
         rentalRequest: {
           include: {
-            tenant: true
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        name: true
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     });
 
     expiringOffers.forEach(offer => {
+      // Get the primary tenant from the tenant group
+      const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
+      const tenant = primaryMember?.user;
+      
       upcomingTasks.push({
         title: 'Lease Renewal Due',
-        description: `${offer.rentalRequest.tenant.firstName} ${offer.rentalRequest.tenant.lastName} - ${offer.property.title || offer.property.name}`,
+        description: `${tenant?.firstName || ''} ${tenant?.lastName || ''} - ${offer.property.title || offer.property.name}`,
         type: 'renewal',
         bgColor: 'bg-red-50',
         date: offer.leaseEndDate
