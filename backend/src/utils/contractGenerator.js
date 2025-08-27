@@ -128,8 +128,8 @@ const generateContractData = async (offer, user = null) => {
   const isLandlordBusiness = !!offer.property?.organization;
   console.log('🏢 Is landlord business?', isLandlordBusiness);
   
-  // 2. Check if tenant is a business (has organization)
-  const isTenantBusiness = !!offer.organization;
+  // 2. Check if tenant is a business (organization on the rental request)
+  const isTenantBusiness = !!(offer.rentalRequest && offer.rentalRequest.organization);
   console.log('🏢 Is tenant business?', isTenantBusiness);
   
   // 3. Check if tenant is a group (has multiple members)
@@ -188,8 +188,8 @@ const generateContractData = async (offer, user = null) => {
   let tenantData = {};
   
   if (isTenantBusiness) {
-    // Business tenant - use organization data
-    const org = offer.organization;
+    // Business tenant - use organization data from rental request
+    const org = offer.rentalRequest.organization;
     tenantData = {
       type: 'business',
       name: org.name || 'Business Tenant',
