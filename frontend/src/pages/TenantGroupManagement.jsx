@@ -29,15 +29,19 @@ const TenantGroupManagement = () => {
 
   const fetchMyGroup = async () => {
     try {
+      setError('');
       setLoading(true);
       const response = await api.get('/tenant-groups/my-group');
-      if (response.data.tenantGroup) {
-        setMyGroup(response.data.tenantGroup);
-      }
+      const group = response.data?.tenantGroup || response.data?.data?.tenantGroup;
+      if (group) setMyGroup(group);
+      else setMyGroup(null);
     } catch (error) {
       console.error('Error fetching group:', error);
-      if (error.response?.status !== 404) {
-        setError('Failed to fetch your group information');
+      if (error.response?.status === 404) {
+        // No group yet – this is expected for new tenants
+        setMyGroup(null);
+      } else {
+        setError(error.response?.data?.message || 'Failed to fetch your group information');
       }
     } finally {
       setLoading(false);
@@ -203,7 +207,7 @@ const TenantGroupManagement = () => {
           </div>
         )}
         
-        {error && (
+        {error && myGroup && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
             <div className="flex items-center">
               <XCircle className="w-5 h-5 mr-2" />
@@ -296,11 +300,22 @@ const TenantGroupManagement = () => {
                   {myGroup.members?.map((member) => (
                     <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-blue-600">
-                            {member.user.name?.charAt(0) || member.user.email?.charAt(0)}
-                          </span>
-                        </div>
+                        {member.user.profileImage ? (
+                          <img
+                            src={member.user.profileImage}
+                            alt={member.user.name || member.user.email}
+                            className="w-8 h-8 rounded-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-medium text-blue-600">
+                              {member.user.name?.charAt(0) || member.user.email?.charAt(0)}
+                            </span>
+                          </div>
+                        )}
                         <div>
                           <p className="font-medium text-gray-900">
                             {member.user.name || 'Unnamed User'}

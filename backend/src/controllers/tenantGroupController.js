@@ -2,26 +2,27 @@ import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
 const prisma = new PrismaClient();
 
-class TenantGroupController {
-  // Helper to ensure invitations table exists (raw SQL to avoid schema migration)
-  async ensureInvitationsTable() {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS tenant_group_invitations (
-        id TEXT PRIMARY KEY,
-        token TEXT UNIQUE NOT NULL,
-        tenant_group_id TEXT NOT NULL,
-        invited_user_id TEXT NOT NULL,
-        inviter_user_id TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'PENDING',
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        expires_at TIMESTAMP WITH TIME ZONE NULL
-      );
-    `);
-  }
+// Module-scoped helpers to avoid losing `this` in route handlers
+const ensureInvitationsTable = async () => {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS tenant_group_invitations (
+      id TEXT PRIMARY KEY,
+      token TEXT UNIQUE NOT NULL,
+      tenant_group_id TEXT NOT NULL,
+      invited_user_id TEXT NOT NULL,
+      inviter_user_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      expires_at TIMESTAMP WITH TIME ZONE NULL
+    );
+  `);
+};
 
-  generateToken() {
-    return crypto.randomBytes(24).toString('hex');
-  }
+const generateToken = () => crypto.randomBytes(24).toString('hex');
+
+class TenantGroupController {
+
+  // class no longer needs generateToken
 
   /**
    * Create a new tenant group
@@ -125,11 +126,39 @@ class TenantGroupController {
       }
 
       // Ensure invitations table exists
-      await this.ensureInvitationsTable();
+      await ensureInvitationsTable();
 
-      // Create or reuse pending invitation
-      const token = this.generateToken();
-      const id = this.generateToken();
+      // Prevent duplicate pending invitations for the same group-user pair
+      const existing = await prisma.$queryRawUnsafe(
+        `SELECT token
+           FROM tenant_group_invitations
+          WHERE tenant_group_id = $1
+            AND invited_user_id = $2
+            AND status = 'PENDING'
+          ORDER BY created_at DESC
+          LIMIT 1`,
+        tenantGroupId,
+        invitedUser.id
+      );
+
+      if (Array.isArray(existing) && existing.length > 0) {
+        const existingToken = existing[0].token;
+        return res.status(200).json({
+          success: true,
+          message: 'An invitation is already pending for this user. Reusing existing invite.',
+          data: {
+            token: existingToken,
+            tenantGroupId,
+            invitedUser: { id: invitedUser.id, name: invitedUser.name, email: invitedUser.email },
+            inviterUserId: userId,
+            note: message || null
+          }
+        });
+      }
+
+      // Create new pending invitation
+      const token = generateToken();
+      const id = generateToken();
       await prisma.$executeRawUnsafe(
         `INSERT INTO tenant_group_invitations (id, token, tenant_group_id, invited_user_id, inviter_user_id, status)
          VALUES ($1, $2, $3, $4, $5, 'PENDING')`,
@@ -163,7 +192,7 @@ class TenantGroupController {
       const { token } = req.body;
       if (!token) return res.status(400).json({ success: false, message: 'Token is required' });
 
-      await this.ensureInvitationsTable();
+      await ensureInvitationsTable();
       const invitation = await prisma.$queryRawUnsafe(
         `SELECT token, tenant_group_id AS "tenantGroupId", invited_user_id AS "invitedUserId", status
          FROM tenant_group_invitations WHERE token = $1 LIMIT 1`,
@@ -201,7 +230,7 @@ class TenantGroupController {
       const { token } = req.body;
       if (!token) return res.status(400).json({ success: false, message: 'Token is required' });
 
-      await this.ensureInvitationsTable();
+      await ensureInvitationsTable();
       const invitation = await prisma.$queryRawUnsafe(
         `SELECT token, invited_user_id AS "invitedUserId" FROM tenant_group_invitations WHERE token = $1 LIMIT 1`,
         token
@@ -224,7 +253,7 @@ class TenantGroupController {
   async getMyInvitations(req, res) {
     try {
       const userId = req.user.id;
-      await this.ensureInvitationsTable();
+      await ensureInvitationsTable();
       const rows = await prisma.$queryRawUnsafe(
         `SELECT i.token,
                 i.created_at AS "createdAt",
@@ -544,32 +573,35 @@ class TenantGroupController {
         });
       }
 
-      // Prevent primary members from leaving if they're the only primary
+      // If primary: allow leaving only if they are the sole member; in that case delete the group
       if (membership.isPrimary) {
-        const primaryMemberCount = await prisma.tenantGroupMember.count({
-          where: {
-            tenantGroupId,
-            isPrimary: true
-          }
-        });
+        const [primaryCount, memberCount] = await Promise.all([
+          prisma.tenantGroupMember.count({ where: { tenantGroupId, isPrimary: true } }),
+          prisma.tenantGroupMember.count({ where: { tenantGroupId } })
+        ]);
 
-        if (primaryMemberCount === 1) {
+        if (memberCount > 1 && primaryCount === 1) {
           return res.status(400).json({
             success: false,
-            message: 'Cannot leave the group. You are the only primary member. Please transfer ownership or delete the group.'
+            message: 'Cannot leave the group. You are the only primary member. Please transfer ownership first.'
           });
+        }
+
+        if (memberCount === 1) {
+          // Delete membership and the empty group in a transaction
+          await prisma.$transaction([
+            prisma.tenantGroupMember.delete({ where: { id: membership.id } }),
+            prisma.tenantGroup.delete({ where: { id: tenantGroupId } })
+          ]);
+
+          return res.status(200).json({ success: true, message: 'Group deleted and left successfully' });
         }
       }
 
-      // Remove user from the group
-      await prisma.tenantGroupMember.delete({
-        where: { id: membership.id }
-      });
+      // Non-primary or multiple primaries: remove membership only
+      await prisma.tenantGroupMember.delete({ where: { id: membership.id } });
 
-      res.status(200).json({
-        success: true,
-        message: 'Successfully left the tenant group'
-      });
+      res.status(200).json({ success: true, message: 'Successfully left the tenant group' });
 
     } catch (error) {
       console.error('Error leaving tenant group:', error);

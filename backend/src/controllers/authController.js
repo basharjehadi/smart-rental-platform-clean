@@ -60,9 +60,13 @@ const register = async (req, res) => {
     let canonicalFirstName = (firstName || '').trim();
     let canonicalLastName = (lastName || '').trim();
     if (!canonicalFirstName || !canonicalLastName) {
-      const parts = (name || '').trim().split(/\s+/);
-      if (!canonicalFirstName && parts.length > 0) canonicalFirstName = parts[0] || '';
-      if (!canonicalLastName && parts.length > 1) canonicalLastName = parts.slice(1).join(' ');
+      const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+      if ((!canonicalLastName || canonicalLastName.length === 0) && parts.length > 0) {
+        canonicalLastName = parts[parts.length - 1];
+      }
+      if ((!canonicalFirstName || canonicalFirstName.length === 0) && parts.length > 0) {
+        canonicalFirstName = parts.slice(0, Math.max(0, parts.length - 1)).join(' ');
+      }
     }
     const canonicalName = (name && name.trim()) || `${canonicalFirstName} ${canonicalLastName}`.trim();
 

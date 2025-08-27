@@ -17,8 +17,8 @@ import { prisma } from '../src/utils/prisma.js';
     let updated = 0;
     for (const u of users) {
       const parts = (u.name || '').trim().split(/\s+/).filter(Boolean);
-      const derivedFirst = u.firstName && u.firstName.trim() ? u.firstName : (parts[0] || null);
-      const derivedLast = u.lastName && u.lastName.trim() ? u.lastName : (parts.length > 1 ? parts.slice(1).join(' ') : null);
+      const derivedFirst = u.firstName && u.firstName.trim() ? u.firstName : (parts.length > 1 ? parts.slice(0, parts.length - 1).join(' ') : parts[0] || null);
+      const derivedLast = u.lastName && u.lastName.trim() ? u.lastName : (parts.length > 1 ? parts[parts.length - 1] : null);
 
       if (derivedFirst || derivedLast) {
         await prisma.user.update({

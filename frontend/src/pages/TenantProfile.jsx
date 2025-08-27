@@ -593,11 +593,7 @@ const TenantProfile = () => {
       const formData = new FormData();
       formData.append('profileImage', originalFile);
       
-      const uploadResponse = await api.post('/users/profile/photo', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      const uploadResponse = await api.post('/users/profile/photo', formData);
       
       setProfilePhoto(uploadResponse.data.photoUrl);
       setPhotoPreview(null);
