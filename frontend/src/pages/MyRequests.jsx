@@ -304,12 +304,23 @@ const MyRequests = () => {
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
                         <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">{request.title}</h3>
-                        {(() => {
-                          // Force badge to Cancelled if cancellation banner is present (defensive UI)
-                          const bannerSuggestsCancelled = true; // banner renders for cancelled unwind; safe fallback
-                          const badgeStatus = bannerSuggestsCancelled && request.status !== 'CANCELLED' ? 'CANCELLED' : request.status;
-                          return getStatusBadge(badgeStatus);
-                        })()}
+                        <div className="flex items-center space-x-2">
+                          {(() => {
+                            const memberCount = request.tenantGroup?._count?.members ?? 1;
+                            const isGroup = memberCount > 1;
+                            const label = isGroup ? 'Group Request' : 'Solo Request';
+                            const color = isGroup ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800';
+                            return (
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${color}`}>
+                                {label}
+                              </span>
+                            );
+                          })()}
+                          {(() => {
+                            const badgeStatus = request.status;
+                            return getStatusBadge(badgeStatus);
+                          })()}
+                        </div>
                         {/* Show offer status if request is locked */}
                         {request.status === 'LOCKED' && getOfferStatusText(request) && (
                           <div className="mt-1 text-xs text-gray-600">
@@ -317,7 +328,7 @@ const MyRequests = () => {
                           </div>
                         )}
                       </div>
-                      </div>
+                    </div>
                       
                     {/* Request details grid */}
                     <div className="space-y-3 mb-6">

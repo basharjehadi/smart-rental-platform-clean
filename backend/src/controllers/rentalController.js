@@ -884,6 +884,12 @@ const getMyRequests = async (req, res) => {
             },
             organizationId: true
           }
+        },
+        tenantGroup: {
+          select: {
+            id: true,
+            _count: { select: { members: true } }
+          }
         }
       },
       orderBy: {

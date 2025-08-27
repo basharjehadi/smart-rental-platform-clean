@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Users, Plus, Mail, UserPlus, Trash2, Crown, CheckCircle, XCircle } from 'lucide-react';
+import CreateRentalRequestModal from '../components/CreateRentalRequestModal';
 
 const TenantGroupManagement = () => {
   const { user, api } = useAuth();
@@ -23,6 +24,20 @@ const TenantGroupManagement = () => {
   const [inviteMessage, setInviteMessage] = useState('');
   const [sendingInvite, setSendingInvite] = useState(false);
 
+  // Inline Create Rental Request modal state
+  const [showCreateRequestModal, setShowCreateRequestModal] = useState(false);
+  
+  // Helper to build absolute profile image URL
+  const getProfilePhotoUrl = (profileImage) => {
+    if (!profileImage) return null;
+    const serverBase = (import.meta.env.VITE_API_URL || 'http://localhost:3001/api').replace(/\/?api$/i, '');
+    if (profileImage.startsWith('http')) return profileImage;
+    if (profileImage.startsWith('/uploads/')) return `${serverBase}${profileImage}`;
+    if (profileImage.startsWith('uploads/')) return `${serverBase}/${profileImage}`;
+    // default directory used by backend uploads
+    return `${serverBase}/uploads/profile_images/${profileImage}`;
+  };
+
   useEffect(() => {
     fetchMyGroup();
   }, []);
@@ -33,8 +48,18 @@ const TenantGroupManagement = () => {
       setLoading(true);
       const response = await api.get('/tenant-groups/my-group');
       const group = response.data?.tenantGroup || response.data?.data?.tenantGroup;
-      if (group) setMyGroup(group);
-      else setMyGroup(null);
+      if (group) {
+        console.log('Group data received:', group);
+        console.log('Members with profile images:', group.members?.map(m => ({
+          name: m.user.name,
+          email: m.user.email,
+          profileImage: m.user.profileImage,
+          hasImage: !!m.user.profileImage
+        })));
+        setMyGroup(group);
+      } else {
+        setMyGroup(null);
+      }
     } catch (error) {
       console.error('Error fetching group:', error);
       if (error.response?.status === 404) {
@@ -124,14 +149,14 @@ const TenantGroupManagement = () => {
     }
   };
 
-  const handleTransferOwnership = async (memberId) => {
+  const handleTransferOwnership = async (memberUserId) => {
     if (!window.confirm('Are you sure you want to transfer ownership to this member? This action cannot be undone.')) {
       return;
     }
 
     try {
       await api.post(`/tenant-groups/${myGroup.id}/transfer-ownership`, {
-        newPrimaryMemberId: memberId
+        newPrimaryUserId: memberUserId
       });
       setSuccess('Ownership transferred successfully!');
       fetchMyGroup(); // Refresh group data
@@ -170,6 +195,9 @@ const TenantGroupManagement = () => {
       </div>
     );
   }
+
+  // Determine if current user is a primary member
+  const iAmPrimary = !!myGroup?.members?.find(m => m.userId === user?.id && m.isPrimary);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -300,40 +328,61 @@ const TenantGroupManagement = () => {
                   {myGroup.members?.map((member) => (
                     <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
-                        {member.user.profileImage ? (
-                          <img
-                            src={member.user.profileImage}
-                            alt={member.user.name || member.user.email}
-                            className="w-8 h-8 rounded-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
+                        {/* Profile Avatar */}
+                        <div className="relative">
+                          {member.user.profileImage ? (
+                            <img
+                              src={getProfilePhotoUrl(member.user.profileImage)}
+                              alt={member.user.name || member.user.email}
+                              className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 shadow-sm"
+                              onError={(e) => {
+                                console.log('Profile image failed to load for:', member.user.email, 'URL:', getProfilePhotoUrl(member.user.profileImage));
+                                // Hide image on error and show fallback
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.nextElementSibling.style.display = 'flex';
+                              }}
+                              onLoad={() => {
+                                console.log('Profile image loaded successfully for:', member.user.email, 'URL:', getProfilePhotoUrl(member.user.profileImage));
+                              }}
+                            />
+                          ) : null}
+                          
+                          {/* Fallback Avatar - Always rendered but conditionally displayed */}
+                          <div 
+                            className={`w-12 h-12 rounded-full flex items-center justify-center border-2 border-gray-200 shadow-sm ${
+                              member.user.profileImage ? 'hidden' : 'flex'
+                            }`}
+                            style={{ 
+                              backgroundColor: member.isPrimary ? '#fef3c7' : '#dbeafe',
+                              borderColor: member.isPrimary ? '#f59e0b' : '#3b82f6'
                             }}
-                          />
-                        ) : (
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                            <span className="text-sm font-medium text-blue-600">
-                              {member.user.name?.charAt(0) || member.user.email?.charAt(0)}
+                          >
+                            <span className={`text-lg font-bold ${
+                              member.isPrimary ? 'text-yellow-800' : 'text-blue-700'
+                            }`}>
+                              {member.user.name?.charAt(0)?.toUpperCase() || member.user.email?.charAt(0)?.toUpperCase() || '?'}
                             </span>
                           </div>
-                        )}
+                          
+                          {/* Primary Member Badge */}
+                          {member.isPrimary && (
+                            <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                              <Crown className="w-3 h-3 text-yellow-800" />
+                            </div>
+                          )}
+                        </div>
                         <div>
                           <p className="font-medium text-gray-900">
                             {member.user.name || 'Unnamed User'}
                           </p>
                           <p className="text-sm text-gray-600">{member.user.email}</p>
                         </div>
-                        {member.isPrimary && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                            <Crown className="w-3 h-3 mr-1" />
-                            Primary
-                          </span>
-                        )}
                       </div>
                       
-                      {!member.isPrimary && myGroup.members?.find(m => m.userId === user.id)?.isPrimary && (
+                      {!member.isPrimary && iAmPrimary && (
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => handleTransferOwnership(member.id)}
+                            onClick={() => handleTransferOwnership(member.user.id)}
                             className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                           >
                             Make Primary
@@ -355,26 +404,25 @@ const TenantGroupManagement = () => {
             {/* Quick Actions */}
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <button
-                  onClick={() => navigate('/request-form')}
+                  onClick={() => setShowCreateRequestModal(true)}
                   className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all text-center group"
                 >
                   <Plus className="w-8 h-8 text-gray-400 mx-auto mb-2 group-hover:text-blue-600" />
                   <p className="font-medium text-gray-900">Create Rental Request</p>
                   <p className="text-sm text-gray-600">Start looking for properties</p>
                 </button>
-                
-                <button
-                  onClick={() => setShowInviteForm(true)}
-                  className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all text-center group"
-                >
-                  <Mail className="w-8 h-8 text-gray-400 mx-auto mb-2 group-hover:text-blue-600" />
-                  <p className="font-medium text-gray-900">Invite More Members</p>
-                  <p className="text-sm text-gray-600">Grow your group</p>
-                </button>
               </div>
             </div>
+            {/* Create Rental Request Modal */}
+            {showCreateRequestModal && (
+              <CreateRentalRequestModal
+                isOpen={showCreateRequestModal}
+                onClose={() => setShowCreateRequestModal(false)}
+                onSuccess={() => navigate('/tenant-request-for-landlord')}
+              />
+            )}
           </div>
         )}
 
