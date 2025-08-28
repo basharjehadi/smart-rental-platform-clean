@@ -26,10 +26,7 @@ function extractLikelyCity(location) {
   return parts[0] || String(location).trim();
 }
 
-function stripOrganization(property) {
-  const { organization, ...stripped } = property;
-  return stripped;
-}
+
 
 class RequestPoolService {
   constructor() {
@@ -57,10 +54,12 @@ class RequestPoolService {
       // 🚀 SCALABILITY: Calculate expiration with grace period and move-in consideration
       const now = new Date();
       const moveIn = new Date(rentalRequest.moveInDate);
+      const moveInValid = moveIn && !Number.isNaN(moveIn.getTime());
       const graceMs = 24 * 60 * 60 * 1000; // 24h grace
-      const expirationDate = new Date(
-        Math.max(moveIn.getTime() - 3 * 864e5, now.getTime() + graceMs)
-      );
+      const defaultTtlMs = 14 * 24 * 60 * 60 * 1000; // 14 days
+      const expirationDate = moveInValid
+        ? new Date(Math.max(moveIn.getTime() - 3 * 864e5, now.getTime() + graceMs))
+        : new Date(now.getTime() + defaultTtlMs);
       
       // Update request status with dynamic expiration
       await prisma.rentalRequest.update({
@@ -84,12 +83,10 @@ class RequestPoolService {
       if (matchingOrganizations.length > 0) {
         // Create matches for all matching organizations
         await this.createMatches(rentalRequest.id, matchingOrganizations, rentalRequest);
-        console.log(`✅ Created ${matchingOrganizations.length} immediate matches for request ${rentalRequest.id}`);
-        console.log(`✅ Request ${rentalRequest.id} added to pool with immediate matching, expires ${expirationDate.toISOString()}`);
+        console.log(`✅ ${matchingOrganizations.length} matches for request ${rentalRequest.id}; expires ${expirationDate.toISOString()}`);
         return matchingOrganizations.length;
       } else {
-        console.log(`⚠️ No matching organizations found for request ${rentalRequest.id}`);
-        console.log(`✅ Request ${rentalRequest.id} added to pool with immediate matching, expires ${expirationDate.toISOString()}`);
+        console.log(`⚠️ No matches for request ${rentalRequest.id}; expires ${expirationDate.toISOString()}`);
         return 0;
       }
 
@@ -110,9 +107,6 @@ class RequestPoolService {
       const rawLocation = rentalRequest.location || '';
       const cityToken = extractLikelyCity(rawLocation);
       const cityTokenNorm = cityToken ? normalizeASCII(cityToken) : '';
-      const tokens = rawLocation.split(',').map(t => t.trim()).filter(Boolean);
-      const normTokens = tokens.map(normalizeASCII).filter(Boolean);
-      const tokenSet = Array.from(new Set([...tokens, ...normTokens]));
 
       // ── Budgets (parsed)
       const maxBudget = parseMoney(rentalRequest.budgetTo ?? rentalRequest.budget);
@@ -132,13 +126,12 @@ class RequestPoolService {
       const where = {
         status: 'AVAILABLE',
         availability: true,
-        ...((cityToken || tokenSet.length > 0) ? {
-          OR: [
-            cityToken ? { city: { contains: cityToken, mode: 'insensitive' } } : undefined,
-            cityTokenNorm && cityTokenNorm !== cityToken ? { city: { contains: cityTokenNorm, mode: 'insensitive' } } : undefined,
-            tokenSet.length > 0 ? { city: { in: tokenSet } } : undefined
-          ].filter(Boolean)
-        } : {}),
+        ...((cityToken || (cityTokenNorm && cityTokenNorm !== cityToken))
+            ? { OR: [
+                cityToken ? { city: { contains: cityToken, mode: 'insensitive' } } : undefined,
+                (cityTokenNorm && cityTokenNorm !== cityToken) ? { city: { contains: cityTokenNorm, mode: 'insensitive' } } : undefined
+              ].filter(Boolean) }
+            : {}),
         monthlyRent: {
           lte: maxBudget != null ? Math.round(maxBudget * 1.2) : 9999999,
           ...(minBudget != null ? { gte: minBudget } : {})
@@ -164,12 +157,12 @@ class RequestPoolService {
         const relaxedWhere = {
           status: 'AVAILABLE',
           availability: true,
-          ...((cityToken || tokenSet.length > 0) ? {
-            OR: [
-              cityToken ? { city: { contains: cityToken, mode: 'insensitive' } } : undefined,
-              cityTokenNorm && cityTokenNorm !== cityToken ? { city: { contains: cityTokenNorm, mode: 'insensitive' } } : undefined,
-            ].filter(Boolean)
-          } : {}),
+          ...((cityToken || (cityTokenNorm && cityTokenNorm !== cityToken))
+              ? { OR: [
+                  cityToken ? { city: { contains: cityToken, mode: 'insensitive' } } : undefined,
+                  (cityTokenNorm && cityTokenNorm !== cityToken) ? { city: { contains: cityTokenNorm, mode: 'insensitive' } } : undefined
+                ].filter(Boolean) }
+              : {}),
           monthlyRent: { lte: maxBudget != null ? Math.round(maxBudget * 2.0) : 9999999, ...(minBudget != null ? { gte: minBudget } : {}) },
           ...(hasMoveIn ? { OR: [ { availableFrom: { lte: availableCutoff } }, { availableFrom: null } ] } : {})
         };
@@ -275,6 +268,7 @@ class RequestPoolService {
       else if (ad <= 90) tim = 3;
     }
 
+    // TODO: add organization-level performance metrics (e.g., avg response time across members, acceptance rate proxy)
     // Performance (organization-based scoring)
     if (organization.organization?.isPersonal) perf += 2; // Personal organizations get bonus
     // Note: Could add more organization-based scoring here in the future
@@ -391,127 +385,7 @@ class RequestPoolService {
     }
   }
 
-  /**
-   * 🚀 SCALABILITY: Get requests for landlord with pagination
-   */
-  async getRequestsForLandlord(landlordId, page = 1, limit = 20) {
-    try {
-      const offset = (page - 1) * limit;
 
-      const requests = await prisma.landlordRequestMatch.findMany({
-        where: {
-          landlordId: landlordId,
-          status: 'ACTIVE',              // only active matches
-          isResponded: false,            // exclude offered/declined
-          isViewed: false,               // pending = unseen (kept as before)
-          rentalRequest: {
-            poolStatus: 'ACTIVE',
-            expiresAt: {
-              gt: new Date()
-            }
-          }
-        },
-        include: {
-          rentalRequest: {
-            include: {
-              tenantGroup: {
-                include: {
-                  members: {
-                    include: {
-                      user: {
-                        select: {
-                          id: true,
-                          name: true,
-                          email: true,
-                          firstName: true,
-                          lastName: true,
-                          profileImage: true,
-                          phoneNumber: true,
-                          profession: true,
-                          dateOfBirth: true,
-                          averageRating: true,
-                          totalReviews: true,
-                          rank: true
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          // Include anchored property details for this match so UI can show matched property
-          property: {
-            select: {
-              id: true,
-              name: true,
-              address: true,
-              city: true,
-              monthlyRent: true,
-              propertyType: true,
-              bedrooms: true,
-              furnished: true,
-              parking: true,
-              petsAllowed: true,
-              availableFrom: true
-            }
-          }
-        },
-        orderBy: [
-          { matchScore: 'desc' },
-          { createdAt: 'desc' }
-        ],
-        skip: offset,
-        take: limit
-      });
-
-      const total = await prisma.landlordRequestMatch.count({
-        where: {
-          landlordId: landlordId,
-          status: 'ACTIVE',
-          isResponded: false,
-          isViewed: false,
-          rentalRequest: {
-            poolStatus: 'ACTIVE',
-            expiresAt: {
-              gt: new Date()
-            }
-          }
-        }
-      });
-
-      // Map the tenant data from tenant group to match the expected format
-      const mappedRequests = requests.map(match => {
-        // Get the primary tenant from the tenant group
-        const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
-        const tenant = primaryMember?.user;
-
-        return {
-          ...match,
-          rentalRequest: {
-            ...match.rentalRequest,
-            tenant: tenant // Map the primary tenant group member's user as the tenant
-          }
-        };
-      });
-
-      const result = {
-        requests: mappedRequests,
-        pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
-        }
-      };
-
-      return result;
-
-    } catch (error) {
-      console.error('❌ Error getting requests for landlord:', error);
-      throw error;
-    }
-  }
 
   /**
    * 🚀 SCALABILITY: Get requests for landlord user with pagination
@@ -646,35 +520,7 @@ class RequestPoolService {
     }
   }
 
-  /**
-   * 🚀 SCALABILITY: Mark request as viewed by landlord
-   */
-  async markAsViewed(landlordId, rentalRequestId) {
-    try {
-      await prisma.landlordRequestMatch.updateMany({
-        where: {
-          landlordId: landlordId,
-          rentalRequestId: rentalRequestId
-        },
-        data: {
-          isViewed: true
-        }
-      });
 
-      // 🚀 SCALABILITY: Update request view count
-      await prisma.rentalRequest.update({
-        where: { id: rentalRequestId },
-        data: {
-          viewCount: {
-            increment: 1
-          }
-        }
-      });
-
-    } catch (error) {
-      console.error('❌ Error marking request as viewed:', error);
-    }
-  }
 
   /**
    * 🚀 SCALABILITY: Mark request as viewed by organization
@@ -721,21 +567,21 @@ class RequestPoolService {
   /**
    * 🚀 SCALABILITY: Update landlord availability after property changes
    */
-  async updateLandlordAvailability(landlordId, hasAvailableProperties = true) {
+  async updateUserAvailability(userId, hasAvailableProperties = true) {
     try {
       // Update landlord availability based on whether they have available properties
       await prisma.user.update({
-        where: { id: landlordId },
+        where: { id: userId },
         data: {
           availability: hasAvailableProperties,
           lastActiveAt: new Date()
         }
       });
 
-      console.log(`📊 Updated landlord ${landlordId} availability to ${hasAvailableProperties}`);
+      console.log(`📊 Updated user ${userId} availability to ${hasAvailableProperties}`);
 
     } catch (error) {
-      console.error('❌ Error updating landlord availability:', error);
+      console.error('❌ Error updating user availability:', error);
     }
   }
 
@@ -808,13 +654,13 @@ class RequestPoolService {
     }
   }
 
-  async clearLandlordCache(landlordId) {
+  async clearOrganizationCache(organizationId) {
     try {
       // Redis disabled for development - will be enabled in production
       console.log('📝 Redis disabled for development');
       return;
     } catch (error) {
-      console.error('❌ Error clearing landlord cache:', error);
+      console.error('❌ Error clearing organization cache:', error);
     }
   }
 
@@ -836,7 +682,6 @@ class RequestPoolService {
         select: { 
           id: true,
           title: true,
-          tenantId: true,
           moveInDate: true,
           expiresAt: true,
           location: true
@@ -865,8 +710,9 @@ class RequestPoolService {
       });
 
       // 🚀 SCALABILITY: Update analytics
-      for (const request of expiredRequests) {
-        await this.updatePoolAnalytics(request.location);
+      const uniqueLocations = Array.from(new Set(expiredRequests.map(r => r.location).filter(Boolean)));
+      for (const loc of uniqueLocations) {
+        await this.updatePoolAnalytics(loc);
       }
 
       console.log(`✅ Cleaned up ${expiredRequests.length} expired requests`);
@@ -886,9 +732,13 @@ class RequestPoolService {
    */
   async getPoolStats() {
     try {
-      const [totalActive, totalLandlords, recentMatches] = await Promise.all([
+      const [totalActive, orgsWithAvailProps, recentMatches] = await Promise.all([
         prisma.rentalRequest.count({ where: { poolStatus: 'ACTIVE' } }),
-        prisma.user.count({ where: { role: 'LANDLORD', availability: true } }),
+        prisma.property.groupBy({
+          by: ['organizationId'],
+          where: { status: 'AVAILABLE', availability: true },
+          _count: { _all: true }
+        }),
         prisma.landlordRequestMatch.count({
           where: {
             createdAt: {
@@ -900,7 +750,7 @@ class RequestPoolService {
 
       return {
         activeRequests: totalActive,
-        availableLandlords: totalLandlords,
+        availableOrganizations: orgsWithAvailProps.length,
         recentMatches,
         timestamp: new Date()
       };
@@ -910,20 +760,6 @@ class RequestPoolService {
       return null;
     }
   }
-}
-
-// helpers outside the class
-function whereSelect() {
-  return {
-    id: true, landlordId: true, monthlyRent: true, propertyType: true, bedrooms: true,
-    city: true, address: true, availableFrom: true, furnished: true, parking: true, petsAllowed: true,
-    landlord: { select: { id: true, availability: true, landlordProfile: { select: { acceptanceRate: true, averageResponseTime: true } } } }
-  };
-}
-
-function stripLandlord(property) {
-  const { landlord, ...rest } = property;
-  return rest;
 }
 
 export default new RequestPoolService();

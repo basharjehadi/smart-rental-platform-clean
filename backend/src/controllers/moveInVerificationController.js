@@ -293,7 +293,7 @@ export const adminApproveCancellation = async (req, res) => {
       const requestPoolService = (await import('../services/requestPoolService.js')).default;
       const landlordId = result.updatedOffer?.landlordId || offer?.landlordId || null;
       if (landlordId) {
-        await requestPoolService.updateLandlordAvailability(landlordId, true);
+        await requestPoolService.updateUserAvailability(landlordId, true);
       }
     } catch (e) {
       console.warn('Could not update landlord availability after cancellation:', e?.message);

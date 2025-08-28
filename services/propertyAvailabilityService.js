@@ -34,7 +34,7 @@ class PropertyAvailabilityService {
       });
       
       // Update landlord availability based on whether they have any available properties
-      await this.updateLandlordAvailability(property.landlordId);
+      await this.updateUserAvailability(property.landlordId);
       
       console.log(`✅ Property ${propertyId} availability updated to ${availability}`);
       return property;
@@ -48,7 +48,7 @@ class PropertyAvailabilityService {
   /**
    * Update landlord availability based on property status
    */
-  async updateLandlordAvailability(landlordId) {
+  async updateUserAvailability(landlordId) {
     try {
       // Check if landlord has any available properties
       const availableProperties = await prisma.property.count({
@@ -139,7 +139,7 @@ class PropertyAvailabilityService {
       });
       
       // Update landlord availability
-      await this.updateLandlordAvailability(landlordId);
+      await this.updateUserAvailability(landlordId);
       
       console.log(`✅ Updated ${result.count} properties for landlord ${landlordId} to availability: ${availability}`);
       return result;

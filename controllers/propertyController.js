@@ -196,7 +196,7 @@ export const updateProperty = async (req, res) => {
     });
 
     // Update landlord availability based on property changes
-    await propertyAvailabilityService.updateLandlordAvailability(landlordId);
+    await propertyAvailabilityService.updateUserAvailability(landlordId);
 
     res.json({
       success: true,

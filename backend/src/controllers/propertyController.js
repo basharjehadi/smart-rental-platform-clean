@@ -307,7 +307,7 @@ export const createProperty = async (req, res) => {
     console.log('✅ Property created successfully:', property.id);
 
     // Update landlord availability based on new property
-    await propertyAvailabilityService.updateLandlordAvailability(landlordId);
+    await propertyAvailabilityService.updateUserAvailability(landlordId);
 
     res.status(201).json({
       success: true,
@@ -465,7 +465,7 @@ export const updateProperty = async (req, res) => {
     console.log('✅ Property updated successfully:', property.id);
 
     // Update landlord availability based on property changes
-    await propertyAvailabilityService.updateLandlordAvailability(landlordId);
+    await propertyAvailabilityService.updateUserAvailability(landlordId);
 
     res.json({
       success: true,
