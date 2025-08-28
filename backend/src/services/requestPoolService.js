@@ -11,8 +11,24 @@ const normalizeASCII = (value) => {
 };
 const parseMoney = (v) => {
   if (v == null) return null;
-  const s = String(v).trim(); if (!s) return null;
-  const n = parseFloat(s.replace(/[^\d,.\-]/g, '').replace(',', '.'));
+  let s = String(v).trim();
+  if (!s) return null;
+  // remove currency and spaces
+  s = s.replace(/[^\d.,\-]/g, '');
+
+  // If both separators present, assume EU: dot = thousand, comma = decimal
+  const hasDot = s.includes('.');
+  const hasComma = s.includes(',');
+  if (hasDot && hasComma) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (hasComma && !hasDot) {
+    // comma-only -> treat as decimal
+    s = s.replace(',', '.');
+  } else {
+    // dot-only or numbers only: already fine
+  }
+
+  const n = Number.parseFloat(s);
   return Number.isFinite(n) ? n : null;
 };
 const asInt = (v) => {
@@ -342,6 +358,11 @@ class RequestPoolService {
       for (const org of organizations) {
         const best = this.findBestMatchingProperty(org.properties, rentalRequest);
 
+        if (!best) { 
+          // Skip creating a match when no property qualifies
+          continue; 
+        }
+
         matches.push({
           organizationId: org.id,
           rentalRequestId,
@@ -604,27 +625,12 @@ class RequestPoolService {
       const day = new Date(); 
       day.setUTCHours(0, 0, 0, 0);
 
-      // Try upsert first; if it throws (before migration), fall back to create()
-      try {
-        await prisma.requestPoolAnalytics.upsert({
-          where: { location_dateBucket: { location, dateBucket: day } },
-          update: { totalRequests, activeRequests, matchedRequests, expiredRequests },
-          create: { location, dateBucket: day, totalRequests, activeRequests, matchedRequests, expiredRequests }
-        });
-      } catch (upsertError) {
-        // Fallback to create() if upsert fails (before migration)
-        await prisma.requestPoolAnalytics.create({ 
-          data: { 
-            location, 
-            date: new Date(), 
-            totalRequests, 
-            activeRequests, 
-            matchedRequests, 
-            expiredRequests,
-            landlordCount
-          } 
-        });
-      }
+      // Use upsert with dateBucket (schema now requires it)
+      await prisma.requestPoolAnalytics.upsert({
+        where: { location_dateBucket: { location, dateBucket: day } },
+        update: { totalRequests, activeRequests, matchedRequests, expiredRequests },
+        create: { location, dateBucket: day, totalRequests, activeRequests, matchedRequests, expiredRequests }
+      });
 
     } catch (error) {
       console.error('❌ Error updating pool analytics:', error);
@@ -758,6 +764,104 @@ class RequestPoolService {
     } catch (error) {
       console.error('❌ Error getting pool stats:', error);
       return null;
+    }
+  }
+
+  /**
+   * Reverse matching: when a new/updated property goes live,
+   * find ACTIVE + non-expired rental requests that could match,
+   * and create anchored matches (propertyId).
+   */
+  async matchRequestsForNewProperty(propertyId) {
+    // Load property with org
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+      select: {
+        id: true, organizationId: true, city: true, address: true, monthlyRent: true,
+        propertyType: true, bedrooms: true, furnished: true, parking: true, petsAllowed: true,
+        availableFrom: true, status: true, availability: true,
+        organization: { select: { id: true, name: true, isPersonal: true } }
+      }
+    });
+    if (!property || property.status !== 'AVAILABLE' || property.availability !== true) return;
+
+    const now = new Date();
+
+    // Build tolerant city token
+    const cityToken = (property.city || '').trim();
+    const cityTokenNorm = cityToken ? cityToken.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+
+    // Find candidate requests
+    const requests = await prisma.rentalRequest.findMany({
+      where: {
+        poolStatus: 'ACTIVE',
+        expiresAt: { gt: now },
+        // 🚀 PERFORMANCE: Time window for high-volume systems (>100k requests)
+        createdAt: { gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) }, // last 60 days
+        OR: [
+          { location: { contains: cityToken, mode: 'insensitive' } },
+          cityTokenNorm && cityTokenNorm !== cityToken
+            ? { location: { contains: cityTokenNorm, mode: 'insensitive' } }
+            : undefined
+        ].filter(Boolean),
+        // Budget window (reuse tolerant logic)
+        OR: [
+          { budgetTo: { gte: property.monthlyRent } }, // within max
+          { budget:  { gte: property.monthlyRent } },  // single budget field
+        ]
+      },
+      take: 200, // safety bound
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!requests.length) return;
+
+    // Score each request vs this single property, reuse existing scoring pieces
+    const orgWrapper = { id: property.organizationId, organization: property.organization };
+    const matches = [];
+    for (const req of requests) {
+      const score = this.calculateWeightedScore(orgWrapper, req, property);
+      // Respect your thresholding (use normal, or relax if no budgets present)
+      let threshold = this.matchingConfig.thresholds.normal;
+      const hasBudget = req.budgetTo != null || req.budget != null || req.budgetFrom != null;
+      if (!hasBudget) threshold = Math.min(threshold, 30);
+      if (score < threshold) continue;
+
+      const reason = this.generateMatchReason(property, req, orgWrapper);
+
+      matches.push({
+        organizationId: property.organizationId,
+        rentalRequestId: req.id,
+        propertyId: property.id,
+        matchScore: score,
+        matchReason: reason,
+        status: 'ACTIVE',
+        isViewed: false,
+        isResponded: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    }
+
+    if (!matches.length) return;
+
+    // Idempotent insert (unique on org+request+property)
+    await prisma.landlordRequestMatch.createMany({ data: matches, skipDuplicates: true });
+
+    // Notify org members in bulk (same helper you already use)
+    try {
+      const { createManyRentalRequestNotifications } = await import('../services/notificationService.js');
+      await createManyRentalRequestNotifications(
+        matches.map(m => ({
+          organizationId: m.organizationId,
+          rentalRequestId: m.rentalRequestId,
+          title: 'New tenant request matches your newly listed property',
+          tenantName: 'Tenant' // you can enrich by loading tenantGroup if needed
+        }))
+      );
+      console.log(`🔔 Reverse-matched ${matches.length} request(s) for property ${property.id}`);
+    } catch (e) {
+      console.error('❌ Reverse-match notifications failed:', e);
     }
   }
 }

@@ -162,8 +162,8 @@ model Property {
   @@index([propertyType, status])
   @@index([monthlyRent, status])
   @@index([status, availability, city])
-  @@index([status, monthlyRent])
-  @@index([status, availableFrom])
+  @@index([status, availability, monthlyRent])
+  @@index([status, availability, availableFrom])
   @@map("properties")
 }
 
@@ -212,6 +212,7 @@ model RentalRequest {
   @@index([tenantGroupId, status])
   @@index([poolStatus, expiresAt])
   @@index([poolStatus, createdAt])
+  @@index([poolStatus, expiresAt, location])
   @@map("rental_requests")
 }
 
@@ -369,11 +370,8 @@ model RequestPoolAnalytics {
   location            String
   requestCount        Int       @default(0)
   landlordCount       Int       @default(0)
-  date                DateTime  @default(now())
-  dateBucket          DateTime?
+  dateBucket          DateTime
 
-  @@index([location, date])
-  @@index([date])
   @@unique([location, dateBucket])
   @@map("request_pool_analytics")
 }

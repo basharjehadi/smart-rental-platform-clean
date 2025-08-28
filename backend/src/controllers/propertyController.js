@@ -1,5 +1,6 @@
 import { prisma } from '../utils/prisma.js';
 import propertyAvailabilityService from '../services/propertyAvailabilityService.js';
+import RequestPoolService from '../services/requestPoolService.js';
 
 // Get all properties for a landlord
 export const getLandlordProperties = async (req, res) => {
@@ -309,6 +310,14 @@ export const createProperty = async (req, res) => {
     // Update landlord availability based on new property
     await propertyAvailabilityService.updateUserAvailability(landlordId);
 
+    // 🚀 REVERSE MATCHING: Find rental requests that match this new property
+    try {
+      await RequestPoolService.matchRequestsForNewProperty(property.id);
+    } catch (reverseMatchError) {
+      console.error('❌ Reverse matching failed for new property:', reverseMatchError);
+      // Don't fail the main operation if reverse matching fails
+    }
+
     res.status(201).json({
       success: true,
       property: property,
@@ -578,6 +587,16 @@ export const updatePropertyStatus = async (req, res) => {
       status
     );
 
+    // 🚀 REVERSE MATCHING: If property becomes available, find matching rental requests
+    if (status === 'AVAILABLE') {
+      try {
+        await RequestPoolService.matchRequestsForNewProperty(id);
+      } catch (reverseMatchError) {
+        console.error('❌ Reverse matching failed for property status update:', reverseMatchError);
+        // Don't fail the main operation if reverse matching fails
+      }
+    }
+
     res.json({
       success: true,
       property: property,
@@ -629,6 +648,16 @@ export const updatePropertyAvailability = async (req, res) => {
 
     // Update property availability
     const property = await propertyAvailabilityService.updatePropertyAvailability(id, availability);
+
+    // 🚀 REVERSE MATCHING: If property becomes available, find matching rental requests
+    if (availability === true) {
+      try {
+        await RequestPoolService.matchRequestsForNewProperty(id);
+      } catch (reverseMatchError) {
+        console.error('❌ Reverse matching failed for property availability update:', reverseMatchError);
+        // Don't fail the main operation if reverse matching fails
+      }
+    }
 
     res.json({
       success: true,
