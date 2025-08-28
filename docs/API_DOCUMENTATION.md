@@ -309,8 +309,7 @@ Get all rental requests (filtered by user role).
 - `page` (number): Page number
 - `limit` (number): Items per page
 
-#### GET /my-requests
-Get current user's rental requests (requires TENANT role).
+<!-- Removed: GET /my-requests (tenants manage via UI and dashboard summary) -->
 
 #### GET /rental-requests/:id
 Get rental request details.

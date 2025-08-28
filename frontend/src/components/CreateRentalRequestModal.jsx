@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
-const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false, requestData = null }) => {
+const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false, requestData = null, rentalType = 'solo' }) => {
   const [originalRequestId, setOriginalRequestId] = useState(null);
   const [formData, setFormData] = useState({
     city: '',
@@ -254,7 +254,8 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
         additionalRequirements: formData.requirements,
         furnished: formData.furnished,
         parking: formData.parking,
-        petsAllowed: formData.petsAllowed
+        petsAllowed: formData.petsAllowed,
+        rentalType
       };
 
       let response;

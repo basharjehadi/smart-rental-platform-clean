@@ -421,6 +421,7 @@ const TenantGroupManagement = () => {
                 isOpen={showCreateRequestModal}
                 onClose={() => setShowCreateRequestModal(false)}
                 onSuccess={() => navigate('/tenant-request-for-landlord')}
+                rentalType="group"
               />
             )}
           </div>

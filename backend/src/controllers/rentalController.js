@@ -28,7 +28,8 @@ const createRentalRequest = async (req, res) => {
       maxCommuteTime,
       mustHaveFeatures,
       flexibleOnMoveInDate,
-      occupants // Array of {name, role} for business tenants
+      occupants, // Array of {name, role} for business tenants
+      rentalType
     } = req.body;
 
     // Validate required fields
@@ -67,6 +68,10 @@ const createRentalRequest = async (req, res) => {
     if (propertyType && singleRoomTypes.includes(propertyType)) {
       finalBedrooms = 1;
     }
+
+    // Normalize budget range: if only single budget is provided, use it for both from/to
+    const finalBudgetFromValue = budgetFrom ? parseFloat(budgetFrom) : (budget ? parseFloat(budget) : null);
+    const finalBudgetToValue = budgetTo ? parseFloat(budgetTo) : (budget ? parseFloat(budget) : null);
 
     // 🚀 SCALABILITY: Create rental request with transaction
     const result = await prisma.$transaction(async (tx) => {
@@ -123,32 +128,38 @@ const createRentalRequest = async (req, res) => {
           tenantGroupId = newTenantGroup.id;
         }
       } else {
-        // Private tenant - check if already has a tenant group
-        const existingTenantGroup = await tx.tenantGroupMember.findFirst({
+        // Private tenant - prefer an existing multi-member group if present (group request);
+        // otherwise reuse or create a solo group.
+        const memberships = await tx.tenantGroupMember.findMany({
           where: { userId: req.user.id },
-          include: { tenantGroup: true }
+          include: { tenantGroup: { include: { members: true } } },
+          orderBy: { joinedAt: 'desc' }
         });
 
-        if (existingTenantGroup) {
-          // Use existing tenant group
-          tenantGroupId = existingTenantGroup.tenantGroup.id;
+        const multiMember = memberships.find(m => (m.tenantGroup?.members?.length || 0) > 1);
+        const soloMember = memberships.find(m => (m.tenantGroup?.members?.length || 0) === 1);
+
+        // If client explicitly says 'solo' or 'group', honor it
+        if (rentalType === 'group' && multiMember) {
+          tenantGroupId = multiMember.tenantGroup.id;
+        } else if (rentalType === 'solo' && soloMember) {
+          tenantGroupId = soloMember.tenantGroup.id;
+        } else if (rentalType === 'group' && !multiMember) {
+          // No existing group; create one and add only the user for now
+          const newGroup = await tx.tenantGroup.create({ data: { name: `Group - ${req.user.name || req.user.email}` } });
+          await tx.tenantGroupMember.create({ data: { userId: req.user.id, tenantGroupId: newGroup.id, isPrimary: true } });
+          tenantGroupId = newGroup.id;
+        } else if (multiMember) {
+          tenantGroupId = multiMember.tenantGroup.id;
+        } else if (soloMember) {
+          tenantGroupId = soloMember.tenantGroup.id;
         } else {
-          // Create new tenant group for private tenant
           const newTenantGroup = await tx.tenantGroup.create({
-            data: {
-              name: `Private Group - ${req.user.name || req.user.email}`
-            }
+            data: { name: `Private Group - ${req.user.name || req.user.email}` }
           });
-
-          // Add user as primary member
           await tx.tenantGroupMember.create({
-            data: {
-              userId: req.user.id,
-              tenantGroupId: newTenantGroup.id,
-              isPrimary: true
-            }
+            data: { userId: req.user.id, tenantGroupId: newTenantGroup.id, isPrimary: true }
           });
-
           tenantGroupId = newTenantGroup.id;
         }
       }
@@ -161,8 +172,8 @@ const createRentalRequest = async (req, res) => {
           location,
           moveInDate: moveInDateObj,
           budget: parseFloat(budget),
-          budgetFrom: budgetFrom ? parseFloat(budgetFrom) : null,
-          budgetTo: budgetTo ? parseFloat(budgetTo) : null,
+          budgetFrom: finalBudgetFromValue,
+          budgetTo: finalBudgetToValue,
           propertyType: propertyType || null,
           district: district || null,
           bedrooms: finalBedrooms ? parseInt(finalBedrooms) : null,
@@ -236,8 +247,15 @@ const getAllActiveRequests = async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
  
+    // Resolve organizations the current user belongs to
+    const _orgMemberships = await prisma.organizationMember.findMany({
+      where: { userId: req.user.id },
+      select: { organizationId: true }
+    });
+    const _orgIds = _orgMemberships.map(m => m.organizationId);
+
      // 1) Pending (unresponded, unseen) via pool service (already excludes declined)
-     const poolRequests = await requestPoolService.getRequestsForLandlord(
+     const poolRequests = await requestPoolService.getRequestsForLandlordUser(
        req.user.id,
        parseInt(page),
        parseInt(limit)
@@ -567,7 +585,26 @@ const markRequestAsViewed = async (req, res) => {
   try {
     const { requestId } = req.params;
     
-    await requestPoolService.markAsViewed(req.user.id, parseInt(requestId));
+    // Find the match to get the organizationId (server derives it, doesn't trust client)
+    const match = await prisma.landlordRequestMatch.findFirst({
+      where: {
+        rentalRequestId: parseInt(requestId),
+        organization: {
+          members: {
+            some: { userId: req.user.id }
+          }
+        }
+      },
+      select: { organizationId: true }
+    });
+    
+    if (!match) {
+      return res.status(404).json({
+        error: 'Match not found or you do not have access to this request.'
+      });
+    }
+    
+    await requestPoolService.markAsViewedForOrg(match.organizationId, parseInt(requestId));
     
     res.json({
       message: 'Request marked as viewed successfully.'
@@ -2009,16 +2046,27 @@ const getAllRentalRequests = async (req, res) => {
                     { location: { contains: property.city.toUpperCase() } }
                   ]
                 },
-                // Budget matching
-                {
-                  AND: [
-                    { budgetFrom: { lte: property.monthlyRent * 1.2 } },
-                    { budgetTo: { gte: property.monthlyRent * 0.8 } }
-                  ]
-                },
-                // Property type matching (case-insensitive)
+                // Budget matching with fallback to single budget value
                 {
                   OR: [
+                    {
+                      AND: [
+                        { budgetFrom: { lte: property.monthlyRent * 1.2 } },
+                        { budgetTo: { gte: property.monthlyRent * 0.8 } }
+                      ]
+                    },
+                    {
+                      AND: [
+                        { budget: { gte: property.monthlyRent * 0.8 } },
+                        { budget: { lte: property.monthlyRent * 1.2 } }
+                      ]
+                    }
+                  ]
+                },
+                // Property type matching (optional, case-insensitive). If request has no type, allow match
+                {
+                  OR: [
+                    { propertyType: null },
                     { propertyType: property.propertyType },
                     { propertyType: property.propertyType.charAt(0).toUpperCase() + property.propertyType.slice(1) },
                     { propertyType: property.propertyType.toLowerCase() }
@@ -2058,7 +2106,10 @@ const getAllRentalRequests = async (req, res) => {
           where: {
             organization: { members: { some: { userId: landlordId } } }
           },
-          include: {
+          select: {
+            id: true,
+            status: true,
+            createdAt: true,
             organization: {
               select: {
                 id: true,
@@ -2066,11 +2117,6 @@ const getAllRentalRequests = async (req, res) => {
                 isPersonal: true
               }
             }
-          },
-          select: {
-            id: true,
-            status: true,
-            createdAt: true
           }
         }
       },
@@ -2083,13 +2129,20 @@ const getAllRentalRequests = async (req, res) => {
     const requestsWithMatchedProperties = requests.map(request => {
       // Find the best matching property for this request
       const matchedProperty = landlordProperties.find(property => {
-        const locationMatch = request.location.toLowerCase().includes(property.city.toLowerCase());
-        const budgetMatch = request.budgetFrom <= property.monthlyRent * 1.2 && 
-                       request.budgetTo >= property.monthlyRent * 0.8;
-        const typeMatch = request.propertyType === property.propertyType;
+        const locationMatch = (request.location || '').toLowerCase().includes((property.city || '').toLowerCase());
+        const budgetRangeMatch =
+          (request.budgetFrom != null && request.budgetTo != null &&
+            request.budgetFrom <= property.monthlyRent * 1.2 &&
+            request.budgetTo >= property.monthlyRent * 0.8);
+        const singleBudgetMatch =
+          (request.budget != null &&
+            request.budget >= property.monthlyRent * 0.8 &&
+            request.budget <= property.monthlyRent * 1.2);
+        const budgetMatch = budgetRangeMatch || singleBudgetMatch;
+        const typeMatch = !request.propertyType || request.propertyType.toLowerCase() === (property.propertyType || '').toLowerCase();
         const dateMatch = new Date(request.moveInDate) >= (property.availableFrom || new Date());
-        
-        // More flexible matching - only require location and budget match
+
+        // Require location and budget; type/date act as soft signals
         return locationMatch && budgetMatch;
       });
 

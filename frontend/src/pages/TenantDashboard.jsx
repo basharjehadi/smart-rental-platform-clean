@@ -48,7 +48,8 @@ const TenantDashboard = () => {
       console.log('🔍 Dashboard: Starting requests fetch...');
       console.log('🔍 Dashboard: Token in localStorage:', localStorage.getItem('token') ? 'Present' : 'Missing');
       setLoading(true);
-      const response = await api.get('/my-requests');
+      // Endpoint removed; dashboard will fetch a summary endpoint if needed
+      const response = await api.get('/tenant-dashboard/summary');
       console.log('✅ Dashboard: Requests response received:', response.data);
       console.log('✅ Dashboard: Rental requests:', response.data.rentalRequests);
       setRequests(response.data.rentalRequests || []);
@@ -544,7 +545,20 @@ const TenantDashboard = () => {
                   <div key={request.id} className="card-elevated p-6">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">{request.title}</h3>
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="text-lg font-semibold text-gray-900">{request.title}</h3>
+                          {(() => {
+                            const memberCount = request.tenantGroup?._count?.members ?? 1;
+                            const isGroup = memberCount > 1;
+                            const color = isGroup ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800';
+                            const label = isGroup ? `Group (${memberCount})` : 'Solo';
+                            return (
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${color}`}>
+                                {label}
+                              </span>
+                            );
+                          })()}
+                        </div>
                         <p className="text-gray-600 mb-3">{request.description}</p>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div>
@@ -687,6 +701,7 @@ const TenantDashboard = () => {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSuccess={handleRequestCreated}
+        rentalType="solo"
       />
 
       {/* Edit Request Modal */}
@@ -697,6 +712,7 @@ const TenantDashboard = () => {
           onSuccess={handleEditSuccess}
           editMode={true}
           requestData={requestToEdit}
+          rentalType={(() => { const mc = requestToEdit?.tenantGroup?._count?.members ?? 1; return mc > 1 ? 'group' : 'solo'; })()}
         />
       )}
 

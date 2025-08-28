@@ -19,7 +19,18 @@ const getLandlordDashboard = async (req, res) => {
           include: {
             rentalRequest: {
               include: {
-                tenant: true
+                tenantGroup: {
+                  include: {
+                    members: {
+                      where: { isPrimary: true },
+                      include: {
+                        user: {
+                          select: { id: true, firstName: true, lastName: true, email: true }
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -53,7 +64,16 @@ const getLandlordDashboard = async (req, res) => {
         property: true,
         rentalRequest: {
           include: {
-            tenant: true
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: { select: { id: true, firstName: true, lastName: true, email: true } }
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -62,7 +82,8 @@ const getLandlordDashboard = async (req, res) => {
     });
 
     const tenantData = recentTenants.map(offer => {
-      const tenant = offer.rentalRequest.tenant;
+      const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
+      const tenant = primaryMember?.user || {};
       const tenantName = tenant.firstName && tenant.lastName 
         ? `${tenant.firstName} ${tenant.lastName}`
         : tenant.email || 'Tenant';

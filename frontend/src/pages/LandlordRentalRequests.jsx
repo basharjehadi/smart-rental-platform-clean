@@ -23,8 +23,7 @@ import {
   Send,
   X,
   LogOut,
-  FileText,
-  CheckCircle
+  FileText
 } from 'lucide-react';
 
 const LandlordRentalRequests = () => {
@@ -52,7 +51,7 @@ const LandlordRentalRequests = () => {
   const [profileData, setProfileData] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [offerSent, setOfferSent] = useState(false);
-  const [declineSuccess, setDeclineSuccess] = useState('');
+  const [declineSuccess, setDeclineSuccess] = useState(false);
   const [priceAdjustedTenants, setPriceAdjustedTenants] = useState(new Set()); // Track which tenants have had prices adjusted
   
   const { api } = useAuth();
@@ -124,7 +123,7 @@ const LandlordRentalRequests = () => {
   useEffect(() => {
     if (declineSuccess) {
       const timer = setTimeout(() => {
-        setDeclineSuccess('');
+        setDeclineSuccess(false);
       }, 5000);
       return () => clearTimeout(timer);
     }
@@ -134,74 +133,22 @@ const LandlordRentalRequests = () => {
     try {
       setLoading(true);
       const response = await api.get('/rental-requests');
-      const raw = response.data.rentalRequests || [];
-
-      const mapToCard = (request) => {
-        const tenantUser = request.tenant || {};
-        const budgetFrom = request.budgetFrom || request.budget;
-        const budgetTo = request.budgetTo || request.budget;
-        const budgetRange = budgetFrom === budgetTo
-          ? `${formatCurrencyDisplay(budgetFrom)}`
-          : `${formatCurrencyDisplay(budgetFrom)} - ${formatCurrencyDisplay(budgetTo)}`;
-
-        const initials = tenantUser.firstName && tenantUser.lastName
-          ? `${tenantUser.firstName.charAt(0)}${tenantUser.lastName.charAt(0)}`
-          : (tenantUser.firstName?.charAt(0) || 'T');
-
-        const mp = request.matchedProperty || {};
-
-        // Check if this is a business request (has organization) or group request (multiple members)
-        const isBusinessRequest = request.offers && request.offers.some(offer => offer.organization && !offer.organization.isPersonal);
-        const isGroupRequest = request.tenantGroup && request.tenantGroup.members && request.tenantGroup.members.length > 1;
-        
-        // Get organization info if it's a business request
-        const organization = request.offers?.find(offer => offer.organization && !offer.organization.isPersonal)?.organization;
-        
-        // Get all tenant group members for group requests
-        const tenantGroupMembers = request.tenantGroup?.members || [];
-
-        return {
-          id: request.id,
-          name: `${tenantUser.firstName || 'Tenant'} ${tenantUser.lastName || ''}`.trim(),
-          initials,
-          profileImage: tenantUser.profileImage || null,
-          email: tenantUser.email || null,
-          phone: tenantUser.phoneNumber || null,
-          age: tenantUser.age || null,
-          occupation: tenantUser.profession || null,
-          verified: tenantUser.isVerified || false,
-          rating: tenantUser.rating ?? undefined,
-          reviews: tenantUser.reviews ?? undefined,
-          budgetRange,
-          budgetFrom,
-          budgetTo,
-          budget: request.budget,
-          moveInDate: request.moveInDate ? formatDate(request.moveInDate) : null,
-          location: request.location,
-          requirements: request.additionalRequirements || 'No specific requirements mentioned.',
-          interestCount: request.responseCount || 0,
-          status: (request.status || 'pending').toLowerCase(),
-          propertyMatch: {
-            id: mp.id,
-            name: mp.name || 'Your Property',
-            address: mp.address || 'Address not specified',
-            rent: mp.monthlyRent ? `${formatCurrencyDisplay(mp.monthlyRent)} zł` : (mp.rent || 'Rent not specified'),
-            available: mp.availableFrom ? formatDate(mp.availableFrom) : (mp.available || 'Date not specified'),
-            propertyType: mp.propertyType || 'Apartment'
-          },
-          propertyType: request.propertyType,
-          // New fields for business and group requests
-          isBusinessRequest,
-          isGroupRequest,
-          organization,
-          tenantGroup: request.tenantGroup,
-          tenantGroupMembers
-        };
-      };
-
-      const mapped = raw.map(mapToCard);
-      setRentalRequests(mapped);
-      setTotalRequests(mapped.length);
+      const raw = response.data.rentalRequests || response.data.pending || [];
+      const mappedRequests = raw.map(req => ({
+        id: req.id,
+        name: req.tenantName,
+        email: req.tenantEmail,
+        phone: req.tenantPhone,
+        budget: req.budget,
+        moveInDate: req.moveInDate,
+        location: req.location,
+        status: req.status,
+        propertyMatch: req.propertyMatch,
+        tenantGroup: req.tenantGroup,
+        offers: req.offers
+      }));
+      setRentalRequests(mappedRequests);
+      setTotalRequests(mappedRequests.length);
     } catch (error) {
       console.error('Error fetching rental requests:', error);
       setError('Failed to load rental requests');
@@ -245,6 +192,8 @@ const LandlordRentalRequests = () => {
           phone: tenantUser.phoneNumber || null,
           age: tenantUser.age || null,
           occupation: tenantUser.profession || null,
+          dateOfBirth: tenantUser.dateOfBirth || null,
+          pesel: tenantUser.pesel || null,
           verified: tenantUser.isVerified || false,
           rating: tenantUser.rating ?? undefined,
           reviews: tenantUser.reviews ?? undefined,
@@ -671,12 +620,18 @@ const LandlordRentalRequests = () => {
             )
           );
           
-          setDeclineSuccess(`Successfully declined rental request from ${tenant.name}`);
-          setTimeout(() => setDeclineSuccess(''), 5000);
+          // Show success message
+          setDeclineSuccess(true);
+          setTimeout(() => setDeclineSuccess(false), 5000);
+          
+          // Refresh the data
+          await fetchRentalRequests();
         }
       } catch (error) {
         console.error('Error declining request:', error);
-        alert('Failed to decline request. Please try again.');
+        
+        // Show user-friendly error message
+        alert('Failed to decline the request. Please try again.');
       } finally {
         setDecliningRequest(null);
       }
@@ -801,10 +756,29 @@ const LandlordRentalRequests = () => {
         {/* Main Content Area */}
         <main className="flex-1 p-6">
           <div className="max-w-7xl mx-auto">
-            {/* Page Description */}
-            <p className="text-gray-600 mb-8">
-              Tenant requests matched to your property listings. Review profiles and send personalized offers.
-            </p>
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Rental Requests</h1>
+              <p className="text-gray-600">
+                Tenant requests matched to your property listings. Review profiles and send personalized offers.
+              </p>
+            </div>
+
+            {/* Success Message for Decline */}
+            {declineSuccess && (
+              <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <svg className="h-5 w-5 text-green-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <div>
+                    <h3 className="text-sm font-medium text-green-800">Success!</h3>
+                    <p className="text-sm text-green-700 mt-1">
+                      Rental request declined successfully. The request remains active for other landlords.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Error Message */}
             {error && !error.includes('No properties found') && (
@@ -1058,7 +1032,9 @@ const LandlordRentalRequests = () => {
             {offerSent && (
               <div className="p-6 bg-green-50 border-b border-green-100">
                 <div className="flex items-center">
-                  <CheckCircle className="h-5 w-5 text-green-400 mr-3" />
+                  <svg className="h-5 w-5 text-green-400 mr-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
                   <div>
                     <h3 className="text-sm font-medium text-green-800">Offer sent successfully!</h3>
                     <p className="text-sm text-green-700">
@@ -1329,7 +1305,9 @@ const LandlordRentalRequests = () => {
                   </>
                 ) : offerSent ? (
                   <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
+                    <svg className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
                     Offer Sent
                   </>
                 ) : (
@@ -1347,4 +1325,4 @@ const LandlordRentalRequests = () => {
   );
 };
 
-export default LandlordRentalRequests; 
+export default LandlordRentalRequests;

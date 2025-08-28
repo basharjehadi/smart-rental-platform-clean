@@ -20,7 +20,7 @@ const router = express.Router();
 
 // 🚀 SCALABILITY: Tenant routes
 router.post('/rental-request', verifyToken, requireTenant, createRentalRequest);
-router.get('/my-requests', verifyToken, requireTenant, getMyRequests);
+// Removed per product decision: tenants manage requests via /tenant-request-for-landlord UI only
 router.put('/rental-request/:id', verifyToken, requireTenant, updateRentalRequest);
 router.delete('/rental-request/:id', verifyToken, requireTenant, deleteRentalRequest);
 

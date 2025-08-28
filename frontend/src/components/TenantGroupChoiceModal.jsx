@@ -32,7 +32,8 @@ const TenantGroupChoiceModal = ({ isOpen, onClose, onChoice }) => {
       // If group already exists or any non-critical error, proceed anyway
     } finally {
       onClose();
-      navigate('/post-request');
+      // Open inline create modal for a clear solo flow
+      navigate('/tenant-request-for-landlord');
     }
   };
 

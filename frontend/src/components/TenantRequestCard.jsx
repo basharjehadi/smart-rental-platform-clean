@@ -327,13 +327,83 @@ const TenantRequestCard = ({
   };
 
   // Get real data or show appropriate fallback
-  const getDisplayAge = (age) => {
-    if (age && age !== '25-34 years') return age;
+  const getDisplayAge = (age, dateOfBirth, pesel) => {
+    // First try to calculate age from dateOfBirth
+    if (dateOfBirth) {
+      try {
+        const birthDate = new Date(dateOfBirth);
+        if (!isNaN(birthDate.getTime())) {
+          const today = new Date();
+          let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+          const monthDiff = today.getMonth() - birthDate.getMonth();
+          
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            calculatedAge--;
+          }
+          
+          if (calculatedAge >= 0 && calculatedAge <= 120) {
+            return `${calculatedAge} years`;
+          }
+        }
+      } catch (error) {
+        console.warn('Error calculating age from dateOfBirth:', error);
+      }
+    }
+    
+    // If no dateOfBirth, try to calculate from PESEL
+    if (pesel && pesel.length === 11) {
+      try {
+        const year = parseInt(pesel.substring(0, 2));
+        const month = parseInt(pesel.substring(2, 4));
+        const day = parseInt(pesel.substring(4, 6));
+        
+        // Determine century based on month
+        let fullYear;
+        if (month >= 1 && month <= 12) {
+          fullYear = 1900 + year;
+        } else if (month >= 21 && month <= 32) {
+          fullYear = 2000 + year;
+        } else if (month >= 41 && month <= 52) {
+          fullYear = 2100 + year;
+        } else if (month >= 61 && month <= 72) {
+          fullYear = 2200 + year;
+        } else if (month >= 81 && month <= 92) {
+          fullYear = 1800 + year;
+        } else {
+          return 'Age not specified';
+        }
+        
+        const birthDate = new Date(fullYear, month - 1, day);
+        if (!isNaN(birthDate.getTime())) {
+          const today = new Date();
+          let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+          const monthDiff = today.getMonth() - birthDate.getMonth();
+          
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            calculatedAge--;
+          }
+          
+          if (calculatedAge >= 0 && calculatedAge <= 120) {
+            return `${calculatedAge} years`;
+          }
+        }
+      } catch (error) {
+        console.warn('Error calculating age from PESEL:', error);
+      }
+    }
+    
+    // If we have a valid age string, return it
+    if (age && age !== '25-34 years' && age !== 'null' && age !== 'undefined') {
+      return age;
+    }
+    
     return 'Age not specified';
   };
 
   const getDisplayOccupation = (occupation) => {
-    if (occupation && occupation !== 'Technology') return occupation;
+    if (occupation && occupation !== 'Technology' && occupation !== 'null' && occupation !== 'undefined') {
+      return occupation;
+    }
     return 'Occupation not specified';
   };
 
@@ -393,10 +463,36 @@ const TenantRequestCard = ({
       {/* Tenant Information */}
       <div className="p-6">
         <div className="flex items-start space-x-3 mb-4">
-          {/* Request Type Icon and Title */}
+          {/* Profile Picture or Request Type Icon */}
           <div className="flex-shrink-0">
-            <div className="h-12 w-12 bg-blue-600 rounded-full flex items-center justify-center text-white">
-              {requestTypeInfo.icon}
+            {!isBusinessRequest && !isGroupRequest && tenant.profileImage ? (
+              <img
+                src={(() => {
+                  const p = tenant.profileImage;
+                  if (!p) return '';
+                  if (p.startsWith('http://') || p.startsWith('https://')) return p;
+                  // If backend returns just a filename, build full URL
+                  if (!p.startsWith('/')) return `http://localhost:3001/uploads/profile_images/${p}`;
+                  // If it starts with /uploads/, prepend base
+                  if (p.startsWith('/uploads/')) return `http://localhost:3001${p}`;
+                  // Fallback
+                  return `http://localhost:3001${p}`;
+                })()}
+                alt={`${tenant.firstName || 'Tenant'} ${tenant.lastName || ''}`}
+                className="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            {/* Fallback avatar when no image or image fails to load */}
+            <div className={`h-12 w-12 rounded-full flex items-center justify-center text-white ${tenant.profileImage && !isBusinessRequest && !isGroupRequest ? 'hidden' : 'flex'} ${isBusinessRequest ? 'bg-blue-600' : isGroupRequest ? 'bg-purple-600' : 'bg-blue-600'}`}>
+              {!isBusinessRequest && !isGroupRequest && !tenant.profileImage ? (
+                <span className="font-semibold text-lg">{tenant.initials || 'T'}</span>
+              ) : (
+                requestTypeInfo.icon
+              )}
             </div>
           </div>
 
@@ -599,7 +695,20 @@ const TenantRequestCard = ({
                 <p className="text-sm font-medium text-gray-900">
                   {isBusinessRequest ? 'Business' : 
                    isGroupRequest ? `${tenantGroupMembers.length} members` :
-                   `${getDisplayAge(tenant.age)}${tenant.age && tenant.occupation && ', '}${getDisplayOccupation(tenant.occupation)}`}
+                   (() => {
+                     const age = getDisplayAge(tenant.age, tenant.dateOfBirth, tenant.pesel);
+                     const occupation = getDisplayOccupation(tenant.occupation);
+                     
+                     if (age === 'Age not specified' && occupation === 'Occupation not specified') {
+                       return 'Age & Occupation not specified';
+                     } else if (age === 'Age not specified') {
+                       return occupation;
+                     } else if (occupation === 'Occupation not specified') {
+                       return age;
+                     } else {
+                       return `${age}, ${occupation}`;
+                     }
+                   })()}
                 </p>
               </div>
               <div>
@@ -658,7 +767,11 @@ const TenantRequestCard = ({
             </div>
 
             {/* Action Buttons or Status */}
-            {(() => { const s = (tenant.status || 'active').toLowerCase(); return s === 'active' || s === 'pending'; })() ? (
+            {(() => { 
+              const s = (tenant.status || 'active').toLowerCase(); 
+              const shouldShowButtons = s === 'active' || s === 'pending';
+              return shouldShowButtons;
+            })() ? (
               <div className="flex space-x-4">
                 <button 
                   onClick={() => onSendOffer(tenant)}
@@ -672,9 +785,12 @@ const TenantRequestCard = ({
                 
                 {/* Decline Button */}
                 <button 
-                  onClick={() => onDeclineRequest(tenant)}
-                  className="btn-danger inline-flex items-center justify-center bg-red-500 hover:bg-red-600 text-white"
+                  onClick={() => {
+                    onDeclineRequest(tenant);
+                  }}
+                  className="btn-danger inline-flex items-center justify-center bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md border-2 border-red-600 shadow-lg"
                   disabled={decliningRequest}
+                  style={{ minHeight: '44px', minWidth: '120px' }}
                 >
                   {decliningRequest ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>

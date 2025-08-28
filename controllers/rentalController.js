@@ -113,7 +113,7 @@ const getAllActiveRequests = async (req, res) => {
     const offset = (page - 1) * limit;
 
     // 🚀 SCALABILITY: Get requests from pool service for this landlord
-    const poolRequests = await requestPoolService.getRequestsForLandlord(
+    const poolRequests = await requestPoolService.getRequestsForLandlordUser(
       req.user.id, 
       parseInt(page), 
       parseInt(limit)
@@ -145,7 +145,26 @@ const markRequestAsViewed = async (req, res) => {
   try {
     const { requestId } = req.params;
     
-    await requestPoolService.markAsViewed(req.user.id, parseInt(requestId));
+    // Find the match to get the organizationId (server derives it, doesn't trust client)
+    const match = await prisma.landlordRequestMatch.findFirst({
+      where: {
+        rentalRequestId: parseInt(requestId),
+        organization: {
+          members: {
+            some: { userId: req.user.id }
+          }
+        }
+      },
+      select: { organizationId: true }
+    });
+    
+    if (!match) {
+      return res.status(404).json({
+        error: 'Match not found or you do not have access to this request.'
+      });
+    }
+    
+    await requestPoolService.markAsViewedForOrg(match.organizationId, parseInt(requestId));
     
     res.json({
       message: 'Request marked as viewed successfully.'

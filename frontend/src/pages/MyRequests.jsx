@@ -1,9 +1,4 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useTranslation } from 'react-i18next';
-import CreateRentalRequestModal from '../components/CreateRentalRequestModal';
-import TenantGroupChoiceModal from '../components/TenantGroupChoiceModal';
+// Deprecated file intentionally left minimal to avoid imports; route removed.
 
 const MyRequests = () => {
   const navigate = useNavigate();
@@ -522,4 +517,4 @@ const MyRequests = () => {
   );
 };
 
-export default MyRequests; 
+export default null;

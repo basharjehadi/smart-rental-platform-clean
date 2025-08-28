@@ -82,7 +82,8 @@ const RequestForm = () => {
   const fetchMyRequests = async () => {
     try {
       setRequestsLoading(true);
-      const response = await api.get('/my-requests');
+      // Endpoint removed; this page now focuses on creating requests only
+      const response = await api.get('/tenant-dashboard/summary');
       // Filter to only show requests that haven't been accepted
       const activeRequests = (response.data.rentalRequests || []).filter(request => {
         return !request.offer || request.offer.status !== 'ACCEPTED';

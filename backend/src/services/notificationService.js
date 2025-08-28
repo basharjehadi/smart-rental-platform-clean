@@ -251,3 +251,36 @@ export class NotificationService {
     }
   }
 }
+
+// Bulk notification creation for rental requests
+export async function createManyRentalRequestNotifications(items) {
+  if (!Array.isArray(items) || !items.length) return;
+  const orgIds = Array.from(new Set(items.map(i => i.organizationId)));
+  const members = await prisma.organizationMember.findMany({
+    where: { organizationId: { in: orgIds } },
+    select: { organizationId: true, userId: true }
+  });
+  const byOrg = new Map();
+  for (const m of members) {
+    if (!byOrg.has(m.organizationId)) byOrg.set(m.organizationId, []);
+    byOrg.get(m.organizationId).push(m.userId);
+  }
+  const notifications = [];
+  for (const it of items) {
+    const userIds = byOrg.get(it.organizationId) || [];
+    for (const userId of userIds) {
+      notifications.push({
+        userId,
+        type: 'NEW_RENTAL_REQUEST',
+        entityId: String(it.rentalRequestId),
+        title: `New rental request: ${it.title}`,
+        body: `${it.tenantName || 'A tenant'} has a request matching your portfolio.`,
+        isRead: false,
+        createdAt: new Date()
+      });
+    }
+  }
+  if (notifications.length) {
+    await prisma.notification.createMany({ data: notifications, skipDuplicates: true });
+  }
+}

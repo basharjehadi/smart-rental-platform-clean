@@ -25,6 +25,34 @@ export const getTenantDashboardData = async (req, res) => {
     const tenantId = req.user.id;
     console.log('🔍 Fetching dashboard data for tenant:', tenantId);
 
+    // Always return the tenant's own rental requests for the My Requests list
+    const rentalRequests = await prisma.rentalRequest.findMany({
+      where: {
+        tenantGroup: { members: { some: { userId: tenantId } } }
+      },
+      include: {
+        offers: {
+          select: {
+            id: true,
+            status: true,
+            moveInVerificationStatus: true,
+            payments: {
+              where: { status: { in: ['SUCCEEDED', 'CANCELLED'] } },
+              select: { id: true, amount: true, status: true, gateway: true, paidAt: true, purpose: true }
+            },
+            organizationId: true
+          }
+        },
+        tenantGroup: {
+          select: {
+            id: true,
+            _count: { select: { members: true } }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
     // Get tenant's active leases (paid offers that were NOT cancelled)
     const activeLeases = await prisma.offer.findMany({
       where: {
@@ -83,6 +111,7 @@ export const getTenantDashboardData = async (req, res) => {
         landlord: null,
         lease: null,
         leases: [],
+        rentalRequests,
         payments: [],
         accountStatus: {
           paymentHistory: 'No Data',
@@ -215,6 +244,7 @@ export const getTenantDashboardData = async (req, res) => {
         securityDeposit: activeLease.depositAmount || activeLease.rentalRequest.budget || 0
       },
       leases,
+      rentalRequests,
       payments: await getTenantPaymentsData(tenantId),
       accountStatus: {
         paymentHistory: 'No Data',
