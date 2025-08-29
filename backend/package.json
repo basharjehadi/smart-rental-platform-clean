@@ -30,7 +30,8 @@
     "translate:logs": "docker-compose -f ../docker-compose.translate.yml logs -f",
     "translate:test": "node test-libretranslate.js",
     "test:renewal": "node scripts/test-renewal-termination.js",
-    "backfill:names": "node scripts/backfill-user-names.js"
+    "backfill:names": "node scripts/backfill-user-names.js",
+    "backfill:publishAfter": "node scripts/backfillPublishAfter.js"
   },
   "keywords": [
     "rental",
@@ -56,6 +57,7 @@
     "joi": "^17.12.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
     "nodemailer": "^7.0.5",
     "passport": "^0.7.0",
     "passport-facebook": "^3.0.0",

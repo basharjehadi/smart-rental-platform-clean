@@ -1,1 +1,1 @@
-export { canSubmitReview } from './canSubmitReview';
+export { canSubmitReview } from './canSubmitReview.js';

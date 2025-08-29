@@ -288,8 +288,4 @@ export async function getExcludedReviews() {
   }
 }
 
-export {
-  computeUserAggregate,
-  computeTenantGroupAggregate,
-  getExcludedReviews
-};
+
