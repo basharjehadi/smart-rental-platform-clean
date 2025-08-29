@@ -1,24 +1,37 @@
+import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { Globe } from 'lucide-react';
 
 const LanguageSwitcher = () => {
   const { i18n } = useTranslation();
 
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
-    // Save preference in localStorage
-    localStorage.setItem('i18nextLng', lng);
   };
 
   return (
-    <div className="relative inline-block text-left">
-      <select
-        value={i18n.language}
-        onChange={(e) => changeLanguage(e.target.value)}
-        className="bg-white border border-gray-300 rounded-md px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+    <div className="flex items-center space-x-2">
+      <Globe className="w-4 h-4 text-gray-600" />
+      <button
+        onClick={() => changeLanguage('en')}
+        className={`px-2 py-1 text-xs rounded ${
+          i18n.language === 'en'
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+        }`}
       >
-        <option value="en">🇺🇸 English</option>
-        <option value="pl">🇵🇱 Polski</option>
-      </select>
+        EN
+      </button>
+      <button
+        onClick={() => changeLanguage('pl')}
+        className={`px-2 py-1 text-xs rounded ${
+          i18n.language === 'pl'
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+        }`}
+      >
+        PL
+      </button>
     </div>
   );
 };

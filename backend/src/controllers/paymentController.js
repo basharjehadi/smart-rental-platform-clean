@@ -853,8 +853,24 @@ const handlePaymentSucceeded = async (paymentIntent) => {
         });
 
         if (lease) {
-          await reviewService.triggerReviewByEvent('PAYMENT_COMPLETED', lease.id, metadata.tenantId);
-          console.log('✅ First review stage triggered for lease:', lease.id);
+          // Create a review signal instead of triggering a review stage
+          try {
+            const reviewSignalService = await import('../services/reviewSignalService.js');
+            await reviewSignalService.default.createReviewSignal({
+              signalType: 'PAYMENT_CONFIRMED',
+              leaseId: lease.id,
+              tenantGroupId: lease.tenantGroupId,
+              metadata: {
+                amount: paymentIntent.amount / 100,
+                purpose: metadata.purpose,
+                paymentIntentId: stripePaymentIntentId
+              }
+            });
+            console.log('✅ Payment confirmed review signal created for lease:', lease.id);
+          } catch (signalError) {
+            console.error('❌ Error creating payment confirmed signal:', signalError);
+            // Don't fail the payment if signal creation fails
+          }
         } else {
           console.log('⚠️ No lease found for rental request:', rentalRequestId);
         }

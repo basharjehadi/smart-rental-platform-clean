@@ -37,6 +37,11 @@ const startServer = async () => {
     const { startLeaseLifecycleScheduler } = await import('./services/leaseLifecycleService.js');
     startLeaseLifecycleScheduler();
 
+    // Start review cron jobs
+    const { initializeReviewCronJobs } = await import('./services/reviewCronService.js');
+    initializeReviewCronJobs();
+    logger.info('⏰ Review cron jobs initialized');
+
     // Create HTTP server
     const server = createServer(app);
 

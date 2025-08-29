@@ -45,10 +45,10 @@ class ReviewService {
     try {
       const { reviewerId, targetTenantGroupId, leaseId, rating, comment, stage, isAnonymous = false } = data;
       
-      console.log(`📝 Creating ${stage} review from ${reviewerId} to ${targetUserId}, lease ${leaseId}`);
+      console.log(`📝 Creating ${stage} review from ${reviewerId} to ${targetTenantGroupId}, lease ${leaseId}`);
       
       // Validate stage
-      const validStages = ['PAYMENT_COMPLETED', 'MOVE_IN', 'LEASE_END'];
+      const validStages = ['MOVE_IN', 'END_OF_LEASE'];
       if (!validStages.includes(stage)) {
         throw new Error(`Invalid review stage: ${stage}`);
       }
@@ -80,14 +80,8 @@ class ReviewService {
         }
       });
 
-             // Update target user's average rating
-       // Average rating now computed at tenant-group level or skipped in this flow
-       
-       // Calculate and update user rank
-       // Rank calc may be adapted later for groups
-       
-       console.log(`✅ ${stage} review created successfully`);
-       return review;
+      console.log(`✅ ${stage} review created successfully`);
+      return review;
     } catch (error) {
       console.error(`❌ Error creating stage review:`, error);
       throw error;
@@ -124,14 +118,11 @@ class ReviewService {
           case 'INITIAL':
             weight = 0.1; // Initial 5-star has minimal weight
             break;
-          case 'PAYMENT_COMPLETED':
-            weight = 0.3; // Payment stage review
-            break;
           case 'MOVE_IN':
-            weight = 0.4; // Move-in stage review (most important)
+            weight = 0.6; // Move-in stage review (most important)
             break;
-          case 'LEASE_END':
-            weight = 0.5; // Final stage review (highest weight)
+          case 'END_OF_LEASE':
+            weight = 0.3; // Final stage review
             break;
         }
 
@@ -197,15 +188,13 @@ class ReviewService {
         averageRating: 0,
         reviewStages: {
           initial: 0,
-          payment: 0,
           moveIn: 0,
-          leaseEnd: 0
+          endOfLease: 0
         },
         recentReviews: [],
         stageProgress: {
-          paymentCompleted: false,
           moveInCompleted: false,
-          leaseEndCompleted: false
+          endOfLeaseCompleted: false
         }
       };
 
@@ -216,17 +205,13 @@ class ReviewService {
             case 'INITIAL':
               summary.reviewStages.initial++;
               break;
-            case 'PAYMENT_COMPLETED':
-              summary.reviewStages.payment++;
-              summary.stageProgress.paymentCompleted = true;
-              break;
             case 'MOVE_IN':
               summary.reviewStages.moveIn++;
               summary.stageProgress.moveInCompleted = true;
               break;
-            case 'LEASE_END':
-              summary.reviewStages.leaseEnd++;
-              summary.stageProgress.leaseEndCompleted = true;
+            case 'END_OF_LEASE':
+              summary.reviewStages.endOfLease++;
+              summary.stageProgress.endOfLeaseCompleted = true;
               break;
           }
         });
@@ -266,14 +251,11 @@ class ReviewService {
       
       let stage;
       switch (eventType) {
-        case 'PAYMENT_COMPLETED':
-          stage = 'PAYMENT_COMPLETED';
-          break;
         case 'MOVE_IN':
           stage = 'MOVE_IN';
           break;
-        case 'LEASE_END':
-          stage = 'LEASE_END';
+        case 'END_OF_LEASE':
+          stage = 'END_OF_LEASE';
           break;
         default:
           throw new Error(`Unknown event type: ${eventType}`);
@@ -282,7 +264,7 @@ class ReviewService {
       // Check if review already exists for this stage
       const existingReview = await prisma.review.findFirst({
         where: {
-          targetUserId: tenantId,
+          targetTenantGroupId: tenantId,
           leaseId,
           reviewStage: stage
         }
@@ -300,7 +282,7 @@ class ReviewService {
           comment: `Review opportunity for ${stage.toLowerCase().replace('_', ' ')}`,
           isAnonymous: false,
           reviewerId: tenantId,
-          targetUserId: tenantId, // Self-review initially
+          targetTenantGroupId: tenantId, // Self-review initially
           leaseId,
           reviewStage: stage,
           isSystemGenerated: true
@@ -357,24 +339,17 @@ class ReviewService {
       // In a real scenario, this would check actual lease data
       return [
         {
-          id: 'demo_payment_1',
-          leaseId: 'demo_lease_1',
-          reviewStage: 'PAYMENT_COMPLETED',
-          description: 'Review tenant after payment completion',
-          tenant: { id: 'demo_tenant_1', name: 'Demo Tenant', email: 'demo@tenant.com' },
-          property: { id: 'demo_property_1', name: 'Demo Property', address: '123 Demo St' },
-          tenantId: 'demo_tenant_1',
-          landlordId: landlordId
-        },
-        {
           id: 'demo_movein_1',
           leaseId: 'demo_lease_1',
           reviewStage: 'MOVE_IN',
+          status: 'PENDING',
           description: 'Review tenant after move-in',
           tenant: { id: 'demo_tenant_1', name: 'Demo Tenant', email: 'demo@tenant.com' },
           property: { id: 'demo_property_1', name: 'Demo Property', address: '123 Demo St' },
           tenantId: 'demo_tenant_1',
-          landlordId: landlordId
+          landlordId: landlordId,
+          isAnonymous: false,
+          isDoubleBlind: true
         }
       ];
     } catch (error) {
@@ -392,24 +367,17 @@ class ReviewService {
       // In a real scenario, this would check actual lease data
       return [
         {
-          id: 'demo_payment_1',
-          leaseId: 'demo_lease_1',
-          reviewStage: 'PAYMENT_COMPLETED',
-          description: 'Review landlord after payment completion',
-          landlord: { id: 'demo_landlord_1', name: 'Demo Landlord', email: 'demo@landlord.com' },
-          property: { id: 'demo_property_1', name: 'Demo Property', address: '123 Demo St' },
-          tenantId: tenantId,
-          landlordId: 'demo_landlord_1'
-        },
-        {
           id: 'demo_movein_1',
           leaseId: 'demo_lease_1',
           reviewStage: 'MOVE_IN',
+          status: 'PENDING',
           description: 'Review landlord after move-in',
           landlord: { id: 'demo_landlord_1', name: 'Demo Landlord', email: 'demo@landlord.com' },
           property: { id: 'demo_property_1', name: 'Demo Property', address: '123 Demo St' },
           tenantId: tenantId,
-          landlordId: 'demo_landlord_1'
+          landlordId: 'demo_landlord_1',
+          isAnonymous: false,
+          isDoubleBlind: true
         }
       ];
     } catch (error) {

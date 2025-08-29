@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, Shield, CreditCard, Building, Wallet, Calendar, User, Star, Users, CheckCircle, AlertCircle, AlertTriangle, Lock, Eye } from 'lucide-react';
+import RatingDisplay from '../components/RatingDisplay';
 
 const MonthlyRentPaymentPage = () => {
   const [selectedPayments, setSelectedPayments] = useState([]);
@@ -559,14 +560,11 @@ const MonthlyRentPaymentPage = () => {
                   </span>
                 </div>
                 
-                {landlordInfo?.averageRating && (
-                  <div className="flex items-center space-x-2">
-                    <Star className="w-4 h-4 text-yellow-400" />
-                    <span className="text-sm text-gray-600">
-                      {landlordInfo.averageRating} ({landlordInfo.totalReviews || 0} review{landlordInfo.totalReviews !== 1 ? 's' : ''})
-                    </span>
-                  </div>
-                )}
+                <RatingDisplay 
+                  averageRating={landlordInfo?.averageRating} 
+                  totalReviews={landlordInfo?.totalReviews} 
+                  size="small"
+                />
                 
                 {landlordInfo?.rank && (
                   <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">

@@ -1,0 +1,114 @@
+{
+  "review": {
+    "flow": {
+      "blindNotice": "Content hidden until published",
+      "blindCountdown": "Publishes in",
+      "publishingNow": "Publishing now...",
+      "moveInLabel": "Move-in check (no score impact)",
+      "leaseEndLabel": "Lease end review (affects score)",
+      "initialLabel": "Initial rating (minimal impact)"
+    },
+    "status": {
+      "pending": "PENDING",
+      "blind": "BLIND",
+      "published": "PUBLISHED",
+      "blocked": "BLOCKED",
+      "unknown": "UNKNOWN"
+    },
+    "actions": {
+      "report": "Report",
+      "reply": "Reply",
+      "writeReview": "Write Review",
+      "submitReview": "Submit Review",
+      "submitting": "Submitting...",
+      "cancel": "Cancel",
+      "close": "Close"
+    },
+    "forms": {
+      "tenantToLandlord": {
+        "title": "Review Your Landlord",
+        "accuracy": "Accuracy",
+        "accuracyDesc": "How accurate was the property description?",
+        "cleanliness": "Cleanliness",
+        "cleanlinessDesc": "How clean was the property upon move-in?",
+        "responsiveness": "Responsiveness",
+        "responsivenessDesc": "How quickly did the landlord respond to issues?",
+        "contractFairness": "Contract Fairness",
+        "contractFairnessDesc": "How fair were the lease terms and conditions?",
+        "value": "Value",
+        "valueDesc": "How good was the value for the rent paid?",
+        "overall": "Overall",
+        "overallDesc": "Overall satisfaction with this landlord"
+      },
+      "landlordToTenant": {
+        "title": "Review Your Tenant",
+        "onTime": "On-time",
+        "onTimeDesc": "Did the tenant pay rent on time?",
+        "care": "Care",
+        "careDesc": "How well did the tenant care for the property?",
+        "communication": "Communication",
+        "communicationDesc": "How good was the tenant's communication?",
+        "moveOut": "Move-out",
+        "moveOutDesc": "How smooth was the move-out process?",
+        "overall": "Overall",
+        "overallDesc": "Overall satisfaction with this tenant"
+      },
+      "common": {
+        "reviewComment": "Review Comment",
+        "commentPlaceholder": "Share your experience (minimum 10 characters)...",
+        "piiNotice": "Your review will be automatically screened for personal information.",
+        "notRated": "Not rated",
+        "validation": {
+          "ratingRequired": "Please provide a rating",
+          "commentRequired": "Please provide a review comment",
+          "commentMinLength": "Review must be at least 10 characters"
+        }
+      }
+    }
+  },
+  "trust": {
+    "levels": {
+      "new": {
+        "name": "New",
+        "description": "New user with limited rental history"
+      },
+      "reliable": {
+        "name": "Reliable",
+        "description": "Consistent performance with good reviews"
+      },
+      "trusted": {
+        "name": "Trusted",
+        "description": "Proven track record of excellence"
+      },
+      "excellent": {
+        "name": "Excellent",
+        "description": "Outstanding reputation and reliability"
+      }
+    },
+    "criteria": {
+      "reviewCount": "Review Count",
+      "averageRating": "Average Rating",
+      "disputeHistory": "Dispute History",
+      "badgeCount": "Badge Count",
+      "lastActive": "Last Active"
+    }
+  },
+  "badges": {
+    "newVerified": "New — verified, no reviews yet",
+    "tenantOnTime12M": "On-time Tenant (12 months)",
+    "hostAccurate95": "Accurate Host (95%+)",
+    "hostResponsive24H": "Responsive Host (<24h)"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "view": "View",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous"
+  }
+}

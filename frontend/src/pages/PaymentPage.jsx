@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, Shield, CreditCard, Building, Wallet, MessageCircle, RefreshCw, Home, MapPin, Calendar, User, HelpCircle, Star, Users } from 'lucide-react';
+import RatingDisplay from '../components/RatingDisplay';
 
 const PaymentPage = () => {
   const [offer, setOffer] = useState(null);
@@ -772,10 +773,11 @@ const PaymentPage = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Star className="w-4 h-4 text-yellow-400" />
-                    <span className="text-sm">{landlordData.rating} ({landlordData.reviews} reviews)</span>
-                  </div>
+                  <RatingDisplay 
+                    averageRating={landlordData.rating} 
+                    totalReviews={landlordData.reviews} 
+                    size="small"
+                  />
                   <div className="text-xs inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800">
                     {offer?.landlord?.rankInfo?.icon || '⭐'} {offer?.landlord?.rankInfo?.name || String(landlordData.rank).replace('_',' ')}
                   </div>

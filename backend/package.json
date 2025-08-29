@@ -11,6 +11,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:integration": "jest tests/integration/",
+    "test:unit": "jest --testPathIgnorePatterns=tests/integration/",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write src/",
@@ -90,17 +92,28 @@
   },
   "jest": {
     "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js",
+      "**/*.test.js"
+    ],
     "collectCoverageFrom": [
       "src/**/*.js",
-      "!src/server.js",
-      "!src/app.js"
+      "!src/**/*.test.js",
+      "!src/**/*.spec.js"
     ],
     "coverageDirectory": "coverage",
     "coverageReporters": [
       "text",
       "lcov",
       "html"
-    ]
+    ],
+    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "testTimeout": 30000,
+    "verbose": true,
+    "forceExit": true,
+    "clearMocks": true,
+    "resetMocks": true,
+    "restoreMocks": true
   },
   "eslintConfig": {
     "extends": [

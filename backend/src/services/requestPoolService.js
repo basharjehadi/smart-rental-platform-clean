@@ -4,6 +4,16 @@ import { prisma } from '../utils/prisma.js';
 // Helpers: tolerant text + safe parsing + int coercion
 // FORCE MODULE RELOAD - Updated: 2025-08-28
 // ────────────────────────────────────────────────────────────
+// 
+// NEW SCORING FORMULA (2025-08-28):
+// +0.3*TrustLevelWeight +0.2*AvgRating -0.3*DisputePenalty +0.1*RecencyBoost -0.2*MisrepresentationFlag
+// 
+// TrustLevelWeight: Based on badge count and review count (0-1 scale)
+// AvgRating: Normalized average rating from 1-5 to 0-1 scale
+// DisputePenalty: Based on user suspension status and future dispute system
+// RecencyBoost: Based on last activity (1 day=1.0, 7 days=0.8, 30 days=0.5, 90 days=0.2)
+// MisrepresentationFlag: Based on new users with perfect ratings and future verification system
+// ────────────────────────────────────────────────────────────
 const normalizeASCII = (value) => {
   if (!value) return '';
   try { return value.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
@@ -204,12 +214,13 @@ class RequestPoolService {
       if (orgCandidates.length === 0) return [];
 
       // Score
-      const scored = orgCandidates.map(org => {
+      const scored = await Promise.all(orgCandidates.map(async (org) => {
         const best = this.findBestMatchingProperty(org.properties, rentalRequest);
-        const matchScore = this.calculateWeightedScore(org, rentalRequest, best);
+        const matchScore = await this.calculateWeightedScore(org, rentalRequest, best);
         const matchReason = this.generateMatchReason(best, rentalRequest, org);
         return { ...org, matchScore, matchReason };
-      }).sort((a,b) => b.matchScore - a.matchScore);
+      }));
+      scored.sort((a,b) => b.matchScore - a.matchScore);
 
       // Thresholding (dynamic-lite)
       let threshold = this.matchingConfig.thresholds.normal;
@@ -229,8 +240,8 @@ class RequestPoolService {
     }
   }
 
-  // Weighted score on best property
-  calculateWeightedScore(organization, rentalRequest, property) {
+  // Weighted score on best property with new scoring formula
+  async calculateWeightedScore(organization, rentalRequest, property) {
     if (!property) return 0;
     const W = this.matchingConfig.weights;
     let loc = 0, bud = 0, feat = 0, tim = 0, perf = 0;
@@ -284,11 +295,102 @@ class RequestPoolService {
       else if (ad <= 90) tim = 3;
     }
 
-    // TODO: add organization-level performance metrics (e.g., avg response time across members, acceptance rate proxy)
-    // Performance (organization-based scoring)
-    if (organization.organization?.isPersonal) perf += 2; // Personal organizations get bonus
-    // Note: Could add more organization-based scoring here in the future
-    if (perf > 5) perf = 5;
+    // NEW SCORING FORMULA: Trust Level + Rating + Dispute Penalty + Recency Boost - Misrepresentation Flag
+    try {
+      // Get organization members to calculate trust levels and ratings
+      const orgMembers = await prisma.organizationMember.findMany({
+        where: { organizationId: organization.id },
+        include: {
+          user: {
+            select: {
+              id: true,
+              averageRating: true,
+              totalReviews: true,
+              badgeCount: true,
+              lastActiveAt: true,
+              isSuspended: false
+            }
+          }
+        }
+      });
+
+      if (orgMembers.length > 0) {
+        // Calculate trust level weight (0-1 scale)
+        let trustLevelWeight = 0;
+        let totalRating = 0;
+        let totalReviews = 0;
+        let totalDisputePenalty = 0;
+        let recencyBoost = 0;
+        let misrepresentationFlag = 0;
+
+        for (const member of orgMembers) {
+          const user = member.user;
+          if (!user) continue;
+
+          // Trust Level Weight (based on badge count and reviews)
+          let memberTrustWeight = 0;
+          if (user.badgeCount >= 3) memberTrustWeight = 1.0;
+          else if (user.badgeCount >= 2) memberTrustWeight = 0.8;
+          else if (user.badgeCount >= 1) memberTrustWeight = 0.6;
+          else if (user.totalReviews >= 10) memberTrustWeight = 0.4;
+          else if (user.totalReviews >= 5) memberTrustWeight = 0.2;
+          else memberTrustWeight = 0.1;
+          
+          trustLevelWeight += memberTrustWeight;
+
+          // Average Rating (1-5 scale, normalize to 0-1)
+          if (user.averageRating && user.totalReviews >= 3) {
+            totalRating += (user.averageRating - 1) / 4; // Convert 1-5 to 0-1 scale
+            totalReviews += user.totalReviews;
+          }
+
+          // Dispute Penalty (placeholder - would need dispute system)
+          // For now, use suspension status as proxy
+          if (user.isSuspended) {
+            totalDisputePenalty += 0.5; // High penalty for suspended users
+          }
+
+          // Recency Boost (based on last activity)
+          if (user.lastActiveAt) {
+            const daysSinceActive = Math.ceil((Date.now() - user.lastActiveAt.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysSinceActive <= 1) recencyBoost += 1.0;
+            else if (daysSinceActive <= 7) recencyBoost += 0.8;
+            else if (daysSinceActive <= 30) recencyBoost += 0.5;
+            else if (daysSinceActive <= 90) recencyBoost += 0.2;
+          }
+
+          // Misrepresentation Flag (placeholder - would need verification system)
+          // For now, use basic heuristics
+          if (user.totalReviews === 0 && user.averageRating === 5.0) {
+            misrepresentationFlag += 0.3; // New user with perfect rating
+          }
+        }
+
+        // Calculate averages and apply new formula
+        const memberCount = orgMembers.length;
+        const avgTrustLevelWeight = trustLevelWeight / memberCount;
+        const avgRating = totalReviews > 0 ? totalRating / memberCount : 0;
+        const avgDisputePenalty = totalDisputePenalty / memberCount;
+        const avgRecencyBoost = recencyBoost / memberCount;
+        const avgMisrepresentationFlag = misrepresentationFlag / memberCount;
+
+        // NEW FORMULA: +0.3*TrustLevelWeight +0.2*AvgRating -0.3*DisputePenalty +0.1*RecencyBoost -0.2*MisrepresentationFlag
+        const newScore = 
+          (0.3 * avgTrustLevelWeight) +
+          (0.2 * avgRating) -
+          (0.3 * avgDisputePenalty) +
+          (0.1 * avgRecencyBoost) -
+          (0.2 * avgMisrepresentationFlag);
+
+        // Convert to 0-5 scale and add to performance score
+        perf = Math.max(0, Math.min(5, newScore * 5));
+      }
+
+    } catch (error) {
+      console.error('Error calculating new performance score:', error);
+      // Fallback to basic scoring
+      if (organization.organization?.isPersonal) perf += 2;
+    }
 
     // Weighted sum (clip 0..100)
     const sum =
@@ -820,7 +922,7 @@ class RequestPoolService {
     const orgWrapper = { id: property.organizationId, organization: property.organization };
     const matches = [];
     for (const req of requests) {
-      const score = this.calculateWeightedScore(orgWrapper, req, property);
+      const score = await this.calculateWeightedScore(orgWrapper, req, property);
       // Respect your thresholding (use normal, or relax if no budgets present)
       let threshold = this.matchingConfig.thresholds.normal;
       const hasBudget = req.budgetTo != null || req.budget != null || req.budgetFrom != null;

@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import ReviewSystem from '../components/ReviewSystem';
 import { Star, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import RatingDisplay from '../components/RatingDisplay';
 
 const ReviewPage = () => {
   const { user } = useAuth();
@@ -51,12 +52,11 @@ const ReviewPage = () => {
                  <p className="text-sm text-gray-600">
                    {user.role === 'LANDLORD' ? 'Landlord Rating' : 'Tenant Rating'}
                  </p>
-                 <div className="flex items-center space-x-1">
-                   <Star className="w-5 h-5 text-yellow-400 fill-current" />
-                   <span className="text-lg font-semibold text-gray-900">
-                     {user.averageRating || 5.0}
-                   </span>
-                 </div>
+                 <RatingDisplay 
+                   averageRating={user.averageRating} 
+                   totalReviews={user.totalReviews} 
+                   size="large"
+                 />
                </div>
             </div>
           </div>

@@ -1,0 +1,114 @@
+{
+  "review": {
+    "flow": {
+      "blindNotice": "Treść ukryta do momentu publikacji",
+      "blindCountdown": "Publikacja za",
+      "publishingNow": "Publikowanie teraz...",
+      "moveInLabel": "Kontrola wprowadzenia (bez wpływu na ocenę)",
+      "leaseEndLabel": "Recenzja końca najmu (wpływa na ocenę)",
+      "initialLabel": "Ocena początkowa (minimalny wpływ)"
+    },
+    "status": {
+      "pending": "OCZEKUJĄCE",
+      "blind": "ŚLEPE",
+      "published": "OPUBLIKOWANE",
+      "blocked": "ZABLOKOWANE",
+      "unknown": "NIEZNANE"
+    },
+    "actions": {
+      "report": "Zgłoś",
+      "reply": "Odpowiedz",
+      "writeReview": "Napisz recenzję",
+      "submitReview": "Wyślij recenzję",
+      "submitting": "Wysyłanie...",
+      "cancel": "Anuluj",
+      "close": "Zamknij"
+    },
+    "forms": {
+      "tenantToLandlord": {
+        "title": "Oceń swojego wynajmującego",
+        "accuracy": "Dokładność",
+        "accuracyDesc": "Jak dokładny był opis nieruchomości?",
+        "cleanliness": "Czystość",
+        "cleanlinessDesc": "Jak czysta była nieruchomość przy wprowadzeniu?",
+        "responsiveness": "Reaktywność",
+        "responsivenessDesc": "Jak szybko wynajmujący reagował na problemy?",
+        "contractFairness": "Sprawiedliwość umowy",
+        "contractFairnessDesc": "Jak sprawiedliwe były warunki najmu?",
+        "value": "Wartość",
+        "valueDesc": "Jak dobra była wartość za zapłacony czynsz?",
+        "overall": "Ogólnie",
+        "overallDesc": "Ogólne zadowolenie z tego wynajmującego"
+      },
+      "landlordToTenant": {
+        "title": "Oceń swojego najemcę",
+        "onTime": "Terminowość",
+        "onTimeDesc": "Czy najemca płacił czynsz na czas?",
+        "care": "Dbałość",
+        "careDesc": "Jak dobrze najemca dbał o nieruchomość?",
+        "communication": "Komunikacja",
+        "communicationDesc": "Jak dobra była komunikacja najemcy?",
+        "moveOut": "Wyprowadzka",
+        "moveOutDesc": "Jak płynny był proces wyprowadzki?",
+        "overall": "Ogólnie",
+        "overallDesc": "Ogólne zadowolenie z tego najemcy"
+      },
+      "common": {
+        "reviewComment": "Komentarz recenzji",
+        "commentPlaceholder": "Podziel się swoim doświadczeniem (minimum 10 znaków)...",
+        "piiNotice": "Twoja recenzja zostanie automatycznie sprawdzona pod kątem informacji osobistych.",
+        "notRated": "Nie oceniono",
+        "validation": {
+          "ratingRequired": "Proszę podać ocenę",
+          "commentRequired": "Proszę podać komentarz recenzji",
+          "commentMinLength": "Recenzja musi mieć co najmniej 10 znaków"
+        }
+      }
+    }
+  },
+  "trust": {
+    "levels": {
+      "new": {
+        "name": "Nowy",
+        "description": "Nowy użytkownik z ograniczoną historią najmu"
+      },
+      "reliable": {
+        "name": "Niezawodny",
+        "description": "Stała wydajność z dobrymi recenzjami"
+      },
+      "trusted": {
+        "name": "Zaufany",
+        "description": "Sprawdzona historia doskonałości"
+      },
+      "excellent": {
+        "name": "Doskonały",
+        "description": "Wyjątkowa reputacja i niezawodność"
+      }
+    },
+    "criteria": {
+      "reviewCount": "Liczba recenzji",
+      "averageRating": "Średnia ocena",
+      "disputeHistory": "Historia sporów",
+      "badgeCount": "Liczba odznak",
+      "lastActive": "Ostatnia aktywność"
+    }
+  },
+  "badges": {
+    "newVerified": "Nowy — zweryfikowany, brak recenzji",
+    "tenantOnTime12M": "Terminowy najemca (12 miesięcy)",
+    "hostAccurate95": "Dokładny gospodarz (95%+)",
+    "hostResponsive24H": "Reaktywny gospodarz (<24h)"
+  },
+  "common": {
+    "loading": "Ładowanie...",
+    "error": "Błąd",
+    "success": "Sukces",
+    "save": "Zapisz",
+    "edit": "Edytuj",
+    "delete": "Usuń",
+    "view": "Zobacz",
+    "back": "Wstecz",
+    "next": "Dalej",
+    "previous": "Poprzedni"
+  }
+}

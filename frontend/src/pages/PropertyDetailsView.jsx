@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, Play, Star, Shield, Calendar, MapPin, Home, Users, Clock, X, ChevronLeft, ChevronRight, Sofa, Car, Bath, Building2, Square, Bed } from 'lucide-react';
 import PropertyMapCard from '../components/PropertyMapCard';
+import RatingDisplay from '../components/RatingDisplay';
 
 const PropertyDetailsView = () => {
   const { offerId } = useParams();
@@ -870,8 +871,11 @@ const PropertyDetailsView = () => {
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center space-x-2">
-                          <Star className="w-4 h-4 text-yellow-400" />
-                          <span className="text-sm">{landlordData.rating} ({landlordData.reviews} reviews)</span>
+                          <RatingDisplay 
+                            averageRating={landlordData.rating} 
+                            totalReviews={landlordData.reviews} 
+                            size="small"
+                          />
                         </div>
                         <div className="text-xs inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800">
                           {offer?.landlord?.rankInfo?.icon || '⭐'} {offer?.landlord?.rankInfo?.name || String(landlordData.rank).replace('_',' ')}
@@ -928,8 +932,11 @@ const PropertyDetailsView = () => {
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center space-x-2">
-                          <Star className="w-4 h-4 text-yellow-400" />
-                          <span className="text-sm">{landlordData.rating} ({landlordData.reviews} reviews)</span>
+                          <RatingDisplay 
+                            averageRating={landlordData.rating} 
+                            totalReviews={landlordData.reviews} 
+                            size="small"
+                          />
                         </div>
                         <div className="text-xs inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800">
                           {offer?.landlord?.rankInfo?.icon || '⭐'} {offer?.landlord?.rankInfo?.name || String(landlordData.rank).replace('_',' ')}

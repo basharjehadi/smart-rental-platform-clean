@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Star, CheckCircle, Clock, AlertCircle, User, Building, MessageSquare, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import ReviewStatusChip from './ReviewStatusChip';
+import RatingDisplay from './RatingDisplay';
 
 const ReviewCard = ({ userId, isLandlord = false }) => {
   const [pendingReviews, setPendingReviews] = useState([]);
@@ -90,28 +92,15 @@ const ReviewCard = ({ userId, isLandlord = false }) => {
       </div>
       
       <div className="space-y-4">
-        {/* Current Rating */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-600">Current Rating</span>
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-1">
-              {Array.from({ length: 5 }, (_, i) => (
-                <Star
-                  key={i}
-                  className={`w-4 h-4 ${
-                    i < (myRating?.averageRating || 5) ? 'text-yellow-400 fill-current' : 'text-gray-300'
-                  }`}
-                />
-              ))}
-            </div>
-            <span className="text-lg font-bold text-gray-900">
-              {myRating?.averageRating || 5.0}
-            </span>
-            <span className="text-sm text-gray-500">
-              ({myRating?.totalReviews || 1})
-            </span>
-          </div>
-        </div>
+                 {/* Current Rating */}
+         <div className="flex items-center justify-between">
+           <span className="text-sm text-gray-600">Current Rating</span>
+           <RatingDisplay 
+             averageRating={myRating?.averageRating} 
+             totalReviews={myRating?.totalReviews} 
+             size="default"
+           />
+         </div>
 
         {/* Rank */}
         <div className="flex items-center justify-between">
@@ -138,6 +127,23 @@ const ReviewCard = ({ userId, isLandlord = false }) => {
             </span>
           </div>
         </div>
+
+        {/* Review Status Summary */}
+        {pendingReviews.length > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-600">Status Summary</span>
+            <div className="flex items-center space-x-2">
+              {pendingReviews.map((review, index) => (
+                <ReviewStatusChip
+                  key={review.id || index}
+                  status={review.status}
+                  publishAfter={review.publishAfter}
+                  isBlind={review.status === 'SUBMITTED' && review.publishAfter}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* View Full Review System Button */}

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Star, CheckCircle, Clock, AlertCircle, User, Building, MessageSquare } from 'lucide-react';
+import ReviewCardWithChips from './ReviewCardWithChips';
+import RatingDisplay from './RatingDisplay';
 
 const ReviewSystem = ({ userId, isLandlord = false }) => {
   const [pendingReviews, setPendingReviews] = useState([]);
@@ -78,33 +80,32 @@ const ReviewSystem = ({ userId, isLandlord = false }) => {
 
   const getStageInfo = (stage) => {
     switch (stage) {
-      case 'PAYMENT_COMPLETED':
-        return {
-          name: 'Payment Completed',
-          description: 'Review after completing payment',
-          icon: <CheckCircle className="w-5 h-5 text-green-500" />,
-          color: 'green'
-        };
       case 'MOVE_IN':
         return {
           name: 'Move-in Experience',
           description: 'Review after moving in',
           icon: <Building className="w-5 h-5 text-blue-500" />,
-          color: 'blue'
+          color: 'blue',
+          label: 'Move-in check (no score impact)',
+          affectsScore: false
         };
-      case 'LEASE_END':
+      case 'END_OF_LEASE':
         return {
           name: 'Lease End',
           description: 'Final review after lease ends',
           icon: <Clock className="w-5 h-5 text-purple-500" />,
-          color: 'purple'
+          color: 'purple',
+          label: 'Lease end review (affects score)',
+          affectsScore: true
         };
       default:
         return {
           name: 'Initial',
           description: 'Starting rating',
           icon: <Star className="w-5 h-5 text-gray-400" />,
-          color: 'gray'
+          color: 'gray',
+          label: 'Initial rating (minimal impact)',
+          affectsScore: true
         };
     }
   };
@@ -150,24 +151,14 @@ const ReviewSystem = ({ userId, isLandlord = false }) => {
             My Current Rating
           </h3>
           
-          <div className="flex items-center space-x-4 mb-4">
-            <div className="flex items-center space-x-1">
-              {Array.from({ length: 5 }, (_, i) => (
-                <Star
-                  key={i}
-                  className={`w-6 h-6 ${
-                    i < (myRating?.averageRating || 5) ? 'text-yellow-400 fill-current' : 'text-gray-300'
-                  }`}
-                />
-              ))}
-            </div>
-            <div className="text-3xl font-bold text-gray-900">
-              {myRating?.averageRating || 5.0}
-            </div>
-            <div className="text-sm text-gray-500">
-              ({myRating?.totalReviews || 1} reviews)
-            </div>
-          </div>
+                     <div className="flex items-center space-x-4 mb-4">
+             <RatingDisplay 
+               averageRating={myRating?.averageRating} 
+               totalReviews={myRating?.totalReviews} 
+               size="large"
+               className="text-3xl font-bold text-gray-900"
+             />
+           </div>
 
           <div className="flex items-center text-sm text-gray-600">
             <CheckCircle className="w-4 h-4 text-green-500 mr-2" />
@@ -288,36 +279,16 @@ const ReviewSystem = ({ userId, isLandlord = false }) => {
           </p>
           
           <div className="space-y-4">
-            {pendingReviews.map((review) => {
-              const stageInfo = getStageInfo(review.reviewStage);
-              return (
-                <div key={review.id} className="border border-gray-200 bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      {stageInfo.icon}
-                      <div>
-                        <div className="font-medium text-sm text-gray-900">
-                          {getReviewTargetName(review)} • {stageInfo.description}
-                        </div>
-                        {review.property && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            Property: {review.property.name || review.property.address}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <button 
-                      onClick={() => handleWriteReview(review)}
-                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                      <span>Write Review</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            {pendingReviews.map((review) => (
+              <ReviewCardWithChips
+                key={review.id}
+                review={review}
+                isLandlord={isLandlord}
+                currentUserId={userId}
+                onWriteReview={handleWriteReview}
+                showWriteReviewButton={true}
+              />
+            ))}
           </div>
         </div>
       ) : (
@@ -356,61 +327,72 @@ const ReviewSystem = ({ userId, isLandlord = false }) => {
 
         <div className="space-y-4">
           {/* Demo Review 1 */}
-          <div className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-sm font-medium text-blue-600">{isLandlord ? 'DT' : 'MJ'}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2 mb-1">
-                <span className="font-medium text-gray-900">{isLandlord ? 'Demo Tenant' : 'Mike Johnson'}</span>
-                <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded">{isLandlord ? 'Tenant' : 'Landlord'}</span>
-              </div>
-              <p className="text-sm text-gray-600 mb-2">{isLandlord ? 'Demo Property • Payment Completion' : 'Sunset Apartments • Payment Completion'}</p>
-              <div className="flex items-center space-x-1 mb-2">
-                {Array.from({ length: 5 }, (_, i) => (
-                  <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
-                ))}
-                <span className="text-sm font-medium text-gray-900 ml-1">5</span>
-              </div>
-              <p className="text-xs text-gray-500 mb-2">Posted 2 days ago</p>
-              <p className="text-sm text-gray-700">
-                {isLandlord 
-                  ? "Excellent landlord! Very responsive and professional during the payment process. All paperwork was handled efficiently."
-                  : "Great tenant! Very responsible with payments and communication. Highly recommend!"
-                }
-              </p>
-            </div>
-          </div>
+          <ReviewCardWithChips
+            review={{
+              id: 'demo-1',
+              reviewerId: 'demo-user-1',
+              reviewStage: 'MOVE_IN',
+              status: 'PUBLISHED',
+              rating: 5,
+              comment: isLandlord 
+                ? "Excellent tenant! Very responsible and communicative during the move-in process. All paperwork was handled efficiently."
+                : "Great landlord! Very helpful and professional during move-in. Highly recommend!",
+              createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+              publishedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+              property: { name: isLandlord ? 'Demo Property' : 'Sunset Apartments' },
+              tenant: { name: 'Demo Tenant', profileImage: null },
+              landlord: { name: 'Mike Johnson', profileImage: null }
+            }}
+            isLandlord={isLandlord}
+            currentUserId={userId}
+            onWriteReview={() => {}}
+            showWriteReviewButton={false}
+          />
 
           {/* Demo Review 2 */}
-          <div className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg">
-            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-sm font-medium text-green-600">{isLandlord ? 'SJ' : 'AL'}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2 mb-1">
-                <span className="flex-1 min-w-0">
-                  <span className="font-medium text-gray-900">{isLandlord ? 'Sarah Johnson' : 'Anna Lee'}</span>
-                  <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded ml-2">{isLandlord ? 'Tenant' : 'Landlord'}</span>
-                </span>
-              </div>
-              <p className="text-sm text-gray-600 mb-2">{isLandlord ? 'Sunset Apartments • Move-in' : 'Downtown Lofts • Move-in'}</p>
-              <div className="flex items-center space-x-1 mb-2">
-                {Array.from({ length: 4 }, (_, i) => (
-                  <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
-                ))}
-                <Star className="w-4 h-4 text-gray-300" />
-                <span className="text-sm font-medium text-gray-900 ml-1">4</span>
-              </div>
-              <p className="text-xs text-gray-500 mb-2">Posted 1 week ago</p>
-              <p className="text-sm text-gray-700">
-                {isLandlord 
-                  ? "Great property and smooth move-in process. The landlord was helpful with the setup and provided all necessary information."
-                  : "Responsible tenant who takes good care of the property. Communication has been excellent throughout the process."
-                }
-              </p>
-            </div>
-          </div>
+          <ReviewCardWithChips
+            review={{
+              id: 'demo-2',
+              reviewerId: 'demo-user-2',
+              reviewStage: 'MOVE_IN',
+              status: 'PUBLISHED',
+              rating: 4,
+              comment: isLandlord 
+                ? "Great property and smooth move-in process. The landlord was helpful with the setup and provided all necessary information."
+                : "Responsible tenant who takes good care of the property. Communication has been excellent throughout the process.",
+              createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+              publishedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+              property: { name: isLandlord ? 'Sunset Apartments' : 'Downtown Lofts' },
+              tenant: { name: 'Sarah Johnson', profileImage: null },
+              landlord: { name: 'Anna Lee', profileImage: null }
+            }}
+            isLandlord={isLandlord}
+            currentUserId={userId}
+            onWriteReview={() => {}}
+            showWriteReviewButton={false}
+          />
+
+          {/* Demo Blind Review */}
+          <ReviewCardWithChips
+            review={{
+              id: 'demo-3',
+              reviewerId: 'demo-user-3',
+              reviewStage: 'END_OF_LEASE',
+              status: 'SUBMITTED',
+              rating: 5,
+              comment: "This is a blind review that will be published later. The content is hidden from the counterpart until it's published.",
+              createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+              submittedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+              publishAfter: new Date(Date.now() + 13 * 24 * 60 * 60 * 1000).toISOString(), // 13 days from now
+              property: { name: 'Demo Property' },
+              tenant: { name: 'Demo Tenant', profileImage: null },
+              landlord: { name: 'Demo Landlord', profileImage: null }
+            }}
+            isLandlord={isLandlord}
+            currentUserId={userId}
+            onWriteReview={() => {}}
+            showWriteReviewButton={false}
+          />
         </div>
       </div>
 
@@ -418,44 +400,42 @@ const ReviewSystem = ({ userId, isLandlord = false }) => {
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <h4 className="font-medium text-gray-900 mb-6 text-lg flex items-center">
           <User className="w-5 h-5 mr-2 text-gray-600" />
-          {isLandlord ? "How the 3-Stage Review System Works for Landlords" : "How the 3-Stage Review System Works for Tenants"}
+          {isLandlord ? "How the 2-Stage Review System Works for Landlords" : "How the 2-Stage Review System Works for Tenants"}
         </h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="text-center">
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-xl font-bold text-blue-600">1</span>
             </div>
-            <h5 className="font-medium text-blue-900 mb-2">Payment Completion</h5>
+            <h5 className="font-medium text-blue-900 mb-2">Move-in Experience</h5>
             <p className="text-sm text-blue-800">
               {isLandlord 
-                ? "Review your tenant after they complete payment"
-                : "Review your landlord after completing payment"
+                ? "Review your tenant after move-in (no score impact)"
+                : "Review your landlord after moving in (no score impact)"
               }
             </p>
-          </div>
-          <div className="text-center">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-xl font-bold text-green-600">2</span>
+            <div className="mt-2">
+              <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                Move-in check (no score impact)
+              </span>
             </div>
-            <h5 className="font-medium text-green-900 mb-2">Move-in</h5>
-            <p className="text-sm text-green-800">
-              {isLandlord 
-                ? "Review your tenant after move-in"
-                : "Review your landlord after moving in"
-              }
-            </p>
           </div>
           <div className="text-center">
             <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-xl font-bold text-purple-600">3</span>
+              <span className="text-xl font-bold text-purple-600">2</span>
             </div>
             <h5 className="font-medium text-purple-900 mb-2">Lease End</h5>
             <p className="text-sm text-purple-800">
               {isLandlord 
-                ? "Final review of your tenant"
-                : "Final review of your landlord"
+                ? "Final review of your tenant (affects score)"
+                : "Final review of your landlord (affects score)"
               }
             </p>
+            <div className="mt-2">
+              <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                Lease end review (affects score)
+              </span>
+            </div>
           </div>
         </div>
         
@@ -535,9 +515,8 @@ const ReviewFormModal = ({ review, isLandlord, onClose, onSubmit }) => {
 
   const getStageName = (stage) => {
     switch (stage) {
-      case 'PAYMENT_COMPLETED': return 'Payment Completion';
       case 'MOVE_IN': return 'Move-in Experience';
-      case 'LEASE_END': return 'Lease End';
+      case 'END_OF_LEASE': return 'Lease End';
       default: return 'General';
     }
   };
