@@ -39,6 +39,7 @@ export async function computeUserAggregate(userId: string): Promise<UserAggregat
         },
         status: 'PUBLISHED',
         reviewStage: 'END_OF_LEASE',
+        excludeFromAggregates: false, // Exclude early termination reviews
         targetTenantGroup: {
           members: {
             some: {

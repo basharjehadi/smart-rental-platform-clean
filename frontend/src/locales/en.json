@@ -10,6 +10,7 @@
     },
     "status": {
       "pending": "PENDING",
+      "submitted": "SUBMITTED",
       "blind": "BLIND",
       "published": "PUBLISHED",
       "blocked": "BLOCKED",

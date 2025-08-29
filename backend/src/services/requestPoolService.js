@@ -1,4 +1,5 @@
 import { prisma } from '../utils/prisma.js';
+import { getUserTrustLevel } from './trustLevels.js';
 
 // ────────────────────────────────────────────────────────────
 // Helpers: tolerant text + safe parsing + int coercion
@@ -6,9 +7,9 @@ import { prisma } from '../utils/prisma.js';
 // ────────────────────────────────────────────────────────────
 // 
 // NEW SCORING FORMULA (2025-08-28):
-// +0.3*TrustLevelWeight +0.2*AvgRating -0.3*DisputePenalty +0.1*RecencyBoost -0.2*MisrepresentationFlag
+// +0.30*trustLevelWeight(user) +0.20*avgRating(user) -0.30*disputePenalty(user) +0.10*recencyBoost(lastReviewDate) -0.20*misrepresentationFlag(property)
 // 
-// TrustLevelWeight: Based on badge count and review count (0-1 scale)
+// TrustLevelWeight: {New:0, Reliable:0.3, Trusted:0.6, Excellent:1}
 // AvgRating: Normalized average rating from 1-5 to 0-1 scale
 // DisputePenalty: Based on user suspension status and future dispute system
 // RecencyBoost: Based on last activity (1 day=1.0, 7 days=0.8, 30 days=0.5, 90 days=0.2)
@@ -52,6 +53,13 @@ function extractLikelyCity(location) {
   return parts[0] || String(location).trim();
 }
 
+// Export helper trustLevelWeight mapping
+export const trustLevelWeight = {
+  New: 0,
+  Reliable: 0.3,
+  Trusted: 0.6,
+  Excellent: 1
+};
 
 
 class RequestPoolService {
@@ -295,7 +303,7 @@ class RequestPoolService {
       else if (ad <= 90) tim = 3;
     }
 
-    // NEW SCORING FORMULA: Trust Level + Rating + Dispute Penalty + Recency Boost - Misrepresentation Flag
+    // NEW SCORING FORMULA: +0.30*trustLevelWeight +0.20*avgRating -0.30*disputePenalty +0.10*recencyBoost -0.20*misrepresentationFlag
     try {
       // Get organization members to calculate trust levels and ratings
       const orgMembers = await prisma.organizationMember.findMany({
@@ -306,37 +314,34 @@ class RequestPoolService {
               id: true,
               averageRating: true,
               totalReviews: true,
-              badgeCount: true,
               lastActiveAt: true,
-              isSuspended: false
+              isSuspended: true
             }
           }
         }
       });
 
       if (orgMembers.length > 0) {
-        // Calculate trust level weight (0-1 scale)
-        let trustLevelWeight = 0;
+        let totalTrustLevelWeight = 0;
         let totalRating = 0;
         let totalReviews = 0;
         let totalDisputePenalty = 0;
-        let recencyBoost = 0;
-        let misrepresentationFlag = 0;
+        let totalRecencyBoost = 0;
+        let totalMisrepresentationFlag = 0;
 
         for (const member of orgMembers) {
           const user = member.user;
           if (!user) continue;
 
-          // Trust Level Weight (based on badge count and reviews)
-          let memberTrustWeight = 0;
-          if (user.badgeCount >= 3) memberTrustWeight = 1.0;
-          else if (user.badgeCount >= 2) memberTrustWeight = 0.8;
-          else if (user.badgeCount >= 1) memberTrustWeight = 0.6;
-          else if (user.totalReviews >= 10) memberTrustWeight = 0.4;
-          else if (user.totalReviews >= 5) memberTrustWeight = 0.2;
-          else memberTrustWeight = 0.1;
-          
-          trustLevelWeight += memberTrustWeight;
+          // Trust Level Weight using trustLevels service
+          try {
+            const trustResult = await getUserTrustLevel(user.id);
+            const memberTrustWeight = trustLevelWeight[trustResult.level] || 0;
+            totalTrustLevelWeight += memberTrustWeight;
+          } catch (error) {
+            console.warn(`Failed to get trust level for user ${user.id}:`, error);
+            totalTrustLevelWeight += 0; // Default to New level
+          }
 
           // Average Rating (1-5 scale, normalize to 0-1)
           if (user.averageRating && user.totalReviews >= 3) {
@@ -353,34 +358,34 @@ class RequestPoolService {
           // Recency Boost (based on last activity)
           if (user.lastActiveAt) {
             const daysSinceActive = Math.ceil((Date.now() - user.lastActiveAt.getTime()) / (1000 * 60 * 60 * 24));
-            if (daysSinceActive <= 1) recencyBoost += 1.0;
-            else if (daysSinceActive <= 7) recencyBoost += 0.8;
-            else if (daysSinceActive <= 30) recencyBoost += 0.5;
-            else if (daysSinceActive <= 90) recencyBoost += 0.2;
+            if (daysSinceActive <= 1) totalRecencyBoost += 1.0;
+            else if (daysSinceActive <= 7) totalRecencyBoost += 0.8;
+            else if (daysSinceActive <= 30) totalRecencyBoost += 0.5;
+            else if (daysSinceActive <= 90) totalRecencyBoost += 0.2;
           }
 
           // Misrepresentation Flag (placeholder - would need verification system)
           // For now, use basic heuristics
           if (user.totalReviews === 0 && user.averageRating === 5.0) {
-            misrepresentationFlag += 0.3; // New user with perfect rating
+            totalMisrepresentationFlag += 0.3; // New user with perfect rating
           }
         }
 
         // Calculate averages and apply new formula
         const memberCount = orgMembers.length;
-        const avgTrustLevelWeight = trustLevelWeight / memberCount;
+        const avgTrustLevelWeight = totalTrustLevelWeight / memberCount;
         const avgRating = totalReviews > 0 ? totalRating / memberCount : 0;
         const avgDisputePenalty = totalDisputePenalty / memberCount;
-        const avgRecencyBoost = recencyBoost / memberCount;
-        const avgMisrepresentationFlag = misrepresentationFlag / memberCount;
+        const avgRecencyBoost = totalRecencyBoost / memberCount;
+        const avgMisrepresentationFlag = totalMisrepresentationFlag / memberCount;
 
-        // NEW FORMULA: +0.3*TrustLevelWeight +0.2*AvgRating -0.3*DisputePenalty +0.1*RecencyBoost -0.2*MisrepresentationFlag
+        // NEW FORMULA: +0.30*trustLevelWeight +0.20*avgRating -0.30*disputePenalty +0.10*recencyBoost -0.20*misrepresentationFlag
         const newScore = 
-          (0.3 * avgTrustLevelWeight) +
-          (0.2 * avgRating) -
-          (0.3 * avgDisputePenalty) +
-          (0.1 * avgRecencyBoost) -
-          (0.2 * avgMisrepresentationFlag);
+          (0.30 * avgTrustLevelWeight) +
+          (0.20 * avgRating) -
+          (0.30 * avgDisputePenalty) +
+          (0.10 * avgRecencyBoost) -
+          (0.20 * avgMisrepresentationFlag);
 
         // Convert to 0-5 scale and add to performance score
         perf = Math.max(0, Math.min(5, newScore * 5));

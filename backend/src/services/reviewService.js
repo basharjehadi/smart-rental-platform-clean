@@ -43,9 +43,9 @@ class ReviewService {
    */
   async createStageReview(data) {
     try {
-      const { reviewerId, targetTenantGroupId, leaseId, rating, comment, stage, isAnonymous = false } = data;
+      const { reviewerId, targetTenantGroupId, leaseId, rating, comment, stage, isAnonymous = false, revieweeId } = data;
       
-      console.log(`📝 Creating ${stage} review from ${reviewerId} to ${targetTenantGroupId}, lease ${leaseId}`);
+      console.log(`📝 Creating ${stage} review from ${reviewerId} to ${revieweeId || targetTenantGroupId}, lease ${leaseId}`);
       
       // Validate stage
       const validStages = ['MOVE_IN', 'END_OF_LEASE'];
@@ -53,11 +53,15 @@ class ReviewService {
         throw new Error(`Invalid review stage: ${stage}`);
       }
 
-      // Check if review already exists for this stage
+      // Use revieweeId if provided, otherwise fall back to targetTenantGroupId
+      const finalRevieweeId = revieweeId || targetTenantGroupId;
+
+      // Check if review already exists for this stage (using the new unique constraint)
       const existingReview = await prisma.review.findFirst({
         where: {
-          targetTenantGroupId,
           leaseId,
+          reviewerId,
+          revieweeId: finalRevieweeId,
           reviewStage: stage
         }
       });
@@ -74,6 +78,7 @@ class ReviewService {
           isAnonymous,
           reviewerId,
           targetTenantGroupId,
+          revieweeId: finalRevieweeId,
           leaseId,
           reviewStage: stage,
           isSystemGenerated: false

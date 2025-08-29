@@ -2052,6 +2052,79 @@ const stats = await getAnonymizationStats();
 
 ---
 
+## 🏆 Trust Level Service
+
+The Trust Level Service provides a comprehensive system for calculating user trust levels based on their rental history, review performance, and behavior patterns. This service implements Option B thresholds for both tenants and landlords.
+
+### Features
+- **Role-Based Calculation**: Different criteria for tenants vs landlords
+- **Option B Thresholds**: Industry-standard trust level requirements
+- **Comprehensive Metrics**: Review count, ratings, payment history, accuracy, and dispute resolution
+- **Auto-Detection**: Automatically determines user role based on rental history
+- **Detailed Reporting**: Returns trust level, reasons, and metrics for transparency
+
+### Trust Levels
+
+#### Tenant Trust Levels
+- **New**: No reviews yet or below minimum thresholds
+- **Reliable**: ≥3 reviews, avg rating ≥3.5, on-time payments ≥80%
+- **Trusted**: ≥10 reviews, avg rating ≥4.2, on-time payments ≥95%
+- **Excellent**: ≥25 reviews, avg rating ≥4.8, 0 unresolved issues
+
+#### Landlord Trust Levels
+- **New**: No reviews yet or below minimum thresholds
+- **Reliable**: ≥3 reviews, 'as described' accuracy ≥80%
+- **Trusted**: ≥10 reviews, 'as described' accuracy ≥95%, avg rating ≥4.2
+- **Excellent**: ≥25 reviews, avg rating ≥4.8, 0 unresolved issues
+
+### Implementation
+- **File**: `backend/src/services/trustLevels.js`
+- **Functions**:
+  - `tenantTrustLevel(userId, prismaClient)`: Calculate tenant trust level
+  - `landlordTrustLevel(userId, prismaClient)`: Calculate landlord trust level
+  - `getUserTrustLevel(userId, prismaClient)`: Auto-detect role and calculate trust level
+
+### Usage
+```javascript
+const trustLevelService = require('./src/services/trustLevels');
+
+// Get tenant trust level
+const tenantLevel = await trustLevelService.tenantTrustLevel('user123');
+
+// Get landlord trust level
+const landlordLevel = await trustLevelService.landlordTrustLevel('user456');
+
+// Auto-detect role and get trust level
+const userLevel = await trustLevelService.getUserTrustLevel('user789');
+```
+
+### Return Format
+```javascript
+{
+  level: 'Trusted', // 'New' | 'Reliable' | 'Trusted' | 'Excellent'
+  reasons: [
+    'Good review count (15)',
+    'High average rating (4.5)',
+    'Excellent on-time payment rate (100.0%)'
+  ],
+  metrics: {
+    reviewCount: 15,
+    averageRating: 4.5,
+    onTimePercentage: 100, // for tenants
+    accuracyPercentage: 95, // for landlords
+    unresolvedIssues: 0
+  }
+}
+```
+
+### Testing
+- **Unit Tests**: `backend/tests/unit/trustLevels.test.js`
+- **Coverage**: All trust level calculations, edge cases, and error handling
+- **Mock Strategy**: Uses mocked Prisma client for isolated testing
+- **Test Scenarios**: 19 test cases covering all trust level thresholds and edge cases
+
+---
+
 ## 🧪 Integration Tests
 
 The review system includes comprehensive integration tests that verify all core functionality works correctly in various scenarios.

@@ -1,23 +1,30 @@
-import { Router } from 'express';
-import verifyToken from '../middlewares/verifyToken.js';
-import { requireAdmin } from '../middlewares/requireAdmin.js';
-import { requireLandlord, requireTenant } from '../middlewares/roleMiddleware.js';
+import express from 'express';
+import { verifyToken } from '../middlewares/authMiddleware.js';
 import {
-  postTerminationNotice,
-  postRenewalDecline,
-  getLeaseByOffer
+  updateLeaseStatus,
+  handleEarlyMoveOut,
+  handle24HourTermination,
+  getLeaseStatusHistory
 } from '../controllers/leaseController.js';
 
-const router = Router();
+const router = express.Router();
 
-// Irreversible: either party can give termination notice
-router.post('/:id/termination/notice', verifyToken, postTerminationNotice);
+// Apply authentication middleware to all routes
+router.use(verifyToken);
 
-// Irreversible: either party can decline renewal
-router.post('/:id/renewal/decline', verifyToken, postRenewalDecline);
+// 🏠 LEASE ROUTES - Status Management & Early Termination
 
-// Helper: fetch lease by offerId for UI convenience
-router.get('/by-offer/:offerId', verifyToken, getLeaseByOffer);
+// Update lease status (general status change)
+router.patch('/:leaseId/status', updateLeaseStatus);
+
+// Handle early move-out request (tenant-initiated)
+router.post('/:leaseId/early-moveout', handleEarlyMoveOut);
+
+// Handle 24-hour termination notice (landlord-initiated)
+router.post('/:leaseId/terminate-24h', handle24HourTermination);
+
+// Get lease status history and related reviews
+router.get('/:leaseId/status-history', getLeaseStatusHistory);
 
 export default router;
 

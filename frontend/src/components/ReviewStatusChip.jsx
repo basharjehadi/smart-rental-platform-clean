@@ -5,6 +5,7 @@ import CountdownTimer from './CountdownTimer';
 
 const ReviewStatusChip = ({ status, publishAfter, isBlind = false }) => {
   const { t } = useTranslation();
+  
   const getStatusConfig = () => {
     switch (status) {
       case 'PENDING':
@@ -19,11 +20,12 @@ const ReviewStatusChip = ({ status, publishAfter, isBlind = false }) => {
             label: t('review.status.blind'),
             color: 'bg-orange-100 text-orange-800 border-orange-200',
             icon: <Eye className="w-3 h-3" />,
-            showCountdown: true
+            showCountdown: true,
+            isDoubleBlind: true
           };
         }
         return {
-          label: t('review.status.pending'),
+          label: t('review.status.submitted'),
           color: 'bg-blue-100 text-blue-800 border-blue-200',
           icon: <Clock className="w-3 h-3" />
         };
@@ -57,8 +59,13 @@ const ReviewStatusChip = ({ status, publishAfter, isBlind = false }) => {
         <span>{config.label}</span>
       </div>
       
-      {config.showCountdown && publishAfter && (
-        <CountdownTimer targetDate={publishAfter} />
+      {/* Show countdown for double-blind reviews */}
+      {config.showCountdown && publishAfter && config.isDoubleBlind && (
+        <div className="inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200">
+          <Eye className="w-3 h-3" />
+          <span>Publishes in</span>
+          <CountdownTimer targetDate={publishAfter} />
+        </div>
       )}
     </div>
   );

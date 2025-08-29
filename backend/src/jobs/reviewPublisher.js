@@ -118,7 +118,8 @@ async function publishReviewPairs() {
  */
 async function publishSingleReviews() {
   try {
-    const now = new Date();
+    const { getCurrentWarsawTime } = await import('../utils/dateUtils.js');
+    const now = getCurrentWarsawTime();
     
     // Find reviews that are ready to publish
     const reviewsToPublish = await prisma.review.findMany({

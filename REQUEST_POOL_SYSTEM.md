@@ -143,6 +143,82 @@ Active Period: March 1st - March 22nd (21 days)
 - **Manual trigger**: Admin dashboard
 - **Real-time**: When tenant accepts+pay
 
+## **🎯 Smart Scoring System**
+
+### **Updated Scoring Formula (2025-08-28)**
+The Request Pool Service now uses a **trust-based scoring system** that prioritizes organizations based on user trust levels, ratings, and behavior rather than simple metrics like account age or property count.
+
+```
+New Formula: +0.30*trustLevelWeight +0.20*avgRating -0.30*disputePenalty +0.10*recencyBoost -0.20*misrepresentationFlag
+```
+
+### **Scoring Components**
+
+#### **1. Trust Level Weight (30% of score)**
+- **New**: 0.0 points - Users with no rental history
+- **Reliable**: 0.3 points - Users with 3+ reviews, good ratings, on-time payments
+- **Trusted**: 0.6 points - Users with 10+ reviews, excellent ratings, 95%+ on-time
+- **Excellent**: 1.0 points - Users with 25+ reviews, perfect ratings, no disputes
+
+#### **2. Average Rating (20% of score)**
+- **Normalized**: 1-5 star ratings converted to 0-1 scale
+- **Minimum**: Only counts users with 3+ reviews
+- **Formula**: `(rating - 1) / 4` to convert to 0-1 scale
+
+#### **3. Dispute Penalty (30% of score)**
+- **Suspensions**: High penalty for suspended users
+- **Future System**: Will include dispute resolution history
+- **Impact**: Reduces overall score significantly
+
+#### **4. Recency Boost (10% of score)**
+- **1 day**: 1.0 points - Very recent activity
+- **7 days**: 0.8 points - Recent activity
+- **30 days**: 0.5 points - Moderate activity
+- **90 days**: 0.2 points - Older activity
+
+#### **5. Misrepresentation Flag (20% penalty)**
+- **New Users**: Penalty for users with 0 reviews but 5.0 rating
+- **Future System**: Will include verification checks
+- **Purpose**: Prevent gaming of the rating system
+
+### **Implementation Details**
+
+#### **Service Integration**
+- **Trust Level Service**: Uses `getUserTrustLevel()` to determine user trust levels
+- **Database Queries**: Fetches organization members with ratings and activity data
+- **Fallback Handling**: Graceful degradation when trust level service fails
+
+#### **Score Calculation**
+```javascript
+// For each organization member:
+const memberTrustWeight = trustLevelWeight[trustResult.level] || 0;
+const memberRating = (user.averageRating - 1) / 4;
+const memberDisputePenalty = user.isSuspended ? 0.5 : 0;
+const memberRecencyBoost = calculateRecencyBoost(user.lastActiveAt);
+const memberMisrepresentationFlag = calculateMisrepresentationFlag(user);
+
+// Apply formula to organization average
+const newScore = 
+  (0.30 * avgTrustLevelWeight) +
+  (0.20 * avgRating) -
+  (0.30 * avgDisputePenalty) +
+  (0.10 * avgRecencyBoost) -
+  (0.20 * avgMisrepresentationFlag);
+```
+
+#### **Benefits of New System**
+- ✅ **Quality over Quantity**: Rewards consistent good behavior over time
+- ✅ **Fraud Prevention**: Penalizes suspicious rating patterns
+- ✅ **Activity Rewards**: Encourages regular platform engagement
+- ✅ **Dispute Awareness**: Discourages problematic behavior
+- ✅ **Trust Building**: Creates clear progression paths for users
+
+### **Migration from Old System**
+- **Removed**: Account age, reviews written, properties managed
+- **Added**: Trust levels, dispute penalties, recency boosts
+- **Maintained**: Location, budget, features, timing scoring
+- **Enhanced**: Performance component now uses trust-based formula
+
 ## **📈 Performance & Scalability**
 
 ### **Database Indexes**
@@ -230,6 +306,6 @@ ON landlord_request_matches(landlord_id, is_responded, is_viewed);
 
 ---
 
-**Last Updated**: March 2024  
-**Version**: 2.0 (Move-in Date Based Expiration)  
+**Last Updated**: August 2025  
+**Version**: 3.0 (Trust-Based Scoring System)  
 **Maintainer**: Development Team

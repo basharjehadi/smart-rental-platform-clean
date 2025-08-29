@@ -118,6 +118,7 @@ export const createReview = async (req, res) => {
           reviewStage,
           reviewerId,
           targetTenantGroupId: targetUserId, // Assuming targetUserId maps to tenant group
+          revieweeId: targetUserId, // Add revieweeId for the new unique constraint
           status: 'BLOCKED',
           redactedText: moderationResult.redactedText,
           violatesPolicy: true
@@ -166,7 +167,8 @@ export const createReview = async (req, res) => {
       rating,
       comment,
       stage: reviewStage,
-      isAnonymous
+      isAnonymous,
+      revieweeId: targetUserId // Pass revieweeId for the new unique constraint
     });
 
     // Get the full review with all fields for transformation
@@ -201,10 +203,12 @@ export const createReview = async (req, res) => {
   } catch (error) {
     console.error('Create review error:', error);
     
-    if (error.message.includes('already exists')) {
-      return res.status(400).json({
-        error: 'Review already exists',
-        message: error.message
+    // Check for duplicate review error (unique constraint violation)
+    if (error.code === 'P2002' || error.message.includes('Unique constraint')) {
+      return res.status(409).json({
+        error: 'REVIEW_EXISTS',
+        code: 'REVIEW_EXISTS',
+        message: 'A review for this lease, stage, and reviewer already exists'
       });
     }
 
@@ -630,9 +634,10 @@ export const createMinimalReview = async (req, res) => {
       targetTenantGroupId = lease.tenantGroupId;
     }
 
-    // Calculate publishAfter (now + 14 days)
-    const publishAfter = new Date();
-    publishAfter.setDate(publishAfter.getDate() + 14);
+    // Calculate publishAfter using centralized date utilities
+    // publishAfter = addDays(14, leaseEndAtTZ) as per user request
+    const { calculatePublishAfter } = await import('../utils/dateUtils.js');
+    const publishAfter = calculatePublishAfter(lease.endDate);
 
     // Create the review
     const review = await prisma.review.create({

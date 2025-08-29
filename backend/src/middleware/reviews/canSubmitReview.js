@@ -26,7 +26,12 @@ export const canSubmitReview = async (req, res, next) => {
     // Load lease with related data
     const lease = await prisma.lease.findUnique({
       where: { id: leaseId },
-      include: {
+      select: {
+        id: true,
+        status: true,
+        startDate: true,
+        endDate: true,
+        tenantGroupId: true,
         tenantGroup: {
           include: {
             members: {

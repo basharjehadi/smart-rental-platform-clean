@@ -2,6 +2,7 @@ import React from 'react';
 import { Star, User, Building, MessageSquare, Eye } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import ReviewStatusChip from './ReviewStatusChip';
+import CountdownTimer from './CountdownTimer';
 
 const ReviewCardWithChips = ({ 
   review, 
@@ -11,14 +12,19 @@ const ReviewCardWithChips = ({
   showWriteReviewButton = false 
 }) => {
   const { t } = useTranslation();
+  
   // Determine if this review is from the current user
   const isMyReview = review.reviewerId === currentUserId;
   
-  // Determine if content should be hidden (blind review from counterpart)
-  const shouldHideContent = !isMyReview && 
-    review.status === 'SUBMITTED' && 
-    review.publishAfter && 
-    new Date(review.publishAfter) > new Date();
+  // Determine if this is a double-blind review (submitted but not yet published)
+  const isDoubleBlind = review.status === 'SUBMITTED' && review.publishAfter && new Date(review.publishAfter) > new Date();
+  
+  // Determine if content should be hidden from the counterpart
+  // Content is hidden when:
+  // 1. It's NOT my review (I'm the counterpart)
+  // 2. Status is SUBMITTED (review is submitted)
+  // 3. It's double-blind (has publishAfter date in the future)
+  const shouldHideContent = !isMyReview && isDoubleBlind;
 
   // Get review target information
   const getReviewTargetInfo = () => {
@@ -104,13 +110,23 @@ const ReviewCardWithChips = ({
               {review.property?.name || review.property?.address || 'Property'} • {stageInfo.description}
             </p>
 
-            {/* Status Chip */}
+            {/* Status Chip with Double-Blind Indicator */}
             <div className="mb-2">
               <ReviewStatusChip 
                 status={review.status} 
                 publishAfter={review.publishAfter}
-                isBlind={review.status === 'SUBMITTED' && review.publishAfter}
+                isBlind={isDoubleBlind}
               />
+              
+              {/* Double-Blind Countdown Chip */}
+              {isDoubleBlind && (
+                <div className="mt-1">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                    <Eye className="w-3 h-3 mr-1" />
+                    Publishes in <CountdownTimer targetDate={review.publishAfter} />
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Stage Label */}
@@ -124,7 +140,7 @@ const ReviewCardWithChips = ({
               </span>
             </div>
 
-            {/* Rating */}
+            {/* Rating - Hidden from counterpart if double-blind */}
             {!shouldHideContent && review.rating && (
               <div className="flex items-center space-x-1 mb-2">
                 {Array.from({ length: 5 }, (_, i) => (
@@ -141,14 +157,14 @@ const ReviewCardWithChips = ({
               </div>
             )}
 
-            {/* Comment */}
+            {/* Comment - Hidden from counterpart if double-blind */}
             {!shouldHideContent && review.comment && (
               <p className="text-sm text-gray-700 mb-2">
                 {review.comment}
               </p>
             )}
 
-            {/* Hidden Content Message */}
+            {/* Hidden Content Message for Double-Blind Reviews */}
             {shouldHideContent && (
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-2">
                 <div className="flex items-center space-x-2">
@@ -158,7 +174,7 @@ const ReviewCardWithChips = ({
                   </span>
                 </div>
                 <p className="text-xs text-orange-700 mt-1">
-                  {t('review.flow.blindCountdown')} {review.publishAfter && <CountdownTimer targetDate={review.publishAfter} />}
+                  {t('review.flow.blindCountdown')} <CountdownTimer targetDate={review.publishAfter} />
                 </p>
               </div>
             )}

@@ -73,6 +73,7 @@ model User {
   payments                 Payment[]                 @relation("UserPayments")
   rentPayments             RentPayment[]             @relation("TenantRentPayments")
   reviewsGiven             Review[]                  @relation("UserReviewsGiven")
+  reviewsReceived          Review[]                  @relation("UserReviewsReceived")
   reviewReplies            ReviewReply[]             @relation("UserReviewReplies")
   reviewReports            ReviewReport[]            @relation("UserReviewReports")
   supportTickets           SupportTicket[]           @relation("UserSupportTickets")
@@ -522,6 +523,7 @@ model Review {
   reviewStage         ReviewStage  @default(INITIAL)
   reviewerId          String
   targetTenantGroupId String
+  revieweeId          String       // The user being reviewed
   isDoubleBlind       Boolean      @default(true)
   publishAfter        DateTime?
   publishedAt         DateTime?
@@ -529,6 +531,10 @@ model Review {
   status              ReviewStatus @default(PENDING)
   submittedAt         DateTime?
   violatesPolicy      Boolean      @default(false)
+  // Early termination fields
+  isEarlyTermination  Boolean      @default(false)
+  earlyTerminationReason String?
+  excludeFromAggregates Boolean    @default(false)
   // Redaction fields
   redactedAt          DateTime?
   redactedBy          String?
@@ -543,15 +549,17 @@ model Review {
   lease               Lease?       @relation("LeaseReviews", fields: [leaseId], references: [id], onDelete: Cascade)
   reviewer            User         @relation("UserReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
   targetTenantGroup   TenantGroup  @relation("TenantGroupReviewsReceived", fields: [targetTenantGroupId], references: [id], onDelete: Cascade)
+  reviewee            User         @relation("UserReviewsReceived", fields: [revieweeId], references: [id], onDelete: Cascade)
   reply               ReviewReply? @relation("ReviewReply")
   reports             ReviewReport[] @relation("ReviewReports")
 
-  @@unique([leaseId, reviewerId, targetTenantGroupId, reviewStage])
+  @@unique([leaseId, reviewerId, revieweeId, reviewStage])
   @@index([leaseId])
   @@index([rating])
   @@index([reviewStage])
   @@index([reviewerId])
   @@index([targetTenantGroupId])
+  @@index([revieweeId])
   @@map("reviews")
 }
 
@@ -939,7 +947,9 @@ enum KYCStatus {
 enum LeaseStatus {
   ACTIVE
   EXPIRED
+  ENDED
   TERMINATED
+  TERMINATED_24H
   PENDING
 }
 
