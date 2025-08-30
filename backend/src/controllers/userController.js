@@ -449,7 +449,15 @@ export const saveContractSignatures = async (req, res) => {
     const rentalRequest = await prisma.rentalRequest.findUnique({
       where: { id: rentalRequestId },
       include: {
-        tenant: true,
+        tenantGroup: {
+          include: {
+            members: {
+              select: {
+                userId: true
+              }
+            }
+          }
+        },
         offer: {
           include: {
             landlord: true,
@@ -511,7 +519,15 @@ export const getContractSignatures = async (req, res) => {
     const rentalRequest = await prisma.rentalRequest.findUnique({
       where: { id: rentalRequestId },
       include: {
-        tenant: true,
+        tenantGroup: {
+          include: {
+            members: {
+              select: {
+                userId: true
+              }
+            }
+          }
+        },
         offer: {
           include: {
             landlord: true,

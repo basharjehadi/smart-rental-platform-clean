@@ -233,7 +233,13 @@ export const getLandlordTenantDetails = async (req, res) => {
         organization: { members: { some: { userId: landlordId } } },
         status: 'PAID',
         rentalRequest: {
-          tenantId: tenantId,
+          tenantGroup: {
+            members: {
+              some: {
+                userId: tenantId,
+              },
+            },
+          },
         },
       },
       select: {
@@ -361,6 +367,18 @@ export const getLandlordTenantDetails = async (req, res) => {
       today: today,
     });
 
+    // Get the primary tenant from the tenant group
+    const primaryMember = paidOffer.rentalRequest.tenantGroup?.members?.[0];
+    const tenant = primaryMember?.user;
+
+    // Validate tenant exists
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tenant not found in tenant group',
+      });
+    }
+
     // Calculate days rented
     const daysRented = Math.floor(
       (today - leaseStartDate) / (1000 * 60 * 60 * 24)
@@ -393,10 +411,6 @@ export const getLandlordTenantDetails = async (req, res) => {
         date: paymentData.payments[0].date,
       });
     }
-
-    // Get the primary tenant from the tenant group
-    const primaryMember = paidOffer.rentalRequest.tenantGroup?.members?.[0];
-    const tenant = primaryMember?.user;
 
     const tenantData = {
       id: tenant.id,

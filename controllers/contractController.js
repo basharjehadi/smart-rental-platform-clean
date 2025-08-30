@@ -86,6 +86,15 @@ export const checkContractEligibility = async (req, res) => {
     const rentalRequest = await prisma.rentalRequest.findUnique({
       where: { id: parseInt(rentalRequestId) },
       include: {
+        tenantGroup: {
+          include: {
+            members: {
+              select: {
+                userId: true
+              }
+            }
+          }
+        },
         offer: {
           include: {
             rentPayments: {
@@ -109,7 +118,10 @@ export const checkContractEligibility = async (req, res) => {
     }
 
     // Check if user is authorized
-    if (rentalRequest.tenantId !== userId && rentalRequest.offer?.landlordId !== userId) {
+    const isTenant = rentalRequest.tenantGroup?.members?.some(member => member.userId === userId);
+    const isLandlord = rentalRequest.offer?.landlordId === userId;
+    
+    if (!isTenant && !isLandlord) {
       return res.status(403).json({ error: 'Unauthorized to view this contract' });
     }
 
@@ -170,6 +182,15 @@ export const generateContract = async (req, res) => {
     const rentalRequest = await prisma.rentalRequest.findUnique({
       where: { id: parseInt(rentalRequestId) },
       include: {
+        tenantGroup: {
+          include: {
+            members: {
+              select: {
+                userId: true
+              }
+            }
+          }
+        },
         tenant: {
           select: {
             id: true,
@@ -210,7 +231,10 @@ export const generateContract = async (req, res) => {
     }
 
     // Check if user is authorized
-    if (rentalRequest.tenantId !== userId && rentalRequest.offer?.landlordId !== userId) {
+    const isTenant = rentalRequest.tenantGroup?.members?.some(member => member.userId === userId);
+    const isLandlord = rentalRequest.offer?.landlordId === userId;
+    
+    if (!isTenant && !isLandlord) {
       return res.status(403).json({ error: 'Unauthorized to generate contract for this rental request' });
     }
 
@@ -623,7 +647,7 @@ export const generateAllMissingContracts = async (req, res) => {
               amount: expectedAmount,
               status: 'SUCCEEDED',
               purpose: 'DEPOSIT_AND_FIRST_MONTH',
-              userId: request.tenantId,
+              userId: request.tenantGroup?.members?.[0]?.userId || 'unknown',
               rentalRequestId: request.id,
               stripePaymentIntentId: `manual_fix_${Date.now()}_${request.id}`
             }

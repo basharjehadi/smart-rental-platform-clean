@@ -766,9 +766,19 @@ const updateTenantOfferStatus = async (req, res) => {
       where: { id: parseInt(offerId) },
       include: {
         rentalRequest: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: {
+                  select: {
+                    userId: true
+                  }
+                }
+              }
+            }
+          },
           select: {
             id: true,
-            tenantId: true,
             poolStatus: true,
             expiresAt: true
           }
@@ -782,7 +792,10 @@ const updateTenantOfferStatus = async (req, res) => {
       });
     }
 
-    if (offer.rentalRequest.tenantId !== req.user.id) {
+    // Check if user is a member of the tenant group for this rental request
+    const isTenant = offer.rentalRequest.tenantGroup?.members?.some(member => member.userId === req.user.id);
+    
+    if (!isTenant) {
       return res.status(403).json({
         error: 'You can only update your own offers.'
       });

@@ -287,7 +287,15 @@ export const saveContractSignatures = async (req, res) => {
     const rentalRequest = await prisma.rentalRequest.findUnique({
       where: { id: rentalRequestId },
       include: {
-        tenant: true,
+        tenantGroup: {
+          include: {
+            members: {
+              select: {
+                userId: true
+              }
+            }
+          }
+        },
         offer: {
           include: {
             landlord: true
@@ -301,7 +309,7 @@ export const saveContractSignatures = async (req, res) => {
     }
 
     // Check if user is tenant or landlord
-    const isTenant = rentalRequest.tenantId === userId;
+    const isTenant = rentalRequest.tenantGroup?.members?.some(member => member.userId === userId);
     const isLandlord = rentalRequest.offer?.landlordId === userId;
 
     if (!isTenant && !isLandlord) {
@@ -343,7 +351,15 @@ export const getContractSignatures = async (req, res) => {
     const rentalRequest = await prisma.rentalRequest.findUnique({
       where: { id: rentalRequestId },
       include: {
-        tenant: true,
+        tenantGroup: {
+          include: {
+            members: {
+              select: {
+                userId: true
+              }
+            }
+          }
+        },
         offer: {
           include: {
             landlord: true
@@ -357,7 +373,7 @@ export const getContractSignatures = async (req, res) => {
     }
 
     // Check if user is tenant or landlord
-    const isTenant = rentalRequest.tenantId === userId;
+    const isTenant = rentalRequest.tenantGroup?.members?.some(member => member.userId === userId);
     const isLandlord = rentalRequest.offer?.landlordId === userId;
 
     if (!isTenant && !isLandlord) {
