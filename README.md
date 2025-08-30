@@ -1,13 +1,14 @@
 # Smart Rental Platform
 
-A full-stack, multi-user rental management system designed to connect landlords and tenants seamlessly, supporting individual, group, and business rentals. This platform streamlines the entire rental process from property discovery to contract signing, featuring advanced automation, real-time communication, and comprehensive user management.
+A full-stack, multi-user rental management system featuring a **reverse marketplace** where tenants post rental requests and landlords make competitive offers. This innovative approach flips the traditional rental model, empowering tenants to define their needs while landlords compete for their business. The platform seamlessly connects landlords and tenants, supporting individual, group, and business rentals with streamlined workflows from request posting to contract signing, featuring advanced automation, real-time communication, and comprehensive user management. Built as a scalable SaaS solution for the modern rental market.
 
 ## Key Features
 
+- **Reverse Marketplace**: Innovative tenant-driven model where tenants post rental requests and landlords compete with competitive offers, flipping traditional rental dynamics.
 - **Role-Based Access Control**: Separate dashboards and functionalities for Tenants, Landlords, and Admins with secure authentication and authorization.
 - **Dynamic Rental Workflows**: Support for Individual Tenants, Group Tenants (with an invitation system), and Business Tenants (with occupant management).
 - **Advanced Landlord Accounts**: Differentiates between Private and Business landlords with a seamless upgrade path and organization management.
-- **Automated Contract Generation**: Dynamically creates and populates bilingual (English/Polish) PDF rental agreements based on user data and property details.
+- **Automated Contract Generation**: Dynamically creates and populates bilingual (English/Polish) PDF rental agreements based on user data and property details, powered by LibreTranslate for accurate language localization.
 - **Digital Signatures**: Securely capture and embed digital signatures from all parties into the final contract for legal compliance.
 - **Real-Time Messaging**: A fully integrated chat system for communication between landlords and tenants with instant notifications.
 - **Payment Integration**: Comprehensive payment processing with support for deposits, rent payments, and multiple payment gateways.
@@ -18,7 +19,7 @@ A full-stack, multi-user rental management system designed to connect landlords 
 ## Tech Stack
 
 ### Frontend
-- **React** - Modern, component-based UI framework
+- **React 19** - Latest React framework with modern hooks and features
 - **Vite** - Fast build tool and development server
 - **TailwindCSS** - Utility-first CSS framework for rapid UI development
 - **Socket.IO Client** - Real-time communication capabilities
@@ -29,6 +30,7 @@ A full-stack, multi-user rental management system designed to connect landlords 
 - **Prisma ORM** - Type-safe database client and migrations
 - **Socket.IO** - Real-time bidirectional communication
 - **JWT** - Secure authentication and authorization
+- **LibreTranslate** - Open-source machine translation service for bilingual contract generation
 
 ### Database
 - **PostgreSQL** - Robust, open-source relational database
@@ -36,9 +38,10 @@ A full-stack, multi-user rental management system designed to connect landlords 
 ## Getting Started
 
 ### Prerequisites
-- Node.js (v16 or higher)
-- npm (v8 or higher)
+- Node.js (v18.0.0 or higher)
+- npm (v8.0.0 or higher)
 - PostgreSQL database
+- LibreTranslate service (for bilingual contract generation)
 
 ### Installation
 
@@ -101,7 +104,16 @@ A full-stack, multi-user rental management system designed to connect landlords 
    npm run db:seed
    ```
 
-5. **Start the Application**
+5. **LibreTranslate Setup**
+   ```bash
+   # Start LibreTranslate service (from root directory)
+   npm run translate:start
+   
+   # Or manually start with Docker
+   docker-compose -f docker-compose.translate.yml up -d
+   ```
+
+6. **Start the Application**
    ```bash
    # Start backend server (from backend directory)
    npm run dev
@@ -110,7 +122,7 @@ A full-stack, multi-user rental management system designed to connect landlords 
    npm run dev
    ```
 
-6. **Access the Application**
+7. **Access the Application**
    - Backend API: http://localhost:3001
    - Frontend: http://localhost:3002
    - Database Studio: http://localhost:5555 (if using Prisma Studio)
@@ -124,6 +136,9 @@ npm run dev:backend      # Start only backend
 npm run dev:frontend     # Start only frontend
 npm run format           # Format code with Prettier
 npm run install:all      # Install dependencies for all packages
+npm run translate:start  # Start LibreTranslate service
+npm run translate:stop   # Stop LibreTranslate service
+npm run translate:logs   # View LibreTranslate logs
 ```
 
 #### Backend
@@ -217,6 +232,15 @@ Smart-rental-System/
 └── README.md
 ```
 
+## Business Vision
+
+Smart Rental Platform is positioned as a disruptive force in the traditional rental market, offering:
+
+- **Market Disruption**: The reverse marketplace model challenges conventional landlord-centric approaches
+- **Scalable SaaS**: Built for rapid expansion across multiple markets and regions
+- **Revenue Streams**: Multiple monetization channels including subscription fees, transaction fees, and premium features
+- **Market Opportunity**: Targeting the growing demand for flexible, technology-driven rental solutions
+
 ## Screenshots
 
 *[Landlord Dashboard]*
@@ -227,21 +251,22 @@ Smart-rental-System/
 *[Real-Time Chat Interface]*
 *[Payment Processing Flow]*
 
-## Contributing
+## Development & Collaboration
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+This is a private commercial project. For internal development:
 
-## License
+1. Create a feature branch (`git checkout -b feature/amazing-feature`)
+2. Commit your changes (`git commit -m 'Add some amazing feature'`)
+3. Push to the branch (`git push origin feature/amazing-feature`)
+4. Create a Pull Request for review
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## License & Usage
 
-## Support
+This is proprietary software owned by Smart Rental Platform. All rights reserved.
 
-For support and questions, please open an issue in the GitHub repository or contact the development team.
+## Support & Contact
+
+For internal support and questions, please contact the development team directly.
 
 ---
 
