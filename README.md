@@ -1,7 +1,149 @@
-# Smart Rental System - Payment-Based Chat System
+# Smart Rental Platform
 
-## Overview
-This system implements a **payment-based chat system** where tenants can only message landlords after they have successfully paid for a property. This ensures secure communication and prevents spam while allowing legitimate tenants to coordinate with landlords.
+A full-stack, multi-user rental management system designed to connect landlords and tenants seamlessly, supporting individual, group, and business rentals. This platform streamlines the entire rental process from property discovery to contract signing, featuring advanced automation, real-time communication, and comprehensive user management.
+
+## Key Features
+
+- **Role-Based Access Control**: Separate dashboards and functionalities for Tenants, Landlords, and Admins with secure authentication and authorization.
+- **Dynamic Rental Workflows**: Support for Individual Tenants, Group Tenants (with an invitation system), and Business Tenants (with occupant management).
+- **Advanced Landlord Accounts**: Differentiates between Private and Business landlords with a seamless upgrade path and organization management.
+- **Automated Contract Generation**: Dynamically creates and populates bilingual (English/Polish) PDF rental agreements based on user data and property details.
+- **Digital Signatures**: Securely capture and embed digital signatures from all parties into the final contract for legal compliance.
+- **Real-Time Messaging**: A fully integrated chat system for communication between landlords and tenants with instant notifications.
+- **Payment Integration**: Comprehensive payment processing with support for deposits, rent payments, and multiple payment gateways.
+- **Property Management**: Advanced property listing, search, and matching algorithms with detailed filtering and location-based services.
+- **Review & Rating System**: Built-in review system for both tenants and landlords to build trust and reputation.
+- **Code Quality & Structure**: Professionally refactored with a clean folder structure, centralized documentation in `/docs`, and consistent code formatting with Prettier.
+
+## Tech Stack
+
+### Frontend
+- **React** - Modern, component-based UI framework
+- **Vite** - Fast build tool and development server
+- **TailwindCSS** - Utility-first CSS framework for rapid UI development
+- **Socket.IO Client** - Real-time communication capabilities
+
+### Backend
+- **Node.js** - Server-side JavaScript runtime
+- **Express.js** - Fast, unopinionated web framework
+- **Prisma ORM** - Type-safe database client and migrations
+- **Socket.IO** - Real-time bidirectional communication
+- **JWT** - Secure authentication and authorization
+
+### Database
+- **PostgreSQL** - Robust, open-source relational database
+
+## Getting Started
+
+### Prerequisites
+- Node.js (v16 or higher)
+- npm (v8 or higher)
+- PostgreSQL database
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd Smart-rental-System
+   ```
+
+2. **Install dependencies**
+   ```bash
+   # Install root dependencies
+   npm install
+   
+   # Install backend dependencies
+   cd backend
+   npm install
+   
+   # Install frontend dependencies
+   cd ../frontend
+   npm install
+   ```
+
+3. **Environment Configuration**
+   
+   Create a `.env` file in the `backend` directory with the following variables:
+   ```env
+   # Database
+   DATABASE_URL="postgresql://username:password@localhost:5432/smart_rental_db"
+   
+   # Authentication
+   JWT_SECRET="your-super-secret-jwt-key"
+   
+   # Server
+   PORT=5000
+   NODE_ENV=development
+   
+   # Payment Gateways (optional)
+   STRIPE_SECRET_KEY="sk_test_..."
+   PAYU_MERCHANT_ID="your-payu-merchant-id"
+   PAYU_SECRET_KEY="your-payu-secret-key"
+   
+   # File Upload (optional)
+   CLOUDINARY_CLOUD_NAME="your-cloud-name"
+   CLOUDINARY_API_KEY="your-api-key"
+   CLOUDINARY_API_SECRET="your-api-secret"
+   ```
+
+4. **Database Setup**
+   ```bash
+   cd backend
+   
+   # Generate Prisma client
+   npm run db:generate
+   
+   # Run database migrations
+   npm run db:migrate
+   
+   # Seed the database (optional)
+   npm run db:seed
+   ```
+
+5. **Start the Application**
+   ```bash
+   # Start backend server (from backend directory)
+   npm run dev
+   
+   # Start frontend development server (from frontend directory)
+   npm run dev
+   ```
+
+6. **Access the Application**
+   - Backend API: http://localhost:3001
+   - Frontend: http://localhost:3002
+   - Database Studio: http://localhost:5555 (if using Prisma Studio)
+
+### Available Scripts
+
+#### Root Level
+```bash
+npm run dev              # Start both backend and frontend
+npm run dev:backend      # Start only backend
+npm run dev:frontend     # Start only frontend
+npm run format           # Format code with Prettier
+npm run install:all      # Install dependencies for all packages
+```
+
+#### Backend
+```bash
+npm run dev              # Start development server
+npm run build            # Build for production
+npm run start            # Start production server
+npm run db:generate      # Generate Prisma client
+npm run db:migrate       # Run database migrations
+npm run db:studio        # Open Prisma Studio
+npm run format           # Format code with Prettier
+```
+
+#### Frontend
+```bash
+npm run dev              # Start development server
+npm run build            # Build for production
+npm run preview          # Preview production build
+npm run format           # Format code with Prettier
+```
 
 ## Documentation
 
@@ -47,154 +189,60 @@ This project includes comprehensive documentation covering various aspects of th
 
 For detailed information about any specific feature or system component, please refer to the appropriate documentation file in the `/docs` directory.
 
-## How It Works
+## Project Structure
 
-### 1. **Payment-Based Chat Unlocking**
-- **Before Payment**: Chat is completely locked - no messaging allowed
-- **After Payment**: Chat unlocks immediately for the specific property
-- **Chat is tied to properties**, not to offers
-- **No manual email/title inputs** - everything is automated
-
-### 2. **Conversation Creation**
-- Conversations are created **by property ID** (not offer ID)
-- System checks if user has **paid for the specific property**
-- **Tenants**: Must have successful payment for the property
-- **Landlords**: Must own the property and have tenants who paid
-- Auto-generates conversation title: `"${Property Name}"`
-
-### 3. **Eligible Chat Targets**
-The system shows users only properties they can chat about:
-- **For Tenants**: Properties they have paid for (deposit, rent, etc.)
-- **For Landlords**: Properties they own where tenants have paid
-- Each target shows: property name, counterpart name, payment details, unlock status
-
-### 4. **Security Rules**
-- **Payment Verification**: Only users with successful payments can chat
-- **Property Ownership**: Landlords can only chat about properties they own
-- **Role-Based Access**: Different logic for tenants vs landlords
-- **No Bypass**: Chat remains locked until payment is confirmed
-
-## Frontend Implementation
-
-### **ChatSelector Component**
-- **Purpose**: Modal for selecting which property to chat about
-- **Data Source**: `GET /api/messaging/eligible` (payment-based)
-- **Auto-Start**: Can automatically start chat if `propertyId` is provided
-- **Visual Indicators**: Shows payment purpose, date, and unlock status
-
-### **Updated Pages**
-- **PaymentSuccessPage**: "Message Landlord" button navigates to property-based chat
-- **MessagingPage**: Handles `propertyId` URL parameter for auto-starting chats
-- **Chat Components**: Display lock icons and banners for payment status
-
-### **Chat Components**
-- **ConversationList**: Shows lock icons for locked conversations
-- **MessageInput**: Disabled with banner when chat is locked
-- **Chat Header**: Displays lock status and payment information
-
-## Database Schema Updates
-
-### **Key Relationships**
-- **Payment** → **Offer** → **Property** (for tenant payments)
-- **Property** → **Offer** → **Payment** (for landlord verification)
-- **Conversation** → **Property** (ties conversations to properties)
-
-### **Payment Types Supported**
-- `DEPOSIT`: Security deposit payment
-- `RENT`: Monthly rent payment  
-- `DEPOSIT_AND_FIRST_MONTH`: Combined payment
-
-## Usage Examples
-
-### **Tenant Flow**
-1. Tenant makes offer on property
-2. Landlord accepts offer
-3. Tenant pays deposit/rent
-4. Payment confirmation page shows "Message Landlord" button
-5. Clicking button unlocks chat for that property
-6. Tenant can immediately start messaging landlord
-
-### **Landlord Flow**
-1. Landlord receives payment from tenant
-2. Property appears in landlord's eligible chat targets
-3. Landlord can start/continue conversation with paying tenant
-4. Chat is always unlocked (tenant has already paid)
-
-## Security Features
-
-### **Payment Verification**
-- Only `SUCCEEDED` payments unlock chat
-- Multiple payment purposes supported
-- Payment must be linked to specific property
-
-### **Access Control**
-- Tenants can only chat about properties they paid for
-- Landlords can only chat about properties they own
-- No cross-property chat access
-
-### **Data Integrity**
-- Conversations tied to specific properties
-- Payment status verified on every chat access
-- No manual override of payment requirements
-
-## Benefits
-
-### **For Tenants**
-- **Immediate Access**: Chat unlocks right after payment
-- **Clear Status**: Know exactly when they can message
-- **No Confusion**: Simple property-based system
-
-### **For Landlords**
-- **Verified Tenants**: Only chat with paying customers
-- **Property Management**: Chat organized by property
-- **Payment Tracking**: See which properties have active tenants
-
-### **For System**
-- **Security**: Prevents unpaid chat access
-- **Simplicity**: No complex offer-based logic
-- **Scalability**: Easy to add new payment types
-- **User Experience**: Clear, intuitive flow
-
-## API Endpoints
-
-### **GET /api/messaging/eligible**
-Returns properties the current user can chat about based on payment status.
-
-### **POST /api/messaging/conversations/by-property/:propertyId**
-Creates or finds a conversation for a specific property, verifying payment access.
-
-## Testing
-
-### **Manual Test Commands**
-```bash
-# Test backend health
-curl http://localhost:3001/health
-
-# Test eligible targets (requires auth token)
-curl -H "Authorization: Bearer <token>" http://localhost:3001/api/messaging/eligible
-
-# Test conversation creation (requires auth token)
-curl -X POST -H "Authorization: Bearer <token>" http://localhost:3001/api/messaging/conversations/by-property/<propertyId>
+```
+Smart-rental-System/
+├── backend/                 # Backend API server
+│   ├── src/
+│   │   ├── controllers/    # Route controllers
+│   │   ├── services/       # Business logic
+│   │   ├── routes/         # API routes
+│   │   ├── middleware/     # Custom middleware
+│   │   ├── utils/          # Utility functions
+│   │   ├── scripts/        # Helper scripts
+│   │   └── tests/          # Test files
+│   ├── prisma/             # Database schema and migrations
+│   └── package.json
+├── frontend/                # React frontend application
+│   ├── src/
+│   │   ├── components/     # Reusable UI components
+│   │   ├── pages/          # Page components
+│   │   ├── hooks/          # Custom React hooks
+│   │   ├── utils/          # Frontend utilities
+│   │   └── services/       # API service functions
+│   └── package.json
+├── docs/                    # Comprehensive documentation
+├── contracts/               # Generated contract templates
+└── README.md
 ```
 
-### **Test Scenarios**
-1. **Tenant without payment** → Chat should be locked
-2. **Tenant with payment** → Chat should unlock immediately
-3. **Landlord with paying tenant** → Should see tenant in eligible targets
-4. **Landlord without paying tenant** → Should not see property in targets
-5. **Payment verification** → Only SUCCEEDED payments unlock chat 
+## Screenshots
 
-## Refunds (Move‑in Cancellation)
+*[Landlord Dashboard]*
+*[Tenant Rental Request Card]*
+*[Generated PDF Contract]*
+*[Group Tenant Management]*
+*[Business Account Upgrade]*
+*[Real-Time Chat Interface]*
+*[Payment Processing Flow]*
 
-When support approves a tenant move‑in issue, the platform unwinds the booking and issues refunds.
+## Contributing
 
-What happens:
-- Stripe: `refundOfferPayments(offerId)` calls Stripe’s Refund API per payment and marks our `Payment` as `CANCELLED` with the refund id recorded (in `errorMessage`, prefixed `REFUNDED:`).
-- Mock gateways (dev): Payments are marked `CANCELLED` to represent a refund; real gateway integrations should implement refund APIs similarly to Stripe.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-Key code:
-- `backend/src/controllers/moveInVerificationController.js` → `adminApproveCancellation()` orchestrates unwind then calls `refundOfferPayments`.
-- `backend/src/controllers/paymentController.js` → `refundOfferPayments()` performs provider‑aware refunds and emits realtime notifications.
+## License
 
-Environment for live refunds:
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` must be set.
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+
+For support and questions, please open an issue in the GitHub repository or contact the development team.
+
+---
+
+**Smart Rental Platform** - Revolutionizing the rental experience through technology and automation.
