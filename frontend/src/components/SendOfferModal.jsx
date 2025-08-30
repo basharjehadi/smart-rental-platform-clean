@@ -34,7 +34,7 @@ const SendOfferModal = ({
 
       // Only pro-rate if not moving in on the 1st
       if (moveInDay > 1) {
-        firstMonthRent = (rent / daysInMonth) * daysOccupied;
+        firstMonthRent = Math.round((rent / daysInMonth) * daysOccupied);
         proRatedCalculation = {
           daysOccupied,
           daysInMonth,
