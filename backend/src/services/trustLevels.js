@@ -185,11 +185,11 @@ async function landlordTrustLevel(userId, prismaClient = defaultPrisma) {
     const reviews = await prismaClient.review.findMany({
       where: {
         revieweeId: userId,
-        stage: 'END_OF_LEASE',
+        reviewStage: 'END_OF_LEASE',
         status: 'PUBLISHED',
       },
       select: {
-        stars: true,
+        rating: true,
         createdAt: true,
       },
     });
@@ -198,11 +198,11 @@ async function landlordTrustLevel(userId, prismaClient = defaultPrisma) {
     const moveInReviews = await prismaClient.review.findMany({
       where: {
         revieweeId: userId,
-        stage: 'MOVE_IN',
+        reviewStage: 'MOVE_IN',
         status: 'PUBLISHED',
       },
       select: {
-        stars: true,
+        rating: true,
         createdAt: true,
       },
     });
@@ -211,12 +211,12 @@ async function landlordTrustLevel(userId, prismaClient = defaultPrisma) {
     const reviewCount = reviews.length;
     const averageRating =
       reviewCount > 0
-        ? reviews.reduce((sum, review) => sum + review.stars, 0) / reviewCount
+        ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviewCount
         : 0;
 
     // Calculate 'as described' accuracy percentage (4+ stars in move-in reviews)
     const accurateMoveIns = moveInReviews.filter(
-      (review) => review.stars >= 4
+      (review) => review.rating >= 4
     ).length;
     const accuracyPercentage =
       moveInReviews.length > 0

@@ -20,6 +20,7 @@ import systemRoutes from './systemRoutes.js';
 import supportRoutes from './supportRoutes.js';
 import reviewRoutes from './reviewRoutes.js';
 import moveInVerificationRoutes from './moveInVerificationRoutes.js';
+import moveInIssueRoutes from './moveInIssueRoutes.js';
 import leaseRoutes from './leaseRoutes.js';
 import renewalRoutes from './renewalRoutes.js';
 import organizationRoutes from './organizationRoutes.js';
@@ -91,6 +92,9 @@ router.use('/reviews', reviewRoutes);
 
 // Move-in verification routes
 router.use('/move-in', moveInVerificationRoutes);
+
+// Move-in issue routes
+router.use('/move-in-issues', moveInIssueRoutes);
 
 // Lease lifecycle routes
 router.use('/leases', leaseRoutes);

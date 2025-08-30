@@ -4,7 +4,6 @@ import upload from '../middlewares/uploadMiddleware.js';
 import {
   getMoveInStatus,
   verifyMoveInSuccess,
-  reportMoveInIssue,
   getLatestPaidOfferStatusForProperty,
   adminApproveCancellation,
   adminRejectCancellation,
@@ -20,12 +19,7 @@ const router = Router();
 // Tenant and landlord must be authenticated
 router.get('/offers/:id/status', verifyToken, getMoveInStatus);
 router.post('/offers/:id/verify', verifyToken, verifyMoveInSuccess);
-router.post(
-  '/offers/:id/report-issue',
-  verifyToken,
-  upload.array('moveInEvidence', 10),
-  reportMoveInIssue
-);
+
 router.get(
   '/property/:propertyId/latest-paid-status',
   verifyToken,

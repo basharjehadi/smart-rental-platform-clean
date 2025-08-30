@@ -6,6 +6,7 @@ import {
   handle24HourTermination,
   getLeaseStatusHistory,
 } from '../controllers/leaseController.js';
+import { listLeaseMoveInIssues } from '../controllers/moveInIssueController.js';
 
 const router = express.Router();
 
@@ -25,5 +26,8 @@ router.post('/:leaseId/terminate-24h', handle24HourTermination);
 
 // Get lease status history and related reviews
 router.get('/:leaseId/status-history', getLeaseStatusHistory);
+
+// List move-in issues for a specific lease
+router.get('/:leaseId/move-in-issues', listLeaseMoveInIssues);
 
 export default router;

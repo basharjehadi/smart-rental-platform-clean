@@ -23,7 +23,7 @@ const AdminDashboard = () => {
   const [overdueSummary, setOverdueSummary] = useState(null);
   const [contracts, setContracts] = useState([]);
   const [contractSummary, setContractSummary] = useState(null);
-  const [moveInIssues, setMoveInIssues] = useState([]);
+
   const [evidencePreview, setEvidencePreview] = useState({ url: '', type: '' });
 
   // Pagination states
@@ -91,7 +91,7 @@ const AdminDashboard = () => {
           ]);
           break;
         case 'movein':
-          await fetchMoveInIssues();
+      
           break;
         case 'users':
           await fetchUsers();
@@ -222,14 +222,7 @@ const AdminDashboard = () => {
     }
   };
 
-  const fetchMoveInIssues = async () => {
-    try {
-      const response = await api.get('/admin/move-in/issues');
-      setMoveInIssues(response.data.offers || []);
-    } catch (error) {
-      console.error('Error fetching move-in issues:', error);
-    }
-  };
+
 
   const handleKYCVerification = async (
     userId,
@@ -1637,143 +1630,7 @@ const AdminDashboard = () => {
     );
   };
 
-  const renderMoveInIssues = () => (
-    <div className='space-y-6'>
-      <div className='flex items-center justify-between'>
-        <h2 className='text-xl font-semibold text-gray-900'>Move-in Issues</h2>
-      </div>
-      {moveInIssues.length === 0 ? (
-        <div className='text-gray-600'>No pending issues.</div>
-      ) : (
-        <div className='space-y-3'>
-          {moveInIssues.map(o => {
-            const evidence = Array.isArray(o.cancellationEvidence)
-              ? o.cancellationEvidence
-              : [];
-            return (
-              <div key={o.id} className='p-4 bg-white rounded border'>
-                <div className='flex items-start justify-between'>
-                  <div className='pr-4'>
-                    <div className='flex items-center space-x-3'>
-                      {o.tenant?.profileImage ? (
-                        <img
-                          src={`http://localhost:3001${o.tenant.profileImage.startsWith('/uploads/') ? o.tenant.profileImage : `/uploads/profile_images/${o.tenant.profileImage}`}`}
-                          alt='Tenant'
-                          className='w-8 h-8 rounded-full object-cover'
-                        />
-                      ) : (
-                        <div className='w-8 h-8 bg-gray-200 rounded-full' />
-                      )}
-                      <div className='font-medium'>
-                        Offer {o.id}{' '}
-                        {o.tenant?.name ? `• ${o.tenant.name}` : ''}
-                      </div>
-                    </div>
-                    <div className='text-sm text-gray-600 mt-1'>
-                      Reason: {o.cancellationReason || '—'}
-                    </div>
-                    <div className='mt-2'>
-                      <Link
-                        to={`/admin/property-review/${o.id}`}
-                        className='inline-flex items-center px-3 py-1 rounded bg-blue-600 text-white text-sm hover:bg-blue-700'
-                      >
-                        Open Admin Review
-                      </Link>
-                    </div>
-                    {evidence.length > 0 && (
-                      <div className='mt-3'>
-                        <div className='text-xs text-gray-500 mb-2'>
-                          Evidence
-                        </div>
-                        <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3'>
-                          {evidence.map((p, idx) => {
-                            const fullUrl = `http://localhost:3001${p}`;
-                            const type = getEvidenceType(p);
-                            return renderEvidenceItem(fullUrl, type, idx);
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className='flex items-center space-x-2'>
-                    <button
-                      className='px-3 py-1 rounded bg-green-600 text-white'
-                      onClick={async () => {
-                        if (
-                          !window.confirm(
-                            'Approve cancellation for this offer?'
-                          )
-                        )
-                          return;
-                        await api.post(`/move-in/offers/${o.id}/admin/approve`);
-                        fetchMoveInIssues();
-                      }}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      className='px-3 py-1 rounded bg-red-600 text-white'
-                      onClick={async () => {
-                        if (
-                          !window.confirm(
-                            'Reject cancellation and mark as successful move-in?'
-                          )
-                        )
-                          return;
-                        await api.post(`/move-in/offers/${o.id}/admin/reject`);
-                        fetchMoveInIssues();
-                      }}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
-      {evidencePreview.url && (
-        <div
-          className='fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6'
-          onClick={() => setEvidencePreview({ url: '', type: '' })}
-        >
-          <div className='max-w-5xl w-full' onClick={e => e.stopPropagation()}>
-            {evidencePreview.type === 'image' && (
-              <img
-                src={evidencePreview.url}
-                alt='evidence preview'
-                className='max-h-[80vh] w-auto mx-auto rounded'
-              />
-            )}
-            {evidencePreview.type === 'video' && (
-              <video
-                src={evidencePreview.url}
-                controls
-                className='max-h-[80vh] w-auto mx-auto rounded bg-black'
-              />
-            )}
-            {evidencePreview.type === 'pdf' && (
-              <iframe
-                src={evidencePreview.url}
-                title='PDF'
-                className='w-[90vw] h-[80vh] bg-white rounded'
-              />
-            )}
-            <div className='text-center mt-3'>
-              <button
-                className='px-4 py-2 bg-white rounded'
-                onClick={() => setEvidencePreview({ url: '', type: '' })}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 
   const renderContent = () => {
     switch (activeTab) {
@@ -1792,7 +1649,7 @@ const AdminDashboard = () => {
       case 'contracts':
         return renderContracts();
       case 'movein':
-        return renderMoveInIssues();
+        return <div className='p-6 text-center text-gray-600'>Move-in issues are now managed through the dedicated Move-In Issues page.</div>;
       default:
         return renderOverview();
     }

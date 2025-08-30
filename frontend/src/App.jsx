@@ -32,6 +32,7 @@ import LandlordHelpCenter from './pages/LandlordHelpCenter';
 import LandlordRentalRequests from './pages/LandlordRentalRequests';
 import LandlordMyTenants from './pages/LandlordMyTenants';
 import LandlordTenantProfile from './pages/LandlordTenantProfile';
+import LandlordMoveInIssuePage from './pages/LandlordMoveInIssuePage';
 
 import MyOffers from './pages/MyOffers';
 import PropertyDetailsView from './pages/PropertyDetailsView';
@@ -58,6 +59,7 @@ import TenantDashboardRedirect from './components/TenantDashboardRedirect';
 import BusinessUpgradePage from './pages/BusinessUpgradePage';
 import TenantGroupManagement from './pages/TenantGroupManagement';
 import AcceptInvitationPage from './pages/AcceptInvitationPage.jsx';
+import TenantMoveInIssuePage from './pages/TenantMoveInIssuePage';
 // import PaymentDemo from './pages/PaymentDemo';
 // import PaymentExample from './pages/PaymentExample';
 
@@ -171,6 +173,15 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <TenantProfile />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path='/tenant/issue/:issueId'
+          element={
+            <ProtectedRoute>
+              <TenantMoveInIssuePage />
             </ProtectedRoute>
           }
         />
@@ -360,6 +371,15 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <LandlordTenantProfile />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path='/landlord/issue/:issueId'
+          element={
+            <ProtectedRoute>
+              <LandlordMoveInIssuePage />
             </ProtectedRoute>
           }
         />

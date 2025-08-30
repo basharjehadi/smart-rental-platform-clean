@@ -43,6 +43,32 @@ const getLandlordDashboard = async (req, res) => {
             },
           },
         },
+        // Include leases to get move-in issues
+        leases: {
+          include: {
+            moveInIssues: {
+              where: {
+                status: 'OPEN',
+              },
+              include: {
+                comments: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 1, // Get latest comment for preview
+                  include: {
+                    author: {
+                      select: {
+                        id: true,
+                        name: true,
+                        role: true,
+                        profileImage: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -247,6 +273,18 @@ const getLandlordDashboard = async (req, res) => {
       },
     });
 
+    // Extract move-in issues from properties
+    const moveInIssues = properties.flatMap(property => 
+      property.leases.flatMap(lease => 
+        lease.moveInIssues.map(issue => ({
+          ...issue,
+          propertyId: property.id,
+          propertyName: property.name || property.title,
+          leaseId: lease.id,
+        }))
+      )
+    );
+
     const dashboardData = {
       // Portfolio metrics
       totalProperties,
@@ -264,6 +302,9 @@ const getLandlordDashboard = async (req, res) => {
       paymentHistory: paymentData.payments, // Renamed to match frontend
       reviews: reviewData, // Renamed to match frontend
       maintenanceRequests: maintenanceData,
+
+      // Move-in issues
+      moveInIssues,
 
       // Aggregated data
       averageRating: 4.5, // Mock data for now

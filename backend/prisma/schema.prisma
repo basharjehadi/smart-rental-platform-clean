@@ -46,8 +46,6 @@ model User {
   isSuspended              Boolean                   @default(false)
   suspensionReason         String?
   suspendedAt              DateTime?
-  isDeleted                Boolean                   @default(false)
-  deletedAt                DateTime?
   availability             Boolean                   @default(true)
   autoAvailability         Boolean                   @default(true)
   maxTenants               Int                       @default(5)
@@ -63,7 +61,10 @@ model User {
   rankPoints               Int                       @default(0)
   rankUpdatedAt            DateTime                  @default(now())
   badgeCount               Int                       @default(0)
-  anonymizedAt             DateTime?                 // When user was anonymized
+  anonymizedAt             DateTime?
+  deletedAt                DateTime?
+  isDeleted                Boolean                   @default(false)
+  adminAuditLogs           AuditLog[]                @relation("AdminAuditLogs")
   chatSessions             ChatSession[]             @relation("UserChatSessions")
   conversationParticipants ConversationParticipant[] @relation("UserConversations")
   landlordProfile          LandlordProfile?          @relation("LandlordProfile")
@@ -72,15 +73,15 @@ model User {
   organizationMembers      OrganizationMember[]      @relation("UserOrganizations")
   payments                 Payment[]                 @relation("UserPayments")
   rentPayments             RentPayment[]             @relation("TenantRentPayments")
-  reviewsGiven             Review[]                  @relation("UserReviewsGiven")
-  reviewsReceived          Review[]                  @relation("UserReviewsReceived")
   reviewReplies            ReviewReply[]             @relation("UserReviewReplies")
   reviewReports            ReviewReport[]            @relation("UserReviewReports")
+  reviewsGiven             Review[]                  @relation("UserReviewsGiven")
+  reviewsReceived          Review[]                  @relation("UserReviewsReceived")
   supportTickets           SupportTicket[]           @relation("UserSupportTickets")
   tenantGroups             TenantGroupMember[]       @relation("UserTenantGroups")
   ticketMessages           TicketMessage[]           @relation("UserTicketMessages")
-  adminAuditLogs           AuditLog[]                @relation("AdminAuditLogs")
-  userBadges               UserBadge[]                @relation("UserBadges")
+  userBadges               UserBadge[]               @relation("UserBadges")
+  moveInIssueComments      MoveInIssueComment[]      @relation("UserMoveInIssueComments")
 
   @@index([role, availability, autoAvailability, currentTenants])
   @@index([email])
@@ -461,8 +462,9 @@ model Lease {
   occupants                 Occupant[]
   payments                  Payment[]            @relation("LeasePayments")
   renewalRequests           RenewalRequest[]
-  reviews                   Review[]             @relation("LeaseReviews")
   reviewSignals             ReviewSignal[]       @relation("LeaseReviewSignals")
+  reviews                   Review[]             @relation("LeaseReviews")
+  moveInIssues              MoveInIssue[]        @relation("LeaseMoveInIssues")
 
   @@index([tenantGroupId])
   @@index([status])
@@ -512,46 +514,42 @@ model RenewalRequest {
 }
 
 model Review {
-  id                  String       @id @default(cuid())
+  id                  String         @id @default(cuid())
   rating              Int
   comment             String
-  isAnonymous         Boolean      @default(false)
+  isAnonymous         Boolean        @default(false)
   leaseId             String?
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
-  isSystemGenerated   Boolean      @default(false)
-  reviewStage         ReviewStage  @default(INITIAL)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  isSystemGenerated   Boolean        @default(false)
+  reviewStage         ReviewStage    @default(INITIAL)
   reviewerId          String
   targetTenantGroupId String
-  revieweeId          String       // The user being reviewed
-  isDoubleBlind       Boolean      @default(true)
+  revieweeId          String
+  isDoubleBlind       Boolean        @default(true)
   publishAfter        DateTime?
   publishedAt         DateTime?
   redactedText        String?
-  status              ReviewStatus @default(PENDING)
+  status              ReviewStatus   @default(PENDING)
   submittedAt         DateTime?
-  violatesPolicy      Boolean      @default(false)
-  // Early termination fields
-  isEarlyTermination  Boolean      @default(false)
+  violatesPolicy      Boolean        @default(false)
+  isEarlyTermination  Boolean        @default(false)
   earlyTerminationReason String?
-  excludeFromAggregates Boolean    @default(false)
-  // Redaction fields
+  excludeFromAggregates Boolean      @default(false)
   redactedAt          DateTime?
   redactedBy          String?
-  // Additional fields for compatibility
-  text                String?      // Alias for comment
-  stars               Int?         // Alias for rating
-  stage               ReviewStage? // Alias for reviewStage
-  targetUserId        String?      // For backward compatibility
-  // Anonymization fields
-  reviewerDisplayName String?      // Cached display name for anonymization
-  revieweeDisplayName String?      // Cached display name for anonymization
-  lease               Lease?       @relation("LeaseReviews", fields: [leaseId], references: [id], onDelete: Cascade)
-  reviewer            User         @relation("UserReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
-  targetTenantGroup   TenantGroup  @relation("TenantGroupReviewsReceived", fields: [targetTenantGroupId], references: [id], onDelete: Cascade)
-  reviewee            User         @relation("UserReviewsReceived", fields: [revieweeId], references: [id], onDelete: Cascade)
-  reply               ReviewReply? @relation("ReviewReply")
+  stage               ReviewStage?
+  stars               Int?
+  targetUserId        String?
+  text                String?
+  revieweeDisplayName String?
+  reviewerDisplayName String?
+  reply               ReviewReply?   @relation("ReviewReply")
   reports             ReviewReport[] @relation("ReviewReports")
+  lease               Lease?         @relation("LeaseReviews", fields: [leaseId], references: [id], onDelete: Cascade)
+  reviewer            User           @relation("UserReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
+  targetTenantGroup   TenantGroup    @relation("TenantGroupReviewsReceived", fields: [targetTenantGroupId], references: [id], onDelete: Cascade)
+  reviewee            User           @relation("UserReviewsReceived", fields: [revieweeId], references: [id], onDelete: Cascade)
 
   @@unique([leaseId, reviewerId, revieweeId, reviewStage])
   @@index([leaseId])
@@ -564,16 +562,15 @@ model Review {
 }
 
 model ReviewReply {
-  id          String   @id @default(cuid())
-  reviewId    String   @unique
-  revieweeId  String
-  content     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  // Anonymization fields
-  userDisplayName String?      // Cached display name for anonymization
-  review      Review   @relation("ReviewReply", fields: [reviewId], references: [id], onDelete: Cascade)
-  reviewee    User     @relation("UserReviewReplies", fields: [revieweeId], references: [id], onDelete: Cascade)
+  id              String   @id @default(cuid())
+  reviewId        String   @unique
+  revieweeId      String
+  content         String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  userDisplayName String?
+  review          Review   @relation("ReviewReply", fields: [reviewId], references: [id], onDelete: Cascade)
+  reviewee        User     @relation("UserReviewReplies", fields: [revieweeId], references: [id], onDelete: Cascade)
 
   @@index([reviewId])
   @@index([revieweeId])
@@ -581,18 +578,17 @@ model ReviewReply {
 }
 
 model ReviewReport {
-  id          String           @id @default(cuid())
-  reviewId    String
-  reporterId  String
-  reason      String
-  description String?
-  status      ReportStatus     @default(PENDING)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  // Anonymization fields
-  reporterDisplayName String?      // Cached display name for anonymization
-  review      Review           @relation("ReviewReports", fields: [reviewId], references: [id], onDelete: Cascade)
-  reporter    User             @relation("UserReviewReports", fields: [reporterId], references: [id], onDelete: Cascade)
+  id                  String       @id @default(cuid())
+  reviewId            String
+  reporterId          String
+  reason              String
+  description         String?
+  status              ReportStatus @default(PENDING)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  reporterDisplayName String?
+  reporter            User         @relation("UserReviewReports", fields: [reporterId], references: [id], onDelete: Cascade)
+  review              Review       @relation("ReviewReports", fields: [reviewId], references: [id], onDelete: Cascade)
 
   @@index([reviewId])
   @@index([reporterId])
@@ -602,17 +598,16 @@ model ReviewReport {
 }
 
 model ReviewSignal {
-  id                  String           @id @default(cuid())
-  signalType          ReviewSignalType @default(PAYMENT_CONFIRMED)
-  leaseId             String
-  tenantGroupId       String
-  metadata            Json?            // Additional data like amount, date, etc.
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
-  // Anonymization fields
-  userDisplayName     String?          // Cached display name for anonymization
-  lease               Lease            @relation("LeaseReviewSignals", fields: [leaseId], references: [id], onDelete: Cascade)
-  tenantGroup         TenantGroup      @relation("TenantGroupReviewSignals", fields: [tenantGroupId], references: [id], onDelete: Cascade)
+  id              String           @id @default(cuid())
+  signalType      ReviewSignalType @default(PAYMENT_CONFIRMED)
+  leaseId         String
+  tenantGroupId   String
+  metadata        Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  userDisplayName String?
+  lease           Lease            @relation("LeaseReviewSignals", fields: [leaseId], references: [id], onDelete: Cascade)
+  tenantGroup     TenantGroup      @relation("TenantGroupReviewSignals", fields: [tenantGroupId], references: [id], onDelete: Cascade)
 
   @@index([leaseId])
   @@index([tenantGroupId])
@@ -676,27 +671,26 @@ model ConversationParticipant {
 }
 
 model Message {
-  id             String       @id @default(cuid())
-  content        String
-  messageType    MessageType  @default(TEXT)
-  attachmentUrl  String?
-  attachmentName String?
-  attachmentSize Int?
-  attachmentType String?
-  isRead         Boolean      @default(false)
-  readAt         DateTime?
-  conversationId String
-  senderId       String
-  replyToId      String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  // Anonymization fields
-  senderDisplayName    String?      // Cached display name for anonymization
-  recipientDisplayName String?      // Cached display name for anonymization
-  conversation   Conversation @relation("ConversationMessages", fields: [conversationId], references: [id], onDelete: Cascade)
-  replyTo        Message?     @relation("MessageReplies", fields: [replyToId], references: [id])
-  replies        Message[]    @relation("MessageReplies")
-  sender         User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  id                   String       @id @default(cuid())
+  content              String
+  messageType          MessageType  @default(TEXT)
+  attachmentUrl        String?
+  attachmentName       String?
+  attachmentSize       Int?
+  attachmentType       String?
+  isRead               Boolean      @default(false)
+  readAt               DateTime?
+  conversationId       String
+  senderId             String
+  replyToId            String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  recipientDisplayName String?
+  senderDisplayName    String?
+  conversation         Conversation @relation("ConversationMessages", fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo              Message?     @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies              Message[]    @relation("MessageReplies")
+  sender               User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
   @@index([senderId])
@@ -828,8 +822,8 @@ model TenantGroup {
   payments       Payment[]           @relation("TenantGroupPayments")
   rentPayments   RentPayment[]       @relation("TenantGroupRentPayments")
   rentalRequests RentalRequest[]     @relation("TenantGroupRequests")
-  reviews        Review[]            @relation("TenantGroupReviewsReceived")
   reviewSignals  ReviewSignal[]      @relation("TenantGroupReviewSignals")
+  reviews        Review[]            @relation("TenantGroupReviewsReceived")
   members        TenantGroupMember[]
 
   @@index([name])
@@ -851,6 +845,122 @@ model TenantGroupMember {
   @@index([tenantGroupId])
   @@index([isPrimary])
   @@map("tenant_group_members")
+}
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  adminId         String
+  action          String
+  resourceType    String
+  resourceId      String
+  details         String?
+  ipAddress       String?
+  userAgent       String?
+  timestamp       DateTime @default(now())
+  userDisplayName String?
+  admin           User     @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([resourceType, resourceId])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+model Badge {
+  id          String      @id @default(cuid())
+  name        String
+  description String
+  category    String
+  icon        String
+  color       String
+  criteria    String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  userBadges  UserBadge[]
+
+  @@index([category])
+  @@map("badges")
+}
+
+model UserBadge {
+  id       String   @id @default(cuid())
+  userId   String
+  badgeId  String
+  earnedAt DateTime @default(now())
+  metadata String?
+  isActive Boolean  @default(true)
+  badge    Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  user     User     @relation("UserBadges", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@index([badgeId])
+  @@index([earnedAt])
+  @@map("user_badges")
+}
+
+model tenant_group_invitations {
+  id              String    @id
+  token           String    @unique
+  tenant_group_id String
+  invited_user_id String
+  inviter_user_id String
+  status          String    @default("PENDING")
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  expires_at      DateTime? @db.Timestamptz(6)
+}
+
+model MoveInIssue {
+  id          String               @id @default(cuid())
+  title       String
+  description String
+  status      MoveInIssueStatus    @default(OPEN)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  
+  // Relations
+  leaseId     String
+  lease       Lease                @relation("LeaseMoveInIssues", fields: [leaseId], references: [id], onDelete: Cascade)
+  
+  // Comments for three-way communication
+  comments    MoveInIssueComment[]
+  
+  // Admin decision fields
+  adminDecision     String?     // "ACCEPTED", "REJECTED", "ESCALATED"
+  adminDecisionAt   DateTime?
+  adminDecisionBy   String?     // Admin user ID
+  adminNotes        String?     // Admin's reasoning
+  refundAmount      Float?      // Amount to refund if approved
+  propertyHoldUntil DateTime?   // Property hold period end date
+  
+  // Indexes for performance
+  @@index([leaseId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([adminDecision])
+  @@map("move_in_issues")
+}
+
+model MoveInIssueComment {
+  id        String      @id @default(cuid())
+  content   String
+  createdAt DateTime    @default(now())
+  
+  // Evidence support
+  evidence  String[]    // Array of file paths
+  evidenceType EvidenceType?  // IMAGE, DOCUMENT, VIDEO
+  
+  // Relations
+  authorId  String
+  author    User        @relation("UserMoveInIssueComments", fields: [authorId], references: [id], onDelete: Cascade)
+  issueId   String
+  issue     MoveInIssue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  
+  // Indexes for performance
+  @@index([authorId])
+  @@index([issueId])
+  @@index([createdAt])
+  @@map("move_in_issue_comments")
 }
 
 enum MoveInVerificationStatus {
@@ -947,9 +1057,7 @@ enum KYCStatus {
 enum LeaseStatus {
   ACTIVE
   EXPIRED
-  ENDED
   TERMINATED
-  TERMINATED_24H
   PENDING
 }
 
@@ -1084,55 +1192,20 @@ enum UserRank {
   DIAMOND_LANDLORD
 }
 
-model AuditLog {
-  id           String   @id @default(cuid())
-  adminId      String
-  action       String
-  resourceType String
-  resourceId   String
-  details      String?  // JSON string of additional details
-  ipAddress    String?
-  userAgent    String?
-  timestamp    DateTime @default(now())
-  // Anonymization fields
-  userDisplayName String?      // Cached display name for anonymization
-  admin        User     @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: Cascade)
-
-  @@index([adminId])
-  @@index([resourceType, resourceId])
-  @@index([timestamp])
-  @@map("audit_logs")
+enum MoveInIssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  ADMIN_APPROVED    // Admin accepted the issue
+  ADMIN_REJECTED    // Admin rejected the issue
+  ESCALATED         // Needs further review
 }
 
-model Badge {
-  id          String   @id @default(cuid())
-  name        String
-  description String
-  category    String   // TENANT, HOST, etc.
-  icon        String
-  color       String
-  criteria    String   // JSON string of criteria
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  userBadges  UserBadge[]
 
-  @@index([category])
-  @@map("badges")
-}
 
-model UserBadge {
-  id        String   @id @default(cuid())
-  userId    String
-  badgeId   String
-  earnedAt  DateTime @default(now())
-  metadata  String?  // JSON string of additional data
-  isActive  Boolean  @default(true)
-  user      User     @relation("UserBadges", fields: [userId], references: [id], onDelete: Cascade)
-  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, badgeId])
-  @@index([userId])
-  @@index([badgeId])
-  @@index([earnedAt])
-  @@map("user_badges")
+enum EvidenceType {
+  IMAGE
+  DOCUMENT
+  VIDEO
 }

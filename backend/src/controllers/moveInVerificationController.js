@@ -17,8 +17,21 @@ export const getMoveInStatus = async (req, res) => {
       include: {
         rentalRequest: true,
         property: true,
-        landlord: true,
-        tenant: true,
+        organization: {
+          include: {
+            members: {
+              where: { role: 'OWNER' },
+              select: { userId: true }
+            }
+          }
+        },
+        tenantGroup: {
+          include: {
+            members: {
+              select: { userId: true }
+            }
+          }
+        }
       },
     });
 
@@ -116,106 +129,6 @@ export const verifyMoveInSuccess = async (req, res) => {
   } catch (error) {
     console.error('Error verifying move-in success:', error);
     return res.status(500).json({ error: 'Failed to verify move-in' });
-  }
-};
-
-// POST /offers/:id/report-issue
-export const reportMoveInIssue = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { reason, notes } = req.body || {};
-    // Collect evidence paths from multer uploads (single or multiple)
-    let evidence = [];
-    if (req.files && req.files.length > 0) {
-      evidence = req.files.map(
-        (f) => `/uploads/move_in_evidence/${f.filename}`
-      );
-    }
-
-    const updated = await prisma.offer.update({
-      where: { id },
-      data: {
-        moveInVerificationStatus: 'ISSUE_REPORTED',
-        cancellationReason: reason || null,
-        cancellationEvidence: Array.isArray(evidence) ? evidence : [],
-        verificationNotes: notes || null,
-      },
-      select: {
-        id: true,
-        moveInVerificationStatus: true,
-        cancellationReason: true,
-        cancellationEvidence: true,
-        verificationNotes: true,
-      },
-    });
-
-    // Notify landlord immediately
-    const offer = await prisma.offer.findUnique({
-      where: { id },
-      select: { organizationId: true, rentalRequestId: true, propertyId: true },
-    });
-
-    if (offer?.organizationId) {
-      // Get the landlord user ID from the organization
-      const landlordMember = await prisma.organizationMember.findFirst({
-        where: {
-          organizationId: offer.organizationId,
-          role: 'OWNER',
-        },
-        select: { userId: true },
-      });
-
-      if (landlordMember?.userId) {
-        await prisma.notification.create({
-          data: {
-            userId: landlordMember.userId,
-            type: 'SYSTEM_ANNOUNCEMENT',
-            entityId: id,
-            title: 'Move-in issue reported',
-            body: 'The tenant reported a move-in issue. Please review.',
-          },
-        });
-      }
-    }
-
-    // Auto-create support ticket for admin processing
-    // Get tenant ID from the rental request
-    const rentalRequest = await prisma.rentalRequest.findUnique({
-      where: { id: offer.rentalRequestId },
-      select: { tenantGroupId: true },
-    });
-
-    if (rentalRequest?.tenantGroupId) {
-      // Get the primary tenant from the tenant group
-      const primaryTenant = await prisma.tenantGroupMember.findFirst({
-        where: { tenantGroupId: rentalRequest.tenantGroupId },
-        select: { userId: true },
-      });
-
-      if (primaryTenant?.userId) {
-        const tenantId = primaryTenant.userId;
-        const tenant = await prisma.user.findUnique({
-          where: { id: tenantId },
-          select: { id: true, email: true },
-        });
-
-        await prisma.supportTicket.create({
-          data: {
-            userId: tenantId,
-            title: `Move-in issue for offer ${id}`,
-            description: `Tenant ${tenant?.email || tenantId} reported: ${reason || 'No reason provided'}. Evidence: ${evidence.join(', ')}`,
-            category: 'PROPERTY_ISSUE',
-            priority: 'HIGH',
-            status: 'OPEN',
-          },
-        });
-      }
-    }
-
-    return res.json({ success: true, data: updated });
-  } catch (error) {
-    console.error('Error reporting move-in issue:', error);
-    return res.status(500).json({ error: 'Failed to report issue' });
   }
 };
 

@@ -9,7 +9,7 @@ import { LogOut } from 'lucide-react';
 import NotificationHeader from '../components/common/NotificationHeader';
 import { useNotifications } from '../contexts/NotificationContext';
 import dayjs from 'dayjs';
-import ReportMoveInIssueModal from '../components/ReportMoveInIssueModal.jsx';
+
 import TenantGroupChoiceModal from '../components/TenantGroupChoiceModal.jsx';
 
 const TenantDashboard = () => {
@@ -40,7 +40,7 @@ const TenantDashboard = () => {
 
   // Chat states
   const [showChat, setShowChat] = useState(false);
-  const [reportOfferId, setReportOfferId] = useState(null);
+
   const [isGroupChoiceModalOpen, setGroupChoiceModalOpen] = useState(false);
 
   const fetchRequests = async () => {
@@ -233,7 +233,7 @@ const TenantDashboard = () => {
             Move-in successful
           </button>
           <button
-            onClick={() => setReportOfferId(paidOffer.id)}
+                            onClick={() => {/* TODO: Implement new move-in issue system */}}
             className='px-3 py-1 rounded-md text-sm bg-red-600 text-white hover:bg-red-700'
           >
             Report issue
@@ -854,26 +854,109 @@ const TenantDashboard = () => {
                 ))}
               </div>
             )}
+
+            {/* Move-In Issues Section */}
+            <div className='mt-12'>
+              <div className='flex items-center justify-between mb-6'>
+                <h2 className='text-lg font-semibold text-gray-900'>
+                  Move-In Issues
+                </h2>
+              </div>
+              
+              {(() => {
+                // Get move-in issues from rental requests that have paid offers
+                const moveInIssues = filteredAndSortedRequests
+                  .filter(request => {
+                    const paidOffer = (request.offers || []).find(o => o.status === 'PAID');
+                    return paidOffer && paidOffer.moveInIssues && paidOffer.moveInIssues.length > 0;
+                  })
+                  .flatMap(request => {
+                    const paidOffer = (request.offers || []).find(o => o.status === 'PAID');
+                    return (paidOffer.moveInIssues || []).map(issue => ({
+                      ...issue,
+                      requestTitle: request.title,
+                      propertyName: paidOffer.property?.name || 'Unknown Property'
+                    }));
+                  });
+
+                if (moveInIssues.length === 0) {
+                  return (
+                    <div className='card-modern p-8 text-center'>
+                      <div className='text-gray-400 text-4xl mb-4'>✅</div>
+                      <p className='text-gray-600 text-lg mb-4'>
+                        No move-in issues reported
+                      </p>
+                      <p className='text-gray-500'>
+                        All your move-ins are proceeding smoothly!
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className='space-y-4'>
+                    {moveInIssues.map(issue => (
+                      <div key={issue.id} className='card-elevated p-6'>
+                        <div className='flex items-start justify-between'>
+                          <div className='flex-1'>
+                            <div className='flex items-center gap-2 mb-2'>
+                              <h3 className='text-lg font-semibold text-gray-900'>
+                                {issue.title}
+                              </h3>
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                issue.status === 'OPEN' ? 'bg-red-100 text-red-800' :
+                                issue.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
+                                issue.status === 'RESOLVED' ? 'bg-green-100 text-green-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {issue.status}
+                              </span>
+
+                            </div>
+                            
+                            <p className='text-gray-600 mb-3'>{issue.description}</p>
+                            
+                            <div className='grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-4'>
+                              <div>
+                                <span className='text-gray-500'>Request:</span>
+                                <p className='font-medium'>{issue.requestTitle}</p>
+                              </div>
+                              <div>
+                                <span className='text-gray-500'>Property:</span>
+                                <p className='font-medium'>{issue.propertyName}</p>
+                              </div>
+                              <div>
+                                <span className='text-gray-500'>Reported:</span>
+                                <p className='font-medium'>
+                                  {new Date(issue.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className='flex items-center justify-between pt-3 border-t border-gray-100'>
+                              <div className='text-xs text-gray-500'>
+                                {issue.comments?.length || 0} comment{issue.comments?.length !== 1 ? 's' : ''}
+                              </div>
+                              <button
+                                onClick={() => navigate(`/tenant/issue/${issue.id}`)}
+                                className='px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors'
+                              >
+                                View Details
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         </main>
       </div>
 
-      {/* Report Issue Modal */}
-      {reportOfferId && (
-        <ReportMoveInIssueModal
-          open={true}
-          onClose={() => setReportOfferId(null)}
-          onSubmit={async form => {
-            await api.post(
-              `/move-in/offers/${reportOfferId}/report-issue`,
-              form,
-              { headers: { 'Content-Type': 'multipart/form-data' } }
-            );
-            setReportOfferId(null);
-            fetchRequests();
-          }}
-        />
-      )}
+
 
       {/* Create Rental Request Modal */}
       <CreateRentalRequestModal
