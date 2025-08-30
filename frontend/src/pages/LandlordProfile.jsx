@@ -8,6 +8,8 @@ import DatePicker from 'react-datepicker';
 import Select from 'react-select';
 import countryList from 'react-select-country-list';
 import 'react-datepicker/dist/react-datepicker.css';
+import BadgeCollection from '../components/BadgeCollection';
+import TrustLevelBadge from '../components/TrustLevelBadge';
 
 // Import signature canvas
 import SignatureCanvas from 'react-signature-canvas';
@@ -58,6 +60,7 @@ const LandlordProfile = () => {
     phoneVerified: false,
     emailVerified: false,
   });
+  const [badges, setBadges] = useState([]);
 
   // Form validation and conditional fields state
   const [formErrors, setFormErrors] = useState({});
@@ -292,6 +295,15 @@ const LandlordProfile = () => {
         // Default to Poland if no country is set
         const polandOption = countries.find(country => country.value === 'PL');
         setSelectedCountry(polandOption);
+      }
+
+      // Set badges if available
+      if (response.data.user.badges) {
+        setBadges(response.data.user.badges);
+        console.log('🔍 Landlord Profile Badges:', response.data.user.badges);
+      } else {
+        setBadges([]);
+        console.log('🔍 No badges found in landlord profile');
       }
     } catch (error) {
       console.error('Error fetching profile data:', error);
@@ -1322,11 +1334,33 @@ const LandlordProfile = () => {
                     <span className='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700'>
                       Landlord
                     </span>
+                    
+                    {/* Badges Section */}
+                    {badges.length > 0 ? (
+                      <div className='mt-3'>
+                        <BadgeCollection 
+                          badges={badges} 
+                          layout="horizontal"
+                          showTitle={false}
+                        />
+                      </div>
+                    ) : (
+                      <div className='mt-3 p-2 bg-gray-50 rounded-lg'>
+                        <p className='text-gray-600 text-xs'>
+                          🔍 Debug: No badges found. Badges array length: {badges.length}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Right side - Profile completion */}
+                {/* Right side - Profile completion and Trust Level */}
                 <div className='text-right'>
+                  {/* Trust Level Badge */}
+                  <div className='mb-3 flex justify-end'>
+                    <TrustLevelBadge level={profileData?.trustLevel || 'New'} size='large' />
+                  </div>
+                  
                   <p className='text-sm font-medium text-gray-900 mb-2'>
                     Profile completion {profileStatus.completionPercentage}%
                   </p>
@@ -2440,6 +2474,37 @@ const LandlordProfile = () => {
                 </>
               )}
             </div>
+
+            {/* Achievements Section */}
+            {badges.length > 0 && (
+              <div className='card-modern p-6'>
+                <div className='flex items-center justify-between mb-6'>
+                  <div className='flex items-center'>
+                    <svg
+                      className='w-5 h-5 text-yellow-600 mr-2'
+                      fill='none'
+                      stroke='currentColor'
+                      viewBox='0 0 24 24'
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth={2}
+                        d='M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'
+                      />
+                    </svg>
+                    <h2 className='text-lg font-semibold text-gray-900'>
+                      Achievements
+                    </h2>
+                  </div>
+                </div>
+                <BadgeCollection 
+                  badges={badges} 
+                  layout="grid"
+                  showTitle={false}
+                />
+              </div>
+            )}
 
             {/* Divider */}
             <div className='border-t border-gray-200 my-6'></div>

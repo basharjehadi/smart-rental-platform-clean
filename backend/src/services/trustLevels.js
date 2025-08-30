@@ -347,7 +347,16 @@ async function getUserTrustLevel(userId, prismaClient = defaultPrisma) {
 
     // Check if user has been a landlord (has properties)
     const hasLandlordHistory = await prismaClient.property.findFirst({
-      where: { ownerId: userId },
+      where: {
+        organization: {
+          members: {
+            some: {
+              userId: userId,
+              role: 'OWNER',
+            },
+          },
+        },
+      },
     });
 
     // If user has both histories, prioritize the role with more activity
@@ -371,7 +380,16 @@ async function getUserTrustLevel(userId, prismaClient = defaultPrisma) {
         },
       });
       const landlordProperties = await prismaClient.property.count({
-        where: { ownerId: userId },
+        where: {
+          organization: {
+            members: {
+              some: {
+                userId: userId,
+                role: 'OWNER',
+              },
+            },
+          },
+        },
       });
 
       if (tenantPayments > landlordProperties) {

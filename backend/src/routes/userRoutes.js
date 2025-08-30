@@ -15,6 +15,8 @@ import {
   reviewKYC,
   findUserByEmail,
   getUserRank,
+  getUserTrustLevelById,
+  getUserBadgesForDisplay,
 } from '../controllers/userController.js';
 import { validateProfileData } from '../middlewares/profileValidationMiddleware.js';
 import verifyToken from '../middlewares/verifyToken.js';
@@ -58,5 +60,11 @@ router.post('/find-by-email', findUserByEmail);
 
 // User rank routes
 router.get('/:userId/rank', getUserRank);
+
+// User trust level routes
+router.get('/:userId/trust-level', getUserTrustLevelById);
+
+// User badge routes
+router.get('/:userId/badges', getUserBadgesForDisplay);
 
 export default router;

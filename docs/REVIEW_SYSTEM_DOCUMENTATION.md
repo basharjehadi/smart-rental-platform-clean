@@ -18,9 +18,10 @@
 15. [Review Reply & Report System](#-review-reply--report-system)
 16. [Audit Logging & Review Redaction](#audit-logging--review-redaction)
 17. [Trust Level Service](#trust-level-service)
-18. [Database Schema](#database-schema)
-19. [Security & Access Control](#security--access-control)
-20. [Troubleshooting](#troubleshooting)
+18. [Trust Levels Display & UI Integration](#trust-levels-display--ui-integration)
+19. [Database Schema](#database-schema)
+20. [Security & Access Control](#security--access-control)
+21. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -2122,6 +2123,135 @@ const userLevel = await trustLevelService.getUserTrustLevel('user789');
 - **Coverage**: All trust level calculations, edge cases, and error handling
 - **Mock Strategy**: Uses mocked Prisma client for isolated testing
 - **Test Scenarios**: 19 test cases covering all trust level thresholds and edge cases
+
+---
+
+## 🎨 Trust Levels Display & UI Integration
+
+### Overview
+The Trust Levels system has been fully integrated into the frontend UI to provide users with visual indicators of their credibility and reliability. This integration enhances user experience by making trust levels visible across key interface elements.
+
+### Frontend Components
+
+#### TrustLevelBadge Component
+**Location**: `frontend/src/components/TrustLevelBadge.jsx`
+
+**Features**:
+- **Responsive Design**: Small, medium, and large size variants
+- **Color-Coded Levels**: Distinct colors for each trust level
+- **Accessibility**: Clear visual indicators and hover states
+- **Flexible Styling**: Customizable through className prop
+
+**Trust Level Styling**:
+- **New User**: Gray (`bg-gray-100`, `text-gray-700`)
+- **Reliable**: Blue (`bg-blue-100`, `text-blue-700`)
+- **Trusted**: Green (`bg-green-100`, `text-green-700`)
+- **Excellent**: Gold/Yellow (`bg-yellow-100`, `text-yellow-700`)
+
+**Usage**:
+```jsx
+import TrustLevelBadge from './TrustLevelBadge';
+
+// Basic usage
+<TrustLevelBadge level="Trusted" />
+
+// With custom styling
+<TrustLevelBadge level="Excellent" size="large" className="ml-2" />
+```
+
+### UI Integration Points
+
+#### 1. Profile Pages (`frontend/src/pages/TenantProfile.jsx` and `frontend/src/pages/LandlordProfile.jsx`)
+**Display Location**: Profile header, next to user name
+**Purpose**: Show user's own trust level prominently
+**Implementation**: Large badge displayed in the top-right corner of profile header
+
+#### 2. Tenant Request Cards (`frontend/src/components/TenantRequestCard.jsx`)
+**Display Location**: Next to tenant name in rental request cards
+**Purpose**: Help landlords assess tenant reliability
+**Implementation**: Small badge displayed next to tenant name and verification status
+
+#### 3. Dashboard Integration
+**Display Location**: Tenant dashboard and various user data displays
+**Purpose**: Provide trust level context in user information displays
+**Implementation**: Integrated into user data objects returned by backend APIs
+
+### Backend Integration
+
+#### API Endpoints
+**New Endpoint**: `GET /api/users/:userId/trust-level`
+- **Purpose**: Retrieve user trust level by ID
+- **Access Control**: Users can view their own trust level, admins can view all
+- **Response**: Trust level data with detailed metrics and reasons
+
+**Enhanced Endpoints**:
+- `GET /api/users/profile` - Now includes `trustLevel` and `trustLevelDetails`
+- `GET /api/rental-requests` - Tenant data includes `trustLevel`
+- `GET /api/tenant-dashboard` - User data includes `trustLevel`
+
+#### Data Flow
+1. **User Action**: User accesses profile or rental requests
+2. **Backend Calculation**: Trust level calculated using `trustLevels.js` service
+3. **API Response**: Trust level included in user data payload
+4. **Frontend Display**: TrustLevelBadge component renders with appropriate styling
+
+### Trust Level Calculation Integration
+
+#### User Controller (`backend/src/controllers/userController.js`)
+**New Functions**:
+- `getUserWithTrustLevel(userId)`: Helper function for internal use
+- `getUserTrustLevelById(req, res)`: API endpoint for trust level retrieval
+
+**Enhanced Functions**:
+- `getUserProfile`: Now includes trust level calculation and response
+
+#### Rental Controller (`backend/src/controllers/rentalController.js`)
+**Enhanced Functions**:
+- `getAllActiveRequests`: Tenant data includes trust level
+- `getLandlordAcceptedRequests`: Tenant data includes trust level
+- All rental request normalization functions now calculate and include trust levels
+
+#### Tenant Dashboard Controller (`backend/src/controllers/tenantDashboardController.js`)
+**Enhanced Functions**:
+- `getTenantDashboardData`: User data includes trust level
+
+### Performance Considerations
+
+#### Caching Strategy
+- Trust levels are calculated on-demand for each API request
+- No persistent caching implemented to ensure real-time accuracy
+- Future optimization: Consider implementing Redis caching for frequently accessed users
+
+#### Database Queries
+- Trust level calculation involves multiple database queries
+- Optimized to minimize database calls through efficient Prisma queries
+- Error handling ensures graceful fallback to 'New' level if calculation fails
+
+### Error Handling & Fallbacks
+
+#### Calculation Failures
+- **Default Level**: 'New' trust level assigned if calculation fails
+- **Logging**: Detailed error logging for debugging and monitoring
+- **User Experience**: No disruption to user interface if trust level unavailable
+
+#### Missing Data
+- **Graceful Degradation**: UI continues to function without trust level data
+- **Conditional Rendering**: TrustLevelBadge only displays when data is available
+- **Fallback Text**: Clear indication when trust level information is unavailable
+
+### Future Enhancements
+
+#### Planned Features
+- **Trust Level History**: Track changes over time
+- **Achievement Badges**: Special badges for reaching trust level milestones
+- **Trust Level Analytics**: Detailed breakdown of factors affecting trust level
+- **Trust Level Comparison**: Compare trust levels between users
+
+#### UI Improvements
+- **Interactive Tooltips**: Detailed trust level information on hover
+- **Progress Indicators**: Visual progress toward next trust level
+- **Trust Level Explanations**: Help text explaining how to improve trust level
+- **Mobile Optimization**: Responsive design for mobile devices
 
 ---
 

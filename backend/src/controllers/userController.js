@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client';
+import { getUserTrustLevel } from '../services/trustLevels.js';
+import { getUserBadges } from '../services/badges.js';
 
 const prisma = new PrismaClient();
 
@@ -78,10 +80,130 @@ export const getUserProfile = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Calculate user's trust level
+    try {
+      const trustLevelData = await getUserTrustLevel(userId);
+      user.trustLevel = trustLevelData.level;
+      user.trustLevelDetails = trustLevelData;
+    } catch (trustLevelError) {
+      console.warn(
+        'Failed to calculate trust level for user:',
+        userId,
+        trustLevelError
+      );
+      user.trustLevel = 'New';
+      user.trustLevelDetails = null;
+    }
+
+    // Get user's badges
+    try {
+      const userBadges = await getUserBadges(userId);
+      user.badges = userBadges;
+    } catch (badgeError) {
+      console.warn(
+        'Failed to get badges for user:',
+        userId,
+        badgeError
+      );
+      user.badges = [];
+    }
+
     res.json({ user });
   } catch (error) {
     console.error('Get user profile error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Get user trust level by user ID
+ * @param {string} userId - The user's ID
+ * @returns {Promise<Object>} User object with trust level information
+ */
+export const getUserWithTrustLevel = async (userId) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+        profileImage: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    // Calculate user's trust level
+    try {
+      const trustLevelData = await getUserTrustLevel(userId);
+      user.trustLevel = trustLevelData.level;
+      user.trustLevelDetails = trustLevelData;
+    } catch (trustLevelError) {
+      console.warn(
+        'Failed to calculate trust level for user:',
+        userId,
+        trustLevelError
+      );
+      user.trustLevel = 'New';
+      user.trustLevelDetails = null;
+    }
+
+    return user;
+  } catch (error) {
+    console.error('Error getting user with trust level:', error);
+    return null;
+  }
+};
+
+/**
+ * Get user trust level by user ID (API endpoint)
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const getUserTrustLevelById = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requestingUserId = req.user.id;
+
+    // Users can view their own trust level, admin can view all
+    if (requestingUserId !== userId && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'You can only view your own trust level',
+      });
+    }
+
+    const userWithTrustLevel = await getUserWithTrustLevel(userId);
+
+    if (!userWithTrustLevel) {
+      return res.status(404).json({
+        error: 'User not found',
+        message: 'The specified user does not exist',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        userId: userWithTrustLevel.id,
+        name: userWithTrustLevel.name,
+        trustLevel: userWithTrustLevel.trustLevel,
+        trustLevelDetails: userWithTrustLevel.trustLevelDetails,
+      },
+    });
+  } catch (error) {
+    console.error('Get user trust level error:', error);
+    res.status(500).json({
+      error: 'Failed to get user trust level',
+      message: 'An error occurred while fetching user trust level',
+    });
   }
 };
 
@@ -1071,6 +1193,38 @@ export const getUserRank = async (req, res) => {
     res.status(500).json({
       error: 'Failed to get user rank',
       message: 'An error occurred while fetching user rank',
+    });
+  }
+};
+
+/**
+ * Get user badges for display in tenant cards and other UI components
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const getUserBadgesForDisplay = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        error: 'User ID is required',
+        message: 'Please provide a valid user ID',
+      });
+    }
+
+    // Get user's badges
+    const userBadges = await getUserBadges(userId);
+
+    res.json({
+      success: true,
+      badges: userBadges,
+    });
+  } catch (error) {
+    console.error('Get user badges error:', error);
+    res.status(500).json({
+      error: 'Failed to get user badges',
+      message: 'An error occurred while fetching user badges',
     });
   }
 };

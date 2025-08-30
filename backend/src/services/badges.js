@@ -516,9 +516,6 @@ export async function getUserBadges(userId) {
         userId,
         isActive: true,
       },
-      include: {
-        badge: true,
-      },
       orderBy: {
         earnedAt: 'desc',
       },

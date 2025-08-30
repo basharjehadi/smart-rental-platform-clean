@@ -3,6 +3,7 @@ import { sendOfferNotification } from '../utils/emailService.js';
 import requestPoolService from '../services/requestPoolService.js';
 import { NotificationService } from '../services/notificationService.js';
 import propertyAvailabilityService from '../services/propertyAvailabilityService.js';
+import { getUserTrustLevel } from '../services/trustLevels.js';
 
 // 🚀 SCALABILITY: Create rental request with pool integration
 const createRentalRequest = async (req, res) => {
@@ -322,49 +323,67 @@ const getAllActiveRequests = async (req, res) => {
       };
     };
 
-    const normalizePending = poolRequests.requests.map((match) => {
-      // Get the primary tenant from the tenant group
-      const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
-      const tenant = primaryMember?.user;
+    const normalizePending = await Promise.all(
+      poolRequests.requests.map(async (match) => {
+        // Get the primary tenant from the tenant group
+        const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
+        const tenant = primaryMember?.user;
 
-      return {
-        ...match.rentalRequest,
-        matchScore: match.matchScore,
-        matchReason: match.matchReason,
-        budgetRange:
-          match.rentalRequest.budgetFrom && match.rentalRequest.budgetTo
-            ? `${match.rentalRequest.budgetFrom} - ${match.rentalRequest.budgetTo} PLN`
-            : match.rentalRequest.budget
-              ? `${match.rentalRequest.budget} PLN`
-              : 'Budget not specified',
-        tenant: {
-          id: tenant?.id,
-          name: tenant?.name,
-          email: tenant?.email,
-          firstName: tenant?.firstName,
-          lastName: tenant?.lastName,
-          profileImage: tenant?.profileImage,
-          phoneNumber: tenant?.phoneNumber,
-          occupation: tenant?.profession, // Map profession to occupation for frontend
-          dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
-          age: tenant?.dateOfBirth
-            ? Math.max(
-                18,
-                Math.floor(
-                  (Date.now() - new Date(tenant.dateOfBirth).getTime()) /
-                    (1000 * 60 * 60 * 24 * 365)
+        // Calculate tenant's trust level
+        let trustLevel = 'New';
+        if (tenant?.id) {
+          try {
+            const trustLevelData = await getUserTrustLevel(tenant.id);
+            trustLevel = trustLevelData.level;
+          } catch (trustLevelError) {
+            console.warn(
+              'Failed to calculate trust level for tenant:',
+              tenant.id,
+              trustLevelError
+            );
+          }
+        }
+
+        return {
+          ...match.rentalRequest,
+          matchScore: match.matchScore,
+          matchReason: match.matchReason,
+          budgetRange:
+            match.rentalRequest.budgetFrom && match.rentalRequest.budgetTo
+              ? `${match.rentalRequest.budgetFrom} - ${match.rentalRequest.budgetTo} PLN`
+              : match.rentalRequest.budget
+                ? `${match.rentalRequest.budget} PLN`
+                : 'Budget not specified',
+          tenant: {
+            id: tenant?.id,
+            name: tenant?.name,
+            email: tenant?.email,
+            firstName: tenant?.firstName,
+            lastName: tenant?.lastName,
+            profileImage: tenant?.profileImage,
+            phoneNumber: tenant?.phoneNumber,
+            occupation: tenant?.profession, // Map profession to occupation for frontend
+            dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
+            age: tenant?.dateOfBirth
+              ? Math.max(
+                  18,
+                  Math.floor(
+                    (Date.now() - new Date(tenant.dateOfBirth).getTime()) /
+                      (1000 * 60 * 60 * 24 * 365)
+                  )
                 )
-              )
-            : null,
-          rating: tenant?.averageRating ?? 5.0,
-          reviews: tenant?.totalReviews ?? 1,
-          rank: tenant?.rank,
-        },
-        landlord: null, // RentalRequest doesn't have landlord field
-        propertyMatch: mapBestProperty(match),
-        status: 'pending',
-      };
-    });
+              : null,
+            rating: tenant?.averageRating ?? 5.0,
+            reviews: tenant?.totalReviews ?? 1,
+            rank: tenant?.rank,
+            trustLevel: trustLevel,
+          },
+          landlord: null, // RentalRequest doesn't have landlord field
+          propertyMatch: mapBestProperty(match),
+          status: 'pending',
+        };
+      })
+    );
 
     // 2) Offered (responded=true and an offer from this landlord exists)
     const offeredMatchesRaw = await prisma.landlordRequestMatch.findMany({
@@ -439,48 +458,66 @@ const getAllActiveRequests = async (req, res) => {
     const offeredMatches = offeredMatchesRaw.filter(
       (m) => (m.rentalRequest.offers || []).length > 0
     );
-    const normalizeOffered = offeredMatches.map((match) => {
-      // Get the primary tenant from the tenant group
-      const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
-      const tenant = primaryMember?.user;
+    const normalizeOffered = await Promise.all(
+      offeredMatches.map(async (match) => {
+        // Get the primary tenant from the tenant group
+        const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
+        const tenant = primaryMember?.user;
 
-      return {
-        ...match.rentalRequest,
-        matchScore: match.matchScore,
-        matchReason: match.matchReason,
-        budgetRange:
-          match.rentalRequest.budgetFrom && match.rentalRequest.budgetTo
-            ? `${match.rentalRequest.budgetFrom} - ${match.rentalRequest.budgetTo} PLN`
-            : match.rentalRequest.budget
-              ? `${match.rentalRequest.budget} PLN`
-              : 'Budget not specified',
-        tenant: {
-          id: tenant?.id,
-          name: tenant?.name,
-          email: tenant?.email,
-          firstName: tenant?.firstName,
-          lastName: tenant?.lastName,
-          profileImage: tenant?.profileImage,
-          phoneNumber: tenant?.phoneNumber,
-          occupation: tenant?.profession, // Map profession to occupation for frontend
-          dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
-          age: tenant?.dateOfBirth
-            ? Math.max(
-                18,
-                Math.floor(
-                  (Date.now() - new Date(tenant.dateOfBirth).getTime()) /
-                    (1000 * 60 * 60 * 24 * 365)
+        // Calculate tenant's trust level
+        let trustLevel = 'New';
+        if (tenant?.id) {
+          try {
+            const trustLevelData = await getUserTrustLevel(tenant.id);
+            trustLevel = trustLevelData.level;
+          } catch (trustLevelError) {
+            console.warn(
+              'Failed to calculate trust level for tenant:',
+              tenant.id,
+              trustLevelError
+            );
+          }
+        }
+
+        return {
+          ...match.rentalRequest,
+          matchScore: match.matchScore,
+          matchReason: match.matchReason,
+          budgetRange:
+            match.rentalRequest.budgetFrom && match.rentalRequest.budgetTo
+              ? `${match.rentalRequest.budgetFrom} - ${match.rentalRequest.budgetTo} PLN`
+              : match.rentalRequest.budget
+                ? `${match.rentalRequest.budget} PLN`
+                : 'Budget not specified',
+          tenant: {
+            id: tenant?.id,
+            name: tenant?.name,
+            email: tenant?.email,
+            firstName: tenant?.firstName,
+            lastName: tenant?.lastName,
+            profileImage: tenant?.profileImage,
+            phoneNumber: tenant?.phoneNumber,
+            occupation: tenant?.profession, // Map profession to occupation for frontend
+            dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
+            age: tenant?.dateOfBirth
+              ? Math.max(
+                  18,
+                  Math.floor(
+                    (Date.now() - new Date(tenant.dateOfBirth).getTime()) /
+                      (1000 * 60 * 60 * 24 * 365)
+                  )
                 )
-              )
-            : null,
-          rating: tenant?.averageRating ?? 5.0,
-          reviews: tenant?.totalReviews ?? 1,
-          rank: tenant?.rank,
-        },
-        propertyMatch: mapBestProperty(match),
-        status: 'offered',
-      };
-    });
+              : null,
+            rating: tenant?.averageRating ?? 5.0,
+            reviews: tenant?.totalReviews ?? 1,
+            rank: tenant?.rank,
+            trustLevel: trustLevel,
+          },
+          propertyMatch: mapBestProperty(match),
+          status: 'offered',
+        };
+      })
+    );
 
     // 3) Accepted (property rented - request accepted)
     // Find rental requests where this landlord has a PAID offer and the property is RENTED
@@ -551,59 +588,77 @@ const getAllActiveRequests = async (req, res) => {
       (offer) => offer.property && offer.property.status === 'RENTED'
     );
 
-    const normalizeAccepted = acceptedOffersFiltered.map((offer) => {
-      // Get the primary tenant from the tenant group
-      const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
-      const tenant = primaryMember?.user;
+    const normalizeAccepted = await Promise.all(
+      acceptedOffersFiltered.map(async (offer) => {
+        // Get the primary tenant from the tenant group
+        const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
+        const tenant = primaryMember?.user;
 
-      return {
-        ...offer.rentalRequest,
-        matchScore: 0, // Offers don't have matchScore
-        matchReason: 'Property rented - request accepted',
-        budgetRange:
-          offer.rentalRequest.budgetFrom && offer.rentalRequest.budgetTo
-            ? `${offer.rentalRequest.budgetFrom} - ${offer.rentalRequest.budgetTo} PLN`
-            : offer.rentalRequest.budget
-              ? `${offer.rentalRequest.budget} PLN`
-              : 'Budget not specified',
-        tenant: {
-          id: tenant?.id,
-          name: tenant?.name,
-          email: tenant?.email,
-          firstName: tenant?.firstName,
-          lastName: tenant?.lastName,
-          profileImage: tenant?.profileImage,
-          phoneNumber: tenant?.phoneNumber,
-          occupation: tenant?.profession, // Map profession to occupation for frontend
-          dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
-          age: tenant?.dateOfBirth
-            ? Math.max(
-                18,
-                Math.floor(
-                  (Date.now() - new Date(tenant.dateOfBirth).getTime()) /
-                    (1000 * 60 * 60 * 24 * 365)
+        // Calculate tenant's trust level
+        let trustLevel = 'New';
+        if (tenant?.id) {
+          try {
+            const trustLevelData = await getUserTrustLevel(tenant.id);
+            trustLevel = trustLevelData.level;
+          } catch (trustLevelError) {
+            console.warn(
+              'Failed to calculate trust level for tenant:',
+              tenant.id,
+              trustLevelError
+            );
+          }
+        }
+
+        return {
+          ...offer.rentalRequest,
+          matchScore: 0, // Offers don't have matchScore
+          matchReason: 'Property rented - request accepted',
+          budgetRange:
+            offer.rentalRequest.budgetFrom && offer.rentalRequest.budgetTo
+              ? `${offer.rentalRequest.budgetFrom} - ${offer.rentalRequest.budgetTo} PLN`
+              : offer.rentalRequest.budget
+                ? `${offer.rentalRequest.budget} PLN`
+                : 'Budget not specified',
+          tenant: {
+            id: tenant?.id,
+            name: tenant?.name,
+            email: tenant?.email,
+            firstName: tenant?.firstName,
+            lastName: tenant?.lastName,
+            profileImage: tenant?.profileImage,
+            phoneNumber: tenant?.phoneNumber,
+            occupation: tenant?.profession, // Map profession to occupation for frontend
+            dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
+            age: tenant?.dateOfBirth
+              ? Math.max(
+                  18,
+                  Math.floor(
+                    (Date.now() - new Date(tenant.dateOfBirth).getTime()) /
+                      (1000 * 60 * 60 * 24 * 365)
+                  )
                 )
-              )
-            : null,
-          rating: tenant?.averageRating ?? 5.0,
-          reviews: tenant?.totalReviews ?? 1,
-          rank: tenant?.rank,
-        },
-        propertyMatch: {
-          id: offer.property?.id,
-          name: offer.property?.name || 'Your Property',
-          address: offer.property?.address || 'Address not specified',
-          rent: offer.property?.monthlyRent
-            ? `${offer.property.monthlyRent.toLocaleString('pl-PL')} zł`
-            : 'Rent not specified',
-          available: offer.property?.availableFrom
-            ? new Date(offer.property.availableFrom).toISOString()
-            : 'Date not specified',
-          propertyType: offer.property?.propertyType || 'Apartment',
-        },
-        status: 'accepted',
-      };
-    });
+              : null,
+            rating: tenant?.averageRating ?? 5.0,
+            reviews: tenant?.totalReviews ?? 1,
+            rank: tenant?.rank,
+            trustLevel: trustLevel,
+          },
+          propertyMatch: {
+            id: offer.property?.id,
+            name: offer.property?.name || 'Your Property',
+            address: offer.property?.address || 'Address not specified',
+            rent: offer.property?.monthlyRent
+              ? `${offer.property.monthlyRent.toLocaleString('pl-PL')} zł`
+              : 'Rent not specified',
+            available: offer.property?.availableFrom
+              ? new Date(offer.property.availableFrom).toISOString()
+              : 'Date not specified',
+            propertyType: offer.property?.propertyType || 'Apartment',
+          },
+          status: 'accepted',
+        };
+      })
+    );
 
     // 4) Declined (by this landlord)
     const declinedMatches = await prisma.landlordRequestMatch.findMany({
@@ -660,48 +715,66 @@ const getAllActiveRequests = async (req, res) => {
       take: parseInt(limit),
     });
 
-    const normalizeDeclined = declinedMatches.map((match) => {
-      // Get the primary tenant from the tenant group
-      const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
-      const tenant = primaryMember?.user;
+    const normalizeDeclined = await Promise.all(
+      declinedMatches.map(async (match) => {
+        // Get the primary tenant from the tenant group
+        const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
+        const tenant = primaryMember?.user;
 
-      return {
-        ...match.rentalRequest,
-        matchScore: match.matchScore,
-        matchReason: match.matchReason,
-        budgetRange:
-          match.rentalRequest.budgetFrom && match.rentalRequest.budgetTo
-            ? `${match.rentalRequest.budgetFrom} - ${match.rentalRequest.budgetTo} PLN`
-            : match.rentalRequest.budget
-              ? `${match.rentalRequest.budget} PLN`
-              : 'Budget not specified',
-        tenant: {
-          id: tenant?.id,
-          name: tenant?.name,
-          email: tenant?.email,
-          firstName: tenant?.firstName,
-          lastName: tenant?.lastName,
-          profileImage: tenant?.profileImage,
-          phoneNumber: tenant?.phoneNumber,
-          occupation: tenant?.profession, // Map profession to occupation for frontend
-          dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
-          age: tenant?.dateOfBirth
-            ? Math.max(
-                18,
-                Math.floor(
-                  (Date.now() - new Date(tenant.dateOfBirth).getTime()) /
-                    (1000 * 60 * 60 * 24 * 365)
+        // Calculate tenant's trust level
+        let trustLevel = 'New';
+        if (tenant?.id) {
+          try {
+            const trustLevelData = await getUserTrustLevel(tenant.id);
+            trustLevel = trustLevelData.level;
+          } catch (trustLevelError) {
+            console.warn(
+              'Failed to calculate trust level for tenant:',
+              tenant.id,
+              trustLevelError
+            );
+          }
+        }
+
+        return {
+          ...match.rentalRequest,
+          matchScore: match.matchScore,
+          matchReason: match.matchReason,
+          budgetRange:
+            match.rentalRequest.budgetFrom && match.rentalRequest.budgetTo
+              ? `${match.rentalRequest.budgetFrom} - ${match.rentalRequest.budgetTo} PLN`
+              : match.rentalRequest.budget
+                ? `${match.rentalRequest.budget} PLN`
+                : 'Budget not specified',
+          tenant: {
+            id: tenant?.id,
+            name: tenant?.name,
+            email: tenant?.email,
+            firstName: tenant?.firstName,
+            lastName: tenant?.lastName,
+            profileImage: tenant?.profileImage,
+            phoneNumber: tenant?.phoneNumber,
+            occupation: tenant?.profession, // Map profession to occupation for frontend
+            dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
+            age: tenant?.dateOfBirth
+              ? Math.max(
+                  18,
+                  Math.floor(
+                    (Date.now() - new Date(tenant.dateOfBirth).getTime()) /
+                      (1000 * 60 * 60 * 24 * 365)
+                  )
                 )
-              )
-            : null,
-          rating: tenant?.averageRating ?? 5.0,
-          reviews: tenant?.totalReviews ?? 1,
-          rank: tenant?.rank,
-        },
-        propertyMatch: mapBestProperty(match),
-        status: 'declined',
-      };
-    });
+              : null,
+            rating: tenant?.averageRating ?? 5.0,
+            reviews: tenant?.totalReviews ?? 1,
+            rank: tenant?.rank,
+            trustLevel: trustLevel,
+          },
+          propertyMatch: mapBestProperty(match),
+          status: 'declined',
+        };
+      })
+    );
 
     return res.json({
       pending: normalizePending,
@@ -2515,47 +2588,67 @@ const getAllRentalRequests = async (req, res) => {
     });
 
     // For each rental request, find the best matching property and map tenant data
-    const requestsWithMatchedProperties = requests.map((request) => {
-      // Find the best matching property for this request
-      const matchedProperty = landlordProperties.find((property) => {
-        const locationMatch = (request.location || '')
-          .toLowerCase()
-          .includes((property.city || '').toLowerCase());
-        const budgetRangeMatch =
-          request.budgetFrom != null &&
-          request.budgetTo != null &&
-          request.budgetFrom <= property.monthlyRent * 1.2 &&
-          request.budgetTo >= property.monthlyRent * 0.8;
-        const singleBudgetMatch =
-          request.budget != null &&
-          request.budget >= property.monthlyRent * 0.8 &&
-          request.budget <= property.monthlyRent * 1.2;
-        const budgetMatch = budgetRangeMatch || singleBudgetMatch;
-        const typeMatch =
-          !request.propertyType ||
-          request.propertyType.toLowerCase() ===
-            (property.propertyType || '').toLowerCase();
-        const dateMatch =
-          new Date(request.moveInDate) >=
-          (property.availableFrom || new Date());
+    const requestsWithMatchedProperties = await Promise.all(
+      requests.map(async (request) => {
+        // Find the best matching property for this request
+        const matchedProperty = landlordProperties.find((property) => {
+          const locationMatch = (request.location || '')
+            .toLowerCase()
+            .includes((property.city || '').toLowerCase());
+          const budgetRangeMatch =
+            request.budgetFrom != null &&
+            request.budgetTo != null &&
+            request.budgetFrom <= property.monthlyRent * 1.2 &&
+            request.budgetTo >= property.monthlyRent * 0.8;
+          const singleBudgetMatch =
+            request.budget != null &&
+            request.budget >= property.monthlyRent * 0.8 &&
+            request.budget <= property.monthlyRent * 1.2;
+          const budgetMatch = budgetRangeMatch || singleBudgetMatch;
+          const typeMatch =
+            !request.propertyType ||
+            request.propertyType.toLowerCase() ===
+              (property.propertyType || '').toLowerCase();
+          const dateMatch =
+            new Date(request.moveInDate) >=
+            (property.availableFrom || new Date());
 
-        // Require location and budget; type/date act as soft signals
-        return locationMatch && budgetMatch;
-      });
+          // Require location and budget; type/date act as soft signals
+          return locationMatch && budgetMatch;
+        });
 
-      // If no specific match found, use the first available property as fallback
-      const finalMatchedProperty = matchedProperty || landlordProperties[0];
+        // If no specific match found, use the first available property as fallback
+        const finalMatchedProperty = matchedProperty || landlordProperties[0];
 
-      // Get the primary tenant from the tenant group
-      const primaryMember = request.tenantGroup?.members?.[0];
-      const tenant = primaryMember?.user;
+        // Get the primary tenant from the tenant group
+        const primaryMember = request.tenantGroup?.members?.[0];
+        const tenant = primaryMember?.user;
 
-      return {
-        ...request,
-        tenant, // Map the primary tenant group member's user as the tenant
-        matchedProperty: finalMatchedProperty,
-      };
-    });
+        // Calculate tenant's trust level
+        let trustLevel = 'New';
+        if (tenant?.id) {
+          try {
+            const trustLevelData = await getUserTrustLevel(tenant.id);
+            trustLevel = trustLevelData.level;
+          } catch (trustLevelError) {
+            console.warn(
+              'Failed to calculate trust level for tenant:',
+              tenant.id,
+              trustLevelError
+            );
+          }
+        }
+
+        return {
+          ...request,
+          tenant: {
+            ...tenant,
+            trustLevel: trustLevel,
+          }, // Map the primary tenant group member's user as the tenant with trust level
+          matchedProperty: finalMatchedProperty,
+        };
+      })
+    );
 
     res.json({
       success: true,
@@ -2636,42 +2729,62 @@ const getLandlordAcceptedRequests = async (req, res) => {
     });
 
     // Transform accepted offers to match the expected format
-    const acceptedRequests = acceptedOffers.map((offer) => {
-      // Get the primary tenant from the tenant group
-      const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
-      const tenant = primaryMember?.user;
+    const acceptedRequests = await Promise.all(
+      acceptedOffers.map(async (offer) => {
+        // Get the primary tenant from the tenant group
+        const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
+        const tenant = primaryMember?.user;
 
-      return {
-        id: offer.rentalRequest.id,
-        title: offer.rentalRequest.title,
-        description: offer.rentalRequest.description,
-        location: offer.rentalRequest.location,
-        budgetFrom: offer.rentalRequest.budgetFrom,
-        budgetTo: offer.rentalRequest.budgetTo,
-        moveInDate: offer.rentalRequest.moveInDate,
-        propertyType: offer.rentalRequest.propertyType,
-        bedrooms: offer.rentalRequest.bedrooms,
-        status: 'accepted', // This will be used for the Accepted tab
-        offerId: offer.id,
-        offerStatus: offer.status,
-        moveInVerificationStatus: offer.moveInVerificationStatus,
-        tenant: tenant, // Use the mapped tenant from tenant group
-        matchedProperty: offer.property,
-        // Format propertyMatch to match TenantRequestCard expectations
-        propertyMatch: {
-          id: offer.property.id,
-          name: offer.property.name || 'Your Property',
-          address: offer.property.address || 'Address not specified',
-          rent: offer.property.monthlyRent
-            ? `${offer.property.monthlyRent} zł`
-            : 'Rent not specified',
-          available: offer.property.availableFrom || 'Date not specified',
-          propertyType: offer.property.propertyType || 'Apartment',
-        },
-        createdAt: offer.rentalRequest.createdAt,
-        updatedAt: offer.rentalRequest.updatedAt,
-      };
-    });
+        // Calculate tenant's trust level
+        let trustLevel = 'New';
+        if (tenant?.id) {
+          try {
+            const trustLevelData = await getUserTrustLevel(tenant.id);
+            trustLevel = trustLevelData.level;
+          } catch (trustLevelError) {
+            console.warn(
+              'Failed to calculate trust level for tenant:',
+              tenant.id,
+              trustLevelError
+            );
+          }
+        }
+
+        return {
+          id: offer.rentalRequest.id,
+          title: offer.rentalRequest.title,
+          description: offer.rentalRequest.description,
+          location: offer.rentalRequest.location,
+          budgetFrom: offer.rentalRequest.budgetFrom,
+          budgetTo: offer.rentalRequest.budgetTo,
+          moveInDate: offer.rentalRequest.moveInDate,
+          propertyType: offer.rentalRequest.propertyType,
+          bedrooms: offer.rentalRequest.bedrooms,
+          status: 'accepted', // This will be used for the Accepted tab
+          offerId: offer.id,
+          offerStatus: offer.status,
+          moveInVerificationStatus: offer.moveInVerificationStatus,
+          tenant: {
+            ...tenant,
+            trustLevel: trustLevel,
+          }, // Use the mapped tenant from tenant group with trust level
+          matchedProperty: offer.property,
+          // Format propertyMatch to match TenantRequestCard expectations
+          propertyMatch: {
+            id: offer.property.id,
+            name: offer.property.name || 'Your Property',
+            address: offer.property.address || 'Address not specified',
+            rent: offer.property.monthlyRent
+              ? `${offer.property.monthlyRent} zł`
+              : 'Rent not specified',
+            available: offer.property.availableFrom || 'Date not specified',
+            propertyType: offer.property.propertyType || 'Apartment',
+          },
+          createdAt: offer.rentalRequest.createdAt,
+          updatedAt: offer.rentalRequest.updatedAt,
+        };
+      })
+    );
 
     res.json({
       success: true,

@@ -3,6 +3,7 @@ import {
   getUnifiedPaymentData,
   getUpcomingPayments,
 } from '../services/paymentService.js';
+import { getUserTrustLevel } from '../services/trustLevels.js';
 
 // Helper function to get tenant payment data - Now using unified service
 const getTenantPaymentsData = async (tenantId) => {
@@ -265,9 +266,25 @@ export const getTenantDashboardData = async (req, res) => {
       };
     });
 
+    // Calculate tenant's trust level
+    let trustLevel = 'New';
+    try {
+      const trustLevelData = await getUserTrustLevel(tenantId);
+      trustLevel = trustLevelData.level;
+    } catch (trustLevelError) {
+      console.warn(
+        'Failed to calculate trust level for tenant:',
+        tenantId,
+        trustLevelError
+      );
+    }
+
     // Simplified response with primary lease and full leases list
     const responseData = {
-      tenant: req.user,
+      tenant: {
+        ...req.user,
+        trustLevel: trustLevel,
+      },
       hasActiveLease: true,
       offerId: activeLease.id,
       property: {

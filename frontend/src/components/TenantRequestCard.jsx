@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api.js';
+import TrustLevelBadge from './TrustLevelBadge';
+import BadgeCollection from './BadgeCollection';
 
 const TenantRequestCard = ({
   tenant,
@@ -18,6 +20,8 @@ const TenantRequestCard = ({
   const [showReviewsModal, setShowReviewsModal] = useState(false);
   const [tenantReviews, setTenantReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [tenantBadges, setTenantBadges] = useState([]);
+  const [badgesLoading, setBadgesLoading] = useState(false);
 
   // Check if this is a business request or group request
   const isBusinessRequest = tenant.isBusinessRequest;
@@ -114,6 +118,28 @@ const TenantRequestCard = ({
     };
 
     fetchTenantRank();
+  }, [tenant.tenantId, tenant.id]);
+
+  // Fetch tenant badges
+  useEffect(() => {
+    const fetchTenantBadges = async () => {
+      // Use tenantId if available, otherwise fall back to tenant.id
+      const tenantUserId = tenant.tenantId || tenant.id;
+      if (!tenantUserId) return;
+
+      try {
+        setBadgesLoading(true);
+        const response = await api.get(`/users/${tenantUserId}/badges`);
+        setTenantBadges(response.data.badges || []);
+      } catch (error) {
+        console.warn('Error fetching tenant badges:', error);
+        setTenantBadges([]);
+      } finally {
+        setBadgesLoading(false);
+      }
+    };
+
+    fetchTenantBadges();
   }, [tenant.tenantId, tenant.id]);
 
   // Fetch tenant reviews when modal opens
@@ -627,6 +653,9 @@ const TenantRequestCard = ({
               <h3 className='text-lg font-semibold text-gray-900'>
                 {requestTypeInfo.title}
               </h3>
+              {tenant.trustLevel && (
+                <TrustLevelBadge level={tenant.trustLevel} size='small' />
+              )}
               {tenant.verified && (
                 <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800'>
                   <svg
@@ -644,6 +673,18 @@ const TenantRequestCard = ({
                 </span>
               )}
             </div>
+
+            {/* Tenant Badges */}
+            {tenantBadges.length > 0 && (
+              <div className='mb-3'>
+                <BadgeCollection 
+                  badges={tenantBadges} 
+                  maxDisplay={3}
+                  layout="compact"
+                  showTitle={false}
+                />
+              </div>
+            )}
 
             {/* Request Type Subtitle */}
             <div className='mb-3'>
