@@ -251,13 +251,24 @@ export const createProperty = async (req, res) => {
         select: { id: true, name: true, email: true }
       });
 
-      const orgName = user?.name ? `${user.name} Personal` : `Personal Organization (${user?.email || landlordId})`;
+      const orgName = user?.name ? `${user.name}` : `Personal Organization (${user?.email || landlordId})`;
+      
+      // Get landlord's address for organization
+      const landlordProfile = await prisma.user.findUnique({
+        where: { id: landlordId },
+        select: { street: true, city: true, zipCode: true, country: true }
+      });
+      
+      const orgAddress = landlordProfile?.street && landlordProfile?.city 
+        ? `${landlordProfile.street}, ${landlordProfile.city}, ${landlordProfile.zipCode || ''}, ${landlordProfile.country || ''}`.trim()
+        : 'Address not provided';
+      
       const organization = await prisma.organization.create({
         data: {
           name: orgName,
           taxId: null,
           regNumber: null,
-          address: null,
+          address: orgAddress,
           signatureBase64: null,
           isPersonal: true
         }

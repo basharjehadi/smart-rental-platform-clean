@@ -126,7 +126,7 @@ async function main() {
   console.log('   Password: password123');
   console.log('   Role: TENANT (Non-Polish)');
   console.log('');
-  console.log('🔗 Frontend URL: http://localhost:4175/');
+  console.log('🔗 Frontend URL: http://localhost:3002/');
   console.log('🔗 Backend URL: http://localhost:3001/');
 }
 

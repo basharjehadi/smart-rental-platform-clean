@@ -5,10 +5,23 @@ const ensureLandlordCanSetPrice = async (userId, leaseId, proposedMonthlyRent) =
   // Only landlord can change price: infer landlord from property via offer
   const lease = await prisma.lease.findUnique({ where: { id: leaseId }, select: { propertyId: true, offerId: true } });
   if (!lease) throw new Error('Lease not found');
-  const offer = lease.offerId ? await prisma.offer.findUnique({ where: { id: lease.offerId }, select: { landlordId: true } }) : null;
-  const landlordId = offer?.landlordId || null;
-  if (!landlordId || landlordId !== userId) {
-    throw new Error('Only landlord can set or change proposedMonthlyRent');
+  const offer = lease.offerId ? await prisma.offer.findUnique({ where: { id: lease.offerId }, select: { organizationId: true } }) : null;
+  
+  if (offer?.organizationId) {
+    // Check if user is a member of the organization that owns the property
+    const isLandlord = await prisma.organizationMember.findFirst({
+      where: {
+        organizationId: offer.organizationId,
+        userId: userId,
+        role: 'OWNER'
+      }
+    });
+    
+    if (!isLandlord) {
+      throw new Error('Only landlord can set or change proposedMonthlyRent');
+    }
+  } else {
+    throw new Error('Offer not found or invalid');
   }
 };
 
@@ -41,8 +54,22 @@ export const createRenewalRequest = async (req, res) => {
     // Notify counterparty (best-effort)
     try {
       const lease = await prisma.lease.findUnique({ where: { id: leaseId }, select: { tenantId: true, offerId: true } });
-      const offer = lease?.offerId ? await prisma.offer.findUnique({ where: { id: lease.offerId }, select: { landlordId: true } }) : null;
-      const targets = [lease?.tenantId, offer?.landlordId].filter(t => t && t !== req.user.id);
+      const offer = lease?.offerId ? await prisma.offer.findUnique({ where: { id: lease.offerId }, select: { organizationId: true } }) : null;
+      
+      // Get landlord ID from organization
+      let landlordId = null;
+      if (offer?.organizationId) {
+        const landlordMember = await prisma.organizationMember.findFirst({
+          where: {
+            organizationId: offer.organizationId,
+            role: 'OWNER'
+          },
+          select: { userId: true }
+        });
+        landlordId = landlordMember?.userId;
+      }
+      
+      const targets = [lease?.tenantId, landlordId].filter(t => t && t !== req.user.id);
       for (const t of targets) {
         await prisma.notification.create({ data: { userId: t, type: 'SYSTEM_ANNOUNCEMENT', entityId: request.id, title: 'Renewal request created', body: 'A lease renewal request is awaiting your response.' } });
       }
@@ -154,8 +181,22 @@ export const acceptRenewalRequest = async (req, res) => {
 
     // Notify both parties
     try {
-      const offer = renewal.lease.offerId ? await prisma.offer.findUnique({ where: { id: renewal.lease.offerId }, select: { tenantId: true, landlordId: true } }) : null;
-      const targets = [offer?.tenantId, offer?.landlordId].filter(Boolean);
+      const offer = renewal.lease.offerId ? await prisma.offer.findUnique({ where: { id: renewal.lease.offerId }, select: { organizationId: true } }) : null;
+      
+      // Get landlord ID from organization
+      let landlordId = null;
+      if (offer?.organizationId) {
+        const landlordMember = await prisma.organizationMember.findFirst({
+          where: {
+            organizationId: offer.organizationId,
+            role: 'OWNER'
+          },
+          select: { userId: true }
+        });
+        landlordId = landlordMember?.userId;
+      }
+      
+      const targets = [landlordId].filter(Boolean);
       for (const t of targets) {
         await prisma.notification.create({ data: { userId: t, type: 'SYSTEM_ANNOUNCEMENT', entityId: id, title: 'Renewal accepted', body: 'A new lease has been created from the renewal.' } });
       }

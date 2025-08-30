@@ -91,11 +91,12 @@ const completeMockPayment = async (req, res) => {
       // First create a general payment record for tracking
       // Ensure we link payment to the tenant's rentalRequest for landlord filtering
       let rentRentalRequestId = null;
+      let rentOffer = null;
       try {
         if (offerId) {
-          const rentOffer = await prisma.offer.findUnique({
+          rentOffer = await prisma.offer.findUnique({
             where: { id: offerId },
-            select: { rentalRequestId: true }
+            select: { rentalRequestId: true, tenantGroupId: true }
           });
           rentRentalRequestId = rentOffer?.rentalRequestId || null;
         }
@@ -109,9 +110,10 @@ const completeMockPayment = async (req, res) => {
           status: 'SUCCEEDED',
           purpose: 'RENT',
           gateway: 'PAYU',
-          userId: userId,
-          offerId: offerId, // This will be the offer ID
-          ...(rentRentalRequestId ? { rentalRequestId: rentRentalRequestId } : {}),
+          offer: { connect: { id: offerId } }, // Connect to offer
+          ...(rentRentalRequestId ? { rentalRequest: { connect: { id: rentRentalRequestId } } } : {}),
+          tenantGroup: { connect: { id: rentOffer?.tenantGroupId } }, // Connect to tenant group
+          user: { connect: { id: userId } }, // Connect to user
           createdAt: new Date(),
           updatedAt: new Date()
         }
@@ -174,11 +176,12 @@ const completeMockPayment = async (req, res) => {
       // Create the main payment record with offerId for chat system
       // Also link to rentalRequestId so landlord dashboards can filter correctly
       let depositRentalRequestId = null;
+      let depOffer = null;
       try {
         if (offerId) {
-          const depOffer = await prisma.offer.findUnique({
+          depOffer = await prisma.offer.findUnique({
             where: { id: offerId },
-            select: { rentalRequestId: true }
+            select: { rentalRequestId: true, tenantGroupId: true }
           });
           depositRentalRequestId = depOffer?.rentalRequestId || null;
         }
@@ -192,9 +195,10 @@ const completeMockPayment = async (req, res) => {
           status: 'SUCCEEDED',
           purpose: 'DEPOSIT_AND_FIRST_MONTH',
           gateway: 'PAYU',
-          userId: userId,
-          offerId: offerId, // This is crucial for chat system to work
-          ...(depositRentalRequestId ? { rentalRequestId: depositRentalRequestId } : {}),
+          offer: { connect: { id: offerId } }, // Connect to offer
+          ...(depositRentalRequestId ? { rentalRequest: { connect: { id: depositRentalRequestId } } } : {}),
+          tenantGroup: { connect: { id: depOffer?.tenantGroupId } }, // Connect to tenant group
+          user: { connect: { id: userId } }, // Connect to user
           createdAt: new Date(),
           updatedAt: new Date()
         }
@@ -1085,7 +1089,7 @@ export const refundOfferPayments = async (offerId) => {
   // Load identifiers
   const offer = await prisma.offer.findUnique({
     where: { id: offerId },
-    select: { id: true, rentalRequestId: true, tenantId: true, landlordId: true }
+    select: { id: true, rentalRequestId: true, organizationId: true }
   });
   if (!offer) return { success: false, message: 'Offer not found' };
 
@@ -1112,38 +1116,66 @@ export const refundOfferPayments = async (offerId) => {
   // Create a summary notification to tenant and landlord
   try {
     const summary = `Refunds processed for ${results.length} payment(s).`;
-    if (offer.tenantId) {
-      const notif = await prisma.notification.create({
-        data: {
-          userId: offer.tenantId,
-          type: 'SYSTEM_ANNOUNCEMENT',
-          entityId: offerId,
-          title: 'Refund processed',
-          body: summary
-        }
+    
+    // Get tenant ID from rental request
+    if (offer.rentalRequestId) {
+      const rentalRequest = await prisma.rentalRequest.findUnique({
+        where: { id: offer.rentalRequestId },
+        select: { tenantGroupId: true }
       });
-      // Best-effort realtime emit (if available)
-      try {
-        const { default: createIO } = await import('../socket/socketServer.js');
-        const io = createIO?.io || global.io;
-        if (io?.emitNotification) await io.emitNotification(offer.tenantId, notif);
-      } catch {}
+      
+      if (rentalRequest?.tenantGroupId) {
+        const tenantMember = await prisma.tenantGroupMember.findFirst({
+          where: { tenantGroupId: rentalRequest.tenantGroupId },
+          select: { userId: true }
+        });
+        
+        if (tenantMember?.userId) {
+          const notif = await prisma.notification.create({
+            data: {
+              userId: tenantMember.userId,
+              type: 'SYSTEM_ANNOUNCEMENT',
+              entityId: offerId,
+              title: 'Refund processed',
+              body: summary
+            }
+          });
+          // Best-effort realtime emit (if available)
+          try {
+            const { default: createIO } = await import('../socket/socketServer.js');
+            const io = createIO?.io || global.io;
+            if (io?.emitNotification) await io.emitNotification(tenantMember.userId, notif);
+          } catch {}
+        }
+      }
     }
-    if (offer.landlordId) {
-      const notif = await prisma.notification.create({
-        data: {
-          userId: offer.landlordId,
-          type: 'SYSTEM_ANNOUNCEMENT',
-          entityId: offerId,
-          title: 'Refund processed',
-          body: summary
-        }
+    
+    // Get landlord ID from organization
+    if (offer.organizationId) {
+      const landlordMember = await prisma.organizationMember.findFirst({
+        where: {
+          organizationId: offer.organizationId,
+          role: 'OWNER'
+        },
+        select: { userId: true }
       });
-      try {
-        const { default: createIO } = await import('../socket/socketServer.js');
-        const io = createIO?.io || global.io;
-        if (io?.emitNotification) await io.emitNotification(offer.landlordId, notif);
-      } catch {}
+      
+      if (landlordMember?.userId) {
+        const notif = await prisma.notification.create({
+          data: {
+            userId: landlordMember.userId,
+            type: 'SYSTEM_ANNOUNCEMENT',
+            entityId: offerId,
+            title: 'Refund processed',
+            body: summary
+          }
+        });
+        try {
+          const { default: createIO } = await import('../socket/socketServer.js');
+          const io = createIO?.io || global.io;
+          if (io?.emitNotification) await io.emitNotification(landlordMember.userId, notif);
+        } catch {}
+      }
     }
   } catch {}
 

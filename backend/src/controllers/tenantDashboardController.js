@@ -510,7 +510,26 @@ export const getCurrentRental = async (req, res) => {
             houseRules: true
           }
         },
-        organization: true
+        organization: {
+          include: {
+            members: {
+              where: { role: 'OWNER' },
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    phoneNumber: true,
+                    profileImage: true
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     });
 
@@ -583,11 +602,25 @@ export const getCurrentRental = async (req, res) => {
         description: activeLease.property.description
       } : null,
       landlord: {
-        id: activeLease.organization?.id || '',
-        name: activeLease.organization?.name || 'Organization',
-        email: null,
-        phone: null,
-        profileImage: null
+        id: activeLease.organization?.members?.[0]?.user?.id || activeLease.organization?.id || '',
+        name: (() => {
+          const user = activeLease.organization?.members?.[0]?.user;
+          if (user?.firstName && user?.lastName) {
+            return `${user.firstName} ${user.lastName}`;
+          }
+          if (user?.name) {
+            return user.name;
+          }
+          // If organization is personal, show a cleaner name
+          const orgName = activeLease.organization?.name || 'Organization';
+          if (orgName.includes(' Personal')) {
+            return orgName.replace(' Personal', '');
+          }
+          return orgName;
+        })(),
+        email: activeLease.organization?.members?.[0]?.user?.email || null,
+        phone: activeLease.organization?.members?.[0]?.user?.phoneNumber || null,
+        profileImage: activeLease.organization?.members?.[0]?.user?.profileImage || null
       }
     };
 

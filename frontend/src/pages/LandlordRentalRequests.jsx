@@ -132,23 +132,60 @@ const LandlordRentalRequests = () => {
   const fetchRentalRequests = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/rental-requests');
-      const raw = response.data.rentalRequests || response.data.pending || [];
-      const mappedRequests = raw.map(req => ({
+      // Use the correct endpoint that includes tenant data
+      const response = await api.get('/pool/rental-requests');
+      console.log('🔍 API Response:', response.data);
+      
+      // Helper function to map request data
+      const mapRequest = (req, status) => ({
         id: req.id,
-        name: req.tenantName,
-        email: req.tenantEmail,
-        phone: req.tenantPhone,
+        tenantId: req.tenant?.id, // Include the actual tenant user ID
+        name: req.tenant?.firstName && req.tenant?.lastName 
+          ? `${req.tenant.firstName} ${req.tenant.lastName}`.trim()
+          : req.tenant?.name || 'Tenant',
+        email: req.tenant?.email,
+        phone: req.tenant?.phoneNumber,
         budget: req.budget,
+        budgetFrom: req.budgetFrom,
+        budgetTo: req.budgetTo,
+        budgetRange: req.budgetRange, // Add budgetRange from backend
         moveInDate: req.moveInDate,
         location: req.location,
-        status: req.status,
+        status: status, // Use the passed status instead of req.status
         propertyMatch: req.propertyMatch,
         tenantGroup: req.tenantGroup,
-        offers: req.offers
-      }));
-      setRentalRequests(mappedRequests);
-      setTotalRequests(mappedRequests.length);
+        offers: req.offers,
+        // Include tenant details for rank calculation
+        tenant: req.tenant,
+        // Add missing fields that TenantRequestCard needs
+        occupation: req.tenant?.occupation,
+        dateOfBirth: req.tenant?.dateOfBirth,
+        age: req.tenant?.age,
+        profileImage: req.tenant?.profileImage,
+        rating: req.tenant?.rating,
+        reviews: req.tenant?.reviews,
+        rank: req.tenant?.rank
+      });
+
+      // Map all request types
+      const pendingRequests = (response.data.pending || []).map(req => mapRequest(req, 'pending'));
+      const offeredRequests = (response.data.offered || []).map(req => mapRequest(req, 'offered'));
+      const acceptedRequests = (response.data.accepted || []).map(req => mapRequest(req, 'accepted'));
+      const declinedRequests = (response.data.declined || []).map(req => mapRequest(req, 'declined'));
+
+      // Combine all requests
+      const allRequests = [...pendingRequests, ...offeredRequests, ...acceptedRequests, ...declinedRequests];
+      
+      console.log('🔍 Mapped requests:', {
+        pending: pendingRequests.length,
+        offered: offeredRequests.length,
+        accepted: acceptedRequests.length,
+        declined: declinedRequests.length,
+        total: allRequests.length
+      });
+
+      setRentalRequests(allRequests);
+      setTotalRequests(allRequests.length);
     } catch (error) {
       console.error('Error fetching rental requests:', error);
       setError('Failed to load rental requests');

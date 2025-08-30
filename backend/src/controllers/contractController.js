@@ -101,11 +101,22 @@ export const checkContractEligibility = async (req, res) => {
     const rentalRequest = await prisma.rentalRequest.findUnique({
       where: { id: parseInt(rentalRequestId) },
       include: {
-        offer: {
+        tenantGroup: {
           include: {
-            rentPayments: {
-              where: {
-                status: 'SUCCEEDED'
+            members: {
+              select: { userId: true }
+            }
+          }
+        },
+        offers: {
+          where: { status: 'PAID' },
+          include: {
+            organization: {
+              include: {
+                members: {
+                  where: { role: 'OWNER' },
+                  select: { userId: true }
+                }
               }
             }
           }
@@ -123,13 +134,16 @@ export const checkContractEligibility = async (req, res) => {
       return res.status(404).json({ error: 'Rental request not found' });
     }
 
-    // Check if user is authorized
-    if (rentalRequest.tenantId !== userId && rentalRequest.offer?.landlordId !== userId) {
+    // Check if user is authorized (either tenant or landlord)
+    const isTenant = rentalRequest.tenantGroup?.members?.some(m => m.userId === userId);
+    const isLandlord = rentalRequest.offers?.[0]?.organization?.members?.[0]?.userId === userId;
+    
+    if (!isTenant && !isLandlord) {
       return res.status(403).json({ error: 'Unauthorized to view this contract' });
     }
 
     // Check if offer exists and is paid
-    if (!rentalRequest.offer || rentalRequest.offer.status !== 'PAID') {
+    if (!rentalRequest.offers || rentalRequest.offers.length === 0) {
       return res.status(400).json({ 
         error: 'No paid offer found for this rental request',
         canGenerate: false,
@@ -220,25 +234,34 @@ export const generateContract = async (req, res) => {
             status: 'PAID'
           },
           include: {
-            landlord: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                pesel: true,
-                dowodOsobistyNumber: true,
-                phoneNumber: true,
-                address: true,
-                street: true,
-                city: true,
-                zipCode: true,
-                country: true,
-                citizenship: true,
-                dateOfBirth: true,
-                profession: true,
-                signatureBase64: true
+            organization: {
+              include: {
+                members: {
+                  where: { role: 'OWNER' },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        firstName: true,
+                        lastName: true,
+                        pesel: true,
+                        dowodOsobistyNumber: true,
+                        phoneNumber: true,
+                        address: true,
+                        street: true,
+                        city: true,
+                        zipCode: true,
+                        country: true,
+                        citizenship: true,
+                        dateOfBirth: true,
+                        profession: true,
+                        signatureBase64: true
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -252,18 +275,23 @@ export const generateContract = async (req, res) => {
     }
 
     // Check if user is authorized (either tenant or landlord)
-    const isTenant = rentalRequest.tenantId === userId;
-    const isLandlord = rentalRequest.offers[0]?.landlordId === userId;
+    const isTenant = rentalRequest.tenantGroup?.members?.some(m => m.userId === userId);
+    
+    // Check if user is landlord (member of organization that owns the property)
+    let isLandlord = false;
+    if (rentalRequest.offers?.[0]?.organization?.members?.[0]?.userId === userId) {
+      isLandlord = true;
+    }
     
     if (!isTenant && !isLandlord) {
       return res.status(403).json({ 
         error: 'Unauthorized to generate contract for this rental request',
         details: {
           userId,
-          tenantId: rentalRequest.tenantId,
-          landlordId: rentalRequest.offers[0]?.landlordId,
           isTenant,
-          isLandlord
+          isLandlord,
+          tenantGroupMembers: rentalRequest.tenantGroup?.members?.map(m => m.userId) || [],
+          organizationMembers: rentalRequest.offers?.[0]?.organization?.members?.map(m => m.userId) || []
         }
       });
     }
@@ -362,7 +390,16 @@ export const getContractStatus = async (req, res) => {
             tenant: true,
             offers: {
               where: { status: 'PAID' },
-              include: { landlord: true }
+              include: { 
+                organization: {
+                  include: {
+                    members: {
+                      where: { role: 'OWNER' },
+                      include: { user: true }
+                    }
+                  }
+                }
+              }
             }
           }
         }
@@ -376,7 +413,10 @@ export const getContractStatus = async (req, res) => {
     // Check authorization
     const { tenant, offers } = contract.rentalRequest;
     const paidOffer = offers?.[0];
-    if (tenant.id !== userId && paidOffer?.landlord.id !== userId) {
+    const isTenant = tenant.id === userId;
+    const isLandlord = paidOffer?.organization?.members?.[0]?.user?.id === userId;
+    
+    if (!isTenant && !isLandlord) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
@@ -388,8 +428,8 @@ export const getContractStatus = async (req, res) => {
       tenantSignedAt: contract.tenantSignedAt,
       landlordSignedAt: contract.landlordSignedAt,
       canSign: contract.status === 'GENERATED',
-      isTenant: tenant.id === userId,
-      isLandlord: paidOffer?.landlord.id === userId
+      isTenant: isTenant,
+      isLandlord: isLandlord
     });
 
   } catch (error) {
@@ -449,25 +489,34 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
             status: 'PAID'
           },
           include: {
-            landlord: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                pesel: true,
-                dowodOsobistyNumber: true,
-                phoneNumber: true,
-                address: true,
-                street: true,
-                city: true,
-                zipCode: true,
-                country: true,
-                citizenship: true,
-                dateOfBirth: true,
-                profession: true,
-                signatureBase64: true
+            organization: {
+              include: {
+                members: {
+                  where: { role: 'OWNER' },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        firstName: true,
+                        lastName: true,
+                        pesel: true,
+                        dowodOsobistyNumber: true,
+                        phoneNumber: true,
+                        address: true,
+                        street: true,
+                        city: true,
+                        zipCode: true,
+                        country: true,
+                        citizenship: true,
+                        dateOfBirth: true,
+                        profession: true,
+                        signatureBase64: true
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -506,14 +555,14 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
       contractNumber,
       agreementDate: new Date(),
       landlord: {
-        name: paidOffer.landlord.name,
-        firstName: paidOffer.landlord.firstName || 'Landlord',
-        lastName: paidOffer.landlord.lastName || 'Name',
-        email: paidOffer.landlord.email,
-        dowodOsobistyNumber: paidOffer.landlord.dowodOsobistyNumber || 'N/A',
-        phoneNumber: paidOffer.landlord.phoneNumber || 'N/A',
-        address: paidOffer.landlord.address || 'N/A',
-        signature: paidOffer.landlord.signatureBase64 || null
+        name: paidOffer.organization?.members?.[0]?.user?.name || 'Landlord',
+        firstName: paidOffer.organization?.members?.[0]?.user?.firstName || 'Landlord',
+        lastName: paidOffer.organization?.members?.[0]?.user?.lastName || 'Name',
+        email: paidOffer.organization?.members?.[0]?.user?.email || 'N/A',
+        dowodOsobistyNumber: paidOffer.organization?.members?.[0]?.user?.dowodOsobistyNumber || 'N/A',
+        phoneNumber: paidOffer.organization?.members?.[0]?.user?.phoneNumber || 'N/A',
+        address: paidOffer.organization?.members?.[0]?.user?.address || 'N/A',
+        signature: paidOffer.organization?.members?.[0]?.user?.signatureBase64 || null
       },
       tenant: {
         name: rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user.name || 'Tenant',
@@ -564,24 +613,55 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
     };
 
     // Generate and save PDF using the new server-side approach
-    const pdfResult = await saveContractPDF(offerForContract, rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user, contractNumber);
-    console.log('📄 PDF generated and saved:', {
-      filename: pdfResult.filename,
-      originalSize: `${(pdfResult.originalSize / 1024 / 1024).toFixed(2)} MB`,
-      compressedSize: `${(pdfResult.compressedSize / 1024 / 1024).toFixed(2)} MB`,
-      compressionRatio: `${pdfResult.compressionRatio}%`
-    });
-
-    // Create contract record in database (schema supports SIGNED/COMPLETED/EXPIRED)
-    const contract = await prisma.contract.create({
-      data: {
-        rentalRequestId: parseInt(rentalRequestId),
-        contractNumber,
-        pdfUrl: pdfResult.url,
-        status: 'SIGNED',
-        signedAt: new Date()
+    let pdfResult = null;
+    let contract = null;
+    
+    try {
+      pdfResult = await saveContractPDF(offerForContract, rentalRequest.tenantGroup.members.find(m => m.isPrimary)?.user, contractNumber);
+      console.log('📄 PDF generated and saved:', {
+        filename: pdfResult.filename,
+        originalSize: `${(pdfResult.originalSize / 1024 / 1024).toFixed(2)} MB`,
+        compressedSize: `${(pdfResult.compressedSize / 1024 / 1024).toFixed(2)} MB`,
+        compressionRatio: `${pdfResult.compressionRatio}%`
+      });
+      
+      // Create contract record with PDF
+      contract = await prisma.contract.create({
+        data: {
+          rentalRequestId: parseInt(rentalRequestId),
+          contractNumber,
+          pdfUrl: pdfResult.url,
+          status: 'SIGNED',
+          signedAt: new Date()
+        }
+      });
+      
+    } catch (pdfError) {
+      console.error('❌ PDF generation failed, creating contract without PDF:', pdfError.message);
+      
+      try {
+        // Create contract record without PDF as fallback
+        contract = await prisma.contract.create({
+          data: {
+            rentalRequestId: parseInt(rentalRequestId),
+            contractNumber,
+            pdfUrl: null, // No PDF available
+            status: 'SIGNED', // Use SIGNED status as fallback
+            signedAt: new Date()
+          }
+        });
+        
+        console.log('⚠️ Contract created without PDF as fallback:', {
+          contractId: contract.id,
+          contractNumber,
+          status: contract.status
+        });
+        
+      } catch (contractError) {
+        console.error('❌ Even contract creation failed:', contractError.message);
+        throw new Error(`Failed to create contract: ${contractError.message}`);
       }
-    });
+    }
 
     console.log('✅ Contract saved to database:', {
       contractId: contract.id,
@@ -848,25 +928,34 @@ export const previewContract = async (req, res) => {
             }
           }
         },
-        landlord: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            pesel: true,
-            dowodOsobistyNumber: true,
-            phoneNumber: true,
-            address: true,
-            street: true,
-            city: true,
-            zipCode: true,
-            country: true,
-            citizenship: true,
-            dateOfBirth: true,
-            profession: true,
-            signatureBase64: true
+        organization: {
+          include: {
+            members: {
+              where: { role: 'OWNER' },
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    firstName: true,
+                    lastName: true,
+                    pesel: true,
+                    dowodOsobistyNumber: true,
+                    phoneNumber: true,
+                    address: true,
+                    street: true,
+                    city: true,
+                    zipCode: true,
+                    country: true,
+                    citizenship: true,
+                    dateOfBirth: true,
+                    profession: true,
+                    signatureBase64: true
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -899,13 +988,13 @@ export const previewContract = async (req, res) => {
       contractNumber,
       agreementDate: new Date(),
       landlord: {
-        name: offer.landlord.name,
-        firstName: offer.landlord.firstName || 'Landlord',
-        lastName: offer.landlord.lastName || 'Name',
-        email: offer.landlord.email,
-        dowodOsobistyNumber: offer.landlord.dowodOsobistyNumber || 'N/A',
-        phoneNumber: offer.landlord.phoneNumber || 'N/A',
-        address: offer.landlord.address || 'N/A',
+        name: offer.organization?.members?.[0]?.user?.name || 'Landlord',
+        firstName: offer.organization?.members?.[0]?.user?.firstName || 'Landlord',
+        lastName: offer.organization?.members?.[0]?.user?.lastName || 'Name',
+        email: offer.organization?.members?.[0]?.user?.email || 'N/A',
+        dowodOsobistyNumber: offer.organization?.members?.[0]?.user?.dowodOsobistyNumber || 'N/A',
+        phoneNumber: offer.organization?.members?.[0]?.user?.phoneNumber || 'N/A',
+        address: offer.organization?.members?.[0]?.user?.address || 'N/A',
         signature: null // No signature in preview
       },
       tenant: {
@@ -983,9 +1072,17 @@ export const signContract = async (req, res) => {
                 }
               }
             },
-            offer: {
+            offers: {
+              where: { status: 'PAID' },
               include: {
-                landlord: true
+                organization: {
+                  include: {
+                    members: {
+                      where: { role: 'OWNER' },
+                      include: { user: true }
+                    }
+                  }
+                }
               }
             }
           }
@@ -1075,13 +1172,23 @@ export const getMyContracts = async (req, res) => {
       include: {
         rentalRequest: {
           include: {
-            offer: {
+            offers: {
+              where: { status: 'PAID' },
               include: {
-                landlord: {
-                  select: {
-                    id: true,
-                    name: true,
-                    email: true
+                organization: {
+                  include: {
+                    members: {
+                      where: { role: 'OWNER' },
+                      include: {
+                        user: {
+                          select: {
+                            id: true,
+                            name: true,
+                            email: true
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -1116,7 +1223,14 @@ export const getLandlordContracts = async (req, res) => {
         rentalRequest: {
           offers: {
             some: {
-              landlordId: userId
+              organization: {
+                members: {
+                  some: {
+                    userId: userId,
+                    role: 'OWNER'
+                  }
+                }
+              }
             }
           }
         },
@@ -1137,11 +1251,20 @@ export const getLandlordContracts = async (req, res) => {
               },
               offers: {
                 include: {
-                  landlord: {
-                    select: {
-                      id: true,
-                      name: true,
-                      email: true
+                  organization: {
+                    include: {
+                      members: {
+                        where: { role: 'OWNER' },
+                        include: {
+                          user: {
+                            select: {
+                              id: true,
+                              name: true,
+                              email: true
+                            }
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -1190,12 +1313,21 @@ export const downloadGeneratedContract = async (req, res) => {
             offers: {
               where: { status: 'PAID' },
               include: {
-                landlord: {
-                  select: {
-                    id: true,
-                    name: true,
-                    firstName: true,
-                    lastName: true
+                organization: {
+                  include: {
+                    members: {
+                      where: { role: 'OWNER' },
+                      include: {
+                        user: {
+                          select: {
+                            id: true,
+                            name: true,
+                            firstName: true,
+                            lastName: true
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -1217,7 +1349,10 @@ export const downloadGeneratedContract = async (req, res) => {
     // Verify the user is authorized (either tenant or landlord)
     const { tenant, offers } = contract.rentalRequest;
     const paidOffer = offers?.[0];
-    if (tenant.id !== userId && paidOffer?.landlord.id !== userId) {
+    const isTenant = tenant.id === userId;
+    const isLandlord = paidOffer?.organization?.members?.[0]?.user?.id === userId;
+    
+    if (!isTenant && !isLandlord) {
       return res.status(403).json({ error: 'Access denied. You can only download contracts you are involved in.' });
     }
 
@@ -1243,7 +1378,7 @@ export const downloadGeneratedContract = async (req, res) => {
       contractId,
       contractNumber: contract.contractNumber,
       createdAt: contract.createdAt,
-      userRole: tenant.id === userId ? 'tenant' : 'landlord',
+      userRole: isTenant ? 'tenant' : 'landlord',
       filename
     });
 
@@ -1286,12 +1421,21 @@ export const downloadSignedContract = async (req, res) => {
             offers: {
               where: { status: 'PAID' },
               include: {
-                landlord: {
-                  select: {
-                    id: true,
-                    name: true,
-                    firstName: true,
-                    lastName: true
+                organization: {
+                  include: {
+                    members: {
+                      where: { role: 'OWNER' },
+                      include: {
+                        user: {
+                          select: {
+                            id: true,
+                            name: true,
+                            firstName: true,
+                            lastName: true
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -1318,7 +1462,10 @@ export const downloadSignedContract = async (req, res) => {
     // Verify the user is authorized (either tenant or landlord)
     const { tenant, offers } = contract.rentalRequest;
     const paidOffer = offers?.[0];
-    if (tenant.id !== userId && paidOffer?.landlord.id !== userId) {
+    const isTenant = tenant.id === userId;
+    const isLandlord = paidOffer?.organization?.members?.[0]?.user?.id === userId;
+    
+    if (!isTenant && !isLandlord) {
       return res.status(403).json({ error: 'Access denied. You can only download contracts you are involved in.' });
     }
 
@@ -1344,7 +1491,7 @@ export const downloadSignedContract = async (req, res) => {
       contractId,
       contractNumber: contract.contractNumber,
       signedAt: contract.signedAt,
-      userRole: tenant.id === userId ? 'tenant' : 'landlord',
+      userRole: isTenant ? 'tenant' : 'landlord',
       filename
     });
 

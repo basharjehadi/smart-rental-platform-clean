@@ -107,12 +107,14 @@ const generateContractData = async (offer, user = null) => {
   
   // Debug signature data
   console.log('🔍 Debug signature data:');
-  console.log('Landlord signature exists:', !!offer.landlord?.signatureBase64);
+  console.log('Landlord signature exists:', !!offer.organization?.members?.[0]?.user?.signatureBase64);
   console.log('Tenant data keys:', Object.keys(offer.tenantGroup || {}));
   
-  // Use original signatures - check if they already have data URL prefix
-  const landlordSignature = offer.landlord?.signatureBase64 ? 
-    (offer.landlord.signatureBase64.startsWith('data:') ? offer.landlord.signatureBase64 : `data:image/png;base64,${offer.landlord.signatureBase64}`) : null;
+  // Get landlord signature from organization member
+  const landlordSignature = offer.organization?.members?.[0]?.user?.signatureBase64 ? 
+    (offer.organization.members[0].user.signatureBase64.startsWith('data:') ? 
+      offer.organization.members[0].user.signatureBase64 : 
+      `data:image/png;base64,${offer.organization.members[0].user.signatureBase64}`) : null;
 
   // Translate additional terms with automatic language detection
   const additionalTermsText = offer.description || offer.additionalTerms || '';
@@ -152,31 +154,32 @@ const generateContractData = async (offer, user = null) => {
       signature: org.signatureBase64 ? 
         (org.signatureBase64.startsWith('data:') ? org.signatureBase64 : `data:image/png;base64,${org.signatureBase64}`) : null,
       // Individual contact person (if available)
-      contactPerson: offer.landlord ? {
-        name: `${offer.landlord.firstName || ''} ${offer.landlord.lastName || ''}`.trim() || offer.landlord.name || 'Contact Person',
-        firstName: offer.landlord.firstName || 'N/A',
-        lastName: offer.landlord.lastName || 'N/A',
-        phone: offer.landlord.phoneNumber || 'N/A',
-        email: offer.landlord.email || 'N/A'
+      contactPerson: offer.organization?.members?.[0]?.user ? {
+        name: `${offer.organization.members[0].user.firstName || ''} ${offer.organization.members[0].user.lastName || ''}`.trim() || offer.organization.members[0].user.name || 'Contact Person',
+        firstName: offer.organization.members[0].user.firstName || 'N/A',
+        lastName: offer.organization.members[0].user.lastName || 'N/A',
+        phone: offer.organization.members[0].user.phoneNumber || 'N/A',
+        email: offer.organization.members[0].user.email || 'N/A'
       } : null
     };
   } else {
-    // Individual landlord - use user data
+    // Individual landlord - use organization member user data
+    const landlordUser = offer.organization?.members?.[0]?.user;
     landlordData = {
       type: 'individual',
-      name: `${offer.landlord?.firstName || ''} ${offer.landlord?.lastName || ''}`.trim() || offer.landlord?.name || 'Landlord',
-      firstName: offer.landlord?.firstName || 'N/A',
-      lastName: offer.landlord?.lastName || 'N/A',
-      address: offer.landlord?.address || 
-        (offer.landlord?.street && offer.landlord?.city ? 
-          `${offer.landlord.street}, ${offer.landlord.city}, ${offer.landlord.zipCode || ''}, ${offer.landlord.country || ''}`.replace(/,\s*,/g, ',').replace(/,\s*$/g, '') : 
+      name: `${landlordUser?.firstName || ''} ${landlordUser?.lastName || ''}`.trim() || landlordUser?.name || 'Landlord',
+      firstName: landlordUser?.firstName || 'N/A',
+      lastName: landlordUser?.lastName || 'N/A',
+      address: landlordUser?.address || 
+        (landlordUser?.street && landlordUser?.city ? 
+          `${landlordUser.street}, ${landlordUser.city}, ${landlordUser.zipCode || ''}, ${landlordUser.country || ''}`.replace(/,\s*,/g, ',').replace(/,\s*$/g, '') : 
           'N/A'),
-      pesel: offer.landlord?.pesel || 'N/A',
-      idNumber: offer.landlord?.dowodOsobistyNumber || 'N/A',
-      phone: offer.landlord?.phoneNumber || 'N/A',
-      email: offer.landlord?.email || 'N/A',
-      citizenship: offer.landlord?.citizenship || 'N/A',
-      dateOfBirth: offer.landlord?.dateOfBirth ? new Date(offer.landlord.dateOfBirth).toLocaleDateString('en-US', {
+      pesel: landlordUser?.pesel || 'N/A',
+      idNumber: landlordUser?.dowodOsobistyNumber || 'N/A',
+      phone: landlordUser?.phoneNumber || 'N/A',
+      email: landlordUser?.email || 'N/A',
+      citizenship: landlordUser?.citizenship || 'N/A',
+      dateOfBirth: landlordUser?.dateOfBirth ? new Date(landlordUser.dateOfBirth).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
@@ -373,63 +376,194 @@ const generateContractData = async (offer, user = null) => {
 
 // Generate HTML from template
 export const generateContractHTML = async (offer, user = null) => {
-  const contractData = await generateContractData(offer, user);
-  const template = loadTemplate();
-  return template(contractData);
+  try {
+    console.log('🔄 Attempting to generate contract HTML with template...');
+    const contractData = await generateContractData(offer, user);
+    console.log('✅ Contract data generated successfully');
+    
+    const template = loadTemplate();
+    console.log('✅ Template loaded successfully');
+    
+    console.log('🔍 Contract data structure:', {
+      hasLandlordData: !!contractData.landlord,
+      hasTenantData: !!contractData.tenant,
+      landlordKeys: contractData.landlord ? Object.keys(contractData.landlord) : [],
+      tenantKeys: contractData.tenant ? Object.keys(contractData.tenant) : []
+    });
+    
+    const htmlResult = template(contractData);
+    console.log('✅ HTML generated successfully from template');
+    
+    return htmlResult;
+  } catch (error) {
+    console.error('❌ Template generation failed, using fallback HTML:', error.message);
+    console.error('❌ Error details:', error.stack);
+    return generateSimpleFallbackHTML(offer, user);
+  }
+};
+
+// Generate simple fallback HTML if template fails
+const generateSimpleFallbackHTML = (offer, user = null) => {
+  const contractNumber = `SR-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`;
+  
+  // Use the most basic HTML possible to avoid any rendering issues
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Rental Contract ${contractNumber}</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+        .section { margin-bottom: 25px; }
+        .section-title { font-weight: bold; font-size: 18px; margin-bottom: 10px; color: #333; }
+        .info-row { margin-bottom: 8px; }
+        .label { font-weight: bold; display: inline-block; width: 150px; }
+        .signature-section { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 20px; }
+        .signature-box { border: 1px solid #000; height: 60px; margin-top: 10px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>RENTAL CONTRACT</h1>
+        <h2>Contract Number: ${contractNumber}</h2>
+        <p>Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">LANDLORD INFORMATION</div>
+        <div class="info-row"><span class="label">Name:</span> ${offer.organization?.members?.[0]?.user?.name || 'Landlord'}</div>
+        <div class="info-row"><span class="label">Email:</span> ${offer.organization?.members?.[0]?.user?.email || 'N/A'}</div>
+        <div class="info-row"><span class="label">Phone:</span> ${offer.organization?.members?.[0]?.user?.phoneNumber || 'N/A'}</div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">TENANT INFORMATION</div>
+        <div class="info-row"><span class="label">Name:</span> ${offer.tenantGroup?.members?.[0]?.user?.name || 'Tenant'}</div>
+        <div class="info-row"><span class="label">Email:</span> ${offer.tenantGroup?.members?.[0]?.user?.email || 'N/A'}</div>
+        <div class="info-row"><span class="label">Phone:</span> ${offer.tenantGroup?.members?.[0]?.user?.phoneNumber || 'N/A'}</div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">PROPERTY INFORMATION</div>
+        <div class="info-row"><span class="label">Address:</span> ${offer.propertyAddress || 'Property Address'}</div>
+        <div class="info-row"><span class="label">Monthly Rent:</span> ${offer.rentAmount || 0} PLN</div>
+        <div class="info-row"><span class="label">Deposit:</span> ${offer.depositAmount || 0} PLN</div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">LEASE TERMS</div>
+        <div class="info-row"><span class="label">Start Date:</span> ${offer.leaseStartDate ? new Date(offer.leaseStartDate).toLocaleDateString() : 'N/A'}</div>
+        <div class="info-row"><span class="label">End Date:</span> ${offer.leaseStartDate ? new Date(offer.leaseStartDate).toLocaleDateString() : 'N/A'}</div>
+        <div class="info-row"><span class="label">Duration:</span> ${offer.leaseDuration || 12} months</div>
+      </div>
+      
+      <div class="signature-section">
+        <div class="section-title">SIGNATURES</div>
+        <div class="info-row">
+          <span class="label">Landlord:</span>
+          <div class="signature-box"></div>
+        </div>
+        <div class="info-row">
+          <span class="label">Tenant:</span>
+          <div class="signature-box"></div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 };
 
 // Generate PDF using Puppeteer with optimization
 export const generateContractPDF = async (offer, user = null) => {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      '--no-sandbox', 
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--no-first-run',
-      '--disable-web-security',
-      '--disable-features=VizDisplayCompositor'
-    ]
-  });
+  let browser = null;
+  let retryCount = 0;
+  const maxRetries = 3;
   
-  try {
-    const page = await browser.newPage();
-    
-    // Set viewport for consistent rendering
-    await page.setViewport({ width: 1200, height: 800 });
-    
-    // Generate HTML content with optimized images
-    const htmlContent = await generateContractHTML(offer, user);
-    
-    // Set content and wait for rendering
-    await page.setContent(htmlContent, {
-      waitUntil: 'networkidle0',
-      timeout: 10000
-    });
-    
-    // Generate PDF with optimized settings
-    const pdf = await page.pdf({
-      format: 'A4',
-      margin: {
-        top: '20mm',
-        right: '20mm',
-        bottom: '20mm',
-        left: '20mm'
-      },
-      printBackground: true,
-      preferCSSPageSize: true,
-      // Optimize for smaller file size
-      omitBackground: false,
-      displayHeaderFooter: false
-    });
-    
-    return pdf;
-  } catch (error) {
-    console.error('❌ Error generating PDF:', error);
-    throw error;
-  } finally {
-    await browser.close();
+  while (retryCount < maxRetries) {
+    try {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          '--no-sandbox', 
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--no-first-run',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+          '--disable-ipc-flooding-protection',
+          '--memory-pressure-off',
+          '--max_old_space_size=4096'
+        ]
+      });
+      
+      const page = await browser.newPage();
+      
+      // Set viewport for consistent rendering
+      await page.setViewport({ width: 1200, height: 800 });
+      
+      // Generate HTML content with optimized images
+      const htmlContent = await generateContractHTML(offer, user);
+      
+      console.log(`🔄 Attempt ${retryCount + 1}: Setting HTML content...`);
+      
+      // Set content and wait for rendering with increased timeout
+      await page.setContent(htmlContent, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000
+      });
+      
+      console.log(`🔄 Attempt ${retryCount + 1}: Waiting for content to render...`);
+      
+      // Wait a bit more for any dynamic content to render
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      console.log(`🔄 Attempt ${retryCount + 1}: Generating PDF...`);
+      
+      // Generate PDF with optimized settings
+      const pdf = await page.pdf({
+        format: 'A4',
+        margin: {
+          top: '20mm',
+          right: '20mm',
+          bottom: '20mm',
+          left: '20mm'
+        },
+        printBackground: true,
+        preferCSSPageSize: true,
+        // Optimize for smaller file size
+        omitBackground: false,
+        displayHeaderFooter: false
+      });
+      
+      console.log(`✅ PDF generated successfully on attempt ${retryCount + 1}`);
+      return pdf;
+      
+    } catch (error) {
+      retryCount++;
+      console.error(`❌ Attempt ${retryCount} failed:`, error.message);
+      
+      if (browser) {
+        try {
+          await browser.close();
+        } catch (closeError) {
+          console.error('Error closing browser:', closeError.message);
+        }
+      }
+      
+      if (retryCount >= maxRetries) {
+        console.error(`❌ All ${maxRetries} attempts failed. Final error:`, error);
+        throw error;
+      }
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
   }
 };
 

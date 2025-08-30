@@ -581,6 +581,8 @@ class RequestPoolService {
                           id: true,
                           name: true,
                           profileImage: true,
+                          profession: true,
+                          dateOfBirth: true,
                           averageRating: true,
                           totalReviews: true,
                           rank: true

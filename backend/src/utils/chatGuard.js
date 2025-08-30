@@ -53,7 +53,11 @@ export const checkPropertyPayment = async (propertyId, userId) => {
     const paidOffer = await prisma.offer.findFirst({
       where: {
         propertyId: propertyId,
-        tenantId: userId,
+        rentalRequest: {
+          tenantGroup: {
+            members: { some: { userId: userId } }
+          }
+        },
         status: 'PAID'
       }
     });
@@ -122,7 +126,7 @@ export const canChat = async (conversationId, userId) => {
         property: {
           select: {
             id: true,
-            landlordId: true
+            organizationId: true
           }
         }
       }
@@ -162,8 +166,19 @@ export const canChat = async (conversationId, userId) => {
     }
 
     // 3.5 Landlord ownership shortcut: landlords can always reply in their own property's conversation
-    if (conversation.property && conversation.property.landlordId === userId) {
-      return { ok: true };
+    if (conversation.property && conversation.property.organizationId) {
+      // Check if user is a member of the organization that owns the property
+      const isLandlord = await prisma.organizationMember.findFirst({
+        where: {
+          organizationId: conversation.property.organizationId,
+          userId: userId,
+          role: 'OWNER'
+        }
+      });
+      
+      if (isLandlord) {
+        return { ok: true };
+      }
     }
 
     // 4. Check payment requirement - either through offer or property

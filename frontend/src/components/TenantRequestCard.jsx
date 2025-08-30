@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '../utils/api.js';
 
 const TenantRequestCard = ({ 
   tenant, 
@@ -67,20 +68,14 @@ const TenantRequestCard = ({
   // Fetch tenant rank information
   useEffect(() => {
     const fetchTenantRank = async () => {
-      if (!tenant.id) return;
+      // Use tenantId if available, otherwise fall back to tenant.id
+      const tenantUserId = tenant.tenantId || tenant.id;
+      if (!tenantUserId) return;
       
       try {
         setRankLoading(true);
-        const response = await fetch(`/api/users/${tenant.id}/rank`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        
-        if (response.ok) {
-          const rankData = await response.json();
-          setTenantRank(rankData.data);
-        }
+        const response = await api.get(`/users/${tenantUserId}/rank`);
+        setTenantRank(response.data.data);
       } catch (error) {
         console.warn('Error fetching tenant rank:', error);
       } finally {
@@ -89,16 +84,18 @@ const TenantRequestCard = ({
     };
 
     fetchTenantRank();
-  }, [tenant.id]);
+  }, [tenant.tenantId, tenant.id]);
 
   // Fetch tenant reviews when modal opens
   const fetchTenantReviews = async () => {
-    if (!tenant.id) return;
+    // Use tenantId if available, otherwise fall back to tenant.id
+    const tenantUserId = tenant.tenantId || tenant.id;
+    if (!tenantUserId) return;
     
     try {
       setReviewsLoading(true);
       // TODO: Replace with actual API call to get tenant reviews
-      // const response = await fetch(`/api/tenants/${tenant.id}/reviews`);
+      // const response = await api.get(`/tenants/${tenantUserId}/reviews`);
       // const reviewsData = await response.json();
       // setTenantReviews(reviewsData.data);
       
@@ -133,6 +130,19 @@ const TenantRequestCard = ({
   };
   // Calculate match score and indicators
   const calculateMatchScore = () => {
+    // Check if propertyMatch exists
+    if (!tenant.propertyMatch) {
+      console.log('⚠️ No property match found for tenant:', tenant.id);
+      return {
+        score: 0,
+        matchType: 'No Property Match',
+        budgetStatus: 'No matching property available',
+        needsPriceAdjustment: false,
+        actionMessage: 'No property to match with this request.',
+        urgencyLevel: 'none'
+      };
+    }
+
     // More robust property rent parsing
     let propertyRent = 0;
     try {
@@ -160,7 +170,7 @@ const TenantRequestCard = ({
       propertyRent,
       tenantMaxBudget,
       tenantMinBudget,
-      propertyRentRaw: tenant.propertyMatch.rent,
+      propertyRentRaw: tenant.propertyMatch?.rent || 'N/A',
       budgetTo: tenant.budgetTo,
       budget: tenant.budget,
       parsedBudgetTo: parseInt(tenant.budgetTo),
@@ -209,12 +219,16 @@ const TenantRequestCard = ({
     }
     
     // Location matching (30 points)
-    if (tenant.propertyMatch.address.includes(tenant.location)) {
-      score += 30;
-    } else if (tenant.propertyMatch.address.toLowerCase().includes(tenant.location.toLowerCase())) {
-      score += 20;
+    if (tenant.propertyMatch.address && tenant.location) {
+      if (tenant.propertyMatch.address.includes(tenant.location)) {
+        score += 30;
+      } else if (tenant.propertyMatch.address.toLowerCase().includes(tenant.location.toLowerCase())) {
+        score += 20;
+      } else {
+        score += 10;
+      }
     } else {
-      score += 10;
+      score += 10; // Default score if no address data
     }
     
     // Property type matching (20 points)
@@ -229,18 +243,22 @@ const TenantRequestCard = ({
     }
     
     // Date matching (10 points)
-    const moveInDate = new Date(tenant.moveInDate);
-    const availableDate = new Date(tenant.propertyMatch.available);
-    const daysDiff = Math.abs((moveInDate - availableDate) / (1000 * 60 * 60 * 24));
-    
-    if (daysDiff <= 7) {
-      score += 10;
-    } else if (daysDiff <= 30) {
-      score += 7;
-    } else if (daysDiff <= 90) {
-      score += 5;
+    if (tenant.moveInDate && tenant.propertyMatch.available) {
+      const moveInDate = new Date(tenant.moveInDate);
+      const availableDate = new Date(tenant.propertyMatch.available);
+      const daysDiff = Math.abs((moveInDate - availableDate) / (1000 * 60 * 60 * 24));
+      
+      if (daysDiff <= 7) {
+        score += 10;
+      } else if (daysDiff <= 30) {
+        score += 7;
+      } else if (daysDiff <= 90) {
+        score += 5;
+      } else {
+        score += 2;
+      }
     } else {
-      score += 2;
+      score += 5; // Default score if no date data
     }
     
     const result = { score, matchType, budgetStatus, needsPriceAdjustment, actionMessage, urgencyLevel };
@@ -252,6 +270,11 @@ const TenantRequestCard = ({
 
   // One-line budget analysis sentence (below / exact / slightly above / above)
   const deriveBudgetSentence = () => {
+    // Check if propertyMatch exists
+    if (!tenant.propertyMatch) {
+      return 'No property match available for budget analysis.';
+    }
+
     // Parse rent
     let propertyRent = 0;
     try {
@@ -713,7 +736,7 @@ const TenantRequestCard = ({
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Budget Range</p>
-                <p className="text-sm font-medium text-gray-900">{tenant.budgetRange}</p>
+                <p className="text-sm font-medium text-gray-900">{tenant.budgetRange || 'Budget not specified'}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Preferred Move-in</p>
@@ -733,31 +756,40 @@ const TenantRequestCard = ({
               </div>
               
               {/* Property Details */}
-              <div className="mb-4">
-                <p className="text-sm text-green-700 font-semibold mb-1">{tenant.propertyMatch.name}</p>
-                <p className="text-sm text-green-700 font-medium">{tenant.propertyMatch.address}</p>
-                <p className="text-sm text-green-700">
-                  Rent: {tenant.propertyMatch.rent} • Available: {tenant.propertyMatch.available}
-                </p>
-              </div>
-              
-              {/* Budget Analysis - One-line guidance */}
-              <div className="bg-white bg-opacity-70 rounded-lg p-2 border border-green-200">
-                <div className="grid grid-cols-3 gap-2 items-center text-sm">
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Your Price</p>
-                    <p className="text-lg font-bold text-gray-900">{tenant.propertyMatch.rent}</p>
+              {tenant.propertyMatch ? (
+                <>
+                  <div className="mb-4">
+                    <p className="text-sm text-green-700 font-semibold mb-1">{tenant.propertyMatch.name}</p>
+                    <p className="text-sm text-green-700 font-medium">{tenant.propertyMatch.address}</p>
+                    <p className="text-sm text-green-700">
+                      Rent: {tenant.propertyMatch.rent} • Available: {tenant.propertyMatch.available}
+                    </p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Analysis</p>
-                    <p className="text-sm font-medium text-gray-700">{budgetSentence}</p>
+                  
+                  {/* Budget Analysis - One-line guidance */}
+                  <div className="bg-white bg-opacity-70 rounded-lg p-2 border border-green-200">
+                    <div className="grid grid-cols-3 gap-2 items-center text-sm">
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">Your Price</p>
+                        <p className="text-lg font-bold text-gray-900">{tenant.propertyMatch.rent}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">Analysis</p>
+                        <p className="text-sm font-medium text-gray-700">{budgetSentence}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">Their Max Budget</p>
+                        <p className="text-lg font-bold text-green-600">{tenant.budgetTo ? `${tenant.budgetTo} PLN` : `${tenant.budget} PLN`}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Their Max Budget</p>
-                    <p className="text-lg font-bold text-green-600">{tenant.budgetTo ? `${tenant.budgetTo} PLN` : `${tenant.budget} PLN`}</p>
-                  </div>
+                </>
+              ) : (
+                <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-sm text-yellow-800 font-medium">⚠️ No Property Match</p>
+                  <p className="text-sm text-yellow-700">This rental request doesn't have a matching property yet.</p>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Tenant Requirements */}

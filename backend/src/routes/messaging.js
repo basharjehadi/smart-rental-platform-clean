@@ -782,7 +782,7 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
         },
         select: {
           id: true,
-          tenantId: true,
+          tenantGroupId: true,
           status: true
         }
       });
@@ -803,9 +803,22 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
         include: {
           offer: {
             include: {
-              property: {
+              property: true,
+              organization: {
                 include: {
-                  landlord: true
+                  members: {
+                    where: { role: 'OWNER' },
+                    include: {
+                      user: {
+                        select: {
+                          id: true,
+                          name: true,
+                          email: true,
+                          profileImage: true
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -820,12 +833,31 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
         const paidOffer = await prisma.offer.findFirst({
           where: {
             propertyId: propertyId,
-            tenantId: userId,
+            rentalRequest: {
+              tenantGroup: {
+                members: { some: { userId: userId } }
+              }
+            },
             status: 'PAID'
           },
           include: {
-            property: {
-              include: { landlord: true }
+            property: true,
+            organization: {
+              include: {
+                members: {
+                  where: { role: 'OWNER' },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        profileImage: true
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         });
@@ -839,6 +871,11 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
             offerId: paidOffer.id,
             offer: paidOffer
           };
+          
+          // Get landlord info from organization for fallback path
+          const landlordUser = paidOffer.organization?.members?.[0]?.user;
+          counterpartUserId = landlordUser?.id || paidOffer.organization?.id;
+          property = paidOffer.property;
         }
       }
 
@@ -854,7 +891,9 @@ router.post('/conversations/by-property/:propertyId', verifyToken, async (req, r
 
       if (payment) {
         hasAccess = true;
-        counterpartUserId = payment.offer.property.landlord.id;
+        // Get landlord info from organization
+        const landlordUser = payment.offer.organization?.members?.[0]?.user;
+        counterpartUserId = landlordUser?.id || payment.offer.organization?.id;
         property = payment.offer.property;
         console.log('✅ Tenant has access, counterpart user ID:', counterpartUserId);
         console.log('🔍 Payment object structure:', {

@@ -912,13 +912,41 @@ export const getUserRank = async (req, res) => {
   try {
     const { userId } = req.params;
     const requestingUserId = req.user.id;
+    
+    console.log('🔍 getUserRank called:', {
+      requestedUserId: userId,
+      requestingUserId: requestingUserId,
+      requestingUserRole: req.user.role
+    });
 
-    // Users can only view their own rank or admin can view all
+    // Users can view their own rank, admin can view all, landlords can view tenant ranks
     if (requestingUserId !== userId && req.user.role !== 'ADMIN') {
-      return res.status(403).json({
-        error: 'Access denied',
-        message: 'You can only view your own rank'
-      });
+      // Check if this is a landlord viewing a tenant's rank
+      if (req.user.role === 'LANDLORD') {
+        const targetUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { role: true }
+        });
+        
+        if (!targetUser) {
+          return res.status(404).json({
+            error: 'User not found',
+            message: 'The specified user does not exist'
+          });
+        }
+        
+        if (targetUser.role !== 'TENANT') {
+          return res.status(403).json({
+            error: 'Access denied',
+            message: 'Landlords can only view tenant ranks'
+          });
+        }
+      } else {
+        return res.status(403).json({
+          error: 'Access denied',
+          message: 'You can only view your own rank'
+        });
+      }
     }
 
     // Get user with rank information
