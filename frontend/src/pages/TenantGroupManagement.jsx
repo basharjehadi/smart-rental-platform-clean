@@ -1,23 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Plus, Mail, UserPlus, Trash2, Crown, CheckCircle, XCircle } from 'lucide-react';
+import {
+  Users,
+  Plus,
+  Mail,
+  UserPlus,
+  Trash2,
+  Crown,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react';
 import CreateRentalRequestModal from '../components/CreateRentalRequestModal';
 
 const TenantGroupManagement = () => {
   const { user, api } = useAuth();
   const navigate = useNavigate();
-  
+
   const [myGroup, setMyGroup] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+
   // Group creation state
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [creatingGroup, setCreatingGroup] = useState(false);
-  
+
   // Invitation state
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -26,14 +35,18 @@ const TenantGroupManagement = () => {
 
   // Inline Create Rental Request modal state
   const [showCreateRequestModal, setShowCreateRequestModal] = useState(false);
-  
+
   // Helper to build absolute profile image URL
-  const getProfilePhotoUrl = (profileImage) => {
+  const getProfilePhotoUrl = profileImage => {
     if (!profileImage) return null;
-    const serverBase = (import.meta.env.VITE_API_URL || 'http://localhost:3001/api').replace(/\/?api$/i, '');
+    const serverBase = (
+      import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+    ).replace(/\/?api$/i, '');
     if (profileImage.startsWith('http')) return profileImage;
-    if (profileImage.startsWith('/uploads/')) return `${serverBase}${profileImage}`;
-    if (profileImage.startsWith('uploads/')) return `${serverBase}/${profileImage}`;
+    if (profileImage.startsWith('/uploads/'))
+      return `${serverBase}${profileImage}`;
+    if (profileImage.startsWith('uploads/'))
+      return `${serverBase}/${profileImage}`;
     // default directory used by backend uploads
     return `${serverBase}/uploads/profile_images/${profileImage}`;
   };
@@ -47,15 +60,19 @@ const TenantGroupManagement = () => {
       setError('');
       setLoading(true);
       const response = await api.get('/tenant-groups/my-group');
-      const group = response.data?.tenantGroup || response.data?.data?.tenantGroup;
+      const group =
+        response.data?.tenantGroup || response.data?.data?.tenantGroup;
       if (group) {
         console.log('Group data received:', group);
-        console.log('Members with profile images:', group.members?.map(m => ({
-          name: m.user.name,
-          email: m.user.email,
-          profileImage: m.user.profileImage,
-          hasImage: !!m.user.profileImage
-        })));
+        console.log(
+          'Members with profile images:',
+          group.members?.map(m => ({
+            name: m.user.name,
+            email: m.user.email,
+            profileImage: m.user.profileImage,
+            hasImage: !!m.user.profileImage,
+          }))
+        );
         setMyGroup(group);
       } else {
         setMyGroup(null);
@@ -66,14 +83,17 @@ const TenantGroupManagement = () => {
         // No group yet – this is expected for new tenants
         setMyGroup(null);
       } else {
-        setError(error.response?.data?.message || 'Failed to fetch your group information');
+        setError(
+          error.response?.data?.message ||
+            'Failed to fetch your group information'
+        );
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateGroup = async (e) => {
+  const handleCreateGroup = async e => {
     e.preventDefault();
     if (!groupName.trim()) {
       setError('Group name is required');
@@ -83,9 +103,11 @@ const TenantGroupManagement = () => {
     try {
       setCreatingGroup(true);
       setError('');
-      
-      const response = await api.post('/tenant-groups', { name: groupName.trim() });
-      
+
+      const response = await api.post('/tenant-groups', {
+        name: groupName.trim(),
+      });
+
       if (response.status === 201) {
         setSuccess('Group created successfully!');
         setGroupName('');
@@ -101,7 +123,7 @@ const TenantGroupManagement = () => {
     }
   };
 
-  const handleSendInvite = async (e) => {
+  const handleSendInvite = async e => {
     e.preventDefault();
     if (!inviteEmail.trim()) {
       setError('Email is required');
@@ -111,12 +133,12 @@ const TenantGroupManagement = () => {
     try {
       setSendingInvite(true);
       setError('');
-      
+
       const response = await api.post(`/tenant-groups/${myGroup.id}/invite`, {
         email: inviteEmail.trim(),
-        message: inviteMessage.trim()
+        message: inviteMessage.trim(),
       });
-      
+
       if (response.status === 200) {
         setSuccess('Invitation sent successfully!');
         setInviteEmail('');
@@ -132,8 +154,12 @@ const TenantGroupManagement = () => {
     }
   };
 
-  const handleRemoveMember = async (memberId) => {
-    if (!window.confirm('Are you sure you want to remove this member from the group?')) {
+  const handleRemoveMember = async memberId => {
+    if (
+      !window.confirm(
+        'Are you sure you want to remove this member from the group?'
+      )
+    ) {
       return;
     }
 
@@ -149,14 +175,18 @@ const TenantGroupManagement = () => {
     }
   };
 
-  const handleTransferOwnership = async (memberUserId) => {
-    if (!window.confirm('Are you sure you want to transfer ownership to this member? This action cannot be undone.')) {
+  const handleTransferOwnership = async memberUserId => {
+    if (
+      !window.confirm(
+        'Are you sure you want to transfer ownership to this member? This action cannot be undone.'
+      )
+    ) {
       return;
     }
 
     try {
       await api.post(`/tenant-groups/${myGroup.id}/transfer-ownership`, {
-        newPrimaryUserId: memberUserId
+        newPrimaryUserId: memberUserId,
       });
       setSuccess('Ownership transferred successfully!');
       fetchMyGroup(); // Refresh group data
@@ -168,7 +198,11 @@ const TenantGroupManagement = () => {
   };
 
   const handleLeaveGroup = async () => {
-    if (!window.confirm('Are you sure you want to leave this group? This action cannot be undone.')) {
+    if (
+      !window.confirm(
+        'Are you sure you want to leave this group? This action cannot be undone.'
+      )
+    ) {
       return;
     }
 
@@ -185,11 +219,13 @@ const TenantGroupManagement = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading your group information...</p>
+      <div className='min-h-screen bg-gray-50 py-8'>
+        <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8'>
+          <div className='text-center py-12'>
+            <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto'></div>
+            <p className='mt-4 text-gray-600'>
+              Loading your group information...
+            </p>
           </div>
         </div>
       </div>
@@ -197,29 +233,43 @@ const TenantGroupManagement = () => {
   }
 
   // Determine if current user is a primary member
-  const iAmPrimary = !!myGroup?.members?.find(m => m.userId === user?.id && m.isPrimary);
+  const iAmPrimary = !!myGroup?.members?.find(
+    m => m.userId === user?.id && m.isPrimary
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className='min-h-screen bg-gray-50 py-8'>
+      <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8'>
         {/* Header */}
-        <div className="mb-8">
+        <div className='mb-8'>
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+            className='flex items-center text-gray-600 hover:text-gray-900 mb-4 transition-colors'
           >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg
+              className='w-4 h-4 mr-2'
+              fill='none'
+              stroke='currentColor'
+              viewBox='0 0 24 24'
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth={2}
+                d='M15 19l-7-7 7-7'
+              />
             </svg>
             Back
           </button>
-          
-          <div className="text-center">
-            <div className="flex items-center justify-center mb-4">
-              <Users className="w-12 h-12 text-blue-600 mr-3" />
-              <h1 className="text-3xl font-bold text-gray-900">Tenant Group Management</h1>
+
+          <div className='text-center'>
+            <div className='flex items-center justify-center mb-4'>
+              <Users className='w-12 h-12 text-blue-600 mr-3' />
+              <h1 className='text-3xl font-bold text-gray-900'>
+                Tenant Group Management
+              </h1>
             </div>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className='text-lg text-gray-600 max-w-2xl mx-auto'>
               Create and manage your tenant group for shared rentals
             </p>
           </div>
@@ -227,18 +277,18 @@ const TenantGroupManagement = () => {
 
         {/* Success/Error Messages */}
         {success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6">
-            <div className="flex items-center">
-              <CheckCircle className="w-5 h-5 mr-2" />
+          <div className='bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6'>
+            <div className='flex items-center'>
+              <CheckCircle className='w-5 h-5 mr-2' />
               {success}
             </div>
           </div>
         )}
-        
+
         {error && myGroup && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-            <div className="flex items-center">
-              <XCircle className="w-5 h-5 mr-2" />
+          <div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6'>
+            <div className='flex items-center'>
+              <XCircle className='w-5 h-5 mr-2' />
               {error}
             </div>
           </div>
@@ -246,48 +296,51 @@ const TenantGroupManagement = () => {
 
         {!myGroup ? (
           /* No Group - Show Create Form */
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8 text-blue-600" />
+          <div className='bg-white rounded-lg shadow-lg p-8'>
+            <div className='text-center mb-8'>
+              <div className='w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4'>
+                <Users className='w-8 h-8 text-blue-600' />
               </div>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+              <h2 className='text-2xl font-semibold text-gray-900 mb-2'>
                 Create Your Tenant Group
               </h2>
-              <p className="text-gray-600">
+              <p className='text-gray-600'>
                 Start a group to rent properties together with friends or family
               </p>
             </div>
 
-            <form onSubmit={handleCreateGroup} className="max-w-md mx-auto">
-              <div className="mb-6">
-                <label htmlFor="groupName" className="block text-sm font-medium text-gray-700 mb-2">
+            <form onSubmit={handleCreateGroup} className='max-w-md mx-auto'>
+              <div className='mb-6'>
+                <label
+                  htmlFor='groupName'
+                  className='block text-sm font-medium text-gray-700 mb-2'
+                >
                   Group Name *
                 </label>
                 <input
-                  type="text"
-                  id="groupName"
+                  type='text'
+                  id='groupName'
                   value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., Friends Group, Family Renters"
+                  onChange={e => setGroupName(e.target.value)}
+                  className='w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                  placeholder='e.g., Friends Group, Family Renters'
                   required
                 />
               </div>
 
               <button
-                type="submit"
+                type='submit'
                 disabled={creatingGroup}
-                className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                className='w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center'
               >
                 {creatingGroup ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
                     Creating Group...
                   </>
                 ) : (
                   <>
-                    <Plus className="w-4 h-4 mr-2" />
+                    <Plus className='w-4 h-4 mr-2' />
                     Create Group
                   </>
                 )}
@@ -296,25 +349,30 @@ const TenantGroupManagement = () => {
           </div>
         ) : (
           /* Has Group - Show Group Details */
-          <div className="space-y-6">
+          <div className='space-y-6'>
             {/* Group Info Card */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <div className="flex items-center justify-between mb-4">
+            <div className='bg-white rounded-lg shadow-lg p-6'>
+              <div className='flex items-center justify-between mb-4'>
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">{myGroup.name}</h2>
-                  <p className="text-gray-600">Created on {new Date(myGroup.createdAt).toLocaleDateString()}</p>
+                  <h2 className='text-xl font-semibold text-gray-900'>
+                    {myGroup.name}
+                  </h2>
+                  <p className='text-gray-600'>
+                    Created on{' '}
+                    {new Date(myGroup.createdAt).toLocaleDateString()}
+                  </p>
                 </div>
-                <div className="flex space-x-3">
+                <div className='flex space-x-3'>
                   <button
                     onClick={() => setShowInviteForm(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                    className='bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center'
                   >
-                    <UserPlus className="w-4 h-4 mr-2" />
+                    <UserPlus className='w-4 h-4 mr-2' />
                     Invite Member
                   </button>
                   <button
                     onClick={handleLeaveGroup}
-                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center"
+                    className='bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center'
                   >
                     Leave Group
                   </button>
@@ -322,74 +380,104 @@ const TenantGroupManagement = () => {
               </div>
 
               {/* Members List */}
-              <div className="mt-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Group Members</h3>
-                <div className="space-y-3">
-                  {myGroup.members?.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
+              <div className='mt-6'>
+                <h3 className='text-lg font-medium text-gray-900 mb-4'>
+                  Group Members
+                </h3>
+                <div className='space-y-3'>
+                  {myGroup.members?.map(member => (
+                    <div
+                      key={member.id}
+                      className='flex items-center justify-between p-3 bg-gray-50 rounded-lg'
+                    >
+                      <div className='flex items-center space-x-3'>
                         {/* Profile Avatar */}
-                        <div className="relative">
+                        <div className='relative'>
                           {member.user.profileImage ? (
                             <img
                               src={getProfilePhotoUrl(member.user.profileImage)}
                               alt={member.user.name || member.user.email}
-                              className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 shadow-sm"
-                              onError={(e) => {
-                                console.log('Profile image failed to load for:', member.user.email, 'URL:', getProfilePhotoUrl(member.user.profileImage));
+                              className='w-12 h-12 rounded-full object-cover border-2 border-gray-200 shadow-sm'
+                              onError={e => {
+                                console.log(
+                                  'Profile image failed to load for:',
+                                  member.user.email,
+                                  'URL:',
+                                  getProfilePhotoUrl(member.user.profileImage)
+                                );
                                 // Hide image on error and show fallback
                                 e.currentTarget.style.display = 'none';
-                                e.currentTarget.nextElementSibling.style.display = 'flex';
+                                e.currentTarget.nextElementSibling.style.display =
+                                  'flex';
                               }}
                               onLoad={() => {
-                                console.log('Profile image loaded successfully for:', member.user.email, 'URL:', getProfilePhotoUrl(member.user.profileImage));
+                                console.log(
+                                  'Profile image loaded successfully for:',
+                                  member.user.email,
+                                  'URL:',
+                                  getProfilePhotoUrl(member.user.profileImage)
+                                );
                               }}
                             />
                           ) : null}
-                          
+
                           {/* Fallback Avatar - Always rendered but conditionally displayed */}
-                          <div 
+                          <div
                             className={`w-12 h-12 rounded-full flex items-center justify-center border-2 border-gray-200 shadow-sm ${
                               member.user.profileImage ? 'hidden' : 'flex'
                             }`}
-                            style={{ 
-                              backgroundColor: member.isPrimary ? '#fef3c7' : '#dbeafe',
-                              borderColor: member.isPrimary ? '#f59e0b' : '#3b82f6'
+                            style={{
+                              backgroundColor: member.isPrimary
+                                ? '#fef3c7'
+                                : '#dbeafe',
+                              borderColor: member.isPrimary
+                                ? '#f59e0b'
+                                : '#3b82f6',
                             }}
                           >
-                            <span className={`text-lg font-bold ${
-                              member.isPrimary ? 'text-yellow-800' : 'text-blue-700'
-                            }`}>
-                              {member.user.name?.charAt(0)?.toUpperCase() || member.user.email?.charAt(0)?.toUpperCase() || '?'}
+                            <span
+                              className={`text-lg font-bold ${
+                                member.isPrimary
+                                  ? 'text-yellow-800'
+                                  : 'text-blue-700'
+                              }`}
+                            >
+                              {member.user.name?.charAt(0)?.toUpperCase() ||
+                                member.user.email?.charAt(0)?.toUpperCase() ||
+                                '?'}
                             </span>
                           </div>
-                          
+
                           {/* Primary Member Badge */}
                           {member.isPrimary && (
-                            <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-                              <Crown className="w-3 h-3 text-yellow-800" />
+                            <div className='absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center border-2 border-white shadow-sm'>
+                              <Crown className='w-3 h-3 text-yellow-800' />
                             </div>
                           )}
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900">
+                          <p className='font-medium text-gray-900'>
                             {member.user.name || 'Unnamed User'}
                           </p>
-                          <p className="text-sm text-gray-600">{member.user.email}</p>
+                          <p className='text-sm text-gray-600'>
+                            {member.user.email}
+                          </p>
                         </div>
                       </div>
-                      
+
                       {!member.isPrimary && iAmPrimary && (
-                        <div className="flex space-x-2">
+                        <div className='flex space-x-2'>
                           <button
-                            onClick={() => handleTransferOwnership(member.user.id)}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                            onClick={() =>
+                              handleTransferOwnership(member.user.id)
+                            }
+                            className='text-blue-600 hover:text-blue-800 text-sm font-medium'
                           >
                             Make Primary
                           </button>
                           <button
                             onClick={() => handleRemoveMember(member.id)}
-                            className="text-red-600 hover:text-red-800 text-sm font-medium"
+                            className='text-red-600 hover:text-red-800 text-sm font-medium'
                           >
                             Remove
                           </button>
@@ -402,16 +490,22 @@ const TenantGroupManagement = () => {
             </div>
 
             {/* Quick Actions */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-              <div className="grid grid-cols-1 gap-4">
+            <div className='bg-white rounded-lg shadow-lg p-6'>
+              <h3 className='text-lg font-medium text-gray-900 mb-4'>
+                Quick Actions
+              </h3>
+              <div className='grid grid-cols-1 gap-4'>
                 <button
                   onClick={() => setShowCreateRequestModal(true)}
-                  className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all text-center group"
+                  className='p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all text-center group'
                 >
-                  <Plus className="w-8 h-8 text-gray-400 mx-auto mb-2 group-hover:text-blue-600" />
-                  <p className="font-medium text-gray-900">Create Rental Request</p>
-                  <p className="text-sm text-gray-600">Start looking for properties</p>
+                  <Plus className='w-8 h-8 text-gray-400 mx-auto mb-2 group-hover:text-blue-600' />
+                  <p className='font-medium text-gray-900'>
+                    Create Rental Request
+                  </p>
+                  <p className='text-sm text-gray-600'>
+                    Start looking for properties
+                  </p>
                 </button>
               </div>
             </div>
@@ -421,7 +515,7 @@ const TenantGroupManagement = () => {
                 isOpen={showCreateRequestModal}
                 onClose={() => setShowCreateRequestModal(false)}
                 onSuccess={() => navigate('/tenant-request-for-landlord')}
-                rentalType="group"
+                rentalType='group'
               />
             )}
           </div>
@@ -429,69 +523,77 @@ const TenantGroupManagement = () => {
 
         {/* Invite Form Modal */}
         {showInviteForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Invite Member</h3>
+          <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
+            <div className='bg-white rounded-lg shadow-xl max-w-md w-full p-6'>
+              <div className='flex items-center justify-between mb-4'>
+                <h3 className='text-lg font-semibold text-gray-900'>
+                  Invite Member
+                </h3>
                 <button
                   onClick={() => setShowInviteForm(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className='text-gray-400 hover:text-gray-600'
                 >
-                  <XCircle className="w-5 h-5" />
+                  <XCircle className='w-5 h-5' />
                 </button>
               </div>
 
-              <form onSubmit={handleSendInvite} className="space-y-4">
+              <form onSubmit={handleSendInvite} className='space-y-4'>
                 <div>
-                  <label htmlFor="inviteEmail" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor='inviteEmail'
+                    className='block text-sm font-medium text-gray-700 mb-1'
+                  >
                     Email Address *
                   </label>
                   <input
-                    type="email"
-                    id="inviteEmail"
+                    type='email'
+                    id='inviteEmail'
                     value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="friend@example.com"
+                    onChange={e => setInviteEmail(e.target.value)}
+                    className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500'
+                    placeholder='friend@example.com'
                     required
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="inviteMessage" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label
+                    htmlFor='inviteMessage'
+                    className='block text-sm font-medium text-gray-700 mb-1'
+                  >
                     Personal Message (Optional)
                   </label>
                   <textarea
-                    id="inviteMessage"
+                    id='inviteMessage'
                     value={inviteMessage}
-                    onChange={(e) => setInviteMessage(e.target.value)}
+                    onChange={e => setInviteMessage(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500'
                     placeholder="Hey! I'd like you to join our tenant group..."
                   />
                 </div>
 
-                <div className="flex space-x-3 pt-4">
+                <div className='flex space-x-3 pt-4'>
                   <button
-                    type="button"
+                    type='button'
                     onClick={() => setShowInviteForm(false)}
-                    className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 font-medium rounded-md hover:bg-gray-200 transition-colors"
+                    className='flex-1 px-4 py-2 text-gray-700 bg-gray-100 font-medium rounded-md hover:bg-gray-200 transition-colors'
                   >
                     Cancel
                   </button>
                   <button
-                    type="submit"
+                    type='submit'
                     disabled={sendingInvite}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    className='flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center'
                   >
                     {sendingInvite ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
                         Sending...
                       </>
                     ) : (
                       <>
-                        <Mail className="w-4 h-4 mr-2" />
+                        <Mail className='w-4 h-4 mr-2' />
                         Send Invitation
                       </>
                     )}

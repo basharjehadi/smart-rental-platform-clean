@@ -16,49 +16,75 @@ async function tenantTrustLevel(userId, prismaClient = defaultPrisma) {
       where: {
         revieweeId: userId,
         stage: 'END_OF_LEASE',
-        status: 'PUBLISHED'
+        status: 'PUBLISHED',
       },
       select: {
         stars: true,
-        createdAt: true
-      }
+        createdAt: true,
+      },
     });
 
     // Get payment history for on-time percentage
     const payments = await prismaClient.payment.findMany({
       where: {
-        tenantId: userId,
-        status: 'COMPLETED'
+        OR: [
+          { userId: userId },
+          {
+            rentalRequest: {
+              tenantGroup: {
+                members: {
+                  some: {
+                    userId: userId,
+                  },
+                },
+              },
+            },
+          },
+        ],
+        status: 'COMPLETED',
       },
       select: {
         dueDate: true,
-        paidAt: true
-      }
+        paidAt: true,
+      },
     });
 
     // Calculate metrics
     const reviewCount = reviews.length;
-    const averageRating = reviewCount > 0 
-      ? reviews.reduce((sum, review) => sum + review.stars, 0) / reviewCount 
-      : 0;
+    const averageRating =
+      reviewCount > 0
+        ? reviews.reduce((sum, review) => sum + review.stars, 0) / reviewCount
+        : 0;
 
     // Calculate on-time payment percentage
-    const onTimePayments = payments.filter(payment => {
+    const onTimePayments = payments.filter((payment) => {
       if (!payment.paidAt || !payment.dueDate) return false;
       return new Date(payment.paidAt) <= new Date(payment.dueDate);
     }).length;
-    const onTimePercentage = payments.length > 0 
-      ? (onTimePayments / payments.length) * 100 
-      : 0;
+    const onTimePercentage =
+      payments.length > 0 ? (onTimePayments / payments.length) * 100 : 0;
 
     // Get unresolved disputes count
     const unresolvedDisputes = await prismaClient.dispute.count({
       where: {
-        tenantId: userId,
+        OR: [
+          { tenantId: userId },
+          {
+            rentalRequest: {
+              tenantGroup: {
+                members: {
+                  some: {
+                    userId: userId,
+                  },
+                },
+              },
+            },
+          },
+        ],
         status: {
-          in: ['OPEN', 'IN_PROGRESS', 'ESCALATED']
-        }
-      }
+          in: ['OPEN', 'IN_PROGRESS', 'ESCALATED'],
+        },
+      },
     });
 
     // Determine trust level based on Option B thresholds
@@ -70,8 +96,8 @@ async function tenantTrustLevel(userId, prismaClient = defaultPrisma) {
           reviewCount: 0,
           averageRating: 0,
           onTimePercentage: 0,
-          unresolvedIssues: unresolvedDisputes
-        }
+          unresolvedIssues: unresolvedDisputes,
+        },
       };
     }
 
@@ -81,14 +107,14 @@ async function tenantTrustLevel(userId, prismaClient = defaultPrisma) {
         reasons: [
           `High review count (${reviewCount})`,
           `Excellent average rating (${averageRating.toFixed(1)})`,
-          'No unresolved issues'
+          'No unresolved issues',
         ],
         metrics: {
           reviewCount,
           averageRating,
           onTimePercentage,
-          unresolvedIssues: unresolvedDisputes
-        }
+          unresolvedIssues: unresolvedDisputes,
+        },
       };
     }
 
@@ -98,14 +124,14 @@ async function tenantTrustLevel(userId, prismaClient = defaultPrisma) {
         reasons: [
           `Good review count (${reviewCount})`,
           `High average rating (${averageRating.toFixed(1)})`,
-          `Excellent on-time payment rate (${onTimePercentage.toFixed(1)}%)`
+          `Excellent on-time payment rate (${onTimePercentage.toFixed(1)}%)`,
         ],
         metrics: {
           reviewCount,
           averageRating,
           onTimePercentage,
-          unresolvedIssues: unresolvedDisputes
-        }
+          unresolvedIssues: unresolvedDisputes,
+        },
       };
     }
 
@@ -115,14 +141,14 @@ async function tenantTrustLevel(userId, prismaClient = defaultPrisma) {
         reasons: [
           `Minimum review count met (${reviewCount})`,
           `Acceptable average rating (${averageRating.toFixed(1)})`,
-          `Good on-time payment rate (${onTimePercentage.toFixed(1)}%)`
+          `Good on-time payment rate (${onTimePercentage.toFixed(1)}%)`,
         ],
         metrics: {
           reviewCount,
           averageRating,
           onTimePercentage,
-          unresolvedIssues: unresolvedDisputes
-        }
+          unresolvedIssues: unresolvedDisputes,
+        },
       };
     }
 
@@ -132,16 +158,15 @@ async function tenantTrustLevel(userId, prismaClient = defaultPrisma) {
       reasons: [
         `Insufficient reviews (${reviewCount}/3)`,
         `Rating below threshold (${averageRating.toFixed(1)}/3.5)`,
-        `On-time rate below threshold (${onTimePercentage.toFixed(1)}%/80%)`
+        `On-time rate below threshold (${onTimePercentage.toFixed(1)}%/80%)`,
       ],
       metrics: {
         reviewCount,
         averageRating,
         onTimePercentage,
-        unresolvedIssues: unresolvedDisputes
-      }
+        unresolvedIssues: unresolvedDisputes,
+      },
     };
-
   } catch (error) {
     console.error('Error calculating tenant trust level:', error);
     throw new Error('Failed to calculate tenant trust level');
@@ -161,12 +186,12 @@ async function landlordTrustLevel(userId, prismaClient = defaultPrisma) {
       where: {
         revieweeId: userId,
         stage: 'END_OF_LEASE',
-        status: 'PUBLISHED'
+        status: 'PUBLISHED',
       },
       select: {
         stars: true,
-        createdAt: true
-      }
+        createdAt: true,
+      },
     });
 
     // Get move-in reviews for accuracy percentage
@@ -174,34 +199,38 @@ async function landlordTrustLevel(userId, prismaClient = defaultPrisma) {
       where: {
         revieweeId: userId,
         stage: 'MOVE_IN',
-        status: 'PUBLISHED'
+        status: 'PUBLISHED',
       },
       select: {
         stars: true,
-        createdAt: true
-      }
+        createdAt: true,
+      },
     });
 
     // Calculate metrics
     const reviewCount = reviews.length;
-    const averageRating = reviewCount > 0 
-      ? reviews.reduce((sum, review) => sum + review.stars, 0) / reviewCount 
-      : 0;
+    const averageRating =
+      reviewCount > 0
+        ? reviews.reduce((sum, review) => sum + review.stars, 0) / reviewCount
+        : 0;
 
     // Calculate 'as described' accuracy percentage (4+ stars in move-in reviews)
-    const accurateMoveIns = moveInReviews.filter(review => review.stars >= 4).length;
-    const accuracyPercentage = moveInReviews.length > 0 
-      ? (accurateMoveIns / moveInReviews.length) * 100 
-      : 0;
+    const accurateMoveIns = moveInReviews.filter(
+      (review) => review.stars >= 4
+    ).length;
+    const accuracyPercentage =
+      moveInReviews.length > 0
+        ? (accurateMoveIns / moveInReviews.length) * 100
+        : 0;
 
     // Get unresolved disputes count
     const unresolvedDisputes = await prismaClient.dispute.count({
       where: {
         landlordId: userId,
         status: {
-          in: ['OPEN', 'IN_PROGRESS', 'ESCALATED']
-        }
-      }
+          in: ['OPEN', 'IN_PROGRESS', 'ESCALATED'],
+        },
+      },
     });
 
     // Determine trust level based on Option B thresholds
@@ -213,8 +242,8 @@ async function landlordTrustLevel(userId, prismaClient = defaultPrisma) {
           reviewCount: 0,
           averageRating: 0,
           accuracyPercentage: 0,
-          unresolvedIssues: unresolvedDisputes
-        }
+          unresolvedIssues: unresolvedDisputes,
+        },
       };
     }
 
@@ -224,14 +253,14 @@ async function landlordTrustLevel(userId, prismaClient = defaultPrisma) {
         reasons: [
           `High review count (${reviewCount})`,
           `Excellent average rating (${averageRating.toFixed(1)})`,
-          'No unresolved issues'
+          'No unresolved issues',
         ],
         metrics: {
           reviewCount,
           averageRating,
           accuracyPercentage,
-          unresolvedIssues: unresolvedDisputes
-        }
+          unresolvedIssues: unresolvedDisputes,
+        },
       };
     }
 
@@ -241,14 +270,14 @@ async function landlordTrustLevel(userId, prismaClient = defaultPrisma) {
         reasons: [
           `Good review count (${reviewCount})`,
           `Excellent accuracy rate (${accuracyPercentage.toFixed(1)}%)`,
-          `High average rating (${averageRating.toFixed(1)})`
+          `High average rating (${averageRating.toFixed(1)})`,
         ],
         metrics: {
           reviewCount,
           averageRating,
           accuracyPercentage,
-          unresolvedIssues: unresolvedDisputes
-        }
+          unresolvedIssues: unresolvedDisputes,
+        },
       };
     }
 
@@ -257,14 +286,14 @@ async function landlordTrustLevel(userId, prismaClient = defaultPrisma) {
         level: 'Reliable',
         reasons: [
           `Minimum review count met (${reviewCount})`,
-          `Good accuracy rate (${accuracyPercentage.toFixed(1)}%)`
+          `Good accuracy rate (${accuracyPercentage.toFixed(1)}%)`,
         ],
         metrics: {
           reviewCount,
           averageRating,
           accuracyPercentage,
-          unresolvedIssues: unresolvedDisputes
-        }
+          unresolvedIssues: unresolvedDisputes,
+        },
       };
     }
 
@@ -273,16 +302,15 @@ async function landlordTrustLevel(userId, prismaClient = defaultPrisma) {
       level: 'New',
       reasons: [
         `Insufficient reviews (${reviewCount}/3)`,
-        `Accuracy rate below threshold (${accuracyPercentage.toFixed(1)}%/80%)`
+        `Accuracy rate below threshold (${accuracyPercentage.toFixed(1)}%/80%)`,
       ],
       metrics: {
         reviewCount,
         averageRating,
         accuracyPercentage,
-        unresolvedIssues: unresolvedDisputes
-      }
+        unresolvedIssues: unresolvedDisputes,
+      },
     };
-
   } catch (error) {
     console.error('Error calculating landlord trust level:', error);
     throw new Error('Failed to calculate landlord trust level');
@@ -299,21 +327,51 @@ async function getUserTrustLevel(userId, prismaClient = defaultPrisma) {
   try {
     // Check if user has been a tenant (has payments)
     const hasTenantHistory = await prismaClient.payment.findFirst({
-      where: { tenantId: userId }
+      where: {
+        OR: [
+          { userId: userId },
+          {
+            rentalRequest: {
+              tenantGroup: {
+                members: {
+                  some: {
+                    userId: userId,
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
     });
 
     // Check if user has been a landlord (has properties)
     const hasLandlordHistory = await prismaClient.property.findFirst({
-      where: { ownerId: userId }
+      where: { ownerId: userId },
     });
 
     // If user has both histories, prioritize the role with more activity
     if (hasTenantHistory && hasLandlordHistory) {
       const tenantPayments = await prismaClient.payment.count({
-        where: { tenantId: userId }
+        where: {
+          OR: [
+            { userId: userId },
+            {
+              rentalRequest: {
+                tenantGroup: {
+                  members: {
+                    some: {
+                      userId: userId,
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        },
       });
       const landlordProperties = await prismaClient.property.count({
-        where: { ownerId: userId }
+        where: { ownerId: userId },
       });
 
       if (tenantPayments > landlordProperties) {
@@ -339,18 +397,13 @@ async function getUserTrustLevel(userId, prismaClient = defaultPrisma) {
       reasons: ['No rental history'],
       metrics: {
         reviewCount: 0,
-        averageRating: 0
-      }
+        averageRating: 0,
+      },
     };
-
   } catch (error) {
     console.error('Error getting user trust level:', error);
     throw new Error('Failed to get user trust level');
   }
 }
 
-export {
-  tenantTrustLevel,
-  landlordTrustLevel,
-  getUserTrustLevel
-};
+export { tenantTrustLevel, landlordTrustLevel, getUserTrustLevel };

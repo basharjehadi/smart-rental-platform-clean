@@ -14,7 +14,7 @@ import {
   editReviewText,
   reportReview,
   replyToReview,
-  editReviewReply
+  editReviewReply,
 } from '../controllers/reviewController.js';
 
 const router = express.Router();

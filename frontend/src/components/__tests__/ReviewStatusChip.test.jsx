@@ -7,24 +7,20 @@ import ReviewStatusChip from '../ReviewStatusChip';
 // Mock the CountdownTimer component
 jest.mock('../CountdownTimer', () => {
   return function MockCountdownTimer({ targetDate }) {
-    return <span data-testid="countdown-timer">2d 5h</span>;
+    return <span data-testid='countdown-timer'>2d 5h</span>;
   };
 });
 
-const renderWithI18n = (component) => {
-  return render(
-    <I18nextProvider i18n={i18n}>
-      {component}
-    </I18nextProvider>
-  );
+const renderWithI18n = component => {
+  return render(<I18nextProvider i18n={i18n}>{component}</I18nextProvider>);
 };
 
 describe('ReviewStatusChip', () => {
   describe('Status Display', () => {
     test('should display PENDING status correctly', () => {
       renderWithI18n(
-        <ReviewStatusChip 
-          status="PENDING" 
+        <ReviewStatusChip
+          status='PENDING'
           publishAfter={null}
           isBlind={false}
         />
@@ -35,8 +31,8 @@ describe('ReviewStatusChip', () => {
 
     test('should display SUBMITTED status correctly', () => {
       renderWithI18n(
-        <ReviewStatusChip 
-          status="SUBMITTED" 
+        <ReviewStatusChip
+          status='SUBMITTED'
           publishAfter={null}
           isBlind={false}
         />
@@ -47,8 +43,8 @@ describe('ReviewStatusChip', () => {
 
     test('should display PUBLISHED status correctly', () => {
       renderWithI18n(
-        <ReviewStatusChip 
-          status="PUBLISHED" 
+        <ReviewStatusChip
+          status='PUBLISHED'
           publishAfter={null}
           isBlind={false}
         />
@@ -59,8 +55,8 @@ describe('ReviewStatusChip', () => {
 
     test('should display BLOCKED status correctly', () => {
       renderWithI18n(
-        <ReviewStatusChip 
-          status="BLOCKED" 
+        <ReviewStatusChip
+          status='BLOCKED'
           publishAfter={null}
           isBlind={false}
         />
@@ -71,8 +67,8 @@ describe('ReviewStatusChip', () => {
 
     test('should display UNKNOWN status for invalid status', () => {
       renderWithI18n(
-        <ReviewStatusChip 
-          status="INVALID_STATUS" 
+        <ReviewStatusChip
+          status='INVALID_STATUS'
           publishAfter={null}
           isBlind={false}
         />
@@ -85,9 +81,9 @@ describe('ReviewStatusChip', () => {
   describe('Double-Blind Status', () => {
     test('should display BLIND status when isBlind is true', () => {
       renderWithI18n(
-        <ReviewStatusChip 
-          status="SUBMITTED" 
-          publishAfter="2025-01-16T00:00:00Z"
+        <ReviewStatusChip
+          status='SUBMITTED'
+          publishAfter='2025-01-16T00:00:00Z'
           isBlind={true}
         />
       );
@@ -97,9 +93,9 @@ describe('ReviewStatusChip', () => {
 
     test('should show countdown chip for double-blind reviews', () => {
       renderWithI18n(
-        <ReviewStatusChip 
-          status="SUBMITTED" 
-          publishAfter="2025-01-16T00:00:00Z"
+        <ReviewStatusChip
+          status='SUBMITTED'
+          publishAfter='2025-01-16T00:00:00Z'
           isBlind={true}
         />
       );
@@ -110,9 +106,9 @@ describe('ReviewStatusChip', () => {
 
     test('should not show countdown chip for non-blind reviews', () => {
       renderWithI18n(
-        <ReviewStatusChip 
-          status="SUBMITTED" 
-          publishAfter="2025-01-16T00:00:00Z"
+        <ReviewStatusChip
+          status='SUBMITTED'
+          publishAfter='2025-01-16T00:00:00Z'
           isBlind={false}
         />
       );
@@ -123,9 +119,9 @@ describe('ReviewStatusChip', () => {
 
     test('should not show countdown chip for published reviews', () => {
       renderWithI18n(
-        <ReviewStatusChip 
-          status="PUBLISHED" 
-          publishAfter="2025-01-16T00:00:00Z"
+        <ReviewStatusChip
+          status='PUBLISHED'
+          publishAfter='2025-01-16T00:00:00Z'
           isBlind={false}
         />
       );
@@ -137,21 +133,25 @@ describe('ReviewStatusChip', () => {
   describe('Countdown Display', () => {
     test('should display countdown with correct styling for double-blind', () => {
       renderWithI18n(
-        <ReviewStatusChip 
-          status="SUBMITTED" 
-          publishAfter="2025-01-16T00:00:00Z"
+        <ReviewStatusChip
+          status='SUBMITTED'
+          publishAfter='2025-01-16T00:00:00Z'
           isBlind={true}
         />
       );
 
       const countdownChip = screen.getByText('Publishes in').closest('div');
-      expect(countdownChip).toHaveClass('bg-orange-50', 'text-orange-700', 'border-orange-200');
+      expect(countdownChip).toHaveClass(
+        'bg-orange-50',
+        'text-orange-700',
+        'border-orange-200'
+      );
     });
 
     test('should handle missing publishAfter date gracefully', () => {
       renderWithI18n(
-        <ReviewStatusChip 
-          status="SUBMITTED" 
+        <ReviewStatusChip
+          status='SUBMITTED'
           publishAfter={null}
           isBlind={true}
         />
@@ -166,8 +166,8 @@ describe('ReviewStatusChip', () => {
   describe('Icon Display', () => {
     test('should display appropriate icons for each status', () => {
       const { container } = renderWithI18n(
-        <ReviewStatusChip 
-          status="PENDING" 
+        <ReviewStatusChip
+          status='PENDING'
           publishAfter={null}
           isBlind={false}
         />
@@ -179,9 +179,9 @@ describe('ReviewStatusChip', () => {
 
     test('should display Eye icon for blind status', () => {
       const { container } = renderWithI18n(
-        <ReviewStatusChip 
-          status="SUBMITTED" 
-          publishAfter="2025-01-16T00:00:00Z"
+        <ReviewStatusChip
+          status='SUBMITTED'
+          publishAfter='2025-01-16T00:00:00Z'
           isBlind={true}
         />
       );
@@ -195,8 +195,8 @@ describe('ReviewStatusChip', () => {
   describe('Styling Classes', () => {
     test('should apply correct color classes for each status', () => {
       const { container } = renderWithI18n(
-        <ReviewStatusChip 
-          status="PENDING" 
+        <ReviewStatusChip
+          status='PENDING'
           publishAfter={null}
           isBlind={false}
         />
@@ -209,9 +209,9 @@ describe('ReviewStatusChip', () => {
 
     test('should apply correct color classes for blind status', () => {
       const { container } = renderWithI18n(
-        <ReviewStatusChip 
-          status="SUBMITTED" 
-          publishAfter="2025-01-16T00:00:00Z"
+        <ReviewStatusChip
+          status='SUBMITTED'
+          publishAfter='2025-01-16T00:00:00Z'
           isBlind={true}
         />
       );
@@ -223,8 +223,8 @@ describe('ReviewStatusChip', () => {
 
     test('should apply correct color classes for published status', () => {
       const { container } = renderWithI18n(
-        <ReviewStatusChip 
-          status="PUBLISHED" 
+        <ReviewStatusChip
+          status='PUBLISHED'
           publishAfter={null}
           isBlind={false}
         />

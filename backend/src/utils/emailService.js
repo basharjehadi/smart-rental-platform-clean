@@ -9,8 +9,8 @@ const createTransporter = () => {
     service: process.env.EMAIL_SERVICE || 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
-    }
+      pass: process.env.EMAIL_PASSWORD,
+    },
   });
 };
 
@@ -75,7 +75,13 @@ const emailTemplates = {
     </html>
   `,
 
-  paymentSuccess: (landlordName, tenantName, propertyTitle, amount, paymentDate) => `
+  paymentSuccess: (
+    landlordName,
+    tenantName,
+    propertyTitle,
+    amount,
+    paymentDate
+  ) => `
     <!DOCTYPE html>
     <html>
     <head>
@@ -249,7 +255,13 @@ const emailTemplates = {
     </html>
   `,
 
-  offerNotification: (tenantName, landlordName, propertyTitle, rentAmount, offerId) => `
+  offerNotification: (
+    tenantName,
+    landlordName,
+    propertyTitle,
+    rentAmount,
+    offerId
+  ) => `
     <!DOCTYPE html>
     <html>
     <head>
@@ -432,7 +444,7 @@ const emailTemplates = {
       </div>
     </body>
     </html>
-  `
+  `,
 };
 
 // Main email sending function
@@ -443,68 +455,132 @@ const sendEmail = async (to, subject, htmlContent) => {
       console.log('📧 Email service not configured. Skipping email send.');
       console.log('📧 Email would have been sent to:', to);
       console.log('📧 Subject:', subject);
-      console.log('📧 To configure email, set EMAIL_USER and EMAIL_PASSWORD in .env');
-      return { success: true, reason: 'Email service not configured - would send in production' };
+      console.log(
+        '📧 To configure email, set EMAIL_USER and EMAIL_PASSWORD in .env'
+      );
+      return {
+        success: true,
+        reason: 'Email service not configured - would send in production',
+      };
     }
 
     const transporter = createTransporter();
-    
+
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: to,
       subject: subject,
-      html: htmlContent
+      html: htmlContent,
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     console.log('📧 Email sent successfully:', {
       messageId: info.messageId,
       to: to,
-      subject: subject
+      subject: subject,
     });
-    
+
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('📧 Email sending failed:', {
       error: error.message,
       to: to,
-      subject: subject
+      subject: subject,
     });
-    
+
     // Don't crash the system, just log the error
     return { success: false, error: error.message };
   }
 };
 
 // Specific email functions
-const sendRentReminder = async (tenantEmail, tenantName, propertyTitle, dueDate, amount) => {
+const sendRentReminder = async (
+  tenantEmail,
+  tenantName,
+  propertyTitle,
+  dueDate,
+  amount
+) => {
   const subject = '🏠 Rent Payment Reminder - Due in 3 Days';
-  const htmlContent = emailTemplates.rentReminder(tenantName, propertyTitle, dueDate, amount);
+  const htmlContent = emailTemplates.rentReminder(
+    tenantName,
+    propertyTitle,
+    dueDate,
+    amount
+  );
   return await sendEmail(tenantEmail, subject, htmlContent);
 };
 
-const sendPaymentSuccess = async (landlordEmail, landlordName, tenantName, propertyTitle, amount, paymentDate) => {
+const sendPaymentSuccess = async (
+  landlordEmail,
+  landlordName,
+  tenantName,
+  propertyTitle,
+  amount,
+  paymentDate
+) => {
   const subject = '✅ Rent Payment Received';
-  const htmlContent = emailTemplates.paymentSuccess(landlordName, tenantName, propertyTitle, amount, paymentDate);
+  const htmlContent = emailTemplates.paymentSuccess(
+    landlordName,
+    tenantName,
+    propertyTitle,
+    amount,
+    paymentDate
+  );
   return await sendEmail(landlordEmail, subject, htmlContent);
 };
 
-const sendOverdueWarning = async (tenantEmail, tenantName, propertyTitle, overdueDays, amount) => {
+const sendOverdueWarning = async (
+  tenantEmail,
+  tenantName,
+  propertyTitle,
+  overdueDays,
+  amount
+) => {
   const subject = '🚨 URGENT: Overdue Rent Payment';
-  const htmlContent = emailTemplates.overdueWarning(tenantName, propertyTitle, overdueDays, amount);
+  const htmlContent = emailTemplates.overdueWarning(
+    tenantName,
+    propertyTitle,
+    overdueDays,
+    amount
+  );
   return await sendEmail(tenantEmail, subject, htmlContent);
 };
 
-const sendRentalLocked = async (tenantEmail, tenantName, propertyTitle, overdueDays, amount) => {
+const sendRentalLocked = async (
+  tenantEmail,
+  tenantName,
+  propertyTitle,
+  overdueDays,
+  amount
+) => {
   const subject = '🔒 Rental Access Locked - Immediate Action Required';
-  const htmlContent = emailTemplates.rentalLocked(tenantName, propertyTitle, overdueDays, amount);
+  const htmlContent = emailTemplates.rentalLocked(
+    tenantName,
+    propertyTitle,
+    overdueDays,
+    amount
+  );
   return await sendEmail(tenantEmail, subject, htmlContent);
 };
 
-const sendOfferNotification = async (tenantEmail, tenantName, landlordName, propertyTitle, rentAmount, offerId) => {
+const sendOfferNotification = async (
+  tenantEmail,
+  tenantName,
+  landlordName,
+  propertyTitle,
+  rentAmount,
+  offerId
+) => {
   const subject = 'New Rental Offer Received - Action Required';
-  const htmlContent = emailTemplates.offerNotification(tenantName, landlordName, propertyTitle, rentAmount, offerId);
+  const htmlContent = emailTemplates.offerNotification(
+    tenantName,
+    landlordName,
+    propertyTitle,
+    rentAmount,
+    offerId
+  );
   return await sendEmail(tenantEmail, subject, htmlContent);
 };
 
@@ -531,5 +607,5 @@ export {
   sendOfferNotification,
   sendKYCApprovalEmail,
   sendKYCRejectionEmail,
-  emailTemplates
-}; 
+  emailTemplates,
+};

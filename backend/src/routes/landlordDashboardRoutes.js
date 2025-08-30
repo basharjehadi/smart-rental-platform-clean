@@ -7,4 +7,4 @@ const router = express.Router();
 // Get landlord dashboard data
 router.get('/dashboard', verifyToken, requireLandlord, getLandlordDashboard);
 
-export default router; 
+export default router;

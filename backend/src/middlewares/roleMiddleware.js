@@ -2,8 +2,8 @@
 const requireRole = (roles) => {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({ 
-        error: 'Authentication required.' 
+      return res.status(401).json({
+        error: 'Authentication required.',
       });
     }
 
@@ -11,8 +11,9 @@ const requireRole = (roles) => {
     const rolesArray = Array.isArray(roles) ? roles : [roles];
 
     if (!rolesArray.includes(req.user.role)) {
-      return res.status(403).json({ 
-        error: 'Insufficient permissions. Required roles: ' + rolesArray.join(', ')
+      return res.status(403).json({
+        error:
+          'Insufficient permissions. Required roles: ' + rolesArray.join(', '),
       });
     }
 
@@ -25,9 +26,4 @@ const requireTenant = requireRole(['TENANT']);
 const requireLandlord = requireRole(['LANDLORD']);
 const requireAdmin = requireRole(['ADMIN']);
 
-export {
-  requireRole,
-  requireTenant,
-  requireLandlord,
-  requireAdmin
-}; 
+export { requireRole, requireTenant, requireLandlord, requireAdmin };

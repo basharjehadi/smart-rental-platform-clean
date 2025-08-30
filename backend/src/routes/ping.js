@@ -7,4 +7,4 @@ router.get('/ping', (req, res) => {
   res.json({ ok: true });
 });
 
-export default router; 
+export default router;

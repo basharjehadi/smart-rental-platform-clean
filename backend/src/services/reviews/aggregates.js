@@ -1,6 +1,6 @@
 /**
  * 📊 Review Aggregates Service
- * 
+ *
  * This service handles the computation of user review aggregates with
  * time-weighted calculations for END_OF_LEASE reviews.
  */
@@ -19,7 +19,7 @@ export async function computeUserAggregate(userId) {
     const publishedReviews = await prisma.review.findMany({
       where: {
         targetTenantGroupId: {
-          not: null
+          not: null,
         },
         status: 'PUBLISHED',
         reviewStage: 'END_OF_LEASE',
@@ -27,32 +27,35 @@ export async function computeUserAggregate(userId) {
         targetTenantGroup: {
           members: {
             some: {
-              userId: userId
-            }
-          }
-        }
+              userId: userId,
+            },
+          },
+        },
       },
       select: {
         id: true,
         rating: true,
         publishedAt: true,
-        targetTenantGroupId: true
+        targetTenantGroupId: true,
       },
       orderBy: {
-        publishedAt: 'desc'
-      }
+        publishedAt: 'desc',
+      },
     });
 
     if (publishedReviews.length === 0) {
-      console.log(`ℹ️  No published END_OF_LEASE reviews found for user ${userId}`);
+      console.log(
+        `ℹ️  No published END_OF_LEASE reviews found for user ${userId}`
+      );
       return await createEmptyAggregate(userId);
     }
 
     // Calculate time-weighted average
     const weightedResult = calculateTimeWeightedAverage(publishedReviews);
-    
+
     // Only store average if we have at least 3 reviews
-    const averageRating = weightedResult.totalReviews >= 3 ? weightedResult.weightedAverage : null;
+    const averageRating =
+      weightedResult.totalReviews >= 3 ? weightedResult.weightedAverage : null;
 
     // Update user record
     const updatedUser = await prisma.user.update({
@@ -60,11 +63,13 @@ export async function computeUserAggregate(userId) {
       data: {
         averageRating: averageRating,
         totalReviews: weightedResult.totalReviews,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
-    console.log(`✅ Updated user ${userId} aggregate: rating=${averageRating}, totalReviews=${weightedResult.totalReviews}`);
+    console.log(
+      `✅ Updated user ${userId} aggregate: rating=${averageRating}, totalReviews=${weightedResult.totalReviews}`
+    );
 
     return {
       userId: userId,
@@ -72,11 +77,13 @@ export async function computeUserAggregate(userId) {
       totalReviews: weightedResult.totalReviews,
       weightedScore: weightedResult.weightedScore,
       lastReviewDate: weightedResult.lastReviewDate,
-      updatedAt: updatedUser.updatedAt
+      updatedAt: updatedUser.updatedAt,
     };
-
   } catch (error) {
-    console.error(`❌ Error computing user aggregate for user ${userId}:`, error);
+    console.error(
+      `❌ Error computing user aggregate for user ${userId}:`,
+      error
+    );
     throw error;
   }
 }
@@ -93,7 +100,7 @@ function calculateTimeWeightedAverage(reviews) {
   reviews.forEach((review) => {
     const monthsAgo = calculateMonthsDifference(review.publishedAt, now);
     const weight = calculateTimeWeight(monthsAgo);
-    
+
     totalWeightedRating += review.rating * weight;
     totalWeight += weight;
 
@@ -102,14 +109,15 @@ function calculateTimeWeightedAverage(reviews) {
     }
   });
 
-  const weightedAverage = totalWeight > 0 ? totalWeightedRating / totalWeight : 0;
+  const weightedAverage =
+    totalWeight > 0 ? totalWeightedRating / totalWeight : 0;
   const weightedScore = calculateWeightedScore(reviews, weightedAverage);
 
   return {
     weightedAverage,
     totalReviews: reviews.length,
     weightedScore,
-    lastReviewDate
+    lastReviewDate,
   };
 }
 
@@ -127,11 +135,11 @@ function calculateMonthsDifference(date1, date2) {
  * More recent reviews get higher weight
  */
 function calculateTimeWeight(monthsAgo) {
-  if (monthsAgo <= 6) return 1.0;      // Last 6 months: full weight
-  if (monthsAgo <= 12) return 0.8;     // 6-12 months: 80% weight
-  if (monthsAgo <= 24) return 0.6;     // 1-2 years: 60% weight
-  if (monthsAgo <= 36) return 0.4;     // 2-3 years: 40% weight
-  return 0.2;                           // 3+ years: 20% weight
+  if (monthsAgo <= 6) return 1.0; // Last 6 months: full weight
+  if (monthsAgo <= 12) return 0.8; // 6-12 months: 80% weight
+  if (monthsAgo <= 24) return 0.6; // 1-2 years: 60% weight
+  if (monthsAgo <= 36) return 0.4; // 2-3 years: 40% weight
+  return 0.2; // 3+ years: 20% weight
 }
 
 /**
@@ -139,11 +147,11 @@ function calculateTimeWeight(monthsAgo) {
  */
 function calculateWeightedScore(reviews, averageRating) {
   if (reviews.length === 0) return 0;
-  
+
   const recencyBonus = calculateRecencyBonus(reviews);
   const volumeBonus = calculateVolumeBonus(reviews.length);
-  
-  return (averageRating * 0.7) + (recencyBonus * 0.2) + (volumeBonus * 0.1);
+
+  return averageRating * 0.7 + recencyBonus * 0.2 + volumeBonus * 0.1;
 }
 
 /**
@@ -151,25 +159,28 @@ function calculateWeightedScore(reviews, averageRating) {
  */
 function calculateRecencyBonus(reviews) {
   if (reviews.length === 0) return 0;
-  
+
   const mostRecent = reviews[0];
-  const monthsAgo = calculateMonthsDifference(mostRecent.publishedAt, new Date());
-  
-  if (monthsAgo <= 3) return 1.0;      // Last 3 months: full bonus
-  if (monthsAgo <= 6) return 0.8;      // 3-6 months: 80% bonus
-  if (monthsAgo <= 12) return 0.6;     // 6-12 months: 60% bonus
-  return 0.4;                           // 12+ months: 40% bonus
+  const monthsAgo = calculateMonthsDifference(
+    mostRecent.publishedAt,
+    new Date()
+  );
+
+  if (monthsAgo <= 3) return 1.0; // Last 3 months: full bonus
+  if (monthsAgo <= 6) return 0.8; // 3-6 months: 80% bonus
+  if (monthsAgo <= 12) return 0.6; // 6-12 months: 60% bonus
+  return 0.4; // 12+ months: 40% bonus
 }
 
 /**
  * Calculate volume bonus based on number of reviews
  */
 function calculateVolumeBonus(reviewCount) {
-  if (reviewCount >= 10) return 1.0;   // 10+ reviews: full bonus
-  if (reviewCount >= 5) return 0.8;    // 5-9 reviews: 80% bonus
-  if (reviewCount >= 3) return 0.6;    // 3-4 reviews: 60% bonus
-  if (reviewCount >= 1) return 0.4;    // 1-2 reviews: 40% bonus
-  return 0;                             // 0 reviews: no bonus
+  if (reviewCount >= 10) return 1.0; // 10+ reviews: full bonus
+  if (reviewCount >= 5) return 0.8; // 5-9 reviews: 80% bonus
+  if (reviewCount >= 3) return 0.6; // 3-4 reviews: 60% bonus
+  if (reviewCount >= 1) return 0.4; // 1-2 reviews: 40% bonus
+  return 0; // 0 reviews: no bonus
 }
 
 /**
@@ -181,8 +192,8 @@ async function createEmptyAggregate(userId) {
     data: {
       averageRating: null,
       totalReviews: 0,
-      updatedAt: new Date()
-    }
+      updatedAt: new Date(),
+    },
   });
 
   return {
@@ -191,7 +202,7 @@ async function createEmptyAggregate(userId) {
     totalReviews: 0,
     weightedScore: 0,
     lastReviewDate: null,
-    updatedAt: updatedUser.updatedAt
+    updatedAt: updatedUser.updatedAt,
   };
 }
 
@@ -205,8 +216,8 @@ export async function computeTenantGroupAggregate(tenantGroupId) {
     const tenantGroup = await prisma.tenantGroup.findUnique({
       where: { id: tenantGroupId },
       include: {
-        members: true
-      }
+        members: true,
+      },
     });
 
     if (!tenantGroup || tenantGroup.members.length === 0) {
@@ -220,38 +231,42 @@ export async function computeTenantGroupAggregate(tenantGroupId) {
         targetTenantGroupId: tenantGroupId,
         status: 'PUBLISHED',
         reviewStage: 'END_OF_LEASE',
-        excludeFromAggregates: false // Exclude early termination reviews
+        excludeFromAggregates: false, // Exclude early termination reviews
       },
       select: {
         id: true,
         rating: true,
-        publishedAt: true
+        publishedAt: true,
       },
       orderBy: {
-        publishedAt: 'desc'
-      }
+        publishedAt: 'desc',
+      },
     });
 
     if (publishedReviews.length === 0) {
-      console.log(`ℹ️  No published reviews found for tenant group: ${tenantGroupId}`);
+      console.log(
+        `ℹ️  No published reviews found for tenant group: ${tenantGroupId}`
+      );
       return null;
     }
 
     // Calculate aggregate for the group
     const weightedResult = calculateTimeWeightedAverage(publishedReviews);
-    
+
     const result = {
       tenantGroupId,
-      averageRating: weightedResult.totalReviews >= 3 ? weightedResult.weightedAverage : null,
+      averageRating:
+        weightedResult.totalReviews >= 3
+          ? weightedResult.weightedAverage
+          : null,
       totalReviews: weightedResult.totalReviews,
       weightedScore: weightedResult.weightedScore,
       lastReviewDate: weightedResult.lastReviewDate,
-      memberCount: tenantGroup.members.length
+      memberCount: tenantGroup.members.length,
     };
 
     console.log(`✅ Tenant group aggregate computed: ${tenantGroupId}`);
     return result;
-
   } catch (error) {
     console.error(`❌ Error computing tenant group aggregate:`, error);
     throw error;
@@ -265,7 +280,7 @@ export async function getExcludedReviews() {
   try {
     const excludedReviews = await prisma.review.findMany({
       where: {
-        excludeFromAggregates: true
+        excludeFromAggregates: true,
       },
       select: {
         id: true,
@@ -274,11 +289,11 @@ export async function getExcludedReviews() {
         revieweeId: true,
         reviewStage: true,
         earlyTerminationReason: true,
-        createdAt: true
+        createdAt: true,
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
     });
 
     return excludedReviews;
@@ -287,5 +302,3 @@ export async function getExcludedReviews() {
     return [];
   }
 }
-
-

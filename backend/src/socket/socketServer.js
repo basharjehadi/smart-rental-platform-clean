@@ -13,29 +13,29 @@ const getNotificationCounts = async (userId) => {
         where: {
           userId,
           type: 'NEW_RENTAL_REQUEST',
-          isRead: false
-        }
+          isRead: false,
+        },
       }),
       prisma.notification.count({
         where: {
           userId,
           type: 'NEW_OFFER',
-          isRead: false
-        }
+          isRead: false,
+        },
       }),
       prisma.notification.count({
         where: {
           userId,
-          isRead: false
-        }
-      })
+          isRead: false,
+        },
+      }),
     ]);
 
     // total should represent ALL unread notifications
     return {
       rentalRequests,
       offers,
-      total: allUnread
+      total: allUnread,
     };
   } catch (error) {
     console.error('Error getting notification counts:', error);
@@ -51,25 +51,27 @@ const checkRateLimit = (socketId, eventType) => {
   const now = Date.now();
   const windowMs = 10000; // 10 seconds
   const maxEvents = 10; // Max 10 events per window
-  
+
   if (!rateLimitMap.has(socketId)) {
     rateLimitMap.set(socketId, {});
   }
-  
+
   const userLimits = rateLimitMap.get(socketId);
-  
+
   if (!userLimits[eventType]) {
     userLimits[eventType] = [];
   }
-  
+
   // Remove old events outside the window
-  userLimits[eventType] = userLimits[eventType].filter(timestamp => now - timestamp < windowMs);
-  
+  userLimits[eventType] = userLimits[eventType].filter(
+    (timestamp) => now - timestamp < windowMs
+  );
+
   // Check if limit exceeded
   if (userLimits[eventType].length >= maxEvents) {
     return false;
   }
-  
+
   // Add current event
   userLimits[eventType].push(now);
   return true;
@@ -86,11 +88,11 @@ export function initializeSocket(server) {
       origin: [
         process.env.FRONTEND_URL || 'http://localhost:5173',
         'http://localhost:5173',
-        'http://localhost:3002'
+        'http://localhost:3002',
       ],
-      methods: ["GET", "POST"],
-      credentials: true
-    }
+      methods: ['GET', 'POST'],
+      credentials: true,
+    },
   });
 
   // Enhanced authentication middleware
@@ -108,8 +110,8 @@ export function initializeSocket(server) {
           id: true,
           role: true,
           email: true,
-          name: true
-        }
+          name: true,
+        },
       });
 
       if (!user) {
@@ -152,10 +154,10 @@ export function initializeSocket(server) {
                         name: true,
                         email: true,
                         profileImage: true,
-                        role: true
-                      }
-                    }
-                  }
+                        role: true,
+                      },
+                    },
+                  },
                 },
                 messages: {
                   take: 1,
@@ -165,10 +167,10 @@ export function initializeSocket(server) {
                       select: {
                         id: true,
                         name: true,
-                        profileImage: true
-                      }
-                    }
-                  }
+                        profileImage: true,
+                      },
+                    },
+                  },
                 },
                 property: {
                   select: {
@@ -185,27 +187,30 @@ export function initializeSocket(server) {
                     bedrooms: true,
                     bathrooms: true,
                     size: true,
-                    images: true
-                  }
+                    images: true,
+                  },
                 },
                 offer: {
                   select: {
                     id: true,
                     status: true,
                     rentAmount: true,
-                    depositAmount: true
-                  }
-                }
-              }
-            }
-          }
+                    depositAmount: true,
+                  },
+                },
+              },
+            },
+          },
         });
 
-        conversations.forEach(participant => {
+        conversations.forEach((participant) => {
           socket.join(`conversation-${participant.conversation.id}`);
         });
 
-        socket.emit('conversations-loaded', conversations.map(p => p.conversation));
+        socket.emit(
+          'conversations-loaded',
+          conversations.map((p) => p.conversation)
+        );
         socket.data.hasJoinedConversations = true;
       } catch (error) {
         console.error('Error joining conversations:', error);
@@ -217,11 +222,11 @@ export function initializeSocket(server) {
       try {
         // Check if user can chat in this conversation
         const chatGuard = await canChat(conversationId, socket.data.user.id);
-        
+
         if (!chatGuard.ok) {
           socket.emit('chat-error', {
             error: chatGuard.error,
-            errorCode: chatGuard.errorCode
+            errorCode: chatGuard.errorCode,
           });
           return;
         }
@@ -229,8 +234,8 @@ export function initializeSocket(server) {
         const participant = await prisma.conversationParticipant.findFirst({
           where: {
             conversationId,
-            userId: socket.data.user.id
-          }
+            userId: socket.data.user.id,
+          },
         });
 
         if (participant) {
@@ -241,7 +246,7 @@ export function initializeSocket(server) {
         console.error('Error joining conversation:', error);
         socket.emit('chat-error', {
           error: 'Failed to join conversation',
-          errorCode: 'INTERNAL_ERROR'
+          errorCode: 'INTERNAL_ERROR',
         });
       }
     });
@@ -252,21 +257,31 @@ export function initializeSocket(server) {
         // Rate limiting check
         if (!checkRateLimit(socket.id, 'send-message')) {
           socket.emit('chat-error', {
-            error: 'Rate limit exceeded. Please wait before sending more messages.',
-            errorCode: 'RATE_LIMITED'
+            error:
+              'Rate limit exceeded. Please wait before sending more messages.',
+            errorCode: 'RATE_LIMITED',
           });
           return;
         }
 
-        const { conversationId, content, messageType = 'TEXT', attachmentUrl, attachmentName, attachmentSize, attachmentType, replyToId } = data;
+        const {
+          conversationId,
+          content,
+          messageType = 'TEXT',
+          attachmentUrl,
+          attachmentName,
+          attachmentSize,
+          attachmentType,
+          replyToId,
+        } = data;
 
         // Check if user can chat
         const chatGuard = await canChat(conversationId, socket.data.user.id);
-        
+
         if (!chatGuard.ok) {
           socket.emit('chat-error', {
             error: chatGuard.error,
-            errorCode: chatGuard.errorCode
+            errorCode: chatGuard.errorCode,
           });
           return;
         }
@@ -282,7 +297,7 @@ export function initializeSocket(server) {
             attachmentType,
             replyToId,
             conversationId,
-            senderId: socket.data.user.id
+            senderId: socket.data.user.id,
           },
           include: {
             sender: {
@@ -290,26 +305,26 @@ export function initializeSocket(server) {
                 id: true,
                 name: true,
                 email: true,
-                profileImage: true
-              }
+                profileImage: true,
+              },
             },
             replyTo: {
               include: {
                 sender: {
                   select: {
                     id: true,
-                    name: true
-                  }
-                }
-              }
-            }
-          }
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
         });
 
         // Update conversation timestamp
         await prisma.conversation.update({
           where: { id: conversationId },
-          data: { updatedAt: new Date() }
+          data: { updatedAt: new Date() },
         });
 
         // Emit to all participants in the conversation
@@ -318,7 +333,7 @@ export function initializeSocket(server) {
         console.error('Error sending message:', error);
         socket.emit('chat-error', {
           error: 'Failed to send message',
-          errorCode: 'INTERNAL_ERROR'
+          errorCode: 'INTERNAL_ERROR',
         });
       }
     });
@@ -329,13 +344,13 @@ export function initializeSocket(server) {
         // First verify user is participant in the conversation
         const message = await prisma.message.findUnique({
           where: { id: messageId },
-          select: { conversationId: true }
+          select: { conversationId: true },
         });
 
         if (!message) {
           socket.emit('chat-error', {
             error: 'Message not found',
-            errorCode: 'NOT_FOUND'
+            errorCode: 'NOT_FOUND',
           });
           return;
         }
@@ -343,14 +358,14 @@ export function initializeSocket(server) {
         const participant = await prisma.conversationParticipant.findFirst({
           where: {
             conversationId: message.conversationId,
-            userId: socket.data.user.id
-          }
+            userId: socket.data.user.id,
+          },
         });
 
         if (!participant) {
           socket.emit('chat-error', {
             error: 'Not a participant in this conversation',
-            errorCode: 'NOT_MEMBER'
+            errorCode: 'NOT_MEMBER',
           });
           return;
         }
@@ -359,19 +374,19 @@ export function initializeSocket(server) {
           where: { id: messageId },
           data: {
             isRead: true,
-            readAt: new Date()
-          }
+            readAt: new Date(),
+          },
         });
 
         io.to(`conversation-${message.conversationId}`).emit('message-read', {
           messageId,
-          readAt: updatedMessage.readAt
+          readAt: updatedMessage.readAt,
         });
       } catch (error) {
         console.error('Error marking message as read:', error);
         socket.emit('chat-error', {
           error: 'Failed to mark message as read',
-          errorCode: 'INTERNAL_ERROR'
+          errorCode: 'INTERNAL_ERROR',
         });
       }
     });
@@ -383,8 +398,8 @@ export function initializeSocket(server) {
         const participant = await prisma.conversationParticipant.findFirst({
           where: {
             conversationId,
-            userId: socket.data.user.id
-          }
+            userId: socket.data.user.id,
+          },
         });
 
         if (!participant) {
@@ -393,7 +408,7 @@ export function initializeSocket(server) {
 
         socket.to(`conversation-${conversationId}`).emit('user-typing', {
           userId: socket.data.user.id,
-          userName: socket.data.user.name
+          userName: socket.data.user.name,
         });
       } catch (error) {
         console.error('Error handling typing indicator:', error);
@@ -406,8 +421,8 @@ export function initializeSocket(server) {
         const participant = await prisma.conversationParticipant.findFirst({
           where: {
             conversationId,
-            userId: socket.data.user.id
-          }
+            userId: socket.data.user.id,
+          },
         });
 
         if (!participant) {
@@ -415,7 +430,7 @@ export function initializeSocket(server) {
         }
 
         socket.to(`conversation-${conversationId}`).emit('user-stop-typing', {
-          userId: socket.data.user.id
+          userId: socket.data.user.id,
         });
       } catch (error) {
         console.error('Error handling stop-typing indicator:', error);
@@ -428,10 +443,10 @@ export function initializeSocket(server) {
         const notifications = await prisma.notification.findMany({
           where: {
             userId: socket.data.user.id,
-            isRead: false
+            isRead: false,
           },
           orderBy: { createdAt: 'desc' },
-          take: 20
+          take: 20,
         });
 
         socket.emit('notifications-loaded', notifications);
@@ -439,7 +454,7 @@ export function initializeSocket(server) {
         console.error('Error fetching notifications:', error);
         socket.emit('notification-error', {
           error: 'Failed to fetch notifications',
-          errorCode: 'INTERNAL_ERROR'
+          errorCode: 'INTERNAL_ERROR',
         });
       }
     });
@@ -448,7 +463,7 @@ export function initializeSocket(server) {
       try {
         await prisma.notification.update({
           where: { id: notificationId },
-          data: { isRead: true }
+          data: { isRead: true },
         });
 
         // Emit updated notification counts to the user
@@ -458,7 +473,7 @@ export function initializeSocket(server) {
         console.error('Error marking notification as read:', error);
         socket.emit('notification-error', {
           error: 'Failed to mark notification as read',
-          errorCode: 'INTERNAL_ERROR'
+          errorCode: 'INTERNAL_ERROR',
         });
       }
     });
@@ -475,12 +490,15 @@ export function initializeSocket(server) {
   io.emitNotification = async (userId, notification) => {
     try {
       const counts = await getNotificationCounts(userId);
-      
+
       // Emit to the specific user's room
       io.to(`user-${userId}`).emit('notification:new', notification);
       io.to(`user-${userId}`).emit('notification:counts', counts);
-      
-      console.log(`🔔 Notification sent to user ${userId}:`, notification.title);
+
+      console.log(
+        `🔔 Notification sent to user ${userId}:`,
+        notification.title
+      );
     } catch (error) {
       console.error('Error emitting notification:', error);
     }
@@ -493,10 +511,12 @@ export function initializeSocket(server) {
       io.to(`user-${landlordId}`).emit('movein-verification:update', {
         offerId,
         status,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
-      
-      console.log(`🏠 Move-in verification update sent to landlord ${landlordId}: ${status}`);
+
+      console.log(
+        `🏠 Move-in verification update sent to landlord ${landlordId}: ${status}`
+      );
     } catch (error) {
       console.error('Error emitting move-in verification update:', error);
     }

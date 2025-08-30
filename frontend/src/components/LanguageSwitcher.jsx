@@ -5,13 +5,13 @@ import { Globe } from 'lucide-react';
 const LanguageSwitcher = () => {
   const { i18n } = useTranslation();
 
-  const changeLanguage = (lng) => {
+  const changeLanguage = lng => {
     i18n.changeLanguage(lng);
   };
 
   return (
-    <div className="flex items-center space-x-2">
-      <Globe className="w-4 h-4 text-gray-600" />
+    <div className='flex items-center space-x-2'>
+      <Globe className='w-4 h-4 text-gray-600' />
       <button
         onClick={() => changeLanguage('en')}
         className={`px-2 py-1 text-xs rounded ${
@@ -36,4 +36,4 @@ const LanguageSwitcher = () => {
   );
 };
 
-export default LanguageSwitcher; 
+export default LanguageSwitcher;

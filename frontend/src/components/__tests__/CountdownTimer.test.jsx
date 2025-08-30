@@ -7,12 +7,8 @@ import CountdownTimer from '../CountdownTimer';
 // Mock Date.now() to control time
 const mockDateNow = jest.fn();
 
-const renderWithI18n = (component) => {
-  return render(
-    <I18nextProvider i18n={i18n}>
-      {component}
-    </I18nextProvider>
-  );
+const renderWithI18n = component => {
+  return render(<I18nextProvider i18n={i18n}>{component}</I18nextProvider>);
 };
 
 describe('CountdownTimer', () => {
@@ -25,7 +21,7 @@ describe('CountdownTimer', () => {
     test('should display days and hours when more than 24 hours remaining', () => {
       // Mock current time: 2025-01-01 12:00:00
       mockDateNow.mockReturnValue(new Date('2025-01-01T12:00:00Z').getTime());
-      
+
       // Target time: 2025-01-03 18:00:00 (2 days, 6 hours later)
       const targetDate = '2025-01-03T18:00:00Z';
 
@@ -37,7 +33,7 @@ describe('CountdownTimer', () => {
     test('should display hours and minutes when less than 24 hours remaining', () => {
       // Mock current time: 2025-01-01 12:00:00
       mockDateNow.mockReturnValue(new Date('2025-01-01T12:00:00Z').getTime());
-      
+
       // Target time: 2025-01-01 15:30:00 (3 hours, 30 minutes later)
       const targetDate = '2025-01-01T15:30:00Z';
 
@@ -49,7 +45,7 @@ describe('CountdownTimer', () => {
     test('should display minutes and seconds when less than 1 hour remaining', () => {
       // Mock current time: 2025-01-01 12:00:00
       mockDateNow.mockReturnValue(new Date('2025-01-01T12:00:00Z').getTime());
-      
+
       // Target time: 2025-01-01 12:05:30 (5 minutes, 30 seconds later)
       const targetDate = '2025-01-01T12:05:30Z';
 
@@ -61,7 +57,7 @@ describe('CountdownTimer', () => {
     test('should display only seconds when less than 1 minute remaining', () => {
       // Mock current time: 2025-01-01 12:00:00
       mockDateNow.mockReturnValue(new Date('2025-01-01T12:00:00Z').getTime());
-      
+
       // Target time: 2025-01-01 12:00:45 (45 seconds later)
       const targetDate = '2025-01-01T12:00:45Z';
 
@@ -75,7 +71,7 @@ describe('CountdownTimer', () => {
     test('should show "Publishing now..." when countdown expires', () => {
       // Mock current time: 2025-01-01 12:00:00
       mockDateNow.mockReturnValue(new Date('2025-01-01T12:00:00Z').getTime());
-      
+
       // Target time: 2025-01-01 11:00:00 (1 hour ago - expired)
       const targetDate = '2025-01-01T11:00:00Z';
 
@@ -87,7 +83,7 @@ describe('CountdownTimer', () => {
     test('should show "Publishing now..." when countdown is exactly 0', () => {
       // Mock current time: 2025-01-01 12:00:00
       mockDateNow.mockReturnValue(new Date('2025-01-01T12:00:00Z').getTime());
-      
+
       // Target time: 2025-01-01 12:00:00 (exactly now)
       const targetDate = '2025-01-01T12:00:00Z';
 
@@ -109,7 +105,7 @@ describe('CountdownTimer', () => {
     });
 
     test('should handle invalid targetDate gracefully', () => {
-      renderWithI18n(<CountdownTimer targetDate="invalid-date" />);
+      renderWithI18n(<CountdownTimer targetDate='invalid-date' />);
 
       // Should handle invalid date gracefully
       expect(screen.queryByText(/Publishing now/)).not.toBeInTheDocument();
@@ -118,7 +114,7 @@ describe('CountdownTimer', () => {
     test('should handle very small time differences', () => {
       // Mock current time: 2025-01-01 12:00:00
       mockDateNow.mockReturnValue(new Date('2025-01-01T12:00:00Z').getTime());
-      
+
       // Target time: 2025-01-01 12:00:01 (1 second later)
       const targetDate = '2025-01-01T12:00:01Z';
 
@@ -131,10 +127,10 @@ describe('CountdownTimer', () => {
   describe('Real-time Updates', () => {
     test('should update countdown every second', () => {
       jest.useFakeTimers();
-      
+
       // Mock current time: 2025-01-01 12:00:00
       mockDateNow.mockReturnValue(new Date('2025-01-01T12:00:00Z').getTime());
-      
+
       // Target time: 2025-01-01 12:00:10 (10 seconds later)
       const targetDate = '2025-01-01T12:00:10Z';
 
@@ -164,14 +160,16 @@ describe('CountdownTimer', () => {
 
     test('should clean up timer on unmount', () => {
       jest.useFakeTimers();
-      
+
       // Mock current time: 2025-01-01 12:00:00
       mockDateNow.mockReturnValue(new Date('2025-01-01T12:00:00Z').getTime());
-      
+
       // Target time: 2025-01-01 12:00:10 (10 seconds later)
       const targetDate = '2025-01-01T12:00:10Z';
 
-      const { unmount } = renderWithI18n(<CountdownTimer targetDate={targetDate} />);
+      const { unmount } = renderWithI18n(
+        <CountdownTimer targetDate={targetDate} />
+      );
 
       // Unmount component
       unmount();
@@ -192,11 +190,13 @@ describe('CountdownTimer', () => {
     test('should apply correct styling classes', () => {
       // Mock current time: 2025-01-01 12:00:00
       mockDateNow.mockReturnValue(new Date('2025-01-01T12:00:00Z').getTime());
-      
+
       // Target time: 2025-01-01 12:00:10 (10 seconds later)
       const targetDate = '2025-01-01T12:00:10Z';
 
-      const { container } = renderWithI18n(<CountdownTimer targetDate={targetDate} />);
+      const { container } = renderWithI18n(
+        <CountdownTimer targetDate={targetDate} />
+      );
 
       const countdownElement = container.querySelector('.text-orange-600');
       expect(countdownElement).toBeInTheDocument();
@@ -206,11 +206,13 @@ describe('CountdownTimer', () => {
     test('should apply correct styling for expired countdown', () => {
       // Mock current time: 2025-01-01 12:00:00
       mockDateNow.mockReturnValue(new Date('2025-01-01T12:00:00Z').getTime());
-      
+
       // Target time: 2025-01-01 11:00:00 (1 hour ago - expired)
       const targetDate = '2025-01-01T11:00:00Z';
 
-      const { container } = renderWithI18n(<CountdownTimer targetDate={targetDate} />);
+      const { container } = renderWithI18n(
+        <CountdownTimer targetDate={targetDate} />
+      );
 
       const expiredElement = container.querySelector('.text-green-600');
       expect(expiredElement).toBeInTheDocument();

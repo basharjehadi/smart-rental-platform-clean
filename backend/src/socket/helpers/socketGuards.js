@@ -14,27 +14,27 @@ export const canChat = async (conversationId, userId) => {
       include: {
         participants: {
           where: { userId },
-          select: { id: true, role: true }
+          select: { id: true, role: true },
         },
         offer: {
-          select: { 
-            id: true, 
-            status: true, 
+          select: {
+            id: true,
+            status: true,
             isPaid: true,
             payments: {
               where: { status: 'SUCCEEDED' },
-              select: { id: true }
-            }
-          }
-        }
-      }
+              select: { id: true },
+            },
+          },
+        },
+      },
     });
 
     if (!conversation) {
       return {
         canChat: false,
         errorCode: 'NOT_FOUND',
-        errorMessage: 'Conversation not found'
+        errorMessage: 'Conversation not found',
       };
     }
 
@@ -43,7 +43,7 @@ export const canChat = async (conversationId, userId) => {
       return {
         canChat: false,
         errorCode: 'NOT_MEMBER',
-        errorMessage: 'You are not a member of this conversation'
+        errorMessage: 'You are not a member of this conversation',
       };
     }
 
@@ -52,20 +52,23 @@ export const canChat = async (conversationId, userId) => {
       return {
         canChat: false,
         errorCode: 'CONVERSATION_NOT_ACTIVE',
-        errorMessage: 'This conversation is not active'
+        errorMessage: 'This conversation is not active',
       };
     }
 
     // Check payment status
     if (conversation.offer) {
       // Check if offer is paid (either isPaid flag or successful payment exists)
-      const isPaid = conversation.offer.isPaid || conversation.offer.status === 'PAID' || conversation.offer.payments.length > 0;
-      
+      const isPaid =
+        conversation.offer.isPaid ||
+        conversation.offer.status === 'PAID' ||
+        conversation.offer.payments.length > 0;
+
       if (!isPaid) {
         return {
           canChat: false,
           errorCode: 'PAYMENT_REQUIRED',
-          errorMessage: 'Payment is required to chat in this conversation'
+          errorMessage: 'Payment is required to chat in this conversation',
         };
       }
     }
@@ -73,14 +76,14 @@ export const canChat = async (conversationId, userId) => {
     return {
       canChat: true,
       errorCode: null,
-      errorMessage: null
+      errorMessage: null,
     };
   } catch (error) {
     console.error('Error in canChat guard:', error);
     return {
       canChat: false,
       errorCode: 'INTERNAL_ERROR',
-      errorMessage: 'Internal server error'
+      errorMessage: 'Internal server error',
     };
   }
 };
@@ -98,25 +101,25 @@ export const getConversationInfo = async (conversationId) => {
         participants: {
           include: {
             user: {
-              select: { id: true, name: true, email: true, role: true }
-            }
-          }
+              select: { id: true, name: true, email: true, role: true },
+            },
+          },
         },
         offer: {
-          select: { 
-            id: true, 
-            status: true, 
+          select: {
+            id: true,
+            status: true,
             isPaid: true,
             rentAmount: true,
             payments: {
-              select: { id: true, status: true, amount: true }
-            }
-          }
+              select: { id: true, status: true, amount: true },
+            },
+          },
         },
         property: {
-          select: { id: true, address: true, city: true }
-        }
-      }
+          select: { id: true, address: true, city: true },
+        },
+      },
     });
 
     return conversation;
@@ -125,5 +128,3 @@ export const getConversationInfo = async (conversationId) => {
     return null;
   }
 };
-
-

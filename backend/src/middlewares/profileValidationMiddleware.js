@@ -4,7 +4,7 @@ import { prisma } from '../utils/prisma.js';
 const REQUIRED_FIELDS = {
   TENANT: ['firstName', 'lastName', 'phoneNumber'],
   LANDLORD: ['firstName', 'lastName', 'phoneNumber'],
-  ADMIN: ['firstName', 'lastName']
+  ADMIN: ['firstName', 'lastName'],
 };
 
 // Validation functions
@@ -56,7 +56,7 @@ export const validateProfileData = async (req, res, next) => {
 
     // Check required fields for the role
     const requiredFields = REQUIRED_FIELDS[role] || [];
-    
+
     for (const field of requiredFields) {
       if (!data[field] || data[field].trim() === '') {
         errors.push(`${field} is required for ${role.toLowerCase()}s`);
@@ -81,13 +81,19 @@ export const validateProfileData = async (req, res, next) => {
       if (data.passportNumber && !validatePassportNumber(data.passportNumber)) {
         errors.push('Invalid passport number format');
       }
-      if (data.kartaPobytuNumber && !validateKartaPobytu(data.kartaPobytuNumber)) {
+      if (
+        data.kartaPobytuNumber &&
+        !validateKartaPobytu(data.kartaPobytuNumber)
+      ) {
         errors.push('Invalid residence card number format');
       }
     }
 
     if (role === 'LANDLORD') {
-      if (data.dowodOsobistyNumber && !validateDowodOsobisty(data.dowodOsobistyNumber)) {
+      if (
+        data.dowodOsobistyNumber &&
+        !validateDowodOsobisty(data.dowodOsobistyNumber)
+      ) {
         errors.push('Invalid Polish ID card number format');
       }
     }
@@ -97,10 +103,10 @@ export const validateProfileData = async (req, res, next) => {
       const existingUser = await prisma.user.findFirst({
         where: {
           email: data.email,
-          id: { not: req.user.id }
-        }
+          id: { not: req.user.id },
+        },
       });
-      
+
       if (existingUser) {
         errors.push('Email already exists');
       }
@@ -109,7 +115,7 @@ export const validateProfileData = async (req, res, next) => {
     if (errors.length > 0) {
       return res.status(400).json({
         error: 'Validation failed',
-        details: errors
+        details: errors,
       });
     }
 
@@ -117,7 +123,7 @@ export const validateProfileData = async (req, res, next) => {
   } catch (error) {
     console.error('Profile validation error:', error);
     res.status(500).json({
-      error: 'Validation error occurred'
+      error: 'Validation error occurred',
     });
   }
 };
@@ -126,7 +132,7 @@ export const validateProfileData = async (req, res, next) => {
 export const getProfileStatus = async (req, res) => {
   try {
     const { id: userId } = req.user;
-    
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -150,8 +156,8 @@ export const getProfileStatus = async (req, res) => {
         profileImage: true,
         signatureBase64: true,
         identityDocument: true,
-        isVerified: true
-      }
+        isVerified: true,
+      },
     });
 
     if (!user) {
@@ -159,14 +165,16 @@ export const getProfileStatus = async (req, res) => {
     }
 
     const requiredFields = REQUIRED_FIELDS[user.role] || [];
-    const completedFields = requiredFields.filter(field => 
-      user[field] && user[field].toString().trim() !== ''
+    const completedFields = requiredFields.filter(
+      (field) => user[field] && user[field].toString().trim() !== ''
     );
 
-    const completionPercentage = Math.round((completedFields.length / requiredFields.length) * 100);
-    
-    const missingFields = requiredFields.filter(field => 
-      !user[field] || user[field].toString().trim() === ''
+    const completionPercentage = Math.round(
+      (completedFields.length / requiredFields.length) * 100
+    );
+
+    const missingFields = requiredFields.filter(
+      (field) => !user[field] || user[field].toString().trim() === ''
     );
 
     res.json({
@@ -177,10 +185,10 @@ export const getProfileStatus = async (req, res) => {
       isVerified: user.isVerified,
       hasProfileImage: !!user.profileImage,
       hasSignature: !!user.signatureBase64,
-      hasIdentityDocument: !!user.identityDocument
+      hasIdentityDocument: !!user.identityDocument,
     });
   } catch (error) {
     console.error('Get profile status error:', error);
     res.status(500).json({ error: 'Failed to get profile status' });
   }
-}; 
+};

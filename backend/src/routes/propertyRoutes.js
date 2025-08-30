@@ -1,13 +1,13 @@
 import express from 'express';
-import { 
-  getLandlordProperties, 
-  getPropertyById, 
-  createProperty, 
-  updateProperty, 
+import {
+  getLandlordProperties,
+  getPropertyById,
+  createProperty,
+  updateProperty,
   deleteProperty,
   updatePropertyStatus,
   updatePropertyAvailability,
-  getPropertyAvailabilitySummary
+  getPropertyAvailabilitySummary,
 } from '../controllers/propertyController.js';
 import { verifyToken, requireLandlord } from '../middlewares/authMiddleware.js';
 import { uploadMultipleFiles } from '../middlewares/uploadMiddleware.js';
@@ -21,10 +21,22 @@ router.get('/', verifyToken, requireLandlord, getLandlordProperties);
 router.get('/:id', verifyToken, requireLandlord, getPropertyById);
 
 // Create a new property
-router.post('/', verifyToken, requireLandlord, uploadMultipleFiles, createProperty);
+router.post(
+  '/',
+  verifyToken,
+  requireLandlord,
+  uploadMultipleFiles,
+  createProperty
+);
 
 // Update a property
-router.put('/:id', verifyToken, requireLandlord, uploadMultipleFiles, updateProperty);
+router.put(
+  '/:id',
+  verifyToken,
+  requireLandlord,
+  uploadMultipleFiles,
+  updateProperty
+);
 
 // Delete a property
 router.delete('/:id', verifyToken, requireLandlord, deleteProperty);
@@ -33,9 +45,19 @@ router.delete('/:id', verifyToken, requireLandlord, deleteProperty);
 router.patch('/:id/status', verifyToken, requireLandlord, updatePropertyStatus);
 
 // NEW: Update property availability
-router.patch('/:id/availability', verifyToken, requireLandlord, updatePropertyAvailability);
+router.patch(
+  '/:id/availability',
+  verifyToken,
+  requireLandlord,
+  updatePropertyAvailability
+);
 
 // NEW: Get property availability summary
-router.get('/availability/summary', verifyToken, requireLandlord, getPropertyAvailabilitySummary);
+router.get(
+  '/availability/summary',
+  verifyToken,
+  requireLandlord,
+  getPropertyAvailabilitySummary
+);
 
-export default router; 
+export default router;

@@ -15,7 +15,7 @@ export class AuthService {
 
       // Check if user already exists
       const existingUser = await prisma.user.findUnique({
-        where: { email }
+        where: { email },
       });
 
       if (existingUser) {
@@ -32,15 +32,15 @@ export class AuthService {
           name,
           email,
           password: hashedPassword,
-          role
+          role,
         },
         select: {
           id: true,
           name: true,
           email: true,
           role: true,
-          createdAt: true
-        }
+          createdAt: true,
+        },
       });
 
       // Generate JWT token
@@ -70,7 +70,7 @@ export class AuthService {
 
       // Find user
       const user = await prisma.user.findUnique({
-        where: { email }
+        where: { email },
       });
 
       if (!user) {
@@ -113,7 +113,7 @@ export class AuthService {
     try {
       // Get user with password
       const user = await prisma.user.findUnique({
-        where: { id: userId }
+        where: { id: userId },
       });
 
       if (!user) {
@@ -121,7 +121,10 @@ export class AuthService {
       }
 
       // Verify current password
-      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      const isCurrentPasswordValid = await bcrypt.compare(
+        currentPassword,
+        user.password
+      );
       if (!isCurrentPasswordValid) {
         throw new Error('Current password is incorrect');
       }
@@ -133,7 +136,7 @@ export class AuthService {
       // Update password
       await prisma.user.update({
         where: { id: userId },
-        data: { password: hashedNewPassword }
+        data: { password: hashedNewPassword },
       });
 
       logger.info(`Password changed for user: ${user.email}`);
@@ -157,4 +160,4 @@ export class AuthService {
       throw new Error('Invalid or expired token');
     }
   }
-} 
+}

@@ -4,7 +4,7 @@ const prisma = new PrismaClient();
 
 /**
  * Middleware to check if a user can submit a review for a lease
- * 
+ *
  * Requirements:
  * - Lease must exist and be active
  * - Lease start date must be in the past
@@ -19,7 +19,7 @@ export const canSubmitReview = async (req, res, next) => {
 
     if (!leaseId) {
       return res.status(400).json({
-        error: 'Lease ID is required'
+        error: 'Lease ID is required',
       });
     }
 
@@ -39,12 +39,12 @@ export const canSubmitReview = async (req, res, next) => {
                 user: {
                   select: {
                     id: true,
-                    role: true
-                  }
-                }
-              }
-            }
-          }
+                    role: true,
+                  },
+                },
+              },
+            },
+          },
         },
         organization: {
           include: {
@@ -53,31 +53,31 @@ export const canSubmitReview = async (req, res, next) => {
                 user: {
                   select: {
                     id: true,
-                    role: true
-                  }
-                }
-              }
-            }
-          }
+                    role: true,
+                  },
+                },
+              },
+            },
+          },
         },
         payments: {
           where: {
-            status: 'SUCCEEDED'
-          }
-        }
-      }
+            status: 'SUCCEEDED',
+          },
+        },
+      },
     });
 
     if (!lease) {
       return res.status(404).json({
-        error: 'Lease not found'
+        error: 'Lease not found',
       });
     }
 
     // Check if lease is active
     if (lease.status !== 'ACTIVE') {
       return res.status(403).json({
-        error: 'Cannot submit review for inactive lease'
+        error: 'Cannot submit review for inactive lease',
       });
     }
 
@@ -85,7 +85,7 @@ export const canSubmitReview = async (req, res, next) => {
     const now = new Date();
     if (lease.startDate > now) {
       return res.status(403).json({
-        error: 'Cannot submit review before lease start date'
+        error: 'Cannot submit review before lease start date',
       });
     }
 
@@ -93,23 +93,24 @@ export const canSubmitReview = async (req, res, next) => {
     const hasPayments = lease.payments.length > 0;
     if (!hasPayments) {
       return res.status(403).json({
-        error: 'Cannot submit review for lease without platform payments'
+        error: 'Cannot submit review for lease without platform payments',
       });
     }
 
     // Check if user is a tenant in the lease
     const isTenant = lease.tenantGroup.members.some(
-      member => member.user.id === userId && member.user.role === 'TENANT'
+      (member) => member.user.id === userId && member.user.role === 'TENANT'
     );
 
     // Check if user is a landlord in the lease
     const isLandlord = lease.organization?.members.some(
-      member => member.user.id === userId && member.user.role === 'LANDLORD'
+      (member) => member.user.id === userId && member.user.role === 'LANDLORD'
     );
 
     if (!isTenant && !isLandlord) {
       return res.status(403).json({
-        error: 'User must be a tenant or landlord in the lease to submit a review'
+        error:
+          'User must be a tenant or landlord in the lease to submit a review',
       });
     }
 
@@ -121,7 +122,7 @@ export const canSubmitReview = async (req, res, next) => {
   } catch (error) {
     console.error('Error in canSubmitReview middleware:', error);
     return res.status(500).json({
-      error: 'Internal server error'
+      error: 'Internal server error',
     });
   }
 };

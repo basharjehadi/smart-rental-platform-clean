@@ -10,7 +10,11 @@ export function setSocketIO(socketInstance) {
 
 export class NotificationService {
   // Create notification for new rental request
-  static async createRentalRequestNotification(landlordId, rentalRequestId, tenantName) {
+  static async createRentalRequestNotification(
+    landlordId,
+    rentalRequestId,
+    tenantName
+  ) {
     try {
       const notification = await prisma.notification.create({
         data: {
@@ -18,8 +22,8 @@ export class NotificationService {
           type: 'NEW_RENTAL_REQUEST',
           entityId: rentalRequestId.toString(),
           title: 'New Rental Request',
-          body: `${tenantName} sent you a rental request`
-        }
+          body: `${tenantName} sent you a rental request`,
+        },
       });
 
       // Emit real-time notification if socket.io is available
@@ -35,7 +39,12 @@ export class NotificationService {
   }
 
   // Create notification for new offer
-  static async createOfferNotification(tenantId, offerId, landlordName, propertyAddress) {
+  static async createOfferNotification(
+    tenantId,
+    offerId,
+    landlordName,
+    propertyAddress
+  ) {
     try {
       const notification = await prisma.notification.create({
         data: {
@@ -43,8 +52,8 @@ export class NotificationService {
           type: 'NEW_OFFER',
           entityId: offerId,
           title: 'New Offer',
-          body: `${landlordName} sent you an offer for ${propertyAddress}`
-        }
+          body: `${landlordName} sent you an offer for ${propertyAddress}`,
+        },
       });
 
       // Emit real-time notification if socket.io is available
@@ -66,8 +75,8 @@ export class NotificationService {
         where: {
           userId,
           type,
-          isRead: false
-        }
+          isRead: false,
+        },
       });
     } catch (error) {
       console.error('Error getting unread count:', error);
@@ -82,11 +91,11 @@ export class NotificationService {
         where: {
           userId,
           type,
-          isRead: false
+          isRead: false,
         },
         data: {
-          isRead: true
-        }
+          isRead: true,
+        },
       });
     } catch (error) {
       console.error('Error marking notifications as read by type:', error);
@@ -102,11 +111,13 @@ export class NotificationService {
           userId,
           type: status === 'SUCCEEDED' ? 'PAYMENT_CONFIRMED' : 'PAYMENT_FAILED',
           entityId: paymentId.toString(),
-          title: status === 'SUCCEEDED' ? 'Payment Confirmed' : 'Payment Failed',
-          body: status === 'SUCCEEDED' 
-            ? `Your payment of $${amount} has been confirmed successfully.`
-            : `Your payment of $${amount} could not be processed. Please try again.`
-        }
+          title:
+            status === 'SUCCEEDED' ? 'Payment Confirmed' : 'Payment Failed',
+          body:
+            status === 'SUCCEEDED'
+              ? `Your payment of $${amount} has been confirmed successfully.`
+              : `Your payment of $${amount} could not be processed. Please try again.`,
+        },
       });
 
       if (io) {
@@ -121,7 +132,12 @@ export class NotificationService {
   }
 
   // Create contract notification
-  static async createContractNotification(userId, contractId, type, contractTitle) {
+  static async createContractNotification(
+    userId,
+    contractId,
+    type,
+    contractTitle
+  ) {
     try {
       const notification = await prisma.notification.create({
         data: {
@@ -129,10 +145,11 @@ export class NotificationService {
           type: type === 'SIGNED' ? 'CONTRACT_SIGNED' : 'CONTRACT_UPDATED',
           entityId: contractId.toString(),
           title: type === 'SIGNED' ? 'Contract Signed' : 'Contract Updated',
-          body: type === 'SIGNED'
-            ? `Your contract "${contractTitle}" has been signed by all parties.`
-            : `Your contract "${contractTitle}" has been updated.`
-        }
+          body:
+            type === 'SIGNED'
+              ? `Your contract "${contractTitle}" has been signed by all parties.`
+              : `Your contract "${contractTitle}" has been updated.`,
+        },
       });
 
       if (io) {
@@ -155,10 +172,11 @@ export class NotificationService {
           type: status === 'APPROVED' ? 'KYC_APPROVED' : 'KYC_REJECTED',
           entityId: userId.toString(),
           title: status === 'APPROVED' ? 'KYC Approved' : 'KYC Rejected',
-          body: status === 'APPROVED'
-            ? 'Your KYC verification has been approved successfully.'
-            : `Your KYC verification has been rejected. Reason: ${reason}`
-        }
+          body:
+            status === 'APPROVED'
+              ? 'Your KYC verification has been approved successfully.'
+              : `Your KYC verification has been rejected. Reason: ${reason}`,
+        },
       });
 
       if (io) {
@@ -173,7 +191,12 @@ export class NotificationService {
   }
 
   // Create property status notification
-  static async createPropertyStatusNotification(userId, propertyId, propertyAddress, newStatus) {
+  static async createPropertyStatusNotification(
+    userId,
+    propertyId,
+    propertyAddress,
+    newStatus
+  ) {
     try {
       const notification = await prisma.notification.create({
         data: {
@@ -181,8 +204,8 @@ export class NotificationService {
           type: 'PROPERTY_STATUS_CHANGED',
           entityId: propertyId.toString(),
           title: 'Property Status Changed',
-          body: `The status of your property at ${propertyAddress} has changed to ${newStatus}.`
-        }
+          body: `The status of your property at ${propertyAddress} has changed to ${newStatus}.`,
+        },
       });
 
       if (io) {
@@ -200,15 +223,15 @@ export class NotificationService {
   static async createSystemAnnouncementNotification(userIds, title, body) {
     try {
       const notifications = await Promise.all(
-        userIds.map(userId => 
+        userIds.map((userId) =>
           prisma.notification.create({
             data: {
               userId,
               type: 'SYSTEM_ANNOUNCEMENT',
               entityId: 'system',
               title,
-              body
-            }
+              body,
+            },
           })
         )
       );
@@ -236,8 +259,8 @@ export class NotificationService {
           type: 'ACCOUNT_UPDATED',
           entityId: userId.toString(),
           title: 'Account Updated',
-          body: `Your account ${updateType} has been updated successfully.`
-        }
+          body: `Your account ${updateType} has been updated successfully.`,
+        },
       });
 
       if (io) {
@@ -255,10 +278,10 @@ export class NotificationService {
 // Bulk notification creation for rental requests
 export async function createManyRentalRequestNotifications(items) {
   if (!Array.isArray(items) || !items.length) return;
-  const orgIds = Array.from(new Set(items.map(i => i.organizationId)));
+  const orgIds = Array.from(new Set(items.map((i) => i.organizationId)));
   const members = await prisma.organizationMember.findMany({
     where: { organizationId: { in: orgIds } },
-    select: { organizationId: true, userId: true }
+    select: { organizationId: true, userId: true },
   });
   const byOrg = new Map();
   for (const m of members) {
@@ -276,11 +299,14 @@ export async function createManyRentalRequestNotifications(items) {
         title: `New rental request: ${it.title}`,
         body: `${it.tenantName || 'A tenant'} has a request matching your portfolio.`,
         isRead: false,
-        createdAt: new Date()
+        createdAt: new Date(),
       });
     }
   }
   if (notifications.length) {
-    await prisma.notification.createMany({ data: notifications, skipDuplicates: true });
+    await prisma.notification.createMany({
+      data: notifications,
+      skipDuplicates: true,
+    });
   }
 }

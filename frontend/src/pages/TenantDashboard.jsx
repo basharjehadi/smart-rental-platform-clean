@@ -15,7 +15,7 @@ import TenantGroupChoiceModal from '../components/TenantGroupChoiceModal.jsx';
 const TenantDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  
+
   const { markByTypeAsRead } = useNotifications();
   const didMarkReadRef = useRef(false);
   const [requests, setRequests] = useState([]);
@@ -23,21 +23,21 @@ const TenantDashboard = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [requestToEdit, setRequestToEdit] = useState(null);
   const [requestToDelete, setRequestToDelete] = useState(null);
-  
+
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [verificationStatuses, setVerificationStatuses] = useState({}); // offerId -> status data
   const [leaseMetaByOffer, setLeaseMetaByOffer] = useState({}); // offerId -> leaseMeta
-  
+
   // Chat states
   const [showChat, setShowChat] = useState(false);
   const [reportOfferId, setReportOfferId] = useState(null);
@@ -46,17 +46,27 @@ const TenantDashboard = () => {
   const fetchRequests = async () => {
     try {
       console.log('🔍 Dashboard: Starting requests fetch...');
-      console.log('🔍 Dashboard: Token in localStorage:', localStorage.getItem('token') ? 'Present' : 'Missing');
+      console.log(
+        '🔍 Dashboard: Token in localStorage:',
+        localStorage.getItem('token') ? 'Present' : 'Missing'
+      );
       setLoading(true);
       // Endpoint removed; dashboard will fetch a summary endpoint if needed
       const response = await api.get('/tenant-dashboard/summary');
       console.log('✅ Dashboard: Requests response received:', response.data);
-      console.log('✅ Dashboard: Rental requests:', response.data.rentalRequests);
+      console.log(
+        '✅ Dashboard: Rental requests:',
+        response.data.rentalRequests
+      );
       setRequests(response.data.rentalRequests || []);
       // Fetch move-in verification status for locked requests with paid offers
-      const lockedWithOffers = (response.data.rentalRequests || [])
-        .filter(r => r.status === 'LOCKED' && Array.isArray(r.offers) && r.offers.some(o => o.status === 'PAID'));
-      const statusPromises = lockedWithOffers.map(async (r) => {
+      const lockedWithOffers = (response.data.rentalRequests || []).filter(
+        r =>
+          r.status === 'LOCKED' &&
+          Array.isArray(r.offers) &&
+          r.offers.some(o => o.status === 'PAID')
+      );
+      const statusPromises = lockedWithOffers.map(async r => {
         const paidOffer = r.offers.find(o => o.status === 'PAID');
         try {
           const s = await api.get(`/move-in/offers/${paidOffer.id}/status`);
@@ -73,7 +83,10 @@ const TenantDashboard = () => {
       try {
         const leaseRes = await api.get('/tenant-dashboard/active-lease');
         if (leaseRes?.data?.offerId && leaseRes?.data?.leaseMeta) {
-          setLeaseMetaByOffer((prev) => ({ ...prev, [leaseRes.data.offerId]: leaseRes.data.leaseMeta }));
+          setLeaseMetaByOffer(prev => ({
+            ...prev,
+            [leaseRes.data.offerId]: leaseRes.data.leaseMeta,
+          }));
         }
       } catch {}
     } catch (error) {
@@ -86,13 +99,18 @@ const TenantDashboard = () => {
     }
   };
 
-  const renderMoveInVerificationCard = (request) => {
-    if (request.status !== 'LOCKED' || !Array.isArray(request.offers)) return null;
+  const renderMoveInVerificationCard = request => {
+    if (request.status !== 'LOCKED' || !Array.isArray(request.offers))
+      return null;
     const paidOffer = request.offers.find(o => o.status === 'PAID');
     if (!paidOffer) return null;
     const status = verificationStatuses[paidOffer.id];
     const statusValue = status?.status || 'PENDING';
-    const deadline = status?.deadline ? dayjs(status.deadline) : (request.moveInDate ? dayjs(request.moveInDate).add(24, 'hour') : null);
+    const deadline = status?.deadline
+      ? dayjs(status.deadline)
+      : request.moveInDate
+        ? dayjs(request.moveInDate).add(24, 'hour')
+        : null;
     const now = dayjs();
     let remainingText = '—';
     if (deadline) {
@@ -106,12 +124,18 @@ const TenantDashboard = () => {
     // If admin rejected -> SUCCESS, show verified message and no actions
     if (statusValue === 'SUCCESS') {
       return (
-        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-green-900 font-medium">✅ Move-in verified</div>
-            {deadline && <div className="text-xs text-green-800">Finalized</div>}
+        <div className='mt-3 p-3 bg-green-50 border border-green-200 rounded-md'>
+          <div className='flex items-center justify-between'>
+            <div className='text-sm text-green-900 font-medium'>
+              ✅ Move-in verified
+            </div>
+            {deadline && (
+              <div className='text-xs text-green-800'>Finalized</div>
+            )}
           </div>
-          <div className="mt-1 text-xs text-green-800">Your move-in has been confirmed. Enjoy your stay!</div>
+          <div className='mt-1 text-xs text-green-800'>
+            Your move-in has been confirmed. Enjoy your stay!
+          </div>
         </div>
       );
     }
@@ -119,12 +143,21 @@ const TenantDashboard = () => {
     // If tenant reported -> awaiting admin
     if (statusValue === 'ISSUE_REPORTED') {
       return (
-        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-yellow-900 font-medium">⚠️ Issue reported</div>
-            {deadline && <div className="text-xs text-yellow-800">Awaiting admin review</div>}
+        <div className='mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md'>
+          <div className='flex items-center justify-between'>
+            <div className='text-sm text-yellow-900 font-medium'>
+              ⚠️ Issue reported
+            </div>
+            {deadline && (
+              <div className='text-xs text-yellow-800'>
+                Awaiting admin review
+              </div>
+            )}
           </div>
-          <div className="mt-1 text-xs text-yellow-800">Support is reviewing your report. We will notify you once a decision is made.</div>
+          <div className='mt-1 text-xs text-yellow-800'>
+            Support is reviewing your report. We will notify you once a decision
+            is made.
+          </div>
         </div>
       );
     }
@@ -132,21 +165,27 @@ const TenantDashboard = () => {
     // If admin approved cancellation
     if (statusValue === 'CANCELLED') {
       return (
-        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-red-900 font-medium">❌ Booking cancelled</div>
+        <div className='mt-3 p-3 bg-red-50 border border-red-200 rounded-md'>
+          <div className='flex items-center justify-between'>
+            <div className='text-sm text-red-900 font-medium'>
+              ❌ Booking cancelled
+            </div>
           </div>
-          <div className="mt-1 text-xs text-red-800">Support approved your cancellation request.</div>
+          <div className='mt-1 text-xs text-red-800'>
+            Support approved your cancellation request.
+          </div>
         </div>
       );
     }
 
     // Default PENDING view with actions
     return (
-      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-blue-900 font-medium">🏠 Move-in verification</div>
-          <div className="text-xs text-blue-800">⏰ {remainingText} left</div>
+      <div className='mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md'>
+        <div className='flex items-center justify-between'>
+          <div className='text-sm text-blue-900 font-medium'>
+            🏠 Move-in verification
+          </div>
+          <div className='text-xs text-blue-800'>⏰ {remainingText} left</div>
         </div>
         {/* Lease meta chips (termination / renewal decline) */}
         {(() => {
@@ -154,23 +193,34 @@ const TenantDashboard = () => {
           if (!lm) return null;
           const chips = [];
           if (lm.terminationNoticeDate) {
-            const eff = lm.terminationEffectiveDate ? new Date(lm.terminationEffectiveDate) : null;
+            const eff = lm.terminationEffectiveDate
+              ? new Date(lm.terminationEffectiveDate)
+              : null;
             chips.push(
-              <span key="term" className="mt-2 inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 mr-2">
-                Termination notice{eff ? ` • effective ${eff.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
+              <span
+                key='term'
+                className='mt-2 inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 mr-2'
+              >
+                Termination notice
+                {eff
+                  ? ` • effective ${eff.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                  : ''}
               </span>
             );
           }
           if (lm.renewalStatus === 'DECLINED') {
             chips.push(
-              <span key="renew" className="mt-2 inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-800 mr-2">
+              <span
+                key='renew'
+                className='mt-2 inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-800 mr-2'
+              >
                 Renewal declined
               </span>
             );
           }
-          return chips.length > 0 ? <div className="mt-2">{chips}</div> : null;
+          return chips.length > 0 ? <div className='mt-2'>{chips}</div> : null;
         })()}
-        <div className="mt-2 flex space-x-2">
+        <div className='mt-2 flex space-x-2'>
           <button
             onClick={async () => {
               try {
@@ -178,13 +228,13 @@ const TenantDashboard = () => {
                 fetchRequests();
               } catch {}
             }}
-            className="px-3 py-1 rounded-md text-sm bg-green-600 text-white hover:bg-green-700"
+            className='px-3 py-1 rounded-md text-sm bg-green-600 text-white hover:bg-green-700'
           >
             Move-in successful
           </button>
           <button
             onClick={() => setReportOfferId(paidOffer.id)}
-            className="px-3 py-1 rounded-md text-sm bg-red-600 text-white hover:bg-red-700"
+            className='px-3 py-1 rounded-md text-sm bg-red-600 text-white hover:bg-red-700'
           >
             Report issue
           </button>
@@ -202,7 +252,7 @@ const TenantDashboard = () => {
     fetchRequests();
   };
 
-  const handleEditClick = (request) => {
+  const handleEditClick = request => {
     setRequestToEdit(request);
     setShowEditModal(true);
   };
@@ -218,7 +268,7 @@ const TenantDashboard = () => {
     setRequestToEdit(null);
   };
 
-  const handleDeleteClick = (request) => {
+  const handleDeleteClick = request => {
     setRequestToDelete(request);
     setShowDeleteModal(true);
   };
@@ -240,42 +290,42 @@ const TenantDashboard = () => {
     setRequestToDelete(null);
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = dateString => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
-  const formatTime = (dateString) => {
+  const formatTime = dateString => {
     return new Date(dateString).toLocaleTimeString('en-US', {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = amount => {
     return new Intl.NumberFormat('pl-PL', {
       style: 'currency',
-      currency: 'PLN'
+      currency: 'PLN',
     }).format(amount);
   };
 
-  const getProfilePhotoUrl = (photoPath) => {
+  const getProfilePhotoUrl = photoPath => {
     if (!photoPath) return null;
-    
+
     // If it's already a full URL, return as is
     if (photoPath.startsWith('http://') || photoPath.startsWith('https://')) {
       return photoPath;
     }
-    
+
     // If it's just a filename, construct full URL to profile_images directory
     if (!photoPath.startsWith('/')) {
       const baseUrl = 'http://localhost:3001';
       return `${baseUrl}/uploads/profile_images/${photoPath}`;
     }
-    
+
     // If it's a relative path, construct full URL
     const baseUrl = 'http://localhost:3001';
     return `${baseUrl}${photoPath}`;
@@ -285,36 +335,41 @@ const TenantDashboard = () => {
     const statusConfig = {
       ACTIVE: { text: 'Active', color: 'bg-green-100 text-green-800' },
       LOCKED: { text: 'Locked', color: 'bg-yellow-100 text-yellow-800' },
-      CANCELLED: { text: 'Cancelled', color: 'bg-red-100 text-red-800' }
+      CANCELLED: { text: 'Cancelled', color: 'bg-red-100 text-red-800' },
     };
     const effective = forceCancelled ? 'CANCELLED' : status;
     const config = statusConfig[effective] || statusConfig.CANCELLED;
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
+      <span
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}
+      >
         {config.text}
       </span>
     );
   };
 
   // Helper function to check if request has accepted/paid offers
-  const hasAcceptedOrPaidOffer = (request) => {
-    return request.offers && request.offers.some(offer => 
-      offer.status === 'ACCEPTED' || offer.status === 'PAID'
+  const hasAcceptedOrPaidOffer = request => {
+    return (
+      request.offers &&
+      request.offers.some(
+        offer => offer.status === 'ACCEPTED' || offer.status === 'PAID'
+      )
     );
   };
 
   // Helper function to get offer status text
-  const getOfferStatusText = (request) => {
+  const getOfferStatusText = request => {
     if (!request.offers || request.offers.length === 0) return null;
-    
-    const acceptedOffer = request.offers.find(offer => 
-      offer.status === 'ACCEPTED' || offer.status === 'PAID'
+
+    const acceptedOffer = request.offers.find(
+      offer => offer.status === 'ACCEPTED' || offer.status === 'PAID'
     );
-    
+
     if (acceptedOffer) {
       return acceptedOffer.status === 'PAID' ? 'Offer Paid' : 'Offer Accepted';
     }
-    
+
     return null;
   };
 
@@ -325,7 +380,7 @@ const TenantDashboard = () => {
       if (statusFilter !== 'all' && request.status !== statusFilter) {
         return false;
       }
-      
+
       // Search filter
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
@@ -335,7 +390,7 @@ const TenantDashboard = () => {
           request.location?.toLowerCase().includes(searchLower)
         );
       }
-      
+
       return true;
     })
     .sort((a, b) => {
@@ -357,7 +412,9 @@ const TenantDashboard = () => {
         (async () => {
           try {
             await markByTypeAsRead('NEW_RENTAL_REQUEST');
-            try { window.dispatchEvent(new Event('notif-unread-refresh')); } catch {}
+            try {
+              window.dispatchEvent(new Event('notif-unread-refresh'));
+            } catch {}
           } catch {}
         })();
       }
@@ -372,9 +429,12 @@ const TenantDashboard = () => {
     const fetchProfileData = async () => {
       try {
         console.log('🔍 Dashboard: Starting profile data fetch...');
-        console.log('🔍 Dashboard: Token in localStorage:', localStorage.getItem('token') ? 'Present' : 'Missing');
+        console.log(
+          '🔍 Dashboard: Token in localStorage:',
+          localStorage.getItem('token') ? 'Present' : 'Missing'
+        );
         console.log('🔍 Dashboard: User from context:', user);
-        
+
         const response = await api.get('/users/profile');
         console.log('✅ Dashboard: Profile response received:', response.data);
         console.log('✅ Dashboard: Profile user data:', response.data.user);
@@ -388,7 +448,7 @@ const TenantDashboard = () => {
         setProfileLoading(false);
       }
     };
-    
+
     fetchProfileData();
   }, [user]); // Add user as dependency to refetch when user changes
 
@@ -403,36 +463,36 @@ const TenantDashboard = () => {
   // Check if user is authenticated
   if (!user) {
     return (
-      <div className="min-h-screen bg-primary flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading user data...</p>
+      <div className='min-h-screen bg-primary flex items-center justify-center'>
+        <div className='text-center'>
+          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4'></div>
+          <p className='text-gray-600'>Loading user data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-primary flex">
+    <div className='min-h-screen bg-primary flex'>
       {/* Left Sidebar */}
       <TenantSidebar />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-                 {/* Top Header */}
-         <header className="header-modern px-6 py-4">
-           <div className="flex items-center justify-between">
-             <h1 className="text-xl font-semibold text-gray-900">My Requests</h1>
-            
-            <div className="flex items-center space-x-4">
+      <div className='flex-1 flex flex-col'>
+        {/* Top Header */}
+        <header className='header-modern px-6 py-4'>
+          <div className='flex items-center justify-between'>
+            <h1 className='text-xl font-semibold text-gray-900'>My Requests</h1>
+
+            <div className='flex items-center space-x-4'>
               {/* Notification Header */}
               <NotificationHeader />
-              
+
               <button
                 onClick={handleLogout}
-                className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200"
+                className='flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200'
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className='w-4 h-4' />
                 <span>Logout</span>
               </button>
             </div>
@@ -440,198 +500,289 @@ const TenantDashboard = () => {
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 p-6">
-          <div className="max-w-6xl mx-auto">
+        <main className='flex-1 p-6'>
+          <div className='max-w-6xl mx-auto'>
             {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{error}</p>
+              <div className='mb-6 p-4 bg-red-50 border border-red-200 rounded-lg'>
+                <p className='text-sm text-red-600'>{error}</p>
               </div>
             )}
-            
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">Your rental requests</h2>
+
+            <div className='flex items-center justify-between mb-6'>
+              <h2 className='text-lg font-semibold text-gray-900'>
+                Your rental requests
+              </h2>
               <button
                 onClick={() => setGroupChoiceModalOpen(true)}
-                className="btn-primary"
+                className='btn-primary'
               >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                <svg
+                  className='w-4 h-4 mr-2'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M12 6v6m0 0v6m0-6h6m-6 0H6'
+                  />
                 </svg>
                 Create New Request
               </button>
             </div>
 
             {/* Search and Filter Section */}
-            <div className="card-modern p-4 mb-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className='card-modern p-4 mb-6'>
+              <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
                 {/* Search */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+                  <label className='block text-sm font-medium text-gray-700 mb-2'>
+                    Search
+                  </label>
                   <input
-                    type="text"
-                    placeholder="Search by title or description..."
+                    type='text'
+                    placeholder='Search by title or description...'
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="input-modern"
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className='input-modern'
                   />
                 </div>
 
                 {/* Status Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <label className='block text-sm font-medium text-gray-700 mb-2'>
+                    Status
+                  </label>
                   <select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="input-modern"
+                    onChange={e => setStatusFilter(e.target.value)}
+                    className='input-modern'
                   >
-                    <option value="all">All Statuses</option>
-                    <option value="ACTIVE">Active</option>
-                    <option value="LOCKED">Locked</option>
-                    <option value="CANCELLED">Cancelled</option>
-                    <option value="EXPIRED">Expired</option>
+                    <option value='all'>All Statuses</option>
+                    <option value='ACTIVE'>Active</option>
+                    <option value='LOCKED'>Locked</option>
+                    <option value='CANCELLED'>Cancelled</option>
+                    <option value='EXPIRED'>Expired</option>
                   </select>
                 </div>
 
                 {/* Sort By */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                  <label className='block text-sm font-medium text-gray-700 mb-2'>
+                    Sort By
+                  </label>
                   <select
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="input-modern"
+                    onChange={e => setSortBy(e.target.value)}
+                    className='input-modern'
                   >
-                    <option value="newest">Newest First</option>
-                    <option value="oldest">Oldest First</option>
+                    <option value='newest'>Newest First</option>
+                    <option value='oldest'>Oldest First</option>
                   </select>
                 </div>
 
                 {/* Results Count */}
-                <div className="flex items-end">
-                  <div className="text-sm text-gray-600">
-                    {filteredAndSortedRequests.length} of {requests.length} requests
+                <div className='flex items-end'>
+                  <div className='text-sm text-gray-600'>
+                    {filteredAndSortedRequests.length} of {requests.length}{' '}
+                    requests
                   </div>
                 </div>
               </div>
             </div>
 
             {loading ? (
-              <div className="card-modern p-8 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-sm text-gray-600">Loading your requests...</p>
+              <div className='card-modern p-8 text-center'>
+                <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4'></div>
+                <p className='text-sm text-gray-600'>
+                  Loading your requests...
+                </p>
               </div>
             ) : filteredAndSortedRequests.length === 0 ? (
-              <div className="card-modern p-8 text-center">
-                <div className="text-gray-400 text-4xl mb-4">📝</div>
-                <p className="text-gray-600 text-lg mb-4">
-                  {searchTerm || statusFilter !== 'all' ? 'No matching requests found' : 'You don\'t have any requests yet.'}
+              <div className='card-modern p-8 text-center'>
+                <div className='text-gray-400 text-4xl mb-4'>📝</div>
+                <p className='text-gray-600 text-lg mb-4'>
+                  {searchTerm || statusFilter !== 'all'
+                    ? 'No matching requests found'
+                    : "You don't have any requests yet."}
                 </p>
                 {searchTerm || statusFilter !== 'all' ? (
-                  <p className="text-gray-500 mb-4">Try adjusting your search or filter criteria.</p>
+                  <p className='text-gray-500 mb-4'>
+                    Try adjusting your search or filter criteria.
+                  </p>
                 ) : (
                   <button
                     onClick={() => setGroupChoiceModalOpen(true)}
-                    className="btn-primary"
+                    className='btn-primary'
                   >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    <svg
+                      className='w-4 h-4 mr-2'
+                      fill='none'
+                      stroke='currentColor'
+                      viewBox='0 0 24 24'
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth={2}
+                        d='M12 6v6m0 0v6m0-6h6m-6 0H6'
+                      />
                     </svg>
                     Create first request
                   </button>
                 )}
               </div>
             ) : (
-              <div className="space-y-4">
-                {filteredAndSortedRequests.map((request) => (
-                  <div key={request.id} className="card-elevated p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="text-lg font-semibold text-gray-900">{request.title}</h3>
+              <div className='space-y-4'>
+                {filteredAndSortedRequests.map(request => (
+                  <div key={request.id} className='card-elevated p-6'>
+                    <div className='flex items-start justify-between'>
+                      <div className='flex-1'>
+                        <div className='flex items-center gap-2 mb-2'>
+                          <h3 className='text-lg font-semibold text-gray-900'>
+                            {request.title}
+                          </h3>
                           {(() => {
-                            const memberCount = request.tenantGroup?._count?.members ?? 1;
+                            const memberCount =
+                              request.tenantGroup?._count?.members ?? 1;
                             const isGroup = memberCount > 1;
-                            const color = isGroup ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800';
-                            const label = isGroup ? `Group (${memberCount})` : 'Solo';
+                            const color = isGroup
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-blue-100 text-blue-800';
+                            const label = isGroup
+                              ? `Group (${memberCount})`
+                              : 'Solo';
                             return (
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${color}`}>
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${color}`}
+                              >
                                 {label}
                               </span>
                             );
                           })()}
                         </div>
-                        <p className="text-gray-600 mb-3">{request.description}</p>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <p className='text-gray-600 mb-3'>
+                          {request.description}
+                        </p>
+                        <div className='grid grid-cols-2 md:grid-cols-4 gap-4 text-sm'>
                           <div>
-                            <span className="text-gray-500">Location:</span>
-                            <p className="font-medium">{request.location}</p>
+                            <span className='text-gray-500'>Location:</span>
+                            <p className='font-medium'>{request.location}</p>
                           </div>
                           <div>
-                            <span className="text-gray-500">Budget:</span>
-                            <p className="font-medium">{formatCurrency(request.budget)}</p>
+                            <span className='text-gray-500'>Budget:</span>
+                            <p className='font-medium'>
+                              {formatCurrency(request.budget)}
+                            </p>
                           </div>
                           <div>
-                            <span className="text-gray-500">Move-in:</span>
-                            <p className="font-medium">{formatDate(request.moveInDate)}</p>
+                            <span className='text-gray-500'>Move-in:</span>
+                            <p className='font-medium'>
+                              {formatDate(request.moveInDate)}
+                            </p>
                           </div>
                           <div>
-                            <span className="text-gray-500">Status:</span>
-                            <div className="mt-1">
+                            <span className='text-gray-500'>Status:</span>
+                            <div className='mt-1'>
                               {(() => {
-                                const paidOffer = (request.offers || []).find(o => o.status === 'PAID');
-                                const v = paidOffer ? verificationStatuses[paidOffer.id] : null;
-                                const forceCancelled = v?.status === 'CANCELLED';
-                                return getStatusBadge(request.status, forceCancelled);
+                                const paidOffer = (request.offers || []).find(
+                                  o => o.status === 'PAID'
+                                );
+                                const v = paidOffer
+                                  ? verificationStatuses[paidOffer.id]
+                                  : null;
+                                const forceCancelled =
+                                  v?.status === 'CANCELLED';
+                                return getStatusBadge(
+                                  request.status,
+                                  forceCancelled
+                                );
                               })()}
                             </div>
                             {/* Show offer status if request is locked */}
-                            {request.status === 'LOCKED' && getOfferStatusText(request) && (
-                              <div className="mt-1 text-xs text-gray-600">
-                                {getOfferStatusText(request)}
-                              </div>
-                            )}
+                            {request.status === 'LOCKED' &&
+                              getOfferStatusText(request) && (
+                                <div className='mt-1 text-xs text-gray-600'>
+                                  {getOfferStatusText(request)}
+                                </div>
+                              )}
                           </div>
                         </div>
-                        
+
                         {/* Move-in verification section for locked requests with paid offer */}
                         {renderMoveInVerificationCard(request)}
 
                         {/* Refund summary for cancelled bookings */}
-                        {request.status === 'CANCELLED' && request._refundSummary && request._refundSummary.count > 0 && (
-                          <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
-                            <div className="flex items-center justify-between">
-                              <div className="text-sm text-green-900 font-medium">Refunds</div>
-                              <div className="text-sm text-green-800">
-                                {new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(request._refundSummary.totalRefunded || 0)}
+                        {request.status === 'CANCELLED' &&
+                          request._refundSummary &&
+                          request._refundSummary.count > 0 && (
+                            <div className='mt-3 p-3 bg-green-50 border border-green-200 rounded-md'>
+                              <div className='flex items-center justify-between'>
+                                <div className='text-sm text-green-900 font-medium'>
+                                  Refunds
+                                </div>
+                                <div className='text-sm text-green-800'>
+                                  {new Intl.NumberFormat('pl-PL', {
+                                    style: 'currency',
+                                    currency: 'PLN',
+                                  }).format(
+                                    request._refundSummary.totalRefunded || 0
+                                  )}
+                                </div>
+                              </div>
+                              <div className='mt-1 text-xs text-green-800'>
+                                {request._refundSummary.count} payment
+                                {request._refundSummary.count !== 1
+                                  ? 's'
+                                  : ''}{' '}
+                                refunded via{' '}
+                                {request._refundSummary.gateways.join(', ')}
                               </div>
                             </div>
-                            <div className="mt-1 text-xs text-green-800">
-                              {request._refundSummary.count} payment{request._refundSummary.count !== 1 ? 's' : ''} refunded via {request._refundSummary.gateways.join(', ')}
-                            </div>
-                          </div>
-                        )}
+                          )}
 
                         {/* Created Date and Time */}
-                        <div className="mt-4 pt-3 border-t border-gray-100">
-                          <div className="text-xs text-gray-500">
-                            Created: {formatDate(request.createdAt)} at {formatTime(request.createdAt)}
+                        <div className='mt-4 pt-3 border-t border-gray-100'>
+                          <div className='text-xs text-gray-500'>
+                            Created: {formatDate(request.createdAt)} at{' '}
+                            {formatTime(request.createdAt)}
                           </div>
                         </div>
                       </div>
-                      <div className="flex flex-col space-y-2 ml-4">
+                      <div className='flex flex-col space-y-2 ml-4'>
                         {request.status !== 'CANCELLED' && (
-                          <div className="flex space-x-2">
+                          <div className='flex space-x-2'>
                             <button
                               onClick={() => handleEditClick(request)}
                               disabled={(() => {
                                 if (request.status === 'LOCKED') return true;
-                                const paidOffer = (request.offers || []).find(o => o.status === 'PAID');
-                                const lm = paidOffer ? leaseMetaByOffer[paidOffer.id] : null;
+                                const paidOffer = (request.offers || []).find(
+                                  o => o.status === 'PAID'
+                                );
+                                const lm = paidOffer
+                                  ? leaseMetaByOffer[paidOffer.id]
+                                  : null;
                                 if (lm?.terminationNoticeDate) return true;
-                                if (lm?.renewalStatus === 'DECLINED') return true;
+                                if (lm?.renewalStatus === 'DECLINED')
+                                  return true;
                                 return false;
                               })()}
                               className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                                (() => { const paidOffer = (request.offers || []).find(o => o.status === 'PAID'); const lm = paidOffer ? leaseMetaByOffer[paidOffer.id] : null; const dis = request.status === 'LOCKED' || lm?.terminationNoticeDate || lm?.renewalStatus === 'DECLINED'; return dis; })()
+                                (() => {
+                                  const paidOffer = (request.offers || []).find(
+                                    o => o.status === 'PAID'
+                                  );
+                                  const lm = paidOffer
+                                    ? leaseMetaByOffer[paidOffer.id]
+                                    : null;
+                                  const dis =
+                                    request.status === 'LOCKED' ||
+                                    lm?.terminationNoticeDate ||
+                                    lm?.renewalStatus === 'DECLINED';
+                                  return dis;
+                                })()
                                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 hover:bg-gray-50 hover:shadow-sm'
                                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 hover:shadow-sm'
                               }`}
@@ -643,14 +794,31 @@ const TenantDashboard = () => {
                               onClick={() => handleDeleteClick(request)}
                               disabled={(() => {
                                 if (request.status === 'LOCKED') return true;
-                                const paidOffer = (request.offers || []).find(o => o.status === 'PAID');
-                                const lm = paidOffer ? leaseMetaByOffer[paidOffer.id] : null;
+                                const paidOffer = (request.offers || []).find(
+                                  o => o.status === 'PAID'
+                                );
+                                const lm = paidOffer
+                                  ? leaseMetaByOffer[paidOffer.id]
+                                  : null;
                                 if (lm?.terminationNoticeDate) return true;
-                                if (lm?.renewalStatus === 'DECLINED') return true;
+                                if (lm?.renewalStatus === 'DECLINED')
+                                  return true;
                                 return false;
                               })()}
                               className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                                (() => { const paidOffer = (request.offers || []).find(o => o.status === 'PAID'); const lm = paidOffer ? leaseMetaByOffer[paidOffer.id] : null; const dis = request.status === 'LOCKED' || lm?.terminationNoticeDate || lm?.renewalStatus === 'DECLINED'; return dis; })()
+                                (() => {
+                                  const paidOffer = (request.offers || []).find(
+                                    o => o.status === 'PAID'
+                                  );
+                                  const lm = paidOffer
+                                    ? leaseMetaByOffer[paidOffer.id]
+                                    : null;
+                                  const dis =
+                                    request.status === 'LOCKED' ||
+                                    lm?.terminationNoticeDate ||
+                                    lm?.renewalStatus === 'DECLINED';
+                                  return dis;
+                                })()
                                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 hover:bg-gray-50 hover:shadow-sm'
                                   : 'bg-white text-red-700 border border-red-300 hover:bg-red-50 hover:border-red-400 hover:shadow-sm'
                               }`}
@@ -660,17 +828,24 @@ const TenantDashboard = () => {
                             </button>
                           </div>
                         )}
-                        
+
                         {/* Show reason why buttons are disabled */}
                         {(() => {
-                          const paidOffer = (request.offers || []).find(o => o.status === 'PAID');
-                          const lm = paidOffer ? leaseMetaByOffer[paidOffer.id] : null;
-                          const isDisabled = request.status === 'LOCKED' || lm?.terminationNoticeDate || lm?.renewalStatus === 'DECLINED';
+                          const paidOffer = (request.offers || []).find(
+                            o => o.status === 'PAID'
+                          );
+                          const lm = paidOffer
+                            ? leaseMetaByOffer[paidOffer.id]
+                            : null;
+                          const isDisabled =
+                            request.status === 'LOCKED' ||
+                            lm?.terminationNoticeDate ||
+                            lm?.renewalStatus === 'DECLINED';
                           if (!isDisabled) return null;
                           return (
-                          <div className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-md border border-gray-100 animate-pulse">
-                            {'🔒 Request locked - cannot be modified'}
-                          </div>
+                            <div className='text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-md border border-gray-100 animate-pulse'>
+                              {'🔒 Request locked - cannot be modified'}
+                            </div>
                           );
                         })()}
                       </div>
@@ -688,8 +863,12 @@ const TenantDashboard = () => {
         <ReportMoveInIssueModal
           open={true}
           onClose={() => setReportOfferId(null)}
-          onSubmit={async (form) => {
-            await api.post(`/move-in/offers/${reportOfferId}/report-issue`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+          onSubmit={async form => {
+            await api.post(
+              `/move-in/offers/${reportOfferId}/report-issue`,
+              form,
+              { headers: { 'Content-Type': 'multipart/form-data' } }
+            );
             setReportOfferId(null);
             fetchRequests();
           }}
@@ -701,7 +880,7 @@ const TenantDashboard = () => {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSuccess={handleRequestCreated}
-        rentalType="solo"
+        rentalType='solo'
       />
 
       {/* Edit Request Modal */}
@@ -712,41 +891,57 @@ const TenantDashboard = () => {
           onSuccess={handleEditSuccess}
           editMode={true}
           requestData={requestToEdit}
-          rentalType={(() => { const mc = requestToEdit?.tenantGroup?._count?.members ?? 1; return mc > 1 ? 'group' : 'solo'; })()}
+          rentalType={(() => {
+            const mc = requestToEdit?.tenantGroup?._count?.members ?? 1;
+            return mc > 1 ? 'group' : 'solo';
+          })()}
         />
       )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && requestToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex items-center mb-4">
-              <div className="flex-shrink-0">
-                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
+          <div className='bg-white rounded-lg max-w-md w-full p-6'>
+            <div className='flex items-center mb-4'>
+              <div className='flex-shrink-0'>
+                <svg
+                  className='h-6 w-6 text-red-600'
+                  fill='none'
+                  viewBox='0 0 24 24'
+                  stroke='currentColor'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z'
+                  />
                 </svg>
               </div>
-              <div className="ml-3">
-                <h3 className="text-lg font-medium text-gray-900">Delete Rental Request</h3>
+              <div className='ml-3'>
+                <h3 className='text-lg font-medium text-gray-900'>
+                  Delete Rental Request
+                </h3>
               </div>
             </div>
-            
-            <div className="mb-6">
-              <p className="text-sm text-gray-600">
-                Are you sure you want to delete the rental request "{requestToDelete.title}"? This action cannot be undone.
+
+            <div className='mb-6'>
+              <p className='text-sm text-gray-600'>
+                Are you sure you want to delete the rental request "
+                {requestToDelete.title}"? This action cannot be undone.
               </p>
             </div>
-            
-            <div className="flex space-x-3">
+
+            <div className='flex space-x-3'>
               <button
                 onClick={handleDeleteCancel}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className='flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteConfirm}
-                className="flex-1 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                className='flex-1 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'
               >
                 Delete
               </button>
@@ -757,24 +952,34 @@ const TenantDashboard = () => {
 
       {/* Chat Modal */}
       {showChat && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-6xl h-[80vh] relative">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Messages</h3>
+        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
+          <div className='bg-white rounded-lg w-full max-w-6xl h-[80vh] relative'>
+            <div className='flex items-center justify-between p-4 border-b border-gray-200'>
+              <h3 className='text-lg font-semibold text-gray-900'>Messages</h3>
               <button
                 onClick={() => setShowChat(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className='text-gray-400 hover:text-gray-600 transition-colors'
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className='w-6 h-6'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M6 18L18 6M6 6l12 12'
+                  />
                 </svg>
               </button>
             </div>
-            <div className="p-4 h-full">
-              <Chat 
-                conversationStatus="ACTIVE"
-                paymentStatus="PAID"
-                className="h-full"
+            <div className='p-4 h-full'>
+              <Chat
+                conversationStatus='ACTIVE'
+                paymentStatus='PAID'
+                className='h-full'
               />
             </div>
           </div>
@@ -785,7 +990,7 @@ const TenantDashboard = () => {
       <TenantGroupChoiceModal
         isOpen={isGroupChoiceModalOpen}
         onClose={() => setGroupChoiceModalOpen(false)}
-        onChoice={(choice) => {
+        onChoice={choice => {
           if (choice === 'individual') {
             setGroupChoiceModalOpen(false);
             setShowCreateModal(true);

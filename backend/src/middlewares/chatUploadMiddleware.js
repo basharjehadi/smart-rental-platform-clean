@@ -16,17 +16,21 @@ const storage = multer.diskStorage({
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname);
     cb(null, 'attachment-' + uniqueSuffix + ext);
-  }
+  },
 });
 
 const fileFilter = (req, file, cb) => {
   // Allow common doc/image types
   const allowed = [
-    'image/png', 'image/jpeg', 'image/gif',
+    'image/png',
+    'image/jpeg',
+    'image/gif',
     'application/pdf',
-    'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'text/plain'
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain',
   ];
   if (allowed.includes(file.mimetype)) return cb(null, true);
   return cb(new Error('Unsupported attachment type'), false);
@@ -35,9 +39,7 @@ const fileFilter = (req, file, cb) => {
 export const uploadChatAttachment = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 20 * 1024 * 1024, files: 5 }
+  limits: { fileSize: 20 * 1024 * 1024, files: 5 },
 });
 
 export default uploadChatAttachment;
-
-

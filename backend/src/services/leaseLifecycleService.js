@@ -8,25 +8,33 @@ export const runLeaseTerminations = async () => {
   const due = await prisma.lease.findMany({
     where: {
       status: { in: ['ACTIVE', 'PENDING'] },
-      terminationEffectiveDate: { not: null, lte: now }
+      terminationEffectiveDate: { not: null, lte: now },
     },
-    select: { id: true, tenantGroupId: true, offerId: true, propertyId: true }
+    select: { id: true, tenantGroupId: true, offerId: true, propertyId: true },
   });
 
   for (const l of due) {
     const updated = await prisma.lease.update({
       where: { id: l.id },
-      data: { status: 'TERMINATED' }
+      data: { status: 'TERMINATED' },
     });
 
     // Contract cleanup based on offer/rentalRequest linkage (best-effort)
     try {
       if (l.offerId) {
-        const off = await prisma.offer.findUnique({ where: { id: l.offerId }, select: { rentalRequestId: true } });
+        const off = await prisma.offer.findUnique({
+          where: { id: l.offerId },
+          select: { rentalRequestId: true },
+        });
         if (off?.rentalRequestId) {
-          const contracts = await prisma.contract.findMany({ where: { rentalRequestId: off.rentalRequestId }, select: { id: true, pdfUrl: true } });
+          const contracts = await prisma.contract.findMany({
+            where: { rentalRequestId: off.rentalRequestId },
+            select: { id: true, pdfUrl: true },
+          });
           if (contracts.length > 0) {
-            await prisma.contract.deleteMany({ where: { rentalRequestId: off.rentalRequestId } });
+            await prisma.contract.deleteMany({
+              where: { rentalRequestId: off.rentalRequestId },
+            });
             // Best-effort file cleanup after DB delete
             try {
               const fs = await import('fs');
@@ -45,14 +53,20 @@ export const runLeaseTerminations = async () => {
     // Archive related conversations
     try {
       if (l.offerId) {
-        await prisma.conversation.updateMany({ where: { offerId: l.offerId }, data: { status: 'ARCHIVED' } });
+        await prisma.conversation.updateMany({
+          where: { offerId: l.offerId },
+          data: { status: 'ARCHIVED' },
+        });
       }
     } catch {}
 
     // Property availability: set AVAILABLE if no overlapping booking; keep marketing false after termination
     try {
       if (l.propertyId) {
-        await prisma.property.update({ where: { id: l.propertyId }, data: { status: 'AVAILABLE', isMarketing: false } });
+        await prisma.property.update({
+          where: { id: l.propertyId },
+          data: { status: 'AVAILABLE', isMarketing: false },
+        });
       }
     } catch {}
 
@@ -65,18 +79,27 @@ export const runLeaseTerminations = async () => {
 
 export const startLeaseLifecycleScheduler = () => {
   if (leaseScheduler) return;
-  leaseScheduler = setInterval(async () => {
-    try {
-      await runLeaseTerminations();
-      // Expire stale renewal requests (every run)
+  leaseScheduler = setInterval(
+    async () => {
       try {
-        const now = new Date();
-        await prisma.renewalRequest.updateMany({ where: { status: { in: ['PENDING', 'COUNTERED'] }, expiresAt: { not: null, lte: now } }, data: { status: 'EXPIRED', decidedAt: now } });
-      } catch {}
-    } catch (e) {
-      console.error('Lease lifecycle scheduler error:', e);
-    }
-  }, 5 * 60 * 1000); // every 5 minutes
+        await runLeaseTerminations();
+        // Expire stale renewal requests (every run)
+        try {
+          const now = new Date();
+          await prisma.renewalRequest.updateMany({
+            where: {
+              status: { in: ['PENDING', 'COUNTERED'] },
+              expiresAt: { not: null, lte: now },
+            },
+            data: { status: 'EXPIRED', decidedAt: now },
+          });
+        } catch {}
+      } catch (e) {
+        console.error('Lease lifecycle scheduler error:', e);
+      }
+    },
+    5 * 60 * 1000
+  ); // every 5 minutes
   console.log('⏰ Lease lifecycle scheduler started (every 5 minutes).');
 };
 
@@ -86,5 +109,3 @@ export const stopLeaseLifecycleScheduler = () => {
     leaseScheduler = undefined;
   }
 };
-
-

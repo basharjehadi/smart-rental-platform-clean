@@ -1,6 +1,6 @@
 /**
  * ⏰ Review Cron Service
- * 
+ *
  * This service manages scheduled jobs for the review system:
  * - Hourly review publishing
  * - Daily cleanup and maintenance
@@ -16,32 +16,40 @@ export function initializeReviewCronJobs() {
   console.log('⏰ Initializing review cron jobs...');
 
   // Run review publisher every hour (at minute 0)
-  cron.schedule('0 * * * *', async () => {
-    console.log('🕐 Hourly review publisher job triggered');
-    try {
-      await publishReviews();
-      console.log('✅ Hourly review publisher job completed successfully');
-    } catch (error) {
-      console.error('❌ Hourly review publisher job failed:', error);
+  cron.schedule(
+    '0 * * * *',
+    async () => {
+      console.log('🕐 Hourly review publisher job triggered');
+      try {
+        await publishReviews();
+        console.log('✅ Hourly review publisher job completed successfully');
+      } catch (error) {
+        console.error('❌ Hourly review publisher job failed:', error);
+      }
+    },
+    {
+      scheduled: true,
+      timezone: 'UTC', // Use UTC for consistency
     }
-  }, {
-    scheduled: true,
-    timezone: "UTC" // Use UTC for consistency
-  });
+  );
 
   // Run daily cleanup at 2 AM UTC
-  cron.schedule('0 2 * * *', async () => {
-    console.log('🌅 Daily review cleanup job triggered');
-    try {
-      await dailyReviewCleanup();
-      console.log('✅ Daily review cleanup job completed successfully');
-    } catch (error) {
-      console.error('❌ Daily review cleanup job failed:', error);
+  cron.schedule(
+    '0 2 * * *',
+    async () => {
+      console.log('🌅 Daily review cleanup job triggered');
+      try {
+        await dailyReviewCleanup();
+        console.log('✅ Daily review cleanup job completed successfully');
+      } catch (error) {
+        console.error('❌ Daily review cleanup job failed:', error);
+      }
+    },
+    {
+      scheduled: true,
+      timezone: 'UTC',
     }
-  }, {
-    scheduled: true,
-    timezone: "UTC"
-  });
+  );
 
   console.log('✅ Review cron jobs initialized');
   console.log('   - Review publisher: Every hour at minute 0');
@@ -61,7 +69,9 @@ async function dailyReviewCleanup() {
 
     // Log any blocked reviews for admin attention
     if (stats.blockedReviews > 0) {
-      console.log(`⚠️  Found ${stats.blockedReviews} blocked reviews that need admin attention`);
+      console.log(
+        `⚠️  Found ${stats.blockedReviews} blocked reviews that need admin attention`
+      );
     }
 
     // Log any pending reviews that might be stuck
@@ -71,7 +81,9 @@ async function dailyReviewCleanup() {
 
     // Log any submitted reviews waiting to be published
     if (stats.submittedReviews > 0) {
-      console.log(`ℹ️  Found ${stats.submittedReviews} submitted reviews waiting to be published`);
+      console.log(
+        `ℹ️  Found ${stats.submittedReviews} submitted reviews waiting to be published`
+      );
     }
 
     console.log('✅ Daily review cleanup completed');
@@ -106,15 +118,15 @@ export function getCronJobStatus() {
         name: 'Review Publisher',
         schedule: '0 * * * *',
         description: 'Publishes reviews every hour',
-        timezone: 'UTC'
+        timezone: 'UTC',
       },
       {
         name: 'Daily Cleanup',
         schedule: '0 2 * * *',
         description: 'Daily review cleanup and maintenance',
-        timezone: 'UTC'
-      }
-    ]
+        timezone: 'UTC',
+      },
+    ],
   };
 }
 
@@ -132,5 +144,5 @@ export default {
   initializeReviewCronJobs,
   triggerReviewPublishing,
   getCronJobStatus,
-  stopReviewCronJobs
+  stopReviewCronJobs,
 };

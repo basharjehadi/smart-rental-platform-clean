@@ -1,6 +1,6 @@
 /**
  * 🛡️ Content Moderation Service
- * 
+ *
  * This service handles content moderation for review text,
  * ensuring compliance with platform guidelines.
  */
@@ -23,7 +23,8 @@ export function moderateReviewText(text) {
   }
 
   // Strip phone numbers (various formats)
-  const phoneRegex = /(\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/g;
+  const phoneRegex =
+    /(\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/g;
   if (phoneRegex.test(redactedText)) {
     redactedText = redactedText.replace(phoneRegex, '[PHONE_REMOVED]');
     reasons.push('Phone numbers are not allowed');
@@ -39,14 +40,26 @@ export function moderateReviewText(text) {
   // Check for profanity (basic list - can be expanded)
   const profanityWords = [
     // Common profanity
-    'fuck', 'shit', 'bitch', 'ass', 'damn', 'hell',
+    'fuck',
+    'shit',
+    'bitch',
+    'ass',
+    'damn',
+    'hell',
     // Hate speech indicators
-    'hate', 'kill', 'death', 'murder', 'suicide',
+    'hate',
+    'kill',
+    'death',
+    'murder',
+    'suicide',
     // Discriminatory terms
-    'racist', 'sexist', 'homophobic', 'transphobic'
+    'racist',
+    'sexist',
+    'homophobic',
+    'transphobic',
   ];
 
-  const hasProfanity = profanityWords.some(word => 
+  const hasProfanity = profanityWords.some((word) =>
     new RegExp(`\\b${word}\\b`, 'i').test(redactedText)
   );
 
@@ -58,10 +71,12 @@ export function moderateReviewText(text) {
   const hatePatterns = [
     /\b(kill|death|murder|suicide)\s+(yourself|himself|herself|themselves)\b/i,
     /\b(hate|despise|loathe)\s+(all|every)\s+(black|white|asian|hispanic|jewish|muslim|christian|gay|lesbian|trans)\w*\b/i,
-    /\b(should\s+be\s+(killed|eliminated|exterminated))\b/i
+    /\b(should\s+be\s+(killed|eliminated|exterminated))\b/i,
   ];
 
-  const hasHateSpeech = hatePatterns.some(pattern => pattern.test(redactedText));
+  const hasHateSpeech = hatePatterns.some((pattern) =>
+    pattern.test(redactedText)
+  );
 
   if (hasHateSpeech) {
     reasons.push('Hate speech or violent content detected');
@@ -73,7 +88,7 @@ export function moderateReviewText(text) {
   return {
     ok,
     redactedText,
-    reasons
+    reasons,
   };
 }
 
@@ -93,7 +108,7 @@ export async function enqueueTrustAndSafetyReview(
     originalText: originalText.substring(0, 100) + '...',
     redactedText: redactedText.substring(0, 100) + '...',
     reasons,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 
   // In a real implementation, this would:
@@ -105,5 +120,5 @@ export async function enqueueTrustAndSafetyReview(
 
 export default {
   moderateReviewText,
-  enqueueTrustAndSafetyReview
+  enqueueTrustAndSafetyReview,
 };

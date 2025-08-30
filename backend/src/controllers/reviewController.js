@@ -1,6 +1,10 @@
 import { prisma } from '../utils/prisma.js';
 import reviewService from '../services/reviewService.js';
-import { transformReviews, getReviewStageInfo, transformReview } from '../utils/reviewTransformer.js';
+import {
+  transformReviews,
+  getReviewStageInfo,
+  transformReview,
+} from '../utils/reviewTransformer.js';
 import moderationService from '../services/moderation.js';
 
 /**
@@ -17,22 +21,22 @@ export const getUserReviewSummary = async (req, res) => {
     if (requestingUserId !== userId && req.user.role !== 'ADMIN') {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'You can only view your own reviews'
+        message: 'You can only view your own reviews',
       });
     }
 
     const summary = await reviewService.getUserReviewSummary(userId);
-    
+
     // Get reviews with replies for this user
     const reviewsWithReplies = await prisma.review.findMany({
       where: {
         targetTenantGroup: {
           members: {
             some: {
-              userId: userId
-            }
-          }
-        }
+              userId: userId,
+            },
+          },
+        },
       },
       include: {
         reply: {
@@ -41,35 +45,35 @@ export const getUserReviewSummary = async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                profileImage: true
-              }
-            }
-          }
-        }
+                profileImage: true,
+              },
+            },
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
-    
+
     // Add stage information with labels
     const enhancedSummary = {
       ...summary,
       stageInfo: {
         moveIn: getReviewStageInfo('MOVE_IN'),
         endOfLease: getReviewStageInfo('END_OF_LEASE'),
-        initial: getReviewStageInfo('INITIAL')
+        initial: getReviewStageInfo('INITIAL'),
       },
-      reviewsWithReplies: reviewsWithReplies
+      reviewsWithReplies: reviewsWithReplies,
     };
-    
+
     res.json({
       success: true,
-      data: enhancedSummary
+      data: enhancedSummary,
     });
   } catch (error) {
     console.error('Get user review summary error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to get review summary'
+      message: 'Failed to get review summary',
     });
   }
 };
@@ -77,14 +81,22 @@ export const getUserReviewSummary = async (req, res) => {
 // Create a new review
 export const createReview = async (req, res) => {
   try {
-    const { leaseId, rating, comment, reviewStage, targetUserId, isAnonymous = false } = req.body;
+    const {
+      leaseId,
+      rating,
+      comment,
+      reviewStage,
+      targetUserId,
+      isAnonymous = false,
+    } = req.body;
     const reviewerId = req.user.id;
 
     // Validate required fields
     if (!leaseId || !rating || !comment || !reviewStage || !targetUserId) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'Lease ID, rating, comment, review stage, and target user ID are required'
+        message:
+          'Lease ID, rating, comment, review stage, and target user ID are required',
       });
     }
 
@@ -92,7 +104,7 @@ export const createReview = async (req, res) => {
     if (rating < 1 || rating > 5) {
       return res.status(400).json({
         error: 'Invalid rating',
-        message: 'Rating must be between 1 and 5'
+        message: 'Rating must be between 1 and 5',
       });
     }
 
@@ -101,7 +113,7 @@ export const createReview = async (req, res) => {
     if (!validStages.includes(reviewStage)) {
       return res.status(400).json({
         error: 'Invalid review stage',
-        message: 'Stage must be one of: MOVE_IN, END_OF_LEASE'
+        message: 'Stage must be one of: MOVE_IN, END_OF_LEASE',
       });
     }
 
@@ -121,8 +133,8 @@ export const createReview = async (req, res) => {
           revieweeId: targetUserId, // Add revieweeId for the new unique constraint
           status: 'BLOCKED',
           redactedText: moderationResult.redactedText,
-          violatesPolicy: true
-        }
+          violatesPolicy: true,
+        },
       });
 
       // Enqueue for Trust & Safety review
@@ -135,9 +147,10 @@ export const createReview = async (req, res) => {
 
       return res.status(400).json({
         error: 'Content blocked',
-        message: 'Your review contains content that violates our community guidelines',
+        message:
+          'Your review contains content that violates our community guidelines',
         reasons: moderationResult.reasons,
-        reviewId: blockedReview.id
+        reviewId: blockedReview.id,
       });
     }
 
@@ -146,16 +159,24 @@ export const createReview = async (req, res) => {
       where: {
         id: leaseId,
         OR: [
-          { tenantId: reviewerId },
-          { landlordId: reviewerId }
-        ]
-      }
+          {
+            tenantGroup: {
+              members: {
+                some: {
+                  userId: reviewerId,
+                },
+              },
+            },
+          },
+          { landlordId: reviewerId },
+        ],
+      },
     });
 
     if (!lease) {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'You can only review leases you are part of'
+        message: 'You can only review leases you are part of',
       });
     }
 
@@ -168,7 +189,7 @@ export const createReview = async (req, res) => {
       comment,
       stage: reviewStage,
       isAnonymous,
-      revieweeId: targetUserId // Pass revieweeId for the new unique constraint
+      revieweeId: targetUserId, // Pass revieweeId for the new unique constraint
     });
 
     // Get the full review with all fields for transformation
@@ -181,15 +202,15 @@ export const createReview = async (req, res) => {
               include: {
                 property: {
                   include: {
-                    landlord: true
-                  }
-                }
-              }
+                    landlord: true,
+                  },
+                },
+              },
             },
-            tenantGroup: true
-          }
-        }
-      }
+            tenantGroup: true,
+          },
+        },
+      },
     });
 
     // Transform the review to include labels
@@ -198,23 +219,23 @@ export const createReview = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Review created successfully',
-      data: transformedReview
+      data: transformedReview,
     });
   } catch (error) {
     console.error('Create review error:', error);
-    
+
     // Check for duplicate review error (unique constraint violation)
     if (error.code === 'P2002' || error.message.includes('Unique constraint')) {
       return res.status(409).json({
         error: 'REVIEW_EXISTS',
         code: 'REVIEW_EXISTS',
-        message: 'A review for this lease, stage, and reviewer already exists'
+        message: 'A review for this lease, stage, and reviewer already exists',
       });
     }
 
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to create review'
+      message: 'Failed to create review',
     });
   }
 };
@@ -228,13 +249,13 @@ export const updateReview = async (req, res) => {
 
     // Find the review
     const review = await prisma.review.findUnique({
-      where: { id: reviewId }
+      where: { id: reviewId },
     });
 
     if (!review) {
       return res.status(404).json({
         error: 'Review not found',
-        message: 'The specified review does not exist'
+        message: 'The specified review does not exist',
       });
     }
 
@@ -242,7 +263,7 @@ export const updateReview = async (req, res) => {
     if (review.reviewerId !== userId && req.user.role !== 'ADMIN') {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'You can only update your own reviews'
+        message: 'You can only update your own reviews',
       });
     }
 
@@ -250,7 +271,7 @@ export const updateReview = async (req, res) => {
     if (rating && (rating < 1 || rating > 5)) {
       return res.status(400).json({
         error: 'Invalid rating',
-        message: 'Rating must be between 1 and 5'
+        message: 'Rating must be between 1 and 5',
       });
     }
 
@@ -260,9 +281,10 @@ export const updateReview = async (req, res) => {
       data: {
         rating: rating || review.rating,
         comment: comment || review.comment,
-        isAnonymous: isAnonymous !== undefined ? isAnonymous : review.isAnonymous,
-        updatedAt: new Date()
-      }
+        isAnonymous:
+          isAnonymous !== undefined ? isAnonymous : review.isAnonymous,
+        updatedAt: new Date(),
+      },
     });
 
     // Update target user's average rating
@@ -278,15 +300,15 @@ export const updateReview = async (req, res) => {
               include: {
                 property: {
                   include: {
-                    landlord: true
-                  }
-                }
-              }
+                    landlord: true,
+                  },
+                },
+              },
             },
-            tenantGroup: true
-          }
-        }
-      }
+            tenantGroup: true,
+          },
+        },
+      },
     });
 
     // Transform the review to include labels
@@ -295,13 +317,13 @@ export const updateReview = async (req, res) => {
     res.json({
       success: true,
       message: 'Review updated successfully',
-      data: transformedReview
+      data: transformedReview,
     });
   } catch (error) {
     console.error('Update review error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to update review'
+      message: 'Failed to update review',
     });
   }
 };
@@ -316,17 +338,17 @@ export const getPendingReviews = async (req, res) => {
     if (requestingUserId !== userId && req.user.role !== 'ADMIN') {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'You can only view your own pending reviews'
+        message: 'You can only view your own pending reviews',
       });
     }
 
     const pendingReviews = await reviewService.getPendingReviews(userId);
-    
+
     // Get pending reviews with replies
     const pendingReviewsWithReplies = await prisma.review.findMany({
       where: {
         reviewerId: userId,
-        status: 'PENDING'
+        status: 'PENDING',
       },
       include: {
         reply: {
@@ -335,31 +357,33 @@ export const getPendingReviews = async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                profileImage: true
-              }
-            }
-          }
-        }
+                profileImage: true,
+              },
+            },
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     // Transform pending reviews to include labels
     const transformedPendingReviews = transformReviews(pendingReviews);
-    
+
     // Transform pending reviews with replies
-    const transformedPendingReviewsWithReplies = transformReviews(pendingReviewsWithReplies);
+    const transformedPendingReviewsWithReplies = transformReviews(
+      pendingReviewsWithReplies
+    );
 
     res.json({
       success: true,
       data: transformedPendingReviews,
-      dataWithReplies: transformedPendingReviewsWithReplies
+      dataWithReplies: transformedPendingReviewsWithReplies,
     });
   } catch (error) {
     console.error('Get pending reviews error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to get pending reviews'
+      message: 'Failed to get pending reviews',
     });
   }
 };
@@ -373,25 +397,25 @@ export const deleteReview = async (req, res) => {
     if (req.user.role !== 'ADMIN') {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'Only admins can delete reviews'
+        message: 'Only admins can delete reviews',
       });
     }
 
     // Find the review
     const review = await prisma.review.findUnique({
-      where: { id: reviewId }
+      where: { id: reviewId },
     });
 
     if (!review) {
       return res.status(404).json({
         error: 'Review not found',
-        message: 'The specified review does not exist'
+        message: 'The specified review does not exist',
       });
     }
 
     // Delete the review
     await prisma.review.delete({
-      where: { id: reviewId }
+      where: { id: reviewId },
     });
 
     // Update target user's average rating
@@ -399,13 +423,13 @@ export const deleteReview = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Review deleted successfully'
+      message: 'Review deleted successfully',
     });
   } catch (error) {
     console.error('Delete review error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to delete review'
+      message: 'Failed to delete review',
     });
   }
 };
@@ -421,16 +445,24 @@ export const getLeaseReviews = async (req, res) => {
       where: {
         id: leaseId,
         OR: [
-          { tenantId: userId },
-          { unit: { property: { landlordId: userId } } }
-        ]
-      }
+          {
+            tenantGroup: {
+              members: {
+                some: {
+                  userId: userId,
+                },
+              },
+            },
+          },
+          { unit: { property: { landlordId: userId } } },
+        ],
+      },
     });
 
     if (!lease && req.user.role !== 'ADMIN') {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'You do not have access to this lease'
+        message: 'You do not have access to this lease',
       });
     }
 
@@ -442,15 +474,15 @@ export const getLeaseReviews = async (req, res) => {
           select: {
             id: true,
             name: true,
-            profileImage: true
-          }
+            profileImage: true,
+          },
         },
         targetUser: {
           select: {
             id: true,
             name: true,
-            profileImage: true
-          }
+            profileImage: true,
+          },
         },
         reply: {
           include: {
@@ -458,13 +490,13 @@ export const getLeaseReviews = async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                profileImage: true
-              }
-            }
-          }
-        }
+                profileImage: true,
+              },
+            },
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     // Transform reviews to include labels and metadata
@@ -472,13 +504,13 @@ export const getLeaseReviews = async (req, res) => {
 
     res.json({
       success: true,
-      data: transformedReviews
+      data: transformedReviews,
     });
   } catch (error) {
     console.error('Get lease reviews error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to get lease reviews'
+      message: 'Failed to get lease reviews',
     });
   }
 };
@@ -492,7 +524,7 @@ export const initializeUserRating = async (req, res) => {
     if (req.user.role !== 'ADMIN') {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'Only admins can initialize user ratings'
+        message: 'Only admins can initialize user ratings',
       });
     }
 
@@ -508,15 +540,15 @@ export const initializeUserRating = async (req, res) => {
               include: {
                 property: {
                   include: {
-                    landlord: true
-                  }
-                }
-              }
+                    landlord: true,
+                  },
+                },
+              },
             },
-            tenantGroup: true
-          }
-        }
-      }
+            tenantGroup: true,
+          },
+        },
+      },
     });
 
     // Transform the review to include labels
@@ -525,13 +557,13 @@ export const initializeUserRating = async (req, res) => {
     res.json({
       success: true,
       message: 'User rating initialized successfully',
-      data: transformedReview
+      data: transformedReview,
     });
   } catch (error) {
     console.error('Initialize user rating error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to initialize user rating'
+      message: 'Failed to initialize user rating',
     });
   }
 };
@@ -545,7 +577,7 @@ export const triggerReviewByEvent = async (req, res) => {
     if (!eventType || !leaseId || !tenantId) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'Event type, lease ID, and tenant ID are required'
+        message: 'Event type, lease ID, and tenant ID are required',
       });
     }
 
@@ -554,11 +586,15 @@ export const triggerReviewByEvent = async (req, res) => {
     if (!validEventTypes.includes(eventType)) {
       return res.status(500).json({
         error: 'Invalid event type',
-        message: 'Event type must be one of: MOVE_IN, END_OF_LEASE'
+        message: 'Event type must be one of: MOVE_IN, END_OF_LEASE',
       });
     }
 
-    const review = await reviewService.triggerReviewByEvent(eventType, leaseId, tenantId);
+    const review = await reviewService.triggerReviewByEvent(
+      eventType,
+      leaseId,
+      tenantId
+    );
 
     // Get the full review with all fields for transformation
     const fullReview = await prisma.review.findUnique({
@@ -570,15 +606,15 @@ export const triggerReviewByEvent = async (req, res) => {
               include: {
                 property: {
                   include: {
-                    landlord: true
-                  }
-                }
-              }
+                    landlord: true,
+                  },
+                },
+              },
             },
-            tenantGroup: true
-          }
-        }
-      }
+            tenantGroup: true,
+          },
+        },
+      },
     });
 
     // Transform the review to include labels
@@ -587,13 +623,13 @@ export const triggerReviewByEvent = async (req, res) => {
     res.json({
       success: true,
       message: 'Review triggered successfully',
-      data: transformedReview
+      data: transformedReview,
     });
   } catch (error) {
     console.error('Trigger review by event error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to trigger review'
+      message: 'Failed to trigger review',
     });
   }
 };
@@ -609,7 +645,7 @@ export const createMinimalReview = async (req, res) => {
     if (!stage) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'Stage is required'
+        message: 'Stage is required',
       });
     }
 
@@ -618,7 +654,7 @@ export const createMinimalReview = async (req, res) => {
     if (!validStages.includes(stage)) {
       return res.status(400).json({
         error: 'Invalid review stage',
-        message: 'Stage must be one of: MOVE_IN, END_OF_LEASE'
+        message: 'Stage must be one of: MOVE_IN, END_OF_LEASE',
       });
     }
 
@@ -651,8 +687,8 @@ export const createMinimalReview = async (req, res) => {
         rating: 0, // Placeholder rating
         comment: '', // Placeholder comment
         isAnonymous: false,
-        isDoubleBlind: true
-      }
+        isDoubleBlind: true,
+      },
     });
 
     // Get the full review with all fields for transformation
@@ -665,15 +701,15 @@ export const createMinimalReview = async (req, res) => {
               include: {
                 property: {
                   include: {
-                    landlord: true
-                  }
-                }
-              }
+                    landlord: true,
+                  },
+                },
+              },
             },
-            tenantGroup: true
-          }
-        }
-      }
+            tenantGroup: true,
+          },
+        },
+      },
     });
 
     // Transform the review to include labels
@@ -682,22 +718,22 @@ export const createMinimalReview = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Review created successfully',
-      data: transformedReview
+      data: transformedReview,
     });
   } catch (error) {
     console.error('Create minimal review error:', error);
-    
+
     // Check for duplicate review error (unique constraint violation)
     if (error.code === 'P2002' || error.message.includes('Unique constraint')) {
       return res.status(409).json({
         error: 'Review already exists',
-        message: 'A review for this lease, stage, and reviewer already exists'
+        message: 'A review for this lease, stage, and reviewer already exists',
       });
     }
 
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to create review'
+      message: 'Failed to create review',
     });
   }
 };
@@ -713,7 +749,7 @@ export const submitReview = async (req, res) => {
     if (!stars || !text) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'Stars and text are required'
+        message: 'Stars and text are required',
       });
     }
 
@@ -721,7 +757,7 @@ export const submitReview = async (req, res) => {
     if (stars < 1 || stars > 5) {
       return res.status(400).json({
         error: 'Invalid stars',
-        message: 'Stars must be between 1 and 5'
+        message: 'Stars must be between 1 and 5',
       });
     }
 
@@ -729,7 +765,7 @@ export const submitReview = async (req, res) => {
     if (text.length < 1 || text.length > 1000) {
       return res.status(400).json({
         error: 'Invalid text',
-        message: 'Text must be between 1 and 1000 characters'
+        message: 'Text must be between 1 and 1000 characters',
       });
     }
 
@@ -743,21 +779,21 @@ export const submitReview = async (req, res) => {
               include: {
                 property: {
                   include: {
-                    landlord: true
-                  }
-                }
-              }
+                    landlord: true,
+                  },
+                },
+              },
             },
-            tenantGroup: true
-          }
-        }
-      }
+            tenantGroup: true,
+          },
+        },
+      },
     });
 
     if (!review) {
       return res.status(404).json({
         error: 'Review not found',
-        message: 'The specified review does not exist'
+        message: 'The specified review does not exist',
       });
     }
 
@@ -765,7 +801,7 @@ export const submitReview = async (req, res) => {
     if (review.reviewerId !== userId) {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'You can only submit your own reviews'
+        message: 'You can only submit your own reviews',
       });
     }
 
@@ -773,7 +809,7 @@ export const submitReview = async (req, res) => {
     if (review.status === 'SUBMITTED') {
       return res.status(400).json({
         error: 'Review already submitted',
-        message: 'This review has already been submitted'
+        message: 'This review has already been submitted',
       });
     }
 
@@ -781,7 +817,7 @@ export const submitReview = async (req, res) => {
     if (review.status !== 'PENDING') {
       return res.status(400).json({
         error: 'Invalid review state',
-        message: 'Review must be in PENDING state to submit'
+        message: 'Review must be in PENDING state to submit',
       });
     }
 
@@ -796,8 +832,8 @@ export const submitReview = async (req, res) => {
           status: 'BLOCKED',
           redactedText: moderationResult.redactedText,
           violatesPolicy: true,
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
       // Enqueue for Trust & Safety review
@@ -810,9 +846,10 @@ export const submitReview = async (req, res) => {
 
       return res.status(400).json({
         error: 'Content blocked',
-        message: 'Your review text contains content that violates our community guidelines',
+        message:
+          'Your review text contains content that violates our community guidelines',
         reasons: moderationResult.reasons,
-        reviewId: blockedReview.id
+        reviewId: blockedReview.id,
       });
     }
 
@@ -824,15 +861,17 @@ export const submitReview = async (req, res) => {
         comment: text,
         status: 'SUBMITTED',
         submittedAt: new Date(),
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     // Update target user's average rating if applicable
     if (review.targetTenantGroupId) {
       // For tenant group reviews, we might need to update the group's rating
       // This would depend on your business logic for group ratings
-      console.log(`Review submitted for tenant group: ${review.targetTenantGroupId}`);
+      console.log(
+        `Review submitted for tenant group: ${review.targetTenantGroupId}`
+      );
     }
 
     // Get the full review with all fields for transformation
@@ -845,15 +884,15 @@ export const submitReview = async (req, res) => {
               include: {
                 property: {
                   include: {
-                    landlord: true
-                  }
-                }
-              }
+                    landlord: true,
+                  },
+                },
+              },
             },
-            tenantGroup: true
-          }
-        }
-      }
+            tenantGroup: true,
+          },
+        },
+      },
     });
 
     // Transform the review to include labels
@@ -862,13 +901,13 @@ export const submitReview = async (req, res) => {
     res.json({
       success: true,
       message: 'Review submitted successfully',
-      data: transformedReview
+      data: transformedReview,
     });
   } catch (error) {
     console.error('Submit review error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to submit review'
+      message: 'Failed to submit review',
     });
   }
 };
@@ -884,7 +923,7 @@ export const editReviewText = async (req, res) => {
     if (!text) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'Text is required'
+        message: 'Text is required',
       });
     }
 
@@ -892,19 +931,19 @@ export const editReviewText = async (req, res) => {
     if (text.length < 1 || text.length > 1000) {
       return res.status(400).json({
         error: 'Invalid text',
-        message: 'Text must be between 1 and 1000 characters'
+        message: 'Text must be between 1 and 1000 characters',
       });
     }
 
     // Find the review
     const review = await prisma.review.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!review) {
       return res.status(404).json({
         error: 'Review not found',
-        message: 'The specified review does not exist'
+        message: 'The specified review does not exist',
       });
     }
 
@@ -912,7 +951,7 @@ export const editReviewText = async (req, res) => {
     if (review.reviewerId !== userId) {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'You can only edit your own reviews'
+        message: 'You can only edit your own reviews',
       });
     }
 
@@ -920,7 +959,7 @@ export const editReviewText = async (req, res) => {
     if (review.status !== 'SUBMITTED') {
       return res.status(400).json({
         error: 'Invalid review state',
-        message: 'Review must be in SUBMITTED state to edit text'
+        message: 'Review must be in SUBMITTED state to edit text',
       });
     }
 
@@ -928,7 +967,7 @@ export const editReviewText = async (req, res) => {
     if (!review.submittedAt) {
       return res.status(400).json({
         error: 'Invalid review state',
-        message: 'Review must have a submission date to edit text'
+        message: 'Review must have a submission date to edit text',
       });
     }
 
@@ -940,7 +979,7 @@ export const editReviewText = async (req, res) => {
     if (hoursSinceSubmission >= 24) {
       return res.status(400).json({
         error: 'Edit time expired',
-        message: 'Review text can only be edited within 24 hours of submission'
+        message: 'Review text can only be edited within 24 hours of submission',
       });
     }
 
@@ -955,8 +994,8 @@ export const editReviewText = async (req, res) => {
           status: 'BLOCKED',
           redactedText: moderationResult.redactedText,
           violatesPolicy: true,
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
       // Enqueue for Trust & Safety review
@@ -969,9 +1008,10 @@ export const editReviewText = async (req, res) => {
 
       return res.status(400).json({
         error: 'Content blocked',
-        message: 'Your edited review text contains content that violates our community guidelines',
+        message:
+          'Your edited review text contains content that violates our community guidelines',
         reasons: moderationResult.reasons,
-        reviewId: blockedReview.id
+        reviewId: blockedReview.id,
       });
     }
 
@@ -980,8 +1020,8 @@ export const editReviewText = async (req, res) => {
       where: { id },
       data: {
         comment: text,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     // Get the full review with all fields for transformation
@@ -994,15 +1034,15 @@ export const editReviewText = async (req, res) => {
               include: {
                 property: {
                   include: {
-                    landlord: true
-                  }
-                }
-              }
+                    landlord: true,
+                  },
+                },
+              },
             },
-            tenantGroup: true
-          }
-        }
-      }
+            tenantGroup: true,
+          },
+        },
+      },
     });
 
     // Transform the review to include labels
@@ -1011,13 +1051,13 @@ export const editReviewText = async (req, res) => {
     res.json({
       success: true,
       message: 'Review text updated successfully',
-      data: transformedReview
+      data: transformedReview,
     });
   } catch (error) {
     console.error('Edit review text error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to update review text'
+      message: 'Failed to update review text',
     });
   }
 };
@@ -1033,7 +1073,7 @@ export const reportReview = async (req, res) => {
     if (!reason) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'Reason is required'
+        message: 'Reason is required',
       });
     }
 
@@ -1041,7 +1081,7 @@ export const reportReview = async (req, res) => {
     if (reason.length < 1 || reason.length > 200) {
       return res.status(400).json({
         error: 'Invalid reason',
-        message: 'Reason must be between 1 and 200 characters'
+        message: 'Reason must be between 1 and 200 characters',
       });
     }
 
@@ -1049,19 +1089,19 @@ export const reportReview = async (req, res) => {
     if (description && (description.length < 1 || description.length > 1000)) {
       return res.status(400).json({
         error: 'Invalid description',
-        message: 'Description must be between 1 and 1000 characters'
+        message: 'Description must be between 1 and 1000 characters',
       });
     }
 
     // Find the review
     const review = await prisma.review.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!review) {
       return res.status(404).json({
         error: 'Review not found',
-        message: 'The specified review does not exist'
+        message: 'The specified review does not exist',
       });
     }
 
@@ -1069,14 +1109,14 @@ export const reportReview = async (req, res) => {
     const existingReport = await prisma.reviewReport.findFirst({
       where: {
         reviewId: id,
-        reporterId: reporterId
-      }
+        reporterId: reporterId,
+      },
     });
 
     if (existingReport) {
       return res.status(400).json({
         error: 'Already reported',
-        message: 'You have already reported this review'
+        message: 'You have already reported this review',
       });
     }
 
@@ -1086,8 +1126,8 @@ export const reportReview = async (req, res) => {
         reviewId: id,
         reporterId: reporterId,
         reason: reason,
-        description: description || null
-      }
+        description: description || null,
+      },
     });
 
     res.status(201).json({
@@ -1097,14 +1137,14 @@ export const reportReview = async (req, res) => {
         id: report.id,
         reason: report.reason,
         status: report.status,
-        createdAt: report.createdAt
-      }
+        createdAt: report.createdAt,
+      },
     });
   } catch (error) {
     console.error('Report review error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to report review'
+      message: 'Failed to report review',
     });
   }
 };
@@ -1120,7 +1160,7 @@ export const replyToReview = async (req, res) => {
     if (!content) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'Content is required'
+        message: 'Content is required',
       });
     }
 
@@ -1128,7 +1168,7 @@ export const replyToReview = async (req, res) => {
     if (content.length < 1 || content.length > 1000) {
       return res.status(400).json({
         error: 'Invalid content',
-        message: 'Content must be between 1 and 1000 characters'
+        message: 'Content must be between 1 and 1000 characters',
       });
     }
 
@@ -1138,40 +1178,40 @@ export const replyToReview = async (req, res) => {
       include: {
         targetTenantGroup: {
           include: {
-            members: true
-          }
-        }
-      }
+            members: true,
+          },
+        },
+      },
     });
 
     if (!review) {
       return res.status(404).json({
         error: 'Review not found',
-        message: 'The specified review does not exist'
+        message: 'The specified review does not exist',
       });
     }
 
     // Check if user is the reviewee (member of target tenant group)
     const isReviewee = review.targetTenantGroup.members.some(
-      member => member.userId === revieweeId
+      (member) => member.userId === revieweeId
     );
 
     if (!isReviewee) {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'Only the reviewee can reply to this review'
+        message: 'Only the reviewee can reply to this review',
       });
     }
 
     // Check if review already has a reply
     const existingReply = await prisma.reviewReply.findUnique({
-      where: { reviewId: id }
+      where: { reviewId: id },
     });
 
     if (existingReply) {
       return res.status(400).json({
         error: 'Reply already exists',
-        message: 'This review already has a reply'
+        message: 'This review already has a reply',
       });
     }
 
@@ -1180,8 +1220,9 @@ export const replyToReview = async (req, res) => {
     if (!moderationResult.ok) {
       return res.status(400).json({
         error: 'Content blocked',
-        message: 'Your reply contains content that violates our community guidelines',
-        reasons: moderationResult.reasons
+        message:
+          'Your reply contains content that violates our community guidelines',
+        reasons: moderationResult.reasons,
       });
     }
 
@@ -1190,8 +1231,8 @@ export const replyToReview = async (req, res) => {
       data: {
         reviewId: id,
         revieweeId: revieweeId,
-        content: content
-      }
+        content: content,
+      },
     });
 
     res.status(201).json({
@@ -1200,14 +1241,14 @@ export const replyToReview = async (req, res) => {
       data: {
         id: reply.id,
         content: reply.content,
-        createdAt: reply.createdAt
-      }
+        createdAt: reply.createdAt,
+      },
     });
   } catch (error) {
     console.error('Reply to review error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to create reply'
+      message: 'Failed to create reply',
     });
   }
 };
@@ -1223,7 +1264,7 @@ export const editReviewReply = async (req, res) => {
     if (!content) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'Content is required'
+        message: 'Content is required',
       });
     }
 
@@ -1231,19 +1272,19 @@ export const editReviewReply = async (req, res) => {
     if (content.length < 1 || content.length > 1000) {
       return res.status(400).json({
         error: 'Invalid content',
-        message: 'Content must be between 1 and 1000 characters'
+        message: 'Content must be between 1 and 1000 characters',
       });
     }
 
     // Find the reply
     const reply = await prisma.reviewReply.findUnique({
-      where: { reviewId: id }
+      where: { reviewId: id },
     });
 
     if (!reply) {
       return res.status(404).json({
         error: 'Reply not found',
-        message: 'The specified reply does not exist'
+        message: 'The specified reply does not exist',
       });
     }
 
@@ -1251,7 +1292,7 @@ export const editReviewReply = async (req, res) => {
     if (reply.revieweeId !== revieweeId) {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'You can only edit your own replies'
+        message: 'You can only edit your own replies',
       });
     }
 
@@ -1263,7 +1304,7 @@ export const editReviewReply = async (req, res) => {
     if (hoursSinceCreation >= 24) {
       return res.status(400).json({
         error: 'Edit time expired',
-        message: 'Reply can only be edited within 24 hours of creation'
+        message: 'Reply can only be edited within 24 hours of creation',
       });
     }
 
@@ -1272,8 +1313,9 @@ export const editReviewReply = async (req, res) => {
     if (!moderationResult.ok) {
       return res.status(400).json({
         error: 'Content blocked',
-        message: 'Your edited reply contains content that violates our community guidelines',
-        reasons: moderationResult.reasons
+        message:
+          'Your edited reply contains content that violates our community guidelines',
+        reasons: moderationResult.reasons,
       });
     }
 
@@ -1282,8 +1324,8 @@ export const editReviewReply = async (req, res) => {
       where: { reviewId: id },
       data: {
         content: content,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     res.json({
@@ -1292,14 +1334,14 @@ export const editReviewReply = async (req, res) => {
       data: {
         id: updatedReply.id,
         content: updatedReply.content,
-        updatedAt: updatedReply.updatedAt
-      }
+        updatedAt: updatedReply.updatedAt,
+      },
     });
   } catch (error) {
     console.error('Edit review reply error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to update reply'
+      message: 'Failed to update reply',
     });
   }
 };
@@ -1321,20 +1363,20 @@ export const redactReview = async (req, res) => {
                 user: {
                   select: {
                     id: true,
-                    name: true
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!review) {
       return res.status(404).json({
         error: 'Review not found',
-        message: 'The specified review does not exist'
+        message: 'The specified review does not exist',
       });
     }
 
@@ -1342,7 +1384,7 @@ export const redactReview = async (req, res) => {
     if (!review.redactedText) {
       return res.status(400).json({
         error: 'Review cannot be redacted',
-        message: 'This review does not have redacted content available'
+        message: 'This review does not have redacted content available',
       });
     }
 
@@ -1358,8 +1400,8 @@ export const redactReview = async (req, res) => {
         text: review.redactedText, // Also update text alias for compatibility
         status: 'PUBLISHED',
         redactedAt: new Date(),
-        redactedBy: adminId
-      }
+        redactedBy: adminId,
+      },
     });
 
     // Log the redaction action
@@ -1375,26 +1417,31 @@ export const redactReview = async (req, res) => {
         redactedText: review.redactedText,
         redactedAt: new Date(),
         targetTenantGroupId: review.targetTenantGroupId,
-        leaseId: review.leaseId
+        leaseId: review.leaseId,
       },
       ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
+      userAgent: req.get('User-Agent'),
     });
 
     // If this is an END_OF_LEASE review, recompute user aggregates
     if (review.reviewStage === 'END_OF_LEASE') {
       try {
-        const { computeUserAggregate } = await import('../services/reviews/aggregates.js');
+        const { computeUserAggregate } = await import(
+          '../services/reviews/aggregates.js'
+        );
         // Since targetUserId was removed, we need to get it from the tenant group
         const tenantGroup = await prisma.tenantGroup.findUnique({
           where: { id: review.targetTenantGroupId },
-          include: { members: { take: 1 } }
+          include: { members: { take: 1 } },
         });
         if (tenantGroup?.members?.[0]?.userId) {
           await computeUserAggregate(tenantGroup.members[0].userId);
         }
       } catch (aggregateError) {
-        console.error('Failed to recompute user aggregates after redaction:', aggregateError);
+        console.error(
+          'Failed to recompute user aggregates after redaction:',
+          aggregateError
+        );
         // Don't fail the redaction if aggregate computation fails
       }
     }
@@ -1408,14 +1455,14 @@ export const redactReview = async (req, res) => {
         text: updatedReview.text,
         status: updatedReview.status,
         redactedAt: updatedReview.redactedAt,
-        redactedBy: updatedReview.redactedBy
-      }
+        redactedBy: updatedReview.redactedBy,
+      },
     });
   } catch (error) {
     console.error('Redact review error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to redact review'
+      message: 'Failed to redact review',
     });
   }
 };

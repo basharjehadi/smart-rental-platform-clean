@@ -14,23 +14,36 @@ import leaseEventService from '../services/leaseEventService.js';
 export const updateLeaseStatus = async (req, res) => {
   try {
     const { leaseId } = req.params;
-    const { newStatus, reason, effectiveDate, isEarlyMoveOut, earlyMoveOutReason } = req.body;
+    const {
+      newStatus,
+      reason,
+      effectiveDate,
+      isEarlyMoveOut,
+      earlyMoveOutReason,
+    } = req.body;
     const userId = req.user.id;
 
     // Validate required fields
     if (!newStatus) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'New status is required'
+        message: 'New status is required',
       });
     }
 
     // Validate status transition
-    const validStatuses = ['ACTIVE', 'ENDED', 'TERMINATED', 'TERMINATED_24H', 'EXPIRED', 'PENDING'];
+    const validStatuses = [
+      'ACTIVE',
+      'ENDED',
+      'TERMINATED',
+      'TERMINATED_24H',
+      'EXPIRED',
+      'PENDING',
+    ];
     if (!validStatuses.includes(newStatus)) {
       return res.status(400).json({
         error: 'Invalid status',
-        message: `Status must be one of: ${validStatuses.join(', ')}`
+        message: `Status must be one of: ${validStatuses.join(', ')}`,
       });
     }
 
@@ -40,30 +53,34 @@ export const updateLeaseStatus = async (req, res) => {
       include: {
         tenantGroup: {
           include: {
-            members: true
-          }
+            members: true,
+          },
         },
         property: {
           include: {
-            landlord: true
-          }
-        }
-      }
+            landlord: true,
+          },
+        },
+      },
     });
 
     if (!currentLease) {
       return res.status(404).json({
         error: 'Lease not found',
-        message: 'The specified lease does not exist'
+        message: 'The specified lease does not exist',
       });
     }
 
     // Check if user has permission to update this lease
-    const hasPermission = await checkLeaseUpdatePermission(currentLease, userId, req.user.role);
+    const hasPermission = await checkLeaseUpdatePermission(
+      currentLease,
+      userId,
+      req.user.role
+    );
     if (!hasPermission) {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'You do not have permission to update this lease'
+        message: 'You do not have permission to update this lease',
       });
     }
 
@@ -75,11 +92,13 @@ export const updateLeaseStatus = async (req, res) => {
       data: {
         status: newStatus,
         terminationReason: reason || null,
-        terminationEffectiveDate: effectiveDate ? new Date(effectiveDate) : null,
+        terminationEffectiveDate: effectiveDate
+          ? new Date(effectiveDate)
+          : null,
         terminationNoticeByUserId: userId,
         terminationNoticeDate: new Date(),
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     // Handle the status change event
@@ -88,10 +107,15 @@ export const updateLeaseStatus = async (req, res) => {
       effectiveDate: effectiveDate ? new Date(effectiveDate) : null,
       isEarlyMoveOut: isEarlyMoveOut || false,
       earlyMoveOutReason,
-      updatedBy: userId
+      updatedBy: userId,
     };
 
-    await leaseEventService.handleLeaseStatusChange(leaseId, oldStatus, newStatus, metadata);
+    await leaseEventService.handleLeaseStatusChange(
+      leaseId,
+      oldStatus,
+      newStatus,
+      metadata
+    );
 
     // Get updated lease with relations
     const fullLease = await prisma.lease.findUnique({
@@ -99,15 +123,15 @@ export const updateLeaseStatus = async (req, res) => {
       include: {
         tenantGroup: {
           include: {
-            members: true
-          }
+            members: true,
+          },
         },
         property: {
           include: {
-            landlord: true
-          }
-        }
-      }
+            landlord: true,
+          },
+        },
+      },
     });
 
     res.json({
@@ -121,15 +145,15 @@ export const updateLeaseStatus = async (req, res) => {
           reason,
           effectiveDate,
           updatedBy: userId,
-          updatedAt: updatedLease.updatedAt
-        }
-      }
+          updatedAt: updatedLease.updatedAt,
+        },
+      },
     });
   } catch (error) {
     console.error('Update lease status error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to update lease status'
+      message: 'Failed to update lease status',
     });
   }
 };
@@ -149,7 +173,7 @@ export const handleEarlyMoveOut = async (req, res) => {
     if (!reason || !effectiveDate) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'Reason and effective date are required for early move-out'
+        message: 'Reason and effective date are required for early move-out',
       });
     }
 
@@ -158,7 +182,7 @@ export const handleEarlyMoveOut = async (req, res) => {
     if (moveOutDate <= new Date()) {
       return res.status(400).json({
         error: 'Invalid effective date',
-        message: 'Effective date must be in the future'
+        message: 'Effective date must be in the future',
       });
     }
 
@@ -168,30 +192,32 @@ export const handleEarlyMoveOut = async (req, res) => {
       include: {
         tenantGroup: {
           include: {
-            members: true
-          }
+            members: true,
+          },
         },
         property: {
           include: {
-            landlord: true
-          }
-        }
-      }
+            landlord: true,
+          },
+        },
+      },
     });
 
     if (!currentLease) {
       return res.status(404).json({
         error: 'Lease not found',
-        message: 'The specified lease does not exist'
+        message: 'The specified lease does not exist',
       });
     }
 
     // Check if user is the tenant
-    const isTenant = currentLease.tenantGroup.members.some(member => member.userId === userId);
+    const isTenant = currentLease.tenantGroup.members.some(
+      (member) => member.userId === userId
+    );
     if (!isTenant && req.user.role !== 'ADMIN') {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'Only the tenant can request early move-out'
+        message: 'Only the tenant can request early move-out',
       });
     }
 
@@ -204,18 +230,23 @@ export const handleEarlyMoveOut = async (req, res) => {
         terminationEffectiveDate: moveOutDate,
         terminationNoticeByUserId: userId,
         terminationNoticeDate: new Date(),
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     // Handle the status change event
-    await leaseEventService.handleLeaseStatusChange(leaseId, currentLease.status, 'ENDED', {
-      reason: `Early move-out: ${reason}`,
-      effectiveDate: moveOutDate,
-      isEarlyMoveOut: true,
-      earlyMoveOutReason: reason,
-      updatedBy: userId
-    });
+    await leaseEventService.handleLeaseStatusChange(
+      leaseId,
+      currentLease.status,
+      'ENDED',
+      {
+        reason: `Early move-out: ${reason}`,
+        effectiveDate: moveOutDate,
+        isEarlyMoveOut: true,
+        earlyMoveOutReason: reason,
+        updatedBy: userId,
+      }
+    );
 
     res.json({
       success: true,
@@ -226,15 +257,15 @@ export const handleEarlyMoveOut = async (req, res) => {
           reason,
           effectiveDate: moveOutDate,
           requestedBy: userId,
-          processedAt: updatedLease.updatedAt
-        }
-      }
+          processedAt: updatedLease.updatedAt,
+        },
+      },
     });
   } catch (error) {
     console.error('Handle early move-out error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to process early move-out'
+      message: 'Failed to process early move-out',
     });
   }
 };
@@ -254,18 +285,19 @@ export const handle24HourTermination = async (req, res) => {
     if (!reason || !effectiveDate) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'Reason and effective date are required for 24-hour termination'
+        message:
+          'Reason and effective date are required for 24-hour termination',
       });
     }
 
     // Validate effective date is at least 24 hours in the future
     const terminationDate = new Date(effectiveDate);
     const minTerminationDate = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
-    
+
     if (terminationDate < minTerminationDate) {
       return res.status(400).json({
         error: 'Invalid effective date',
-        message: 'Effective date must be at least 24 hours in the future'
+        message: 'Effective date must be at least 24 hours in the future',
       });
     }
 
@@ -275,21 +307,21 @@ export const handle24HourTermination = async (req, res) => {
       include: {
         tenantGroup: {
           include: {
-            members: true
-          }
+            members: true,
+          },
         },
         property: {
           include: {
-            landlord: true
-          }
-        }
-      }
+            landlord: true,
+          },
+        },
+      },
     });
 
     if (!currentLease) {
       return res.status(404).json({
         error: 'Lease not found',
-        message: 'The specified lease does not exist'
+        message: 'The specified lease does not exist',
       });
     }
 
@@ -298,7 +330,7 @@ export const handle24HourTermination = async (req, res) => {
     if (!isLandlord && req.user.role !== 'ADMIN') {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'Only the landlord can issue 24-hour termination notices'
+        message: 'Only the landlord can issue 24-hour termination notices',
       });
     }
 
@@ -311,17 +343,22 @@ export const handle24HourTermination = async (req, res) => {
         terminationEffectiveDate: terminationDate,
         terminationNoticeByUserId: userId,
         terminationNoticeDate: new Date(),
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     // Handle the status change event
-    await leaseEventService.handleLeaseStatusChange(leaseId, currentLease.status, 'TERMINATED_24H', {
-      reason: `24-hour termination: ${reason}`,
-      effectiveDate: terminationDate,
-      terminationReason: reason,
-      updatedBy: userId
-    });
+    await leaseEventService.handleLeaseStatusChange(
+      leaseId,
+      currentLease.status,
+      'TERMINATED_24H',
+      {
+        reason: `24-hour termination: ${reason}`,
+        effectiveDate: terminationDate,
+        terminationReason: reason,
+        updatedBy: userId,
+      }
+    );
 
     res.json({
       success: true,
@@ -332,15 +369,15 @@ export const handle24HourTermination = async (req, res) => {
           reason,
           effectiveDate: terminationDate,
           issuedBy: userId,
-          issuedAt: updatedLease.updatedAt
-        }
-      }
+          issuedAt: updatedLease.updatedAt,
+        },
+      },
     });
   } catch (error) {
     console.error('Handle 24-hour termination error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to process 24-hour termination notice'
+      message: 'Failed to process 24-hour termination notice',
     });
   }
 };
@@ -361,21 +398,21 @@ export const getLeaseStatusHistory = async (req, res) => {
       include: {
         tenantGroup: {
           include: {
-            members: true
-          }
+            members: true,
+          },
         },
         property: {
           include: {
-            landlord: true
-          }
-        }
-      }
+            landlord: true,
+          },
+        },
+      },
     });
 
     if (!lease) {
       return res.status(404).json({
         error: 'Lease not found',
-        message: 'The specified lease does not exist'
+        message: 'The specified lease does not exist',
       });
     }
 
@@ -384,7 +421,7 @@ export const getLeaseStatusHistory = async (req, res) => {
     if (!hasAccess) {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'You do not have access to this lease'
+        message: 'You do not have access to this lease',
       });
     }
 
@@ -396,18 +433,18 @@ export const getLeaseStatusHistory = async (req, res) => {
           select: {
             id: true,
             name: true,
-            profileImage: true
-          }
+            profileImage: true,
+          },
         },
         reviewee: {
           select: {
             id: true,
             name: true,
-            profileImage: true
-          }
-        }
+            profileImage: true,
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     res.json({
@@ -419,15 +456,15 @@ export const getLeaseStatusHistory = async (req, res) => {
           current: lease.status,
           terminationReason: lease.terminationReason,
           terminationEffectiveDate: lease.terminationEffectiveDate,
-          terminationNoticeDate: lease.terminationNoticeDate
-        }
-      }
+          terminationNoticeDate: lease.terminationNoticeDate,
+        },
+      },
     });
   } catch (error) {
     console.error('Get lease status history error:', error);
     res.status(500).json({
       error: 'Internal server error',
-      message: 'Failed to get lease status history'
+      message: 'Failed to get lease status history',
     });
   }
 };
@@ -451,7 +488,9 @@ async function checkLeaseUpdatePermission(lease, userId, userRole) {
   }
 
   // Tenants can update their own leases
-  const isTenant = lease.tenantGroup.members.some(member => member.userId === userId);
+  const isTenant = lease.tenantGroup.members.some(
+    (member) => member.userId === userId
+  );
   if (isTenant) {
     return true;
   }
@@ -478,12 +517,12 @@ async function checkLeaseAccess(lease, userId, userRole) {
   }
 
   // Tenants can access their own leases
-  const isTenant = lease.tenantGroup.members.some(member => member.userId === userId);
+  const isTenant = lease.tenantGroup.members.some(
+    (member) => member.userId === userId
+  );
   if (isTenant) {
     return true;
   }
 
   return false;
 }
-
-

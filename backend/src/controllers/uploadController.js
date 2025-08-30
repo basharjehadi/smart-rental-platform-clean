@@ -19,7 +19,7 @@ export const uploadProfileImage = async (req, res) => {
       originalname: req.file.originalname,
       filename: req.file.filename,
       mimetype: req.file.mimetype,
-      size: req.file.size
+      size: req.file.size,
     });
 
     // Store just the filename in the database
@@ -29,17 +29,19 @@ export const uploadProfileImage = async (req, res) => {
       select: {
         id: true,
         profileImage: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
-    console.log('✅ Profile image saved to database:', updatedUser.profileImage);
+    console.log(
+      '✅ Profile image saved to database:',
+      updatedUser.profileImage
+    );
 
     res.json({
       message: 'Profile image uploaded successfully',
-      profileImage: updatedUser.profileImage
+      profileImage: updatedUser.profileImage,
     });
-
   } catch (error) {
     console.error('❌ Upload profile image error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -54,7 +56,7 @@ export const deleteProfileImage = async (req, res) => {
     // Get current user to find existing image
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { profileImage: true }
+      select: { profileImage: true },
     });
 
     if (user && user.profileImage) {
@@ -74,17 +76,16 @@ export const deleteProfileImage = async (req, res) => {
       select: {
         id: true,
         profileImage: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     res.json({
       message: 'Profile image deleted successfully',
-      profileImage: updatedUser.profileImage
+      profileImage: updatedUser.profileImage,
     });
-
   } catch (error) {
     console.error('Delete profile image error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-}; 
+};

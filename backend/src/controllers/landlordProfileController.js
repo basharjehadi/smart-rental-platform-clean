@@ -19,10 +19,10 @@ export const getLandlordProfile = async (req, res) => {
             availability: true,
             autoAvailability: true,
             maxTenants: true,
-            currentTenants: true
-          }
-        }
-      }
+            currentTenants: true,
+          },
+        },
+      },
     });
 
     // If profile doesn't exist, create a default one
@@ -41,7 +41,7 @@ export const getLandlordProfile = async (req, res) => {
           propertyTypes: JSON.stringify([]),
           amenities: JSON.stringify([]),
           propertyImages: JSON.stringify([]),
-          propertyVideos: JSON.stringify([])
+          propertyVideos: JSON.stringify([]),
         },
         include: {
           user: {
@@ -53,34 +53,41 @@ export const getLandlordProfile = async (req, res) => {
               availability: true,
               autoAvailability: true,
               maxTenants: true,
-              currentTenants: true
-            }
-          }
-        }
+              currentTenants: true,
+            },
+          },
+        },
       });
     }
 
     // Parse JSON fields
     const parsedProfile = {
       ...profile,
-      preferredLocations: profile.preferredLocations ? JSON.parse(profile.preferredLocations) : [],
-      propertyTypes: profile.propertyTypes ? JSON.parse(profile.propertyTypes) : [],
+      preferredLocations: profile.preferredLocations
+        ? JSON.parse(profile.preferredLocations)
+        : [],
+      propertyTypes: profile.propertyTypes
+        ? JSON.parse(profile.propertyTypes)
+        : [],
       amenities: profile.amenities ? JSON.parse(profile.amenities) : [],
-      propertyImages: profile.propertyImages ? JSON.parse(profile.propertyImages) : [],
-      propertyVideos: profile.propertyVideos ? JSON.parse(profile.propertyVideos) : [],
-      autoFillMedia: profile.autoFillMedia
+      propertyImages: profile.propertyImages
+        ? JSON.parse(profile.propertyImages)
+        : [],
+      propertyVideos: profile.propertyVideos
+        ? JSON.parse(profile.propertyVideos)
+        : [],
+      autoFillMedia: profile.autoFillMedia,
     };
 
     res.json({
       message: 'Landlord profile retrieved successfully',
-      profile: parsedProfile
+      profile: parsedProfile,
     });
-
   } catch (error) {
     console.error('❌ Error getting landlord profile:', error);
     res.status(500).json({
       message: 'Failed to retrieve landlord profile',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -104,19 +111,19 @@ export const updateLandlordProfile = async (req, res) => {
       propertyDescription,
       autoFillMedia,
       autoFillRules,
-      autoFillDescription
+      autoFillDescription,
     } = req.body;
 
     // Validate required fields
     if (!preferredLocations || preferredLocations.length === 0) {
       return res.status(400).json({
-        message: 'At least one preferred location is required'
+        message: 'At least one preferred location is required',
       });
     }
 
     if (maxTenants && maxTenants < 1) {
       return res.status(400).json({
-        message: 'Maximum tenants must be at least 1'
+        message: 'Maximum tenants must be at least 1',
       });
     }
 
@@ -126,15 +133,18 @@ export const updateLandlordProfile = async (req, res) => {
       maxBudget: maxBudget ? parseFloat(maxBudget) : null,
       minBudget: minBudget ? parseFloat(minBudget) : null,
       maxTenants: maxTenants ? parseInt(maxTenants) : 5,
-      manualAvailability: manualAvailability !== undefined ? manualAvailability : true,
-      autoAvailability: autoAvailability !== undefined ? autoAvailability : true,
+      manualAvailability:
+        manualAvailability !== undefined ? manualAvailability : true,
+      autoAvailability:
+        autoAvailability !== undefined ? autoAvailability : true,
       propertyTypes: propertyTypes ? JSON.stringify(propertyTypes) : null,
       amenities: amenities ? JSON.stringify(amenities) : null,
       propertyRules: propertyRules || null,
       propertyDescription: propertyDescription || null,
       autoFillMedia: autoFillMedia !== undefined ? autoFillMedia : true,
       autoFillRules: autoFillRules !== undefined ? autoFillRules : true,
-      autoFillDescription: autoFillDescription !== undefined ? autoFillDescription : true
+      autoFillDescription:
+        autoFillDescription !== undefined ? autoFillDescription : true,
     };
 
     // Update or create landlord profile
@@ -143,30 +153,40 @@ export const updateLandlordProfile = async (req, res) => {
       update: profileData,
       create: {
         ...profileData,
-        userId
-      }
+        userId,
+      },
     });
 
     // Update user availability based on capacity
-    await updateUserAvailability(userId, profile.maxTenants, profile.manualAvailability, profile.autoAvailability);
+    await updateUserAvailability(
+      userId,
+      profile.maxTenants,
+      profile.manualAvailability,
+      profile.autoAvailability
+    );
 
     res.json({
       message: 'Landlord profile updated successfully',
       profile: {
         ...profile,
         preferredLocations: JSON.parse(profile.preferredLocations),
-        propertyTypes: profile.propertyTypes ? JSON.parse(profile.propertyTypes) : [],
+        propertyTypes: profile.propertyTypes
+          ? JSON.parse(profile.propertyTypes)
+          : [],
         amenities: profile.amenities ? JSON.parse(profile.amenities) : [],
-        propertyImages: profile.propertyImages ? JSON.parse(profile.propertyImages) : [],
-        propertyVideos: profile.propertyVideos ? JSON.parse(profile.propertyVideos) : []
-      }
+        propertyImages: profile.propertyImages
+          ? JSON.parse(profile.propertyImages)
+          : [],
+        propertyVideos: profile.propertyVideos
+          ? JSON.parse(profile.propertyVideos)
+          : [],
+      },
     });
-
   } catch (error) {
     console.error('❌ Error updating landlord profile:', error);
     res.status(500).json({
       message: 'Failed to update landlord profile',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -181,41 +201,42 @@ export const uploadPropertyImages = async (req, res) => {
 
     if (!images || !Array.isArray(images)) {
       return res.status(400).json({
-        message: 'Images array is required'
+        message: 'Images array is required',
       });
     }
 
     const profile = await prisma.landlordProfile.findUnique({
-      where: { userId }
+      where: { userId },
     });
 
     if (!profile) {
       return res.status(404).json({
-        message: 'Landlord profile not found'
+        message: 'Landlord profile not found',
       });
     }
 
     // Get existing images and add new ones
-    const existingImages = profile.propertyImages ? JSON.parse(profile.propertyImages) : [];
+    const existingImages = profile.propertyImages
+      ? JSON.parse(profile.propertyImages)
+      : [];
     const updatedImages = [...existingImages, ...images];
 
     await prisma.landlordProfile.update({
       where: { userId },
       data: {
-        propertyImages: JSON.stringify(updatedImages)
-      }
+        propertyImages: JSON.stringify(updatedImages),
+      },
     });
 
     res.json({
       message: 'Property images uploaded successfully',
-      images: updatedImages
+      images: updatedImages,
     });
-
   } catch (error) {
     console.error('❌ Error uploading property images:', error);
     res.status(500).json({
       message: 'Failed to upload property images',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -230,41 +251,42 @@ export const uploadPropertyVideos = async (req, res) => {
 
     if (!videos || !Array.isArray(videos)) {
       return res.status(400).json({
-        message: 'Videos array is required'
+        message: 'Videos array is required',
       });
     }
 
     const profile = await prisma.landlordProfile.findUnique({
-      where: { userId }
+      where: { userId },
     });
 
     if (!profile) {
       return res.status(404).json({
-        message: 'Landlord profile not found'
+        message: 'Landlord profile not found',
       });
     }
 
     // Get existing videos and add new ones
-    const existingVideos = profile.propertyVideos ? JSON.parse(profile.propertyVideos) : [];
+    const existingVideos = profile.propertyVideos
+      ? JSON.parse(profile.propertyVideos)
+      : [];
     const updatedVideos = [...existingVideos, ...videos];
 
     await prisma.landlordProfile.update({
       where: { userId },
       data: {
-        propertyVideos: JSON.stringify(updatedVideos)
-      }
+        propertyVideos: JSON.stringify(updatedVideos),
+      },
     });
 
     res.json({
       message: 'Property videos uploaded successfully',
-      videos: updatedVideos
+      videos: updatedVideos,
     });
-
   } catch (error) {
     console.error('❌ Error uploading property videos:', error);
     res.status(500).json({
       message: 'Failed to upload property videos',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -279,17 +301,17 @@ export const deletePropertyImages = async (req, res) => {
 
     if (!images || !Array.isArray(images)) {
       return res.status(400).json({
-        message: 'Images array is required'
+        message: 'Images array is required',
       });
     }
 
     const profile = await prisma.landlordProfile.findUnique({
-      where: { userId }
+      where: { userId },
     });
 
     if (!profile) {
       return res.status(404).json({
-        message: 'Landlord profile not found'
+        message: 'Landlord profile not found',
       });
     }
 
@@ -297,20 +319,19 @@ export const deletePropertyImages = async (req, res) => {
     await prisma.landlordProfile.update({
       where: { userId },
       data: {
-        propertyImages: JSON.stringify(images)
-      }
+        propertyImages: JSON.stringify(images),
+      },
     });
 
     res.json({
       message: 'Property images deleted successfully',
-      images: images
+      images: images,
     });
-
   } catch (error) {
     console.error('❌ Error deleting property images:', error);
     res.status(500).json({
       message: 'Failed to delete property images',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -325,17 +346,17 @@ export const deletePropertyVideos = async (req, res) => {
 
     if (!videos || !Array.isArray(videos)) {
       return res.status(400).json({
-        message: 'Videos array is required'
+        message: 'Videos array is required',
       });
     }
 
     const profile = await prisma.landlordProfile.findUnique({
-      where: { userId }
+      where: { userId },
     });
 
     if (!profile) {
       return res.status(404).json({
-        message: 'Landlord profile not found'
+        message: 'Landlord profile not found',
       });
     }
 
@@ -343,20 +364,19 @@ export const deletePropertyVideos = async (req, res) => {
     await prisma.landlordProfile.update({
       where: { userId },
       data: {
-        propertyVideos: JSON.stringify(videos)
-      }
+        propertyVideos: JSON.stringify(videos),
+      },
     });
 
     res.json({
       message: 'Property videos deleted successfully',
-      videos: videos
+      videos: videos,
     });
-
   } catch (error) {
     console.error('❌ Error deleting property videos:', error);
     res.status(500).json({
       message: 'Failed to delete property videos',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -371,7 +391,7 @@ export const toggleAvailability = async (req, res) => {
 
     if (manualAvailability === undefined) {
       return res.status(400).json({
-        message: 'Manual availability status is required'
+        message: 'Manual availability status is required',
       });
     }
 
@@ -379,28 +399,27 @@ export const toggleAvailability = async (req, res) => {
     await prisma.user.update({
       where: { id: userId },
       data: {
-        availability: manualAvailability
-      }
+        availability: manualAvailability,
+      },
     });
 
     // Update landlord profile
     await prisma.landlordProfile.update({
       where: { userId },
       data: {
-        manualAvailability
-      }
+        manualAvailability,
+      },
     });
 
     res.json({
       message: `Landlord availability ${manualAvailability ? 'enabled' : 'disabled'} successfully`,
-      availability: manualAvailability
+      availability: manualAvailability,
     });
-
   } catch (error) {
     console.error('❌ Error toggling availability:', error);
     res.status(500).json({
       message: 'Failed to toggle availability',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -418,17 +437,19 @@ export const getCapacityStatus = async (req, res) => {
         availability: true,
         autoAvailability: true,
         maxTenants: true,
-        currentTenants: true
-      }
+        currentTenants: true,
+      },
     });
 
     if (!user) {
       return res.status(404).json({
-        message: 'User not found'
+        message: 'User not found',
       });
     }
 
-    const isAvailable = user.availability && (user.currentTenants < user.maxTenants || !user.autoAvailability);
+    const isAvailable =
+      user.availability &&
+      (user.currentTenants < user.maxTenants || !user.autoAvailability);
 
     res.json({
       message: 'Capacity status retrieved successfully',
@@ -438,15 +459,14 @@ export const getCapacityStatus = async (req, res) => {
         availableSlots: Math.max(0, user.maxTenants - user.currentTenants),
         isAvailable,
         manualAvailability: user.availability,
-        autoAvailability: user.autoAvailability
-      }
+        autoAvailability: user.autoAvailability,
+      },
     });
-
   } catch (error) {
     console.error('❌ Error getting capacity status:', error);
     res.status(500).json({
       message: 'Failed to get capacity status',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -454,20 +474,25 @@ export const getCapacityStatus = async (req, res) => {
 /**
  * 🔄 Helper function to update user availability based on capacity
  */
-async function updateUserAvailability(userId, maxTenants, manualAvailability, autoAvailability) {
+async function updateUserAvailability(
+  userId,
+  maxTenants,
+  manualAvailability,
+  autoAvailability
+) {
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { currentTenants: true }
+      select: { currentTenants: true },
     });
 
     if (!user) return;
 
     // Calculate availability based on capacity and settings
     let shouldBeAvailable = manualAvailability;
-    
+
     if (autoAvailability) {
-      shouldBeAvailable = shouldBeAvailable && (user.currentTenants < maxTenants);
+      shouldBeAvailable = shouldBeAvailable && user.currentTenants < maxTenants;
     }
 
     await prisma.user.update({
@@ -475,11 +500,10 @@ async function updateUserAvailability(userId, maxTenants, manualAvailability, au
       data: {
         availability: shouldBeAvailable,
         maxTenants,
-        autoAvailability
-      }
+        autoAvailability,
+      },
     });
-
   } catch (error) {
     console.error('❌ Error updating user availability:', error);
   }
-} 
+}

@@ -32,13 +32,13 @@ const ToastContainer: React.FC = () => {
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div className='fixed top-4 right-4 z-50 space-y-2'>
       {unreadNotifications.map((notification, index) => (
         <div
           key={notification.id}
           style={{
             transform: `translateY(${index * 80}px)`,
-            zIndex: 50 - index
+            zIndex: 50 - index,
           }}
         >
           <ToastNotification

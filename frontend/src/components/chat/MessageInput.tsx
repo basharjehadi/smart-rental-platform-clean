@@ -13,7 +13,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   onSendMessage,
   onTyping,
   disabled = false,
-  placeholder = "Type a message..."
+  placeholder = 'Type a message...',
 }) => {
   const { user } = useAuth();
   const [message, setMessage] = useState('');
@@ -79,8 +79,16 @@ const MessageInput: React.FC<MessageInputProps> = ({
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
-      'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/aac', 'audio/m4a', 'audio/ogg',
-      'video/mp4', 'video/quicktime', 'video/webm', 'video/ogg'
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/wav',
+      'audio/aac',
+      'audio/m4a',
+      'audio/ogg',
+      'video/mp4',
+      'video/quicktime',
+      'video/webm',
+      'video/ogg',
     ];
 
     if (!allowedTypes.includes(file.type)) {
@@ -100,9 +108,9 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
   const getFileIcon = (file: File) => {
     if (file.type.startsWith('image/')) {
-      return <Image className="w-4 h-4" />;
+      return <Image className='w-4 h-4' />;
     }
-    return <FileText className="w-4 h-4" />;
+    return <FileText className='w-4 h-4' />;
   };
 
   const formatFileSize = (bytes: number) => {
@@ -114,19 +122,28 @@ const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   return (
-    <div className="space-y-3 pb-2">
+    <div className='space-y-3 pb-2'>
       {/* Chat locked banner */}
       {disabled && (
-        <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div className="flex items-center space-x-2 text-yellow-800">
-            <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        <div className='mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg'>
+          <div className='flex items-center space-x-2 text-yellow-800'>
+            <svg
+              className='w-5 h-5 text-yellow-600'
+              fill='none'
+              stroke='currentColor'
+              viewBox='0 0 24 24'
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth={2}
+                d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+              />
             </svg>
-            <span className="text-sm font-medium">
-              {user?.role === 'TENANT' 
+            <span className='text-sm font-medium'>
+              {user?.role === 'TENANT'
                 ? 'Chat is locked until You will have active Lease'
-                : 'Chat is locked until You will have Tenant'
-              }
+                : 'Chat is locked until You will have Tenant'}
             </span>
           </div>
         </div>
@@ -134,25 +151,25 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
       {/* Selected file preview */}
       {selectedFile && (
-        <div className="mb-3 p-3 bg-gray-50 rounded-lg border">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
+        <div className='mb-3 p-3 bg-gray-50 rounded-lg border'>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center space-x-2'>
               {getFileIcon(selectedFile)}
               <div>
-                <p className="text-sm font-medium text-gray-900 truncate">
+                <p className='text-sm font-medium text-gray-900 truncate'>
                   {selectedFile.name}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className='text-xs text-gray-500'>
                   {formatFileSize(selectedFile.size)}
                 </p>
               </div>
             </div>
             <button
               onClick={removeSelectedFile}
-              className="p-1 hover:bg-gray-200 rounded transition-colors"
-              title="Remove file"
+              className='p-1 hover:bg-gray-200 rounded transition-colors'
+              title='Remove file'
             >
-              <X className="w-4 h-4 text-gray-500" />
+              <X className='w-4 h-4 text-gray-500' />
             </button>
           </div>
         </div>
@@ -160,14 +177,14 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
       {/* Upload progress */}
       {isUploading && (
-        <div className="mb-3">
-          <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
+        <div className='mb-3'>
+          <div className='flex items-center justify-between text-sm text-gray-600 mb-1'>
             <span>Uploading...</span>
             <span>{uploadProgress}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className='w-full bg-gray-200 rounded-full h-2'>
             <div
-              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+              className='bg-blue-500 h-2 rounded-full transition-all duration-300'
               style={{ width: `${uploadProgress}%` }}
             ></div>
           </div>
@@ -175,39 +192,41 @@ const MessageInput: React.FC<MessageInputProps> = ({
       )}
 
       {/* Message input */}
-      <div className="flex items-center space-x-2">
-        <div className="flex-1">
+      <div className='flex items-center space-x-2'>
+        <div className='flex-1'>
           <textarea
             value={message}
             onChange={handleMessageChange}
             onKeyPress={handleKeyPress}
             placeholder={placeholder}
             disabled={disabled || isUploading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className='w-full px-3 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed'
             rows={1}
             style={{ minHeight: '40px', maxHeight: '120px' }}
           />
         </div>
 
-        <div className="flex items-center space-x-1">
+        <div className='flex items-center space-x-1'>
           {/* File attachment button */}
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled || isUploading}
-            className="h-10 w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Attach file"
+            className='h-10 w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+            title='Attach file'
           >
-            <Paperclip className="w-5 h-5" />
+            <Paperclip className='w-5 h-5' />
           </button>
 
           {/* Send button */}
           <button
             onClick={handleSendMessage}
-            disabled={disabled || isUploading || (!message.trim() && !selectedFile)}
-            className="h-10 w-10 flex items-center justify-center bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Send message"
+            disabled={
+              disabled || isUploading || (!message.trim() && !selectedFile)
+            }
+            className='h-10 w-10 flex items-center justify-center bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+            title='Send message'
           >
-            <Send className="w-5 h-5" />
+            <Send className='w-5 h-5' />
           </button>
         </div>
       </div>
@@ -215,15 +234,13 @@ const MessageInput: React.FC<MessageInputProps> = ({
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
-        type="file"
+        type='file'
         onChange={handleFileSelect}
-        accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.txt"
-        className="hidden"
+        accept='image/*,audio/*,video/*,.pdf,.doc,.docx,.txt'
+        className='hidden'
       />
     </div>
   );
 };
 
 export default MessageInput;
-
-

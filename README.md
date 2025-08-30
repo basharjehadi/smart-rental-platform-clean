@@ -3,6 +3,50 @@
 ## Overview
 This system implements a **payment-based chat system** where tenants can only message landlords after they have successfully paid for a property. This ensures secure communication and prevents spam while allowing legitimate tenants to coordinate with landlords.
 
+## Documentation
+
+This project includes comprehensive documentation covering various aspects of the system:
+
+### **API & Integration Documentation**
+- [API Documentation](docs/API_DOCUMENTATION.md) - Complete API reference and endpoints
+- [Organization API Implementation](docs/ORGANIZATION_API_IMPLEMENTATION.md) - Organization management features
+- [Tenant Group API Implementation](docs/TENANT_GROUP_API_IMPLEMENTATION.md) - Tenant group functionality
+- [Tenant Group UI Summary](docs/TENANT_GROUP_UI_SUMMARY.md) - Frontend tenant group features
+
+### **Business Features Documentation**
+- [Business Account Upgrade UI](docs/BUSINESS_ACCOUNT_UPGRADE_UI.md) - Business account management
+- [Business Occupant Management](docs/BUSINESS_OCCUPANT_MANAGEMENT_SUMMARY.md) - Occupant management system
+- [Monthly Payment System](docs/MONTHLY_PAYMENT_SYSTEM_DOCUMENTATION.md) - Payment processing documentation
+- [Property Availability System](docs/PROPERTY_AVAILABILITY_SYSTEM.md) - Property availability management
+- [Landlord Journey System](docs/LANDLORD_JOURNEY_SYSTEM.md) - Landlord onboarding and workflow
+- [Request Pool System](docs/REQUEST_POOL_SYSTEM.md) - Rental request management system
+
+### **System & Technical Documentation**
+- [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) - System deployment instructions
+- [Docker Setup](docs/DOCKER_SETUP.md) - Docker configuration and setup
+- [Hybrid Dev Setup](docs/HYBRID_DEV_SETUP.md) - Development environment configuration
+- [Quick Start Guide](docs/QUICK_START.md) - Quick setup and getting started
+- [Database Cleanup Guide](docs/DATABASE_CLEANUP_GUIDE.md) - Database maintenance procedures
+- [Migration Summary](docs/MIGRATION_SUMMARY.md) - Database migration history
+- [Lease Lifecycle](docs/LEASE_LIFECYCLE.md) - Lease management workflow
+
+### **Contract & Legal Documentation**
+- [Enhanced Contract Template](docs/ENHANCED_CONTRACT_TEMPLATE.md) - Contract generation system
+- [Dynamic Contract Generation](docs/DYNAMIC_CONTRACT_GENERATION.md) - Automated contract creation
+- [Refunds System](docs/REFUNDS.md) - Refund processing documentation
+
+### **Development & Testing**
+- [Messaging Tests](docs/README_MESSAGING_TESTS.md) - Messaging system testing
+- [LibreTranslate Setup](docs/LIBRETRANSLATE_SETUP.md) - Translation service configuration
+- [Updated Rental Request Logic](docs/UPDATED_RENTAL_REQUEST_LOGIC.md) - Rental request system updates
+- [Review System Documentation](docs/REVIEW_SYSTEM_DOCUMENTATION.md) - Comprehensive review system guide
+- [Chat System Documentation](docs/README_CHAT_SYSTEM.md) - Chat and messaging system overview
+
+### **Admin & Management**
+- [Admin Dashboard Documentation](docs/ADMIN_DASHBOARD_DOCUMENTATION.md) - Admin panel and management features
+
+For detailed information about any specific feature or system component, please refer to the appropriate documentation file in the `/docs` directory.
+
 ## How It Works
 
 ### 1. **Payment-Based Chat Unlocking**

@@ -1,4 +1,10 @@
-import React, { createContext, useContext, ReactNode, useEffect, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  ReactNode,
+  useEffect,
+  useState,
+} from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 
@@ -63,7 +69,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       setIsConnected(false);
     });
 
-    newSocket.on('connect_error', (error) => {
+    newSocket.on('connect_error', error => {
       console.error('🔌 Socket connection error:', error.message || error);
       setIsConnected(false);
     });
@@ -78,12 +84,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   const value: SocketContextType = {
     socket,
-    isConnected
+    isConnected,
   };
 
   return (
-    <SocketContext.Provider value={value}>
-      {children}
-    </SocketContext.Provider>
+    <SocketContext.Provider value={value}>{children}</SocketContext.Provider>
   );
 };

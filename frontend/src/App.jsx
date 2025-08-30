@@ -1,4 +1,10 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -44,7 +50,6 @@ import AdminPropertyReview from './pages/AdminPropertyReview.jsx';
 import AuthCallback from './pages/AuthCallback';
 import TestPage from './pages/TestPage';
 
-
 import PropertyMediaUpload from './components/PropertyMediaUpload';
 import ContractManagementPage from './pages/ContractManagementPage';
 import PaymentManagementPage from './pages/PaymentManagementPage';
@@ -59,8 +64,44 @@ import AcceptInvitationPage from './pages/AcceptInvitationPage.jsx';
 // Component to conditionally render Navbar
 const AppContent = () => {
   const location = useLocation();
-  const hideNavbarRoutes = ['/', '/login', '/register', '/dashboard', '/tenant-dashboard', '/tenant-help-center', '/tenant-request-for-landlord', '/tenant-profile', '/post-request', '/my-offers', '/property', '/contracts', '/payments', '/payment', '/my-rents', '/landlord-dashboard', '/tenant-rental-requests', '/requests', '/landlord-profile', '/landlord-my-property', '/landlord-add-property', '/landlord-edit-property', '/landlord-property-details', '/landlord-help-center', '/landlord-my-tenants', '/landlord-tenant-profile', '/admin', '/payment-success', '/payment-history', '/monthly-rent-payment', '/mock-payment', '/reviews', '/messaging', '/tenant-group-management', '/business-upgrade'];
-  
+  const hideNavbarRoutes = [
+    '/',
+    '/login',
+    '/register',
+    '/dashboard',
+    '/tenant-dashboard',
+    '/tenant-help-center',
+    '/tenant-request-for-landlord',
+    '/tenant-profile',
+    '/post-request',
+    '/my-offers',
+    '/property',
+    '/contracts',
+    '/payments',
+    '/payment',
+    '/my-rents',
+    '/landlord-dashboard',
+    '/tenant-rental-requests',
+    '/requests',
+    '/landlord-profile',
+    '/landlord-my-property',
+    '/landlord-add-property',
+    '/landlord-edit-property',
+    '/landlord-property-details',
+    '/landlord-help-center',
+    '/landlord-my-tenants',
+    '/landlord-tenant-profile',
+    '/admin',
+    '/payment-success',
+    '/payment-history',
+    '/monthly-rent-payment',
+    '/mock-payment',
+    '/reviews',
+    '/messaging',
+    '/tenant-group-management',
+    '/business-upgrade',
+  ];
+
   // Check if current path should hide navbar (including parameterized routes)
   const shouldHideNavbar = hideNavbarRoutes.some(route => {
     if (route.includes(':')) {
@@ -70,317 +111,316 @@ const AppContent = () => {
       return regex.test(location.pathname);
     } else {
       // Handle exact matches
-      return location.pathname === route || location.pathname.startsWith(route + '/');
+      return (
+        location.pathname === route || location.pathname.startsWith(route + '/')
+      );
     }
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className='min-h-screen bg-gray-50'>
       {!shouldHideNavbar && <Navbar />}
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/test" element={<TestPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route 
-          path="/dashboard" 
+        <Route path='/' element={<HomePage />} />
+        <Route path='/test' element={<TestPage />} />
+        <Route path='/login' element={<LoginPage />} />
+        <Route path='/register' element={<RegisterPage />} />
+        <Route path='/auth/callback' element={<AuthCallback />} />
+        <Route
+          path='/dashboard'
           element={
             <ProtectedRoute>
               <TenantDashboardRedirect />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/tenant-dashboard" 
+        <Route
+          path='/tenant-dashboard'
           element={
             <ProtectedRoute>
               <TenantDashboardNew />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/accept-invitation/:token" 
+        <Route
+          path='/accept-invitation/:token'
           element={
             <ProtectedRoute>
               <AcceptInvitationPage />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/tenant-help-center" 
+        <Route
+          path='/tenant-help-center'
           element={
             <ProtectedRoute>
               <TenantHelpCenter />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/tenant-request-for-landlord" 
+        <Route
+          path='/tenant-request-for-landlord'
           element={
             <ProtectedRoute>
               <TenantDashboard />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/tenant-profile" 
+        <Route
+          path='/tenant-profile'
           element={
             <ProtectedRoute>
               <TenantProfile />
             </ProtectedRoute>
-          } 
+          }
         />
         {/* Removed /my-requests route per product decision */}
 
-        <Route 
-          path="/landlord-dashboard" 
+        <Route
+          path='/landlord-dashboard'
           element={
             <ProtectedRoute>
               <LandlordDashboard />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/tenant-rental-requests" 
+        <Route
+          path='/tenant-rental-requests'
           element={
             <ProtectedRoute>
               <LandlordRentalRequests />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/my-offers" 
+        <Route
+          path='/my-offers'
           element={
             <ProtectedRoute>
               <MyOffers />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/property/:offerId" 
+        <Route
+          path='/property/:offerId'
           element={
             <ProtectedRoute>
               <PropertyDetailsView />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/payment" 
+        <Route
+          path='/payment'
           element={
             <ProtectedRoute>
               <PaymentPage />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/payment/:offerId" 
+        <Route
+          path='/payment/:offerId'
           element={
             <ProtectedRoute>
               <PaymentPage />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/payment-success" 
+        <Route
+          path='/payment-success'
           element={
             <ProtectedRoute>
               <PaymentSuccessPage />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/my-rents" 
+        <Route
+          path='/my-rents'
           element={
             <ProtectedRoute>
               <TenantRentHistory />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/payment-history" 
+        <Route
+          path='/payment-history'
           element={
             <ProtectedRoute>
               <PaymentHistory />
             </ProtectedRoute>
-          } 
+          }
         />
 
-        <Route 
-          path="/monthly-rent-payment" 
+        <Route
+          path='/monthly-rent-payment'
           element={
             <ProtectedRoute>
-              <div className="min-h-screen bg-gray-50">
+              <div className='min-h-screen bg-gray-50'>
                 <MonthlyRentPaymentPage />
               </div>
             </ProtectedRoute>
-          } 
+          }
         />
 
-        <Route 
-          path="/mock-payment" 
-          element={<MockPaymentPage />}
-        />
+        <Route path='/mock-payment' element={<MockPaymentPage />} />
 
-        <Route 
-          path="/reviews" 
+        <Route
+          path='/reviews'
           element={
             <ProtectedRoute>
               <ReviewPage />
             </ProtectedRoute>
-          } 
+          }
         />
 
-        <Route 
-          path="/admin" 
+        <Route
+          path='/admin'
           element={
             <ProtectedRoute>
               <AdminDashboard />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/admin/move-in-issues" 
+        <Route
+          path='/admin/move-in-issues'
           element={
             <ProtectedRoute>
               <AdminMoveInIssues />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/admin/property-review/:offerId" 
+        <Route
+          path='/admin/property-review/:offerId'
           element={
             <ProtectedRoute>
               <AdminPropertyReview />
             </ProtectedRoute>
-          } 
+          }
         />
 
-        <Route 
-          path="/landlord-profile" 
+        <Route
+          path='/landlord-profile'
           element={
             <ProtectedRoute>
               <LandlordProfile />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/landlord-my-property" 
+        <Route
+          path='/landlord-my-property'
           element={
             <ProtectedRoute>
               <LandlordMyProperty />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/landlord-add-property" 
+        <Route
+          path='/landlord-add-property'
           element={
             <ProtectedRoute>
               <LandlordAddProperty />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/landlord-edit-property/:propertyId" 
+        <Route
+          path='/landlord-edit-property/:propertyId'
           element={
             <ProtectedRoute>
               <LandlordEditProperty />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/landlord-property-details/:propertyId" 
+        <Route
+          path='/landlord-property-details/:propertyId'
           element={
             <ProtectedRoute>
               <LandlordPropertyDetails />
             </ProtectedRoute>
-          } 
+          }
         />
 
-        <Route 
-          path="/landlord-help-center" 
+        <Route
+          path='/landlord-help-center'
           element={
             <ProtectedRoute>
               <LandlordHelpCenter />
             </ProtectedRoute>
-          } 
+          }
         />
 
-        <Route 
-          path="/landlord-my-tenants" 
+        <Route
+          path='/landlord-my-tenants'
           element={
             <ProtectedRoute>
               <LandlordMyTenants />
             </ProtectedRoute>
-          } 
+          }
         />
 
-        <Route 
-          path="/landlord-tenant-profile/:tenantId" 
+        <Route
+          path='/landlord-tenant-profile/:tenantId'
           element={
             <ProtectedRoute>
               <LandlordTenantProfile />
             </ProtectedRoute>
-          } 
+          }
         />
 
-        <Route 
-          path="/property-media" 
+        <Route
+          path='/property-media'
           element={
             <ProtectedRoute>
               <PropertyMediaUpload />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/contracts" 
+        <Route
+          path='/contracts'
           element={
             <ProtectedRoute>
               <ContractManagementPage />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/payments" 
+        <Route
+          path='/payments'
           element={
             <ProtectedRoute>
               <PaymentManagementPage />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/messaging" 
+        <Route
+          path='/messaging'
           element={
             <ProtectedRoute>
               <MessagingPage />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/messaging/:conversationId" 
+        <Route
+          path='/messaging/:conversationId'
           element={
             <ProtectedRoute>
               <MessagingPage />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/business-upgrade" 
+        <Route
+          path='/business-upgrade'
           element={
             <ProtectedRoute>
               <BusinessUpgradePage />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/tenant-group-management" 
+        <Route
+          path='/tenant-group-management'
           element={
             <ProtectedRoute>
               <TenantGroupManagement />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path='*' element={<Navigate to='/' replace />} />
       </Routes>
     </div>
   );
@@ -388,7 +428,7 @@ const AppContent = () => {
 
 function App() {
   console.log('App component is rendering'); // Debug log
-  
+
   return (
     <AuthProvider>
       <SocketProvider>

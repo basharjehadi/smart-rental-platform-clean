@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rental Agreement - SR-202508-0680</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 20mm;
+      }
+
+      body {
+        font-family: 'Times New Roman', serif;
+        font-size: 11pt;
+        line-height: 1.4;
+        color: #333;
+        margin: 0;
+        padding: 0;
+        background: white;
+        /* Optimize for PDF generation */
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .page {
+        width: 210mm;
+        min-height: 297mm;
+        padding: 20mm;
+        margin: 0 auto;
+        background: white;
+        box-sizing: border-box;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 30pt;
+        border-bottom: 2pt solid #333;
+        padding-bottom: 15pt;
+      }
+
+      .main-title {
+        font-size: 18pt;
+        font-weight: bold;
+        margin-bottom: 5pt;
+        text-transform: uppercase;
+      }
+
+      .sub-title {
+        font-size: 14pt;
+        font-weight: bold;
+        margin-bottom: 5pt;
+      }
+
+      .contract-number {
+        font-size: 12pt;
+        font-weight: bold;
+        margin-bottom: 5pt;
+      }
+
+      .contract-date {
+        font-size: 11pt;
+        margin-bottom: 10pt;
+      }
+
+      .section {
+        margin-bottom: 20pt;
+        page-break-inside: avoid;
+      }
+
+      .section-title {
+        font-size: 12pt;
+        font-weight: bold;
+        margin-bottom: 10pt;
+        text-transform: uppercase;
+        border-bottom: 1pt solid #333;
+        padding-bottom: 3pt;
+      }
+
+      .bilingual-content {
+        display: table;
+        width: 100%;
+        margin-bottom: 15pt;
+      }
+
+      .english-content {
+        display: table-cell;
+        width: 50%;
+        text-align: left;
+        padding-right: 8pt;
+        vertical-align: top;
+      }
+
+      .polish-content {
+        display: table-cell;
+        width: 50%;
+        text-align: left;
+        padding-left: 8pt;
+        vertical-align: top;
+        border-left: 1pt solid #ccc;
+      }
+
+      .content {
+        margin-bottom: 10pt;
+        text-align: justify;
+      }
+
+      .parties-section {
+        margin-bottom: 25pt;
+      }
+
+      .party-info {
+        margin-bottom: 15pt;
+      }
+
+      .party-title {
+        font-weight: bold;
+        margin-bottom: 8pt;
+        font-size: 12pt;
+      }
+
+      .party-details {
+        margin-left: 10pt;
+      }
+
+      .party-detail {
+        margin-bottom: 5pt;
+      }
+
+      .payment-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10pt 0;
+      }
+
+      .payment-table th,
+      .payment-table td {
+        border: 1pt solid #333;
+        padding: 5pt;
+        text-align: center;
+        font-size: 10pt;
+      }
+
+      .payment-table th {
+        background-color: #f5f5f5;
+        font-weight: bold;
+      }
+
+      .payment-table .amount {
+        font-weight: bold;
+      }
+
+      .signatures-section {
+        margin-top: 30pt;
+        page-break-inside: avoid;
+      }
+
+      .signature-container {
+        display: table;
+        width: 100%;
+        margin-top: 20pt;
+      }
+
+      .signature-box {
+        display: table-cell;
+        width: 50%;
+        text-align: center;
+        padding: 10pt;
+      }
+
+      .signature-image {
+        max-width: 120pt;
+        max-height: 60pt;
+        margin-bottom: 10pt;
+        border: 1pt solid #ccc;
+        /* Optimize image rendering */
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+      }
+
+      .signature-line {
+        width: 150pt;
+        height: 1pt;
+        background-color: #333;
+        margin: 10pt auto;
+      }
+
+      .signature-name {
+        font-weight: bold;
+        margin-bottom: 5pt;
+      }
+
+      .signature-title {
+        font-style: italic;
+        margin-bottom: 5pt;
+      }
+
+      .signature-date {
+        font-size: 10pt;
+      }
+
+      .footer {
+        margin-top: 30pt;
+        text-align: center;
+        font-size: 9pt;
+        color: #666;
+        border-top: 1pt solid #ccc;
+        padding-top: 10pt;
+      }
+
+      .page-number {
+        position: absolute;
+        bottom: 10mm;
+        right: 20mm;
+        font-size: 10pt;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="header">
+        <div class="main-title">Rental Agreement</div>
+        <div class="sub-title">Umowa Najmu</div>
+        <div class="contract-number">Contract No.: SR-202508-0680</div>
+        <div class="contract-date">Date: August 8, 2025</div>
+      </div>
+
+      <div class="parties-section">
+        <div class="section-title">§1. Parties / Strony</div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="party-info">
+              <div class="party-title">LANDLORD:</div>
+              <div class="party-details">
+                <div class="party-detail">Name: Test Landlord</div>
+                <div class="party-detail">Address: N/A</div>
+                <div class="party-detail">PESEL: N/A</div>
+                <div class="party-detail">Phone: 888881596</div>
+                <div class="party-detail">Email: testlandlord@example.com</div>
+              </div>
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="party-info">
+              <div class="party-title">WYNAJMUJĄCY:</div>
+              <div class="party-details">
+                <div class="party-detail">Imię i nazwisko: Test Landlord</div>
+                <div class="party-detail">Adres: N/A</div>
+                <div class="party-detail">PESEL: N/A</div>
+                <div class="party-detail">Telefon: 888881596</div>
+                <div class="party-detail">Email: testlandlord@example.com</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="party-info">
+              <div class="party-title">TENANT:</div>
+              <div class="party-details">
+                <div class="party-detail">Name: Test Tenant</div>
+                <div class="party-detail">Address: N/A</div>
+                <div class="party-detail">PESEL: 97103010959</div>
+                <div class="party-detail">Phone: 573977786</div>
+                <div class="party-detail">Email: testtenant@example.com</div>
+              </div>
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="party-info">
+              <div class="party-title">NAJEMCA:</div>
+              <div class="party-details">
+                <div class="party-detail">Imię i nazwisko: Test Tenant</div>
+                <div class="party-detail">Adres: N/A</div>
+                <div class="party-detail">PESEL: 97103010959</div>
+                <div class="party-detail">Telefon: 573977786</div>
+                <div class="party-detail">Email: testtenant@example.com</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          §2. Subject of Agreement / Przedmiot Umowy
+        </div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              The Landlord declares that he/she is the owner of the real estate
+              property located at: Jarochowskiego 97/19, 60-129, Poznan. The
+              Landlord hereby rents to the Tenant, and the Tenant hereby rents
+              from the Landlord, the above-mentioned property for residential
+              purposes.
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              Wynajmujący oświadcza, że jest właścicielem nieruchomości
+              położonej pod adresem: Jarochowskiego 97/19, 60-129, Poznan.
+              Wynajmujący niniejszym wynajmuje Najemcy, a Najemca niniejszym
+              wynajmuje od Wynajmującego ww. nieruchomość na cele mieszkalne.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">§3. Lease Term / Okres Najmu</div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              The lease term is 12 months, starting from August 15, 2025 and
+              ending on August 15, 2026.
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              Okres najmu wynosi 12 miesięcy, rozpoczynając się od August 15,
+              2025 i kończąc się August 15, 2026.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">§4. Rent and Deposit / Czynsz i Kaucja</div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              a) The monthly rent is 3000 PLN, payable in advance by the 10th of
+              each month.<br />
+              b) The security deposit is 3000 PLN, to be paid upon signing this
+              agreement.<br />
+              c) Utilities are included in the rent amount.
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              a) Miesięczny czynsz wynosi 3000 PLN, płatny z góry do 10. dnia
+              każdego miesiąca.<br />
+              b) Kaucja wynosi 3000 PLN, płatna przy podpisaniu niniejszej
+              umowy.<br />
+              c) Media są wliczone w kwotę czynszu.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          §5. Payment Schedule / Harmonogram Płatności
+        </div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <table class="payment-table">
+              <thead>
+                <tr>
+                  <th>Payment No.</th>
+                  <th>Due Date</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>2</td>
+                  <td>September 10, 2025</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>3</td>
+                  <td>October 10, 2025</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>4</td>
+                  <td>November 10, 2025</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>5</td>
+                  <td>December 10, 2025</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>6</td>
+                  <td>January 10, 2026</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>7</td>
+                  <td>February 10, 2026</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>8</td>
+                  <td>March 10, 2026</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>9</td>
+                  <td>April 10, 2026</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>10</td>
+                  <td>May 10, 2026</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>11</td>
+                  <td>June 10, 2026</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>12</td>
+                  <td>July 10, 2026</td>
+                  <td class="amount">1452 PLN</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="polish-content">
+            <table class="payment-table">
+              <thead>
+                <tr>
+                  <th>Nr płatności</th>
+                  <th>Termin płatności</th>
+                  <th>Kwota</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>2</td>
+                  <td>September 10, 2025</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>3</td>
+                  <td>October 10, 2025</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>4</td>
+                  <td>November 10, 2025</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>5</td>
+                  <td>December 10, 2025</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>6</td>
+                  <td>January 10, 2026</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>7</td>
+                  <td>February 10, 2026</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>8</td>
+                  <td>March 10, 2026</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>9</td>
+                  <td>April 10, 2026</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>10</td>
+                  <td>May 10, 2026</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>11</td>
+                  <td>June 10, 2026</td>
+                  <td class="amount">3000 PLN</td>
+                </tr>
+                <tr>
+                  <td>12</td>
+                  <td>July 10, 2026</td>
+                  <td class="amount">1452 PLN</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">§6. Tenant Protection / Ochrona Najemcy</div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              The tenant has the right to terminate this agreement within 24
+              hours of signing and receive a full refund of all payments made,
+              including the security deposit.
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              Najemca ma prawo do rozwiązania niniejszej umowy w ciągu 24 godzin
+              od podpisania i otrzymania pełnego zwrotu wszystkich dokonanych
+              płatności, w tym kaucji.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="signatures-section">
+        <div class="section-title">§7. Signatures / Podpisy</div>
+        <div class="signature-container">
+          <div class="signature-box">
+            <div class="signature-name">Test Landlord</div>
+            <div class="signature-title">Landlord / Wynajmujący</div>
+            <img
+              src="data:image/jpeg;base64,/9j/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAA/AZADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AJgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/2Q&#x3D;&#x3D;"
+              class="signature-image"
+              alt="Landlord Signature"
+              width="400"
+              height="63"
+            />
+            <div class="signature-date">Date: August 8, 2025</div>
+          </div>
+          <div class="signature-box">
+            <div class="signature-name">Test Tenant</div>
+            <div class="signature-title">Tenant / Najemca</div>
+            <img
+              src="data:image/jpeg;base64,/9j/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAA/AZADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AJgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/2Q&#x3D;&#x3D;"
+              class="signature-image"
+              alt="Tenant Signature"
+              width="400"
+              height="63"
+            />
+            <div class="signature-date">Date: August 8, 2025</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        This document was generated by Smart Rental System on August 8, 2025.
+        Legally binding.
+      </div>
+
+      <div class="page-number">1</div>
+    </div>
+  </body>
+</html>

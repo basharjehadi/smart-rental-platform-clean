@@ -8,18 +8,20 @@ export const validate = (schema, property = 'body') => {
   return (req, res, next) => {
     const { error, value } = schema.validate(req[property], {
       abortEarly: false,
-      stripUnknown: true
+      stripUnknown: true,
     });
 
     if (error) {
-      const errorMessage = error.details.map(detail => detail.message).join(', ');
+      const errorMessage = error.details
+        .map((detail) => detail.message)
+        .join(', ');
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
-        errors: error.details.map(detail => ({
+        errors: error.details.map((detail) => ({
           field: detail.path.join('.'),
-          message: detail.message
-        }))
+          message: detail.message,
+        })),
       });
     }
 
@@ -43,8 +45,8 @@ export const validateAsync = (validator) => {
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
-        error: error.message
+        error: error.message,
       });
     }
   };
-}; 
+};

@@ -34,14 +34,20 @@ router.put('/:organizationId', organizationController.updateOrganization);
  * @desc    Add member to organization
  * @access  Private (organization owners and admins)
  */
-router.post('/:organizationId/members', organizationController.addOrganizationMember);
+router.post(
+  '/:organizationId/members',
+  organizationController.addOrganizationMember
+);
 
 /**
  * @route   DELETE /api/organizations/:organizationId/members/:memberUserId
  * @desc    Remove member from organization
  * @access  Private (organization owners and admins)
  */
-router.delete('/:organizationId/members/:memberUserId', organizationController.removeOrganizationMember);
+router.delete(
+  '/:organizationId/members/:memberUserId',
+  organizationController.removeOrganizationMember
+);
 
 /**
  * @route   GET /api/organizations

@@ -15,7 +15,7 @@ class ReviewService {
   async initializeUserRating(userId) {
     try {
       console.log(`⭐ Initializing 5-star rating for new user: ${userId}`);
-      
+
       // Create initial review with 5-star rating (self-review)
       const initialReview = await prisma.review.create({
         data: {
@@ -26,8 +26,8 @@ class ReviewService {
           targetTenantGroupId: null,
           leaseId: null, // No lease yet
           reviewStage: 'INITIAL',
-          isSystemGenerated: true
-        }
+          isSystemGenerated: true,
+        },
       });
 
       console.log(`✅ Initial 5-star rating created for user ${userId}`);
@@ -43,10 +43,21 @@ class ReviewService {
    */
   async createStageReview(data) {
     try {
-      const { reviewerId, targetTenantGroupId, leaseId, rating, comment, stage, isAnonymous = false, revieweeId } = data;
-      
-      console.log(`📝 Creating ${stage} review from ${reviewerId} to ${revieweeId || targetTenantGroupId}, lease ${leaseId}`);
-      
+      const {
+        reviewerId,
+        targetTenantGroupId,
+        leaseId,
+        rating,
+        comment,
+        stage,
+        isAnonymous = false,
+        revieweeId,
+      } = data;
+
+      console.log(
+        `📝 Creating ${stage} review from ${reviewerId} to ${revieweeId || targetTenantGroupId}, lease ${leaseId}`
+      );
+
       // Validate stage
       const validStages = ['MOVE_IN', 'END_OF_LEASE'];
       if (!validStages.includes(stage)) {
@@ -62,8 +73,8 @@ class ReviewService {
           leaseId,
           reviewerId,
           revieweeId: finalRevieweeId,
-          reviewStage: stage
-        }
+          reviewStage: stage,
+        },
       });
 
       if (existingReview) {
@@ -81,8 +92,8 @@ class ReviewService {
           revieweeId: finalRevieweeId,
           leaseId,
           reviewStage: stage,
-          isSystemGenerated: false
-        }
+          isSystemGenerated: false,
+        },
       });
 
       console.log(`✅ ${stage} review created successfully`);
@@ -99,11 +110,11 @@ class ReviewService {
   async updateUserAverageRating(userId) {
     try {
       console.log(`🔄 Updating average rating for user: ${userId}`);
-      
+
       // Get all reviews received by the user
       const reviews = await prisma.review.findMany({
         where: { reviewerId: userId },
-        select: { rating: true, reviewStage: true, isSystemGenerated: true }
+        select: { rating: true, reviewStage: true, isSystemGenerated: true },
       });
 
       if (reviews.length === 0) {
@@ -115,9 +126,9 @@ class ReviewService {
       let totalWeightedRating = 0;
       let totalWeight = 0;
 
-      reviews.forEach(review => {
+      reviews.forEach((review) => {
         let weight = 1;
-        
+
         // Weight reviews by stage importance
         switch (review.reviewStage) {
           case 'INITIAL':
@@ -140,23 +151,26 @@ class ReviewService {
         totalWeight += weight;
       });
 
-      const averageRating = totalWeight > 0 ? totalWeightedRating / totalWeight : 0;
+      const averageRating =
+        totalWeight > 0 ? totalWeightedRating / totalWeight : 0;
       const roundedRating = Math.round(averageRating * 10) / 10; // Round to 1 decimal
 
-             // Update user's average rating
-       await prisma.user.update({
-         where: { id: userId },
-         data: { 
-           averageRating: roundedRating,
-           totalReviews: reviews.length
-         }
-       });
+      // Update user's average rating
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          averageRating: roundedRating,
+          totalReviews: reviews.length,
+        },
+      });
 
-       // Calculate and update user rank
-       await rankService.calculateUserRank(userId);
+      // Calculate and update user rank
+      await rankService.calculateUserRank(userId);
 
-       console.log(`✅ User ${userId} average rating updated to ${roundedRating} (${reviews.length} reviews)`);
-       return roundedRating;
+      console.log(
+        `✅ User ${userId} average rating updated to ${roundedRating} (${reviews.length} reviews)`
+      );
+      return roundedRating;
     } catch (error) {
       console.error(`❌ Error updating user average rating:`, error);
       throw error;
@@ -172,8 +186,8 @@ class ReviewService {
         where: {
           OR: [
             { reviewerId: userId },
-            { targetTenantGroup: { members: { some: { userId } } } }
-          ]
+            { targetTenantGroup: { members: { some: { userId } } } },
+          ],
         },
         include: {
           lease: {
@@ -181,11 +195,11 @@ class ReviewService {
               id: true,
               startDate: true,
               endDate: true,
-              status: true
-            }
-          }
+              status: true,
+            },
+          },
         },
-        orderBy: { createdAt: 'asc' }
+        orderBy: { createdAt: 'asc' },
       });
 
       const summary = {
@@ -194,18 +208,18 @@ class ReviewService {
         reviewStages: {
           initial: 0,
           moveIn: 0,
-          endOfLease: 0
+          endOfLease: 0,
         },
         recentReviews: [],
         stageProgress: {
           moveInCompleted: false,
-          endOfLeaseCompleted: false
-        }
+          endOfLeaseCompleted: false,
+        },
       };
 
       if (reviews.length > 0) {
         // Calculate stage counts
-        reviews.forEach(review => {
+        reviews.forEach((review) => {
           switch (review.reviewStage) {
             case 'INITIAL':
               summary.reviewStages.initial++;
@@ -223,19 +237,19 @@ class ReviewService {
 
         // Get recent reviews (last 3)
         summary.recentReviews = reviews
-          .filter(r => !r.isSystemGenerated)
+          .filter((r) => !r.isSystemGenerated)
           .slice(-3)
-          .map(r => ({
+          .map((r) => ({
             rating: r.rating,
             comment: r.comment,
             stage: r.reviewStage,
-            createdAt: r.createdAt
+            createdAt: r.createdAt,
           }));
 
         // Get average rating from user table
         const user = await prisma.user.findUnique({
           where: { id: userId },
-          select: { averageRating: true }
+          select: { averageRating: true },
         });
         summary.averageRating = user?.averageRating || 0;
       }
@@ -252,8 +266,10 @@ class ReviewService {
    */
   async triggerReviewByEvent(eventType, leaseId, tenantId) {
     try {
-      console.log(`🎯 Triggering review for event: ${eventType}, lease: ${leaseId}`);
-      
+      console.log(
+        `🎯 Triggering review for event: ${eventType}, lease: ${leaseId}`
+      );
+
       let stage;
       switch (eventType) {
         case 'MOVE_IN':
@@ -271,8 +287,8 @@ class ReviewService {
         where: {
           targetTenantGroupId: tenantId,
           leaseId,
-          reviewStage: stage
-        }
+          reviewStage: stage,
+        },
       });
 
       if (existingReview) {
@@ -290,8 +306,8 @@ class ReviewService {
           targetTenantGroupId: tenantId, // Self-review initially
           leaseId,
           reviewStage: stage,
-          isSystemGenerated: true
-        }
+          isSystemGenerated: true,
+        },
       });
 
       console.log(`✅ Review opportunity created for stage ${stage}`);
@@ -308,11 +324,11 @@ class ReviewService {
   async getPendingReviews(userId) {
     try {
       console.log(`🔍 Fetching pending reviews for user: ${userId}`);
-      
+
       // Get user's role
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { role: true }
+        select: { role: true },
       });
 
       if (!user) {
@@ -320,7 +336,7 @@ class ReviewService {
       }
 
       const isLandlord = user.role === 'LANDLORD';
-      
+
       // Get pending reviews based on user role
       if (isLandlord) {
         // Landlord needs to review tenants
@@ -349,13 +365,21 @@ class ReviewService {
           reviewStage: 'MOVE_IN',
           status: 'PENDING',
           description: 'Review tenant after move-in',
-          tenant: { id: 'demo_tenant_1', name: 'Demo Tenant', email: 'demo@tenant.com' },
-          property: { id: 'demo_property_1', name: 'Demo Property', address: '123 Demo St' },
+          tenant: {
+            id: 'demo_tenant_1',
+            name: 'Demo Tenant',
+            email: 'demo@tenant.com',
+          },
+          property: {
+            id: 'demo_property_1',
+            name: 'Demo Property',
+            address: '123 Demo St',
+          },
           tenantId: 'demo_tenant_1',
           landlordId: landlordId,
           isAnonymous: false,
-          isDoubleBlind: true
-        }
+          isDoubleBlind: true,
+        },
       ];
     } catch (error) {
       console.error(`❌ Error getting landlord pending reviews:`, error);
@@ -377,13 +401,21 @@ class ReviewService {
           reviewStage: 'MOVE_IN',
           status: 'PENDING',
           description: 'Review landlord after move-in',
-          landlord: { id: 'demo_landlord_1', name: 'Demo Landlord', email: 'demo@landlord.com' },
-          property: { id: 'demo_property_1', name: 'Demo Property', address: '123 Demo St' },
+          landlord: {
+            id: 'demo_landlord_1',
+            name: 'Demo Landlord',
+            email: 'demo@landlord.com',
+          },
+          property: {
+            id: 'demo_property_1',
+            name: 'Demo Property',
+            address: '123 Demo St',
+          },
           tenantId: tenantId,
           landlordId: 'demo_landlord_1',
           isAnonymous: false,
-          isDoubleBlind: true
-        }
+          isDoubleBlind: true,
+        },
       ];
     } catch (error) {
       console.error(`❌ Error getting tenant pending reviews:`, error);

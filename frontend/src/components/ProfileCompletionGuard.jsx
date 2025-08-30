@@ -15,16 +15,20 @@ const ProfileCompletionGuard = ({ children, required = true }) => {
       try {
         const response = await api.get('/users/profile/status');
         setProfileStatus(response.data);
-        
+
         // If profile is incomplete and this route requires complete profile
         if (required && !response.data.isComplete) {
           // Redirect to appropriate profile page based on user role
-          const profileRoute = response.data.user?.role === 'LANDLORD' ? '/landlord-profile' : '/profile';
-          navigate(profileRoute, { 
-            state: { 
-              message: 'Please complete your profile information before proceeding',
-              missingFields: response.data.missingFields 
-            } 
+          const profileRoute =
+            response.data.user?.role === 'LANDLORD'
+              ? '/landlord-profile'
+              : '/profile';
+          navigate(profileRoute, {
+            state: {
+              message:
+                'Please complete your profile information before proceeding',
+              missingFields: response.data.missingFields,
+            },
           });
         }
       } catch (error) {
@@ -41,10 +45,10 @@ const ProfileCompletionGuard = ({ children, required = true }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Checking profile status...</p>
+      <div className='min-h-screen bg-gray-100 flex items-center justify-center'>
+        <div className='text-center'>
+          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto'></div>
+          <p className='mt-4 text-gray-600'>Checking profile status...</p>
         </div>
       </div>
     );
@@ -59,5 +63,4 @@ const ProfileCompletionGuard = ({ children, required = true }) => {
   return null;
 };
 
-export default ProfileCompletionGuard; 
-
+export default ProfileCompletionGuard;

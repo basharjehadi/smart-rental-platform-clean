@@ -17,7 +17,9 @@ class LeaseEventService {
    */
   async handleLeaseStatusChange(leaseId, oldStatus, newStatus, metadata = {}) {
     try {
-      console.log(`🔄 Lease status change: ${leaseId} ${oldStatus} → ${newStatus}`);
+      console.log(
+        `🔄 Lease status change: ${leaseId} ${oldStatus} → ${newStatus}`
+      );
 
       // Get lease details
       const lease = await prisma.lease.findUnique({
@@ -25,15 +27,15 @@ class LeaseEventService {
         include: {
           tenantGroup: {
             include: {
-              members: true
-            }
+              members: true,
+            },
           },
           property: {
             include: {
-              landlord: true
-            }
-          }
-        }
+              landlord: true,
+            },
+          },
+        },
       });
 
       if (!lease) {
@@ -78,7 +80,7 @@ class LeaseEventService {
     await this.createEndOfLeaseReviews(lease, {
       isEarlyTermination: isEarlyMoveOut,
       earlyTerminationReason: earlyMoveOutReason,
-      excludeFromAggregates: false // Normal end-of-lease reviews count
+      excludeFromAggregates: false, // Normal end-of-lease reviews count
     });
 
     // If it's an early move-out, create special reviews
@@ -95,14 +97,15 @@ class LeaseEventService {
   async handleLeaseTerminated24H(lease, metadata) {
     console.log(`⏰ Handling lease terminated 24H: ${lease.id}`);
 
-    const terminationReason = metadata.terminationReason || '24-hour termination notice';
+    const terminationReason =
+      metadata.terminationReason || '24-hour termination notice';
 
     // Create special reviews for TERMINATED_24H
     await this.createEndOfLeaseReviews(lease, {
       isEarlyTermination: true,
       earlyTerminationReason: 'TERMINATED_24H',
       excludeFromAggregates: true, // These reviews don't count in aggregates
-      terminationReason
+      terminationReason,
     });
 
     // Award early termination badge to tenant
@@ -124,7 +127,7 @@ class LeaseEventService {
       isEarlyTermination: true,
       earlyTerminationReason: 'TERMINATED',
       excludeFromAggregates: true, // Terminated lease reviews don't count
-      terminationReason
+      terminationReason,
     });
   }
 
@@ -138,7 +141,7 @@ class LeaseEventService {
       isEarlyTermination = false,
       earlyTerminationReason = null,
       excludeFromAggregates = false,
-      terminationReason = null
+      terminationReason = null,
     } = options;
 
     try {
@@ -155,7 +158,7 @@ class LeaseEventService {
             isEarlyTermination,
             earlyTerminationReason,
             excludeFromAggregates,
-            terminationReason
+            terminationReason,
           }
         );
       }
@@ -172,7 +175,7 @@ class LeaseEventService {
             isEarlyTermination,
             earlyTerminationReason,
             excludeFromAggregates,
-            terminationReason
+            terminationReason,
           }
         );
       }
@@ -193,13 +196,20 @@ class LeaseEventService {
    * @param {Date} leaseEndDate - Lease end date for calculating publishAfter
    * @param {Object} options - Review options
    */
-  async createEndOfLeaseReview(leaseId, reviewerId, revieweeId, targetTenantGroupId, leaseEndDate, options = {}) {
+  async createEndOfLeaseReview(
+    leaseId,
+    reviewerId,
+    revieweeId,
+    targetTenantGroupId,
+    leaseEndDate,
+    options = {}
+  ) {
     try {
       const {
         isEarlyTermination = false,
         earlyTerminationReason = null,
         excludeFromAggregates = false,
-        terminationReason = null
+        terminationReason = null,
       } = options;
 
       // Check if review already exists
@@ -208,12 +218,14 @@ class LeaseEventService {
           leaseId,
           reviewerId,
           revieweeId,
-          reviewStage: 'END_OF_LEASE'
-        }
+          reviewStage: 'END_OF_LEASE',
+        },
       });
 
       if (existingReview) {
-        console.log(`ℹ️ End-of-lease review already exists: ${existingReview.id}`);
+        console.log(
+          `ℹ️ End-of-lease review already exists: ${existingReview.id}`
+        );
         return existingReview;
       }
 
@@ -234,8 +246,8 @@ class LeaseEventService {
           isEarlyTermination,
           earlyTerminationReason,
           excludeFromAggregates,
-          isSystemGenerated: true
-        }
+          isSystemGenerated: true,
+        },
       });
 
       console.log(`✅ End-of-lease review created: ${review.id}`);
@@ -258,7 +270,7 @@ class LeaseEventService {
       // Create additional review for early move-out context
       if (lease.tenantGroup?.members?.length > 0) {
         const tenantId = lease.tenantGroup.members[0].userId;
-        
+
         // Create a special review that captures early move-out context
         await prisma.review.create({
           data: {
@@ -276,8 +288,8 @@ class LeaseEventService {
             isEarlyTermination: true,
             earlyTerminationReason: 'EARLY_MOVE_OUT',
             excludeFromAggregates: false, // Early move-out reviews can count
-            isSystemGenerated: true
-          }
+            isSystemGenerated: true,
+          },
         });
       }
 
@@ -306,9 +318,9 @@ class LeaseEventService {
         where: {
           userId: tenantId,
           badge: {
-            name: 'EARLY_TERMINATION_HANDLER'
-          }
-        }
+            name: 'EARLY_TERMINATION_HANDLER',
+          },
+        },
       });
 
       if (existingBadge) {
@@ -322,7 +334,7 @@ class LeaseEventService {
         description: 'Successfully handled early lease termination',
         criteria: 'Completed lease termination process within 24 hours',
         icon: '⏰',
-        color: 'orange'
+        color: 'orange',
       });
 
       // Award badge to user
@@ -346,13 +358,13 @@ class LeaseEventService {
         where: {
           OR: [
             { reviewerId: userId, excludeFromAggregates: true },
-            { revieweeId: userId, excludeFromAggregates: true }
-          ]
+            { revieweeId: userId, excludeFromAggregates: true },
+          ],
         },
-        select: { id: true }
+        select: { id: true },
       });
 
-      return excludedReviews.map(review => review.id);
+      return excludedReviews.map((review) => review.id);
     } catch (error) {
       console.error(`❌ Error getting excluded review IDs:`, error);
       return [];
@@ -371,36 +383,38 @@ class LeaseEventService {
         where: {
           status: 'ACTIVE',
           endDate: {
-            lte: new Date() // Lease has ended
-          }
+            lte: new Date(), // Lease has ended
+          },
         },
         include: {
           tenantGroup: {
             include: {
-              members: true
-            }
+              members: true,
+            },
           },
           property: {
             include: {
-              landlord: true
-            }
-          }
-        }
+              landlord: true,
+            },
+          },
+        },
       });
 
-      console.log(`📋 Found ${activeLeases.length} leases that need status updates`);
+      console.log(
+        `📋 Found ${activeLeases.length} leases that need status updates`
+      );
 
       for (const lease of activeLeases) {
         try {
           // Update lease status to ENDED
           await prisma.lease.update({
             where: { id: lease.id },
-            data: { status: 'ENDED' }
+            data: { status: 'ENDED' },
           });
 
           // Handle the status change
           await this.handleLeaseStatusChange(lease.id, 'ACTIVE', 'ENDED', {
-            isEarlyMoveOut: false
+            isEarlyMoveOut: false,
           });
 
           console.log(`✅ Processed lease: ${lease.id}`);

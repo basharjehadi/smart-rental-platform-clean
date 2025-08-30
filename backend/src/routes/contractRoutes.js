@@ -1,8 +1,8 @@
 import express from 'express';
-import { 
-  checkContractEligibility, 
-  generateContract, 
-  saveSignature, 
+import {
+  checkContractEligibility,
+  generateContract,
+  saveSignature,
   getContractStatus,
   generateAllMissingContracts,
   previewContract,
@@ -10,7 +10,7 @@ import {
   downloadSignedContract,
   downloadGeneratedContract,
   getMyContracts,
-  getLandlordContracts
+  getLandlordContracts,
 } from '../controllers/contractController.js';
 import verifyToken from '../middlewares/verifyToken.js';
 import { PrismaClient } from '@prisma/client';
@@ -21,7 +21,11 @@ const prisma = new PrismaClient();
 const router = express.Router();
 
 // Check if user is eligible to generate contract
-router.get('/eligibility/:rentalRequestId', verifyToken, checkContractEligibility);
+router.get(
+  '/eligibility/:rentalRequestId',
+  verifyToken,
+  checkContractEligibility
+);
 
 // Preview contract (before payment)
 router.get('/preview/:offerId', verifyToken, previewContract);
@@ -33,7 +37,11 @@ router.post('/sign/:contractId', verifyToken, signContract);
 router.get('/download/:contractId', verifyToken, downloadSignedContract);
 
 // Download generated contract (before signing)
-router.get('/download-generated/:contractId', verifyToken, downloadGeneratedContract);
+router.get(
+  '/download-generated/:contractId',
+  verifyToken,
+  downloadGeneratedContract
+);
 
 // Generate contract
 router.post('/generate/:rentalRequestId', verifyToken, generateContract);
@@ -53,38 +61,42 @@ router.post('/generate-by-offer/:offerId', verifyToken, async (req, res) => {
         landlord: true,
         rentalRequest: {
           include: {
-            tenant: true
-          }
-        }
-      }
+            tenant: true,
+          },
+        },
+      },
     });
 
     if (!offer) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        error: 'Offer not found' 
+        error: 'Offer not found',
       });
     }
 
     // Verify the user is authorized (either tenant or landlord)
-    if (offer.rentalRequest.tenant.id !== userId && offer.landlord.id !== userId) {
-      return res.status(403).json({ 
+    if (
+      offer.rentalRequest.tenant.id !== userId &&
+      offer.landlord.id !== userId
+    ) {
+      return res.status(403).json({
         success: false,
-        error: 'Access denied. You can only generate contracts for offers you are involved in.' 
+        error:
+          'Access denied. You can only generate contracts for offers you are involved in.',
       });
     }
 
     // Check if offer is paid
     if (offer.status !== 'PAID') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Contract can only be generated for paid offers' 
+        error: 'Contract can only be generated for paid offers',
       });
     }
 
     // Check if contract already exists
     const existingContract = await prisma.contract.findFirst({
-      where: { rentalRequestId: offer.rentalRequestId }
+      where: { rentalRequestId: offer.rentalRequestId },
     });
 
     if (existingContract) {
@@ -92,7 +104,7 @@ router.post('/generate-by-offer/:offerId', verifyToken, async (req, res) => {
       return res.json({
         success: true,
         contract: existingContract,
-        message: 'Contract already exists'
+        message: 'Contract already exists',
       });
     }
 
@@ -100,20 +112,19 @@ router.post('/generate-by-offer/:offerId', verifyToken, async (req, res) => {
     // We need to call it with the rental request ID
     const generateRequest = {
       params: { rentalRequestId: offer.rentalRequestId },
-      user: { id: userId }
+      user: { id: userId },
     };
 
     // Call the generateContract function
     const result = await generateContract(generateRequest, res);
-    
+
     console.log('✅ Contract generated successfully by offer ID');
     return result;
-
   } catch (error) {
     console.error('❌ Error generating contract by offer ID:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Failed to generate contract' 
+      error: 'Failed to generate contract',
     });
   }
 });
@@ -141,8 +152,8 @@ router.get('/:contractId', verifyToken, async (req, res) => {
                 id: true,
                 name: true,
                 firstName: true,
-                lastName: true
-              }
+                lastName: true,
+              },
             },
             offers: {
               where: { status: 'PAID' },
@@ -152,20 +163,20 @@ router.get('/:contractId', verifyToken, async (req, res) => {
                     id: true,
                     name: true,
                     firstName: true,
-                    lastName: true
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                    lastName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!contract) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        error: 'Contract not found' 
+        error: 'Contract not found',
       });
     }
 
@@ -173,13 +184,17 @@ router.get('/:contractId', verifyToken, async (req, res) => {
     const { tenant, offers } = contract.rentalRequest;
     const paidOffer = offers?.[0];
     if (tenant.id !== userId && paidOffer?.landlord.id !== userId) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         success: false,
-        error: 'Access denied. You can only view contracts you are involved in.' 
+        error:
+          'Access denied. You can only view contracts you are involved in.',
       });
     }
 
-    console.log('✅ Contract details fetched successfully:', contract.contractNumber);
+    console.log(
+      '✅ Contract details fetched successfully:',
+      contract.contractNumber
+    );
 
     res.json({
       success: true,
@@ -190,20 +205,17 @@ router.get('/:contractId', verifyToken, async (req, res) => {
         pdfUrl: contract.pdfUrl,
         signedAt: contract.signedAt,
         createdAt: contract.createdAt,
-        updatedAt: contract.updatedAt
-      }
+        updatedAt: contract.updatedAt,
+      },
     });
-
   } catch (error) {
     console.error('❌ Error fetching contract details:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Failed to fetch contract details' 
+      error: 'Failed to fetch contract details',
     });
   }
 });
-
-
 
 // Save user signature
 router.post('/signature', verifyToken, saveSignature);
@@ -214,4 +226,4 @@ router.get('/status/:rentalRequestId', verifyToken, getContractStatus);
 // Manual trigger to generate all missing contracts (for immediate fixes)
 router.post('/generate-all-missing', verifyToken, generateAllMissingContracts);
 
-export default router; 
+export default router;

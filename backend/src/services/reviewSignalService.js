@@ -1,6 +1,6 @@
 /**
  * 📊 Review Signal Service
- * 
+ *
  * This service manages review signals for tracking payment events
  * without affecting public review averages. Signals are private
  * and used for internal tracking and analytics.
@@ -16,7 +16,9 @@ export async function createReviewSignal(data) {
   try {
     const { signalType, leaseId, tenantGroupId, metadata = {} } = data;
 
-    logger.info(`📊 Creating review signal: ${signalType} for lease ${leaseId}`);
+    logger.info(
+      `📊 Creating review signal: ${signalType} for lease ${leaseId}`
+    );
 
     // Validate signal type
     const validSignalTypes = ['PAYMENT_CONFIRMED', 'DEPOSIT_RETURNED'];
@@ -28,8 +30,8 @@ export async function createReviewSignal(data) {
     const lease = await prisma.lease.findUnique({
       where: { id: leaseId },
       include: {
-        tenantGroup: true
-      }
+        tenantGroup: true,
+      },
     });
 
     if (!lease) {
@@ -47,7 +49,7 @@ export async function createReviewSignal(data) {
         signalType,
         leaseId,
         tenantGroupId,
-        metadata
+        metadata,
       },
       include: {
         lease: {
@@ -55,22 +57,21 @@ export async function createReviewSignal(data) {
             id: true,
             startDate: true,
             endDate: true,
-            status: true
-          }
+            status: true,
+          },
         },
         tenantGroup: {
           select: {
             id: true,
-            name: true
-          }
-        }
-      }
+            name: true,
+          },
+        },
+      },
     });
 
     logger.info(`✅ Review signal created: ${signal.id} (${signalType})`);
 
     return signal;
-
   } catch (error) {
     logger.error(`❌ Error creating review signal:`, error);
     throw error;
@@ -90,17 +91,18 @@ export async function getLeaseReviewSignals(leaseId) {
         tenantGroup: {
           select: {
             id: true,
-            name: true
-          }
-        }
+            name: true,
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
-    logger.info(`✅ Found ${signals.length} review signals for lease ${leaseId}`);
+    logger.info(
+      `✅ Found ${signals.length} review signals for lease ${leaseId}`
+    );
 
     return signals;
-
   } catch (error) {
     logger.error(`❌ Error fetching lease review signals:`, error);
     throw error;
@@ -112,7 +114,9 @@ export async function getLeaseReviewSignals(leaseId) {
  */
 export async function getTenantGroupReviewSignals(tenantGroupId) {
   try {
-    logger.info(`📊 Fetching review signals for tenant group: ${tenantGroupId}`);
+    logger.info(
+      `📊 Fetching review signals for tenant group: ${tenantGroupId}`
+    );
 
     const signals = await prisma.reviewSignal.findMany({
       where: { tenantGroupId },
@@ -122,17 +126,18 @@ export async function getTenantGroupReviewSignals(tenantGroupId) {
             id: true,
             startDate: true,
             endDate: true,
-            status: true
-          }
-        }
+            status: true,
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
-    logger.info(`✅ Found ${signals.length} review signals for tenant group ${tenantGroupId}`);
+    logger.info(
+      `✅ Found ${signals.length} review signals for tenant group ${tenantGroupId}`
+    );
 
     return signals;
-
   } catch (error) {
     logger.error(`❌ Error fetching tenant group review signals:`, error);
     throw error;
@@ -149,7 +154,7 @@ export async function getReviewSignalsByType(signalType, options = {}) {
     logger.info(`📊 Fetching review signals by type: ${signalType}`);
 
     const where = { signalType };
-    
+
     if (leaseId) where.leaseId = leaseId;
     if (tenantGroupId) where.tenantGroupId = tenantGroupId;
 
@@ -161,24 +166,26 @@ export async function getReviewSignalsByType(signalType, options = {}) {
             id: true,
             startDate: true,
             endDate: true,
-            status: true
-          }
+            status: true,
+          },
         },
         tenantGroup: {
           select: {
             id: true,
-            name: true
-          }
-        }
+            name: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: limit,
-      skip: offset
+      skip: offset,
     });
 
     const total = await prisma.reviewSignal.count({ where });
 
-    logger.info(`✅ Found ${signals.length} ${signalType} signals (total: ${total})`);
+    logger.info(
+      `✅ Found ${signals.length} ${signalType} signals (total: ${total})`
+    );
 
     return {
       signals,
@@ -186,10 +193,9 @@ export async function getReviewSignalsByType(signalType, options = {}) {
         total,
         limit,
         offset,
-        hasMore: offset + limit < total
-      }
+        hasMore: offset + limit < total,
+      },
     };
-
   } catch (error) {
     logger.error(`❌ Error fetching review signals by type:`, error);
     throw error;
@@ -206,7 +212,7 @@ export async function getReviewSignalStats(options = {}) {
     logger.info(`📊 Fetching review signal statistics`);
 
     const where = {};
-    
+
     if (leaseId) where.leaseId = leaseId;
     if (tenantGroupId) where.tenantGroupId = tenantGroupId;
     if (startDate || endDate) {
@@ -215,26 +221,37 @@ export async function getReviewSignalStats(options = {}) {
       if (endDate) where.createdAt.lte = new Date(endDate);
     }
 
-    const [totalSignals, paymentConfirmed, depositReturned] = await Promise.all([
-      prisma.reviewSignal.count({ where }),
-      prisma.reviewSignal.count({ where: { ...where, signalType: 'PAYMENT_CONFIRMED' } }),
-      prisma.reviewSignal.count({ where: { ...where, signalType: 'DEPOSIT_RETURNED' } })
-    ]);
+    const [totalSignals, paymentConfirmed, depositReturned] = await Promise.all(
+      [
+        prisma.reviewSignal.count({ where }),
+        prisma.reviewSignal.count({
+          where: { ...where, signalType: 'PAYMENT_CONFIRMED' },
+        }),
+        prisma.reviewSignal.count({
+          where: { ...where, signalType: 'DEPOSIT_RETURNED' },
+        }),
+      ]
+    );
 
     const stats = {
       totalSignals,
       paymentConfirmed,
       depositReturned,
       breakdown: {
-        paymentConfirmed: totalSignals > 0 ? (paymentConfirmed / totalSignals * 100).toFixed(1) : 0,
-        depositReturned: totalSignals > 0 ? (depositReturned / totalSignals * 100).toFixed(1) : 0
-      }
+        paymentConfirmed:
+          totalSignals > 0
+            ? ((paymentConfirmed / totalSignals) * 100).toFixed(1)
+            : 0,
+        depositReturned:
+          totalSignals > 0
+            ? ((depositReturned / totalSignals) * 100).toFixed(1)
+            : 0,
+      },
     };
 
     logger.info(`✅ Review signal statistics:`, stats);
 
     return stats;
-
   } catch (error) {
     logger.error(`❌ Error fetching review signal statistics:`, error);
     throw error;
@@ -249,13 +266,12 @@ export async function deleteReviewSignal(signalId) {
     logger.info(`🗑️ Deleting review signal: ${signalId}`);
 
     const signal = await prisma.reviewSignal.delete({
-      where: { id: signalId }
+      where: { id: signalId },
     });
 
     logger.info(`✅ Review signal deleted: ${signalId}`);
 
     return signal;
-
   } catch (error) {
     logger.error(`❌ Error deleting review signal:`, error);
     throw error;
@@ -275,15 +291,14 @@ export async function cleanupOldReviewSignals(monthsOld = 24) {
     const result = await prisma.reviewSignal.deleteMany({
       where: {
         createdAt: {
-          lt: cutoffDate
-        }
-      }
+          lt: cutoffDate,
+        },
+      },
     });
 
     logger.info(`✅ Cleaned up ${result.count} old review signals`);
 
     return result.count;
-
   } catch (error) {
     logger.error(`❌ Error cleaning up old review signals:`, error);
     throw error;
@@ -297,5 +312,5 @@ export default {
   getReviewSignalsByType,
   getReviewSignalStats,
   deleteReviewSignal,
-  cleanupOldReviewSignals
+  cleanupOldReviewSignals,
 };

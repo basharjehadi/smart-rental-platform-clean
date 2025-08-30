@@ -13,25 +13,34 @@ export const createTicket = async (req, res) => {
     if (!title || !description || !category || !priority) {
       return res.status(400).json({
         success: false,
-        error: 'Title, description, category, and priority are required'
+        error: 'Title, description, category, and priority are required',
       });
     }
 
     // Validate category and priority values
-    const validCategories = ['TECHNICAL', 'BILLING', 'GENERAL', 'EMERGENCY', 'PROPERTY_ISSUE', 'PAYMENT_ISSUE'];
+    const validCategories = [
+      'TECHNICAL',
+      'BILLING',
+      'GENERAL',
+      'EMERGENCY',
+      'PROPERTY_ISSUE',
+      'PAYMENT_ISSUE',
+    ];
     const validPriorities = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
     if (!validCategories.includes(category)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid category. Must be one of: ' + validCategories.join(', ')
+        error:
+          'Invalid category. Must be one of: ' + validCategories.join(', '),
       });
     }
 
     if (!validPriorities.includes(priority)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid priority. Must be one of: ' + validPriorities.join(', ')
+        error:
+          'Invalid priority. Must be one of: ' + validPriorities.join(', '),
       });
     }
 
@@ -43,7 +52,7 @@ export const createTicket = async (req, res) => {
         description,
         category,
         priority,
-        status: 'OPEN'
+        status: 'OPEN',
       },
       include: {
         user: {
@@ -51,10 +60,10 @@ export const createTicket = async (req, res) => {
             id: true,
             name: true,
             email: true,
-            role: true
-          }
-        }
-      }
+            role: true,
+          },
+        },
+      },
     });
 
     console.log(`✅ Support ticket created: ${ticket.id} by user ${userId}`);
@@ -62,14 +71,13 @@ export const createTicket = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Support ticket created successfully',
-      ticket
+      ticket,
     });
-
   } catch (error) {
     console.error('Create support ticket error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to create support ticket'
+      error: 'Failed to create support ticket',
     });
   }
 };
@@ -82,7 +90,7 @@ export const getUserTickets = async (req, res) => {
 
     // Build where clause
     const where = { userId };
-    
+
     if (status) where.status = status;
     if (category) where.category = category;
     if (priority) where.priority = priority;
@@ -97,25 +105,24 @@ export const getUserTickets = async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                role: true
-              }
-            }
-          }
-        }
+                role: true,
+              },
+            },
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     res.json({
       success: true,
-      tickets
+      tickets,
     });
-
   } catch (error) {
     console.error('Get user tickets error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch support tickets'
+      error: 'Failed to fetch support tickets',
     });
   }
 };
@@ -129,7 +136,7 @@ export const getTicket = async (req, res) => {
     const ticket = await prisma.supportTicket.findFirst({
       where: {
         id,
-        userId // Ensure user can only access their own tickets
+        userId, // Ensure user can only access their own tickets
       },
       include: {
         user: {
@@ -137,8 +144,8 @@ export const getTicket = async (req, res) => {
             id: true,
             name: true,
             email: true,
-            role: true
-          }
+            role: true,
+          },
         },
         messages: {
           orderBy: { createdAt: 'asc' },
@@ -147,31 +154,30 @@ export const getTicket = async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                role: true
-              }
-            }
-          }
-        }
-      }
+                role: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!ticket) {
       return res.status(404).json({
         success: false,
-        error: 'Support ticket not found'
+        error: 'Support ticket not found',
       });
     }
 
     res.json({
       success: true,
-      ticket
+      ticket,
     });
-
   } catch (error) {
     console.error('Get ticket error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch support ticket'
+      error: 'Failed to fetch support ticket',
     });
   }
 };
@@ -186,7 +192,7 @@ export const addTicketMessage = async (req, res) => {
     if (!message) {
       return res.status(400).json({
         success: false,
-        error: 'Message is required'
+        error: 'Message is required',
       });
     }
 
@@ -194,14 +200,14 @@ export const addTicketMessage = async (req, res) => {
     const ticket = await prisma.supportTicket.findFirst({
       where: {
         id,
-        userId
-      }
+        userId,
+      },
     });
 
     if (!ticket) {
       return res.status(404).json({
         success: false,
-        error: 'Support ticket not found'
+        error: 'Support ticket not found',
       });
     }
 
@@ -211,24 +217,24 @@ export const addTicketMessage = async (req, res) => {
         ticketId: id,
         userId,
         message,
-        isInternal: false
+        isInternal: false,
       },
       include: {
         user: {
           select: {
             id: true,
             name: true,
-            role: true
-          }
-        }
-      }
+            role: true,
+          },
+        },
+      },
     });
 
     // Update ticket status to IN_PROGRESS if it was OPEN
     if (ticket.status === 'OPEN') {
       await prisma.supportTicket.update({
         where: { id },
-        data: { status: 'IN_PROGRESS' }
+        data: { status: 'IN_PROGRESS' },
       });
     }
 
@@ -237,14 +243,13 @@ export const addTicketMessage = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Message added successfully',
-      ticketMessage
+      ticketMessage,
     });
-
   } catch (error) {
     console.error('Add ticket message error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to add message to ticket'
+      error: 'Failed to add message to ticket',
     });
   }
 };
@@ -259,7 +264,7 @@ export const updateTicketStatus = async (req, res) => {
     if (!status) {
       return res.status(400).json({
         success: false,
-        error: 'Status is required'
+        error: 'Status is required',
       });
     }
 
@@ -268,7 +273,7 @@ export const updateTicketStatus = async (req, res) => {
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid status. Must be one of: ' + validStatuses.join(', ')
+        error: 'Invalid status. Must be one of: ' + validStatuses.join(', '),
       });
     }
 
@@ -276,36 +281,37 @@ export const updateTicketStatus = async (req, res) => {
     const ticket = await prisma.supportTicket.findFirst({
       where: {
         id,
-        userId
-      }
+        userId,
+      },
     });
 
     if (!ticket) {
       return res.status(404).json({
         success: false,
-        error: 'Support ticket not found'
+        error: 'Support ticket not found',
       });
     }
 
     // Update ticket status
     const updatedTicket = await prisma.supportTicket.update({
       where: { id },
-      data: { status }
+      data: { status },
     });
 
-    console.log(`✅ Ticket ${id} status updated to ${status} by user ${userId}`);
+    console.log(
+      `✅ Ticket ${id} status updated to ${status} by user ${userId}`
+    );
 
     res.json({
       success: true,
       message: 'Ticket status updated successfully',
-      ticket: updatedTicket
+      ticket: updatedTicket,
     });
-
   } catch (error) {
     console.error('Update ticket status error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to update ticket status'
+      error: 'Failed to update ticket status',
     });
   }
 };
@@ -320,16 +326,16 @@ export const startChatSession = async (req, res) => {
       where: {
         userId,
         status: {
-          in: ['WAITING', 'ACTIVE']
-        }
-      }
+          in: ['WAITING', 'ACTIVE'],
+        },
+      },
     });
 
     if (existingSession) {
       return res.json({
         success: true,
         message: 'Chat session already exists',
-        session: existingSession
+        session: existingSession,
       });
     }
 
@@ -337,17 +343,17 @@ export const startChatSession = async (req, res) => {
     const session = await prisma.chatSession.create({
       data: {
         userId,
-        status: 'WAITING'
+        status: 'WAITING',
       },
       include: {
         user: {
           select: {
             id: true,
             name: true,
-            role: true
-          }
-        }
-      }
+            role: true,
+          },
+        },
+      },
     });
 
     console.log(`✅ Chat session started: ${session.id} by user ${userId}`);
@@ -355,14 +361,13 @@ export const startChatSession = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Chat session started successfully',
-      session
+      session,
     });
-
   } catch (error) {
     console.error('Start chat session error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to start chat session'
+      error: 'Failed to start chat session',
     });
   }
 };
@@ -377,32 +382,31 @@ export const getChatMessages = async (req, res) => {
     const session = await prisma.chatSession.findFirst({
       where: {
         id: sessionId,
-        userId
-      }
+        userId,
+      },
     });
 
     if (!session) {
       return res.status(404).json({
         success: false,
-        error: 'Chat session not found'
+        error: 'Chat session not found',
       });
     }
 
     const messages = await prisma.chatMessage.findMany({
       where: { sessionId },
-      orderBy: { timestamp: 'asc' }
+      orderBy: { timestamp: 'asc' },
     });
 
     res.json({
       success: true,
-      messages
+      messages,
     });
-
   } catch (error) {
     console.error('Get chat messages error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch chat messages'
+      error: 'Failed to fetch chat messages',
     });
   }
 };
@@ -417,7 +421,7 @@ export const sendChatMessage = async (req, res) => {
     if (!message) {
       return res.status(400).json({
         success: false,
-        error: 'Message is required'
+        error: 'Message is required',
       });
     }
 
@@ -427,15 +431,15 @@ export const sendChatMessage = async (req, res) => {
         id: sessionId,
         userId,
         status: {
-          in: ['WAITING', 'ACTIVE']
-        }
-      }
+          in: ['WAITING', 'ACTIVE'],
+        },
+      },
     });
 
     if (!session) {
       return res.status(404).json({
         success: false,
-        error: 'Chat session not found or inactive'
+        error: 'Chat session not found or inactive',
       });
     }
 
@@ -443,7 +447,7 @@ export const sendChatMessage = async (req, res) => {
     if (session.status === 'WAITING') {
       await prisma.chatSession.update({
         where: { id: sessionId },
-        data: { status: 'ACTIVE' }
+        data: { status: 'ACTIVE' },
       });
     }
 
@@ -452,23 +456,24 @@ export const sendChatMessage = async (req, res) => {
       data: {
         sessionId,
         senderId: userId,
-        message
-      }
+        message,
+      },
     });
 
-    console.log(`✅ Chat message sent: ${chatMessage.id} in session ${sessionId}`);
+    console.log(
+      `✅ Chat message sent: ${chatMessage.id} in session ${sessionId}`
+    );
 
     res.status(201).json({
       success: true,
       message: 'Message sent successfully',
-      chatMessage
+      chatMessage,
     });
-
   } catch (error) {
     console.error('Send chat message error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to send chat message'
+      error: 'Failed to send chat message',
     });
   }
 };
@@ -483,14 +488,14 @@ export const endChatSession = async (req, res) => {
     const session = await prisma.chatSession.findFirst({
       where: {
         id: sessionId,
-        userId
-      }
+        userId,
+      },
     });
 
     if (!session) {
       return res.status(404).json({
         success: false,
-        error: 'Chat session not found'
+        error: 'Chat session not found',
       });
     }
 
@@ -499,8 +504,8 @@ export const endChatSession = async (req, res) => {
       where: { id: sessionId },
       data: {
         status: 'ENDED',
-        endedAt: new Date()
-      }
+        endedAt: new Date(),
+      },
     });
 
     console.log(`✅ Chat session ended: ${sessionId} by user ${userId}`);
@@ -508,14 +513,13 @@ export const endChatSession = async (req, res) => {
     res.json({
       success: true,
       message: 'Chat session ended successfully',
-      session: updatedSession
+      session: updatedSession,
     });
-
   } catch (error) {
     console.error('End chat session error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to end chat session'
+      error: 'Failed to end chat session',
     });
   }
 };

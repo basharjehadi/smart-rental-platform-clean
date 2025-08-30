@@ -3,7 +3,7 @@ export const requireAdmin = (req, res, next) => {
     next();
   } else {
     res.status(403).json({
-      error: 'Access denied. Admin privileges required.'
+      error: 'Access denied. Admin privileges required.',
     });
   }
-}; 
+};

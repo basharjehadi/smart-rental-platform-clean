@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Building2, FileText, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import {
+  Building2,
+  FileText,
+  CheckCircle,
+  AlertCircle,
+  ArrowLeft,
+} from 'lucide-react';
 import SignatureCanvas from 'react-signature-canvas';
 
 const BusinessUpgradePage = () => {
@@ -15,7 +21,7 @@ const BusinessUpgradePage = () => {
   const [savedSignature, setSavedSignature] = useState(null);
   const [hasSavedSignature, setHasSavedSignature] = useState(false);
   const [confirmAuthority, setConfirmAuthority] = useState(false);
-  
+
   // Form state
   const [formData, setFormData] = useState({
     companyName: '',
@@ -24,9 +30,9 @@ const BusinessUpgradePage = () => {
     address: '',
     city: '',
     zipCode: '',
-    country: 'Poland'
+    country: 'Poland',
   });
-  
+
   // Form validation
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -70,45 +76,45 @@ const BusinessUpgradePage = () => {
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    
+
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
-    
+
     // Mark field as touched
     setTouched(prev => ({ ...prev, [field]: true }));
   };
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.companyName.trim()) {
       newErrors.companyName = 'Company name is required';
     }
-    
+
     if (!formData.taxId.trim()) {
       newErrors.taxId = 'Tax ID (NIP) is required';
     } else if (!/^\d{10}$/.test(formData.taxId.replace(/\s/g, ''))) {
       newErrors.taxId = 'Tax ID must be 10 digits';
     }
-    
+
     if (!formData.regNumber.trim()) {
       newErrors.regNumber = 'Registration number is required';
     }
-    
+
     if (!formData.address.trim()) {
       newErrors.address = 'Address is required';
     }
-    
+
     if (!formData.city.trim()) {
       newErrors.city = 'City is required';
     }
-    
+
     if (!formData.zipCode.trim()) {
       newErrors.zipCode = 'ZIP code is required';
     }
-    
+
     // Signature requirement: if user has saved signature and isn't drawing a new one,
     // we will reuse the saved signature after confirmation. Otherwise require drawing.
     if (useNewSignature || !hasSavedSignature) {
@@ -120,48 +126,57 @@ const BusinessUpgradePage = () => {
     if (!confirmAuthority) {
       newErrors.authority = 'You must confirm you are an authorized signatory.';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
-    
+
     setIsLoading(true);
     setError('');
     setSuccess('');
-    
+
     try {
       // Determine which signature to send
       let signatureData = null;
       if (useNewSignature || !hasSavedSignature) {
         signatureData = signaturePad.toDataURL();
       }
-      
+
       const upgradeData = {
-        ...formData
+        ...formData,
       };
       if (signatureData) {
         upgradeData.signature = signatureData;
       }
-      
-      const response = await api.post('/organizations/upgrade-to-business', upgradeData);
-      
-      setSuccess('Successfully upgraded to business account! Your properties have been transferred to the new organization.');
-      
+
+      const response = await api.post(
+        '/organizations/upgrade-to-business',
+        upgradeData
+      );
+
+      setSuccess(
+        'Successfully upgraded to business account! Your properties have been transferred to the new organization.'
+      );
+
       // Redirect to profile page after a short delay
       setTimeout(() => {
-        navigate(user.role === 'LANDLORD' ? '/landlord-profile' : '/tenant-profile');
+        navigate(
+          user.role === 'LANDLORD' ? '/landlord-profile' : '/tenant-profile'
+        );
       }, 3000);
-      
     } catch (error) {
       console.error('Error upgrading to business account:', error);
-      setError(error.response?.data?.message || 'Failed to upgrade to business account. Please try again.');
+      setError(
+        error.response?.data?.message ||
+          'Failed to upgrade to business account. Please try again.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -177,51 +192,53 @@ const BusinessUpgradePage = () => {
   };
 
   const handleBackToProfile = () => {
-    navigate(user.role === 'LANDLORD' ? '/landlord-profile' : '/tenant-profile');
+    navigate(
+      user.role === 'LANDLORD' ? '/landlord-profile' : '/tenant-profile'
+    );
   };
 
   // If user already has an organization, show success message
   if (hasOrganization) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <div className="text-center">
-              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold text-gray-900 mb-4">
+      <div className='min-h-screen bg-gray-50 py-8'>
+        <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8'>
+          <div className='bg-white rounded-lg shadow-lg p-8'>
+            <div className='text-center'>
+              <CheckCircle className='w-16 h-16 text-green-500 mx-auto mb-4' />
+              <h1 className='text-2xl font-bold text-gray-900 mb-4'>
                 Business Account Already Active
               </h1>
-              <p className="text-gray-600 mb-6">
-                You have already upgraded to a business account. Your organization is ready to use.
+              <p className='text-gray-600 mb-6'>
+                You have already upgraded to a business account. Your
+                organization is ready to use.
               </p>
-              
-              <div className="bg-gray-50 rounded-lg p-6 mb-6 text-left">
-                <h3 className="font-semibold text-gray-900 mb-3">Organization Details:</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              <div className='bg-gray-50 rounded-lg p-6 mb-6 text-left'>
+                <h3 className='font-semibold text-gray-900 mb-3'>
+                  Organization Details:
+                </h3>
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                   <div>
-                    <p className="text-sm text-gray-600">Company Name</p>
-                    <p className="font-medium">{organizationData?.name}</p>
+                    <p className='text-sm text-gray-600'>Company Name</p>
+                    <p className='font-medium'>{organizationData?.name}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Tax ID (NIP)</p>
-                    <p className="font-medium">{organizationData?.taxId}</p>
+                    <p className='text-sm text-gray-600'>Tax ID (NIP)</p>
+                    <p className='font-medium'>{organizationData?.taxId}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Registration Number</p>
-                    <p className="font-medium">{organizationData?.regNumber}</p>
+                    <p className='text-sm text-gray-600'>Registration Number</p>
+                    <p className='font-medium'>{organizationData?.regNumber}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Address</p>
-                    <p className="font-medium">{organizationData?.address}</p>
+                    <p className='text-sm text-gray-600'>Address</p>
+                    <p className='font-medium'>{organizationData?.address}</p>
                   </div>
                 </div>
               </div>
-              
-              <button
-                onClick={handleBackToProfile}
-                className="btn-primary"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
+
+              <button onClick={handleBackToProfile} className='btn-primary'>
+                <ArrowLeft className='w-4 h-4 mr-2' />
                 Back to Profile
               </button>
             </div>
@@ -232,37 +249,38 @@ const BusinessUpgradePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className='min-h-screen bg-gray-50 py-8'>
+      <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8'>
         {/* Header */}
-        <div className="mb-8">
+        <div className='mb-8'>
           <button
             onClick={handleBackToProfile}
-            className="flex items-center text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+            className='flex items-center text-gray-600 hover:text-gray-900 mb-4 transition-colors'
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
+            <ArrowLeft className='w-4 h-4 mr-2' />
             Back to Profile
           </button>
-          
-          <div className="text-center">
-            <div className="flex items-center justify-center mb-4">
-              <Building2 className="w-12 h-12 text-blue-600 mr-3" />
-              <h1 className="text-3xl font-bold text-gray-900">
+
+          <div className='text-center'>
+            <div className='flex items-center justify-center mb-4'>
+              <Building2 className='w-12 h-12 text-blue-600 mr-3' />
+              <h1 className='text-3xl font-bold text-gray-900'>
                 Upgrade to Business Account
               </h1>
             </div>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Transform your account into a business entity to manage properties and tenants 
-              under your company name. This will create a professional presence for your rental business.
+            <p className='text-lg text-gray-600 max-w-2xl mx-auto'>
+              Transform your account into a business entity to manage properties
+              and tenants under your company name. This will create a
+              professional presence for your rental business.
             </p>
           </div>
         </div>
 
         {/* Success Message */}
         {success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6">
-            <div className="flex items-center">
-              <CheckCircle className="w-5 h-5 mr-2" />
+          <div className='bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6'>
+            <div className='flex items-center'>
+              <CheckCircle className='w-5 h-5 mr-2' />
               {success}
             </div>
           </div>
@@ -270,146 +288,179 @@ const BusinessUpgradePage = () => {
 
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-            <div className="flex items-center">
-              <AlertCircle className="w-5 h-5 mr-2" />
+          <div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6'>
+            <div className='flex items-center'>
+              <AlertCircle className='w-5 h-5 mr-2' />
               {error}
             </div>
           </div>
         )}
 
         {/* Business Upgrade Form */}
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <div className='bg-white rounded-lg shadow-lg p-8'>
+          <form onSubmit={handleSubmit} className='space-y-6'>
             {/* Company Information Section */}
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <Building2 className="w-5 h-5 mr-2 text-blue-600" />
+              <h2 className='text-xl font-semibold text-gray-900 mb-4 flex items-center'>
+                <Building2 className='w-5 h-5 mr-2 text-blue-600' />
                 Company Information
               </h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+              <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
                 {/* Company Name */}
                 <div>
-                  <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor='companyName'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
                     Company Name *
                   </label>
                   <input
-                    type="text"
-                    id="companyName"
+                    type='text'
+                    id='companyName'
                     value={formData.companyName}
-                    onChange={(e) => handleInputChange('companyName', e.target.value)}
+                    onChange={e =>
+                      handleInputChange('companyName', e.target.value)
+                    }
                     className={`input-modern ${errors.companyName ? 'border-red-300' : ''}`}
-                    placeholder="Enter company name"
+                    placeholder='Enter company name'
                   />
                   {errors.companyName && touched.companyName && (
-                    <p className="mt-1 text-sm text-red-600">{errors.companyName}</p>
+                    <p className='mt-1 text-sm text-red-600'>
+                      {errors.companyName}
+                    </p>
                   )}
                 </div>
 
                 {/* Tax ID (NIP) */}
                 <div>
-                  <label htmlFor="taxId" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor='taxId'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
                     Tax ID (NIP) *
                   </label>
                   <input
-                    type="text"
-                    id="taxId"
+                    type='text'
+                    id='taxId'
                     value={formData.taxId}
-                    onChange={(e) => handleInputChange('taxId', e.target.value)}
+                    onChange={e => handleInputChange('taxId', e.target.value)}
                     className={`input-modern ${errors.taxId ? 'border-red-300' : ''}`}
-                    placeholder="1234567890"
-                    maxLength="10"
+                    placeholder='1234567890'
+                    maxLength='10'
                   />
                   {errors.taxId && touched.taxId && (
-                    <p className="mt-1 text-sm text-red-600">{errors.taxId}</p>
+                    <p className='mt-1 text-sm text-red-600'>{errors.taxId}</p>
                   )}
                 </div>
 
                 {/* Registration Number */}
                 <div>
-                  <label htmlFor="regNumber" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor='regNumber'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
                     Registration Number *
                   </label>
                   <input
-                    type="text"
-                    id="regNumber"
+                    type='text'
+                    id='regNumber'
                     value={formData.regNumber}
-                    onChange={(e) => handleInputChange('regNumber', e.target.value)}
+                    onChange={e =>
+                      handleInputChange('regNumber', e.target.value)
+                    }
                     className={`input-modern ${errors.regNumber ? 'border-red-300' : ''}`}
-                    placeholder="Enter registration number"
+                    placeholder='Enter registration number'
                   />
                   {errors.regNumber && touched.regNumber && (
-                    <p className="mt-1 text-sm text-red-600">{errors.regNumber}</p>
+                    <p className='mt-1 text-sm text-red-600'>
+                      {errors.regNumber}
+                    </p>
                   )}
                 </div>
 
                 {/* Country */}
                 <div>
-                  <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor='country'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
                     Country
                   </label>
                   <input
-                    type="text"
-                    id="country"
+                    type='text'
+                    id='country'
                     value={formData.country}
-                    onChange={(e) => handleInputChange('country', e.target.value)}
-                    className="input-modern"
-                    placeholder="Country"
+                    onChange={e => handleInputChange('country', e.target.value)}
+                    className='input-modern'
+                    placeholder='Country'
                   />
                 </div>
               </div>
 
               {/* Address Fields */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                <div className="md:col-span-2">
-                  <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">
+              <div className='grid grid-cols-1 md:grid-cols-3 gap-6 mt-6'>
+                <div className='md:col-span-2'>
+                  <label
+                    htmlFor='address'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
                     Street Address *
                   </label>
                   <input
-                    type="text"
-                    id="address"
+                    type='text'
+                    id='address'
                     value={formData.address}
-                    onChange={(e) => handleInputChange('address', e.target.value)}
+                    onChange={e => handleInputChange('address', e.target.value)}
                     className={`input-modern ${errors.address ? 'border-red-300' : ''}`}
-                    placeholder="Enter street address"
+                    placeholder='Enter street address'
                   />
                   {errors.address && touched.address && (
-                    <p className="mt-1 text-sm text-red-600">{errors.address}</p>
+                    <p className='mt-1 text-sm text-red-600'>
+                      {errors.address}
+                    </p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor='city'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
                     City *
                   </label>
                   <input
-                    type="text"
-                    id="city"
+                    type='text'
+                    id='city'
                     value={formData.city}
-                    onChange={(e) => handleInputChange('city', e.target.value)}
+                    onChange={e => handleInputChange('city', e.target.value)}
                     className={`input-modern ${errors.city ? 'border-red-300' : ''}`}
-                    placeholder="Enter city"
+                    placeholder='Enter city'
                   />
                   {errors.city && touched.city && (
-                    <p className="mt-1 text-sm text-red-600">{errors.city}</p>
+                    <p className='mt-1 text-sm text-red-600'>{errors.city}</p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor="zipCode" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor='zipCode'
+                    className='block text-sm font-medium text-gray-700 mb-2'
+                  >
                     ZIP Code *
                   </label>
                   <input
-                    type="text"
-                    id="zipCode"
+                    type='text'
+                    id='zipCode'
                     value={formData.zipCode}
-                    onChange={(e) => handleInputChange('zipCode', e.target.value)}
+                    onChange={e => handleInputChange('zipCode', e.target.value)}
                     className={`input-modern ${errors.zipCode ? 'border-red-300' : ''}`}
-                    placeholder="00-000"
+                    placeholder='00-000'
                   />
                   {errors.zipCode && touched.zipCode && (
-                    <p className="mt-1 text-sm text-red-600">{errors.zipCode}</p>
+                    <p className='mt-1 text-sm text-red-600'>
+                      {errors.zipCode}
+                    </p>
                   )}
                 </div>
               </div>
@@ -417,30 +468,34 @@ const BusinessUpgradePage = () => {
 
             {/* Company Signature Section */}
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <FileText className="w-5 h-5 mr-2 text-blue-600" />
+              <h2 className='text-xl font-semibold text-gray-900 mb-4 flex items-center'>
+                <FileText className='w-5 h-5 mr-2 text-blue-600' />
                 Company Signature
               </h2>
-              
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+
+              <div className='border-2 border-dashed border-gray-300 rounded-lg p-6'>
                 {!useNewSignature && hasSavedSignature ? (
                   <div>
-                    <div className="text-center mb-4">
-                      <p className="text-sm text-gray-600 mb-2">Your saved signature will be used for company contracts</p>
-                      <p className="text-xs text-gray-500">You may switch to a different signature if needed</p>
+                    <div className='text-center mb-4'>
+                      <p className='text-sm text-gray-600 mb-2'>
+                        Your saved signature will be used for company contracts
+                      </p>
+                      <p className='text-xs text-gray-500'>
+                        You may switch to a different signature if needed
+                      </p>
                     </div>
-                    <div className="flex justify-center mb-4">
+                    <div className='flex justify-center mb-4'>
                       <img
                         src={savedSignature}
-                        alt="Saved signature"
-                        className="max-w-full h-24 object-contain border border-gray-300 rounded"
+                        alt='Saved signature'
+                        className='max-w-full h-24 object-contain border border-gray-300 rounded'
                       />
                     </div>
-                    <div className="text-center">
+                    <div className='text-center'>
                       <button
-                        type="button"
+                        type='button'
                         onClick={() => setUseNewSignature(true)}
-                        className="btn-secondary"
+                        className='btn-secondary'
                       >
                         Use a Different Signature
                       </button>
@@ -448,103 +503,115 @@ const BusinessUpgradePage = () => {
                   </div>
                 ) : (
                   <div>
-                    <div className="text-center mb-4">
-                      <p className="text-sm text-gray-600 mb-2">Draw your company's authorized signature below</p>
-                      <p className="text-xs text-gray-500">This signature will be used on all business contracts and documents</p>
+                    <div className='text-center mb-4'>
+                      <p className='text-sm text-gray-600 mb-2'>
+                        Draw your company's authorized signature below
+                      </p>
+                      <p className='text-xs text-gray-500'>
+                        This signature will be used on all business contracts
+                        and documents
+                      </p>
                     </div>
                     <SignatureCanvas
-                      ref={(ref) => setSignaturePad(ref)}
+                      ref={ref => setSignaturePad(ref)}
                       canvasProps={{
-                        className: 'w-full h-32 border border-gray-300 rounded mx-auto'
+                        className:
+                          'w-full h-32 border border-gray-300 rounded mx-auto',
                       }}
                     />
-                    <div className="flex justify-center space-x-3 mt-4">
+                    <div className='flex justify-center space-x-3 mt-4'>
                       {hasSavedSignature && (
                         <button
-                          type="button"
+                          type='button'
                           onClick={() => {
                             setUseNewSignature(false);
                             handleSignatureClear();
                           }}
-                          className="btn-secondary"
+                          className='btn-secondary'
                         >
                           Use Saved Signature
                         </button>
                       )}
                       <button
-                        type="button"
+                        type='button'
                         onClick={handleSignatureClear}
-                        className="btn-secondary"
+                        className='btn-secondary'
                       >
                         Clear Signature
                       </button>
                     </div>
                     {errors.signature && (
-                      <p className="mt-2 text-sm text-red-600 text-center">{errors.signature}</p>
+                      <p className='mt-2 text-sm text-red-600 text-center'>
+                        {errors.signature}
+                      </p>
                     )}
                   </div>
                 )}
               </div>
 
               {/* Authority confirmation */}
-              <div className="mt-4">
-                <label className="flex items-start space-x-2">
+              <div className='mt-4'>
+                <label className='flex items-start space-x-2'>
                   <input
-                    type="checkbox"
+                    type='checkbox'
                     checked={confirmAuthority}
-                    onChange={(e) => setConfirmAuthority(e.target.checked)}
-                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    onChange={e => setConfirmAuthority(e.target.checked)}
+                    className='mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
                   />
-                  <span className="text-sm text-gray-800">
-                    I confirm I am an authorized signatory for this business and approve the use of my saved signature for all company contracts.
+                  <span className='text-sm text-gray-800'>
+                    I confirm I am an authorized signatory for this business and
+                    approve the use of my saved signature for all company
+                    contracts.
                   </span>
                 </label>
                 {errors.authority && (
-                  <p className="mt-1 text-sm text-red-600">{errors.authority}</p>
+                  <p className='mt-1 text-sm text-red-600'>
+                    {errors.authority}
+                  </p>
                 )}
               </div>
             </div>
 
             {/* Benefits Section */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-blue-900 mb-3">
+            <div className='bg-blue-50 border border-blue-200 rounded-lg p-6'>
+              <h3 className='text-lg font-semibold text-blue-900 mb-3'>
                 Benefits of Business Account
               </h3>
-              <ul className="space-y-2 text-sm text-blue-800">
-                <li className="flex items-center">
-                  <CheckCircle className="w-4 h-4 mr-2 text-blue-600" />
+              <ul className='space-y-2 text-sm text-blue-800'>
+                <li className='flex items-center'>
+                  <CheckCircle className='w-4 h-4 mr-2 text-blue-600' />
                   Professional business presence in rental contracts
                 </li>
-                <li className="flex items-center">
-                  <CheckCircle className="w-4 h-4 mr-2 text-blue-600" />
+                <li className='flex items-center'>
+                  <CheckCircle className='w-4 h-4 mr-2 text-blue-600' />
                   Company details displayed on all business documents
                 </li>
-                <li className="flex items-center">
-                  <CheckCircle className="w-4 h-4 mr-2 text-blue-600" />
+                <li className='flex items-center'>
+                  <CheckCircle className='w-4 h-4 mr-2 text-blue-600' />
                   Automatic property ownership transfer to organization
                 </li>
-                <li className="flex items-center">
-                  <CheckCircle className="w-4 h-4 mr-2 text-blue-600" />
+                <li className='flex items-center'>
+                  <CheckCircle className='w-4 h-4 mr-2 text-blue-600' />
                   Enhanced credibility with tenants and partners
                 </li>
               </ul>
             </div>
 
             {/* Submit Button */}
-            <div className="flex justify-center pt-4">
+            <div className='flex justify-center pt-4'>
               <button
-                type="submit"
+                type='submit'
                 disabled={isLoading}
-                className="btn-primary px-8 py-3 text-lg disabled:opacity-50"
+                className='btn-primary px-8 py-3 text-lg disabled:opacity-50'
               >
                 {isLoading ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
                     Upgrading Account...
                   </>
                 ) : (
                   <>
-                    <Building2 className="w-5 h-5 mr-2" />
+                    <Building2 className='w-5 h-5 mr-2' />
                     Upgrade to Business Account
                   </>
                 )}

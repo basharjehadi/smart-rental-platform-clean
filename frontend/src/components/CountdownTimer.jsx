@@ -7,7 +7,7 @@ const CountdownTimer = ({ targetDate }) => {
     days: 0,
     hours: 0,
     minutes: 0,
-    seconds: 0
+    seconds: 0,
   });
 
   useEffect(() => {
@@ -21,9 +21,11 @@ const CountdownTimer = ({ targetDate }) => {
       if (difference > 0) {
         setTimeLeft({
           days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+          hours: Math.floor(
+            (difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+          ),
           minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
-          seconds: Math.floor((difference % (1000 * 60)) / 1000)
+          seconds: Math.floor((difference % (1000 * 60)) / 1000),
         });
       } else {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
@@ -41,11 +43,15 @@ const CountdownTimer = ({ targetDate }) => {
 
   if (!targetDate) return null;
 
-  const isExpired = timeLeft.days === 0 && timeLeft.hours === 0 && timeLeft.minutes === 0 && timeLeft.seconds === 0;
+  const isExpired =
+    timeLeft.days === 0 &&
+    timeLeft.hours === 0 &&
+    timeLeft.minutes === 0 &&
+    timeLeft.seconds === 0;
 
   if (isExpired) {
     return (
-      <span className="text-xs text-green-600 font-medium">
+      <span className='text-xs text-green-600 font-medium'>
         {t('review.flow.publishingNow')}
       </span>
     );
@@ -65,7 +71,7 @@ const CountdownTimer = ({ targetDate }) => {
   };
 
   return (
-    <span className="text-xs text-orange-600 font-medium">
+    <span className='text-xs text-orange-600 font-medium'>
       {t('review.flow.blindCountdown')} {formatTime()}
     </span>
   );

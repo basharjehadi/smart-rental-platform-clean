@@ -4,7 +4,7 @@ import {
   updateLeaseStatus,
   handleEarlyMoveOut,
   handle24HourTermination,
-  getLeaseStatusHistory
+  getLeaseStatusHistory,
 } from '../controllers/leaseController.js';
 
 const router = express.Router();
@@ -27,5 +27,3 @@ router.post('/:leaseId/terminate-24h', handle24HourTermination);
 router.get('/:leaseId/status-history', getLeaseStatusHistory);
 
 export default router;
-
-

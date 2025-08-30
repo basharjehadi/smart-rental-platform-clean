@@ -20,7 +20,8 @@ interface UseChatReturn {
 export const useChat = (): UseChatReturn => {
   const { token } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+  const [activeConversation, setActiveConversation] =
+    useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,41 +33,43 @@ export const useChat = (): UseChatReturn => {
   const loadConversations = useCallback(async () => {
     console.log('🔍 loadConversations called');
     console.log('🔍 token exists:', !!token);
-    
+
     if (!token) {
       console.log('❌ No token, returning early');
       return;
     }
-    
+
     try {
       console.log('🔄 Setting loading state...');
       setIsLoading(true);
-      
+
       const url = `${API_BASE}/messaging/conversations`;
       console.log('🔍 Fetching from URL:', url);
-      
+
       const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       });
-      
+
       console.log('🔍 Response status:', response.status);
-      
+
       if (!response.ok) {
         throw new Error('Failed to load conversations');
       }
-      
+
       const data = await response.json();
       console.log('✅ Conversations data received:', data);
       console.log('✅ Number of conversations:', data.length);
-      
+
       setConversations(data);
       console.log('✅ Conversations state updated');
     } catch (err) {
       console.error('❌ Error in loadConversations:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load conversations');
+      setError(
+        err instanceof Error ? err.message : 'Failed to load conversations'
+      );
     } finally {
       console.log('🔄 Setting loading to false');
       setIsLoading(false);
@@ -74,45 +77,56 @@ export const useChat = (): UseChatReturn => {
   }, [token]);
 
   // Load messages for a conversation
-  const loadMessages = useCallback(async (conversationId: string, page = 1) => {
-    if (!token) return;
-    
-    try {
-      const response = await fetch(`${API_BASE}/messaging/conversations/${conversationId}/messages?page=${page}&limit=50`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+  const loadMessages = useCallback(
+    async (conversationId: string, page = 1) => {
+      if (!token) return;
+
+      try {
+        const response = await fetch(
+          `${API_BASE}/messaging/conversations/${conversationId}/messages?page=${page}&limit=50`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!response.ok) throw new Error('Failed to load messages');
+
+        const data = await response.json();
+
+        if (page === 1) {
+          setMessages(data);
+        } else {
+          setMessages(prev => [...data, ...prev]);
         }
-      });
-      
-      if (!response.ok) throw new Error('Failed to load messages');
-      
-      const data = await response.json();
-      
-      if (page === 1) {
-        setMessages(data);
-      } else {
-        setMessages(prev => [...data, ...prev]);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Failed to load messages'
+        );
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load messages');
-    }
-  }, [token]);
+    },
+    [token]
+  );
 
   // Load unread count
   const loadUnreadCount = useCallback(async () => {
     if (!token) return;
-    
+
     try {
-      const response = await fetch(`${API_BASE}/messaging/conversations/unread-count`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      const response = await fetch(
+        `${API_BASE}/messaging/conversations/unread-count`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         }
-      });
-      
+      );
+
       if (!response.ok) throw new Error('Failed to load unread count');
-      
+
       const data = await response.json();
       setUnreadCount(data.unreadCount);
     } catch (err) {
@@ -121,13 +135,16 @@ export const useChat = (): UseChatReturn => {
   }, [token]);
 
   // Join a specific conversation
-  const joinConversation = useCallback((conversationId: string) => {
-    const conversation = conversations.find(c => c.id === conversationId);
-    if (conversation) {
-      setActiveConversation(conversation);
-      loadMessages(conversationId);
-    }
-  }, [conversations, loadMessages]);
+  const joinConversation = useCallback(
+    (conversationId: string) => {
+      const conversation = conversations.find(c => c.id === conversationId);
+      if (conversation) {
+        setActiveConversation(conversation);
+        loadMessages(conversationId);
+      }
+    },
+    [conversations, loadMessages]
+  );
 
   // Leave conversation
   const leaveConversation = useCallback(() => {
@@ -136,30 +153,36 @@ export const useChat = (): UseChatReturn => {
   }, []);
 
   // Send text message
-  const sendMessage = useCallback(async (content: string, replyToId?: string) => {
-    if (!activeConversation || !token || !content.trim()) return;
-    
-    try {
-      const response = await fetch(`${API_BASE}/messaging/conversations/${activeConversation.id}/messages`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          content: content.trim(),
-          replyToId
-        })
-      });
-      
-      if (!response.ok) throw new Error('Failed to send message');
-      
-      const message = await response.json();
-      setMessages(prev => [...prev, message]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
-    }
-  }, [activeConversation, token]);
+  const sendMessage = useCallback(
+    async (content: string, replyToId?: string) => {
+      if (!activeConversation || !token || !content.trim()) return;
+
+      try {
+        const response = await fetch(
+          `${API_BASE}/messaging/conversations/${activeConversation.id}/messages`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              content: content.trim(),
+              replyToId,
+            }),
+          }
+        );
+
+        if (!response.ok) throw new Error('Failed to send message');
+
+        const message = await response.json();
+        setMessages(prev => [...prev, message]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to send message');
+      }
+    },
+    [activeConversation, token]
+  );
 
   return {
     conversations,
@@ -173,6 +196,6 @@ export const useChat = (): UseChatReturn => {
     sendMessage,
     loadMessages,
     loadConversations,
-    loadUnreadCount
+    loadUnreadCount,
   };
 };

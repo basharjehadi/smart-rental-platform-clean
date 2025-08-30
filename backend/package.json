@@ -21,17 +21,17 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset",
-    "db:seed": "node scripts/seed.js",
-    "db:cleanup": "node cleanup-database.cjs",
+    "db:seed": "node src/scripts/seed.js",
+    "db:cleanup": "node src/scripts/cleanup-database.cjs",
     "logs": "tail -f logs/all.log",
     "logs:error": "tail -f logs/error.log",
     "translate:start": "docker-compose -f ../docker-compose.translate.yml up -d",
     "translate:stop": "docker-compose -f ../docker-compose.translate.yml down",
     "translate:logs": "docker-compose -f ../docker-compose.translate.yml logs -f",
-    "translate:test": "node test-libretranslate.js",
-    "test:renewal": "node scripts/test-renewal-termination.js",
-    "backfill:names": "node scripts/backfill-user-names.js",
-    "backfill:publishAfter": "node scripts/backfillPublishAfter.js"
+    "translate:test": "echo 'test-libretranslate.js not found'",
+    "test:renewal": "node src/scripts/test-renewal-termination.js",
+    "backfill:names": "node src/scripts/backfill-user-names.js",
+    "backfill:publishAfter": "node src/scripts/backfillPublishAfter.js"
   },
   "keywords": [
     "rental",
@@ -87,7 +87,7 @@
     "eslint-plugin-node": "^11.1.0",
     "jest": "^29.7.0",
     "nodemon": "^3.0.1",
-    "prettier": "^3.2.5",
+    "prettier": "^3.6.2",
     "prisma": "^6.12.0",
     "supertest": "^7.0.0"
   },
@@ -113,7 +113,7 @@
       "html"
     ],
     "setupFilesAfterEnv": [
-      "<rootDir>/tests/setup.js"
+      "<rootDir>/src/tests/setup.js"
     ],
     "testTimeout": 30000,
     "verbose": true,

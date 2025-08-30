@@ -13,11 +13,23 @@ const register = async (req, res) => {
 
     // Validate required fields (support either name OR first/last)
     const hasFullName = Boolean(name && name.trim().length > 0);
-    const hasFirstLast = Boolean((firstName && firstName.trim().length > 0) && (lastName && lastName.trim().length > 0));
+    const hasFirstLast = Boolean(
+      firstName &&
+        firstName.trim().length > 0 &&
+        lastName &&
+        lastName.trim().length > 0
+    );
     if ((!hasFullName && !hasFirstLast) || !email || !password) {
-      console.log('Missing required fields:', { name: !!name, firstName: !!firstName, lastName: !!lastName, email: !!email, password: !!password });
+      console.log('Missing required fields:', {
+        name: !!name,
+        firstName: !!firstName,
+        lastName: !!lastName,
+        email: !!email,
+        password: !!password,
+      });
       return res.status(400).json({
-        error: 'First and last name (or full name), email, and password are required.'
+        error:
+          'First and last name (or full name), email, and password are required.',
       });
     }
 
@@ -26,7 +38,7 @@ const register = async (req, res) => {
     if (role && !validRoles.includes(role)) {
       console.log('Invalid role provided:', role);
       return res.status(400).json({
-        error: 'Role must be either TENANT, LANDLORD, or ADMIN.'
+        error: 'Role must be either TENANT, LANDLORD, or ADMIN.',
       });
     }
 
@@ -34,19 +46,19 @@ const register = async (req, res) => {
     if (!process.env.JWT_SECRET) {
       console.error('JWT_SECRET is not configured');
       return res.status(500).json({
-        error: 'Server configuration error. Please contact administrator.'
+        error: 'Server configuration error. Please contact administrator.',
       });
     }
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email },
     });
 
     if (existingUser) {
       console.log('User already exists with email:', email);
       return res.status(409).json({
-        error: 'User with this email already exists.'
+        error: 'User with this email already exists.',
       });
     }
 
@@ -61,14 +73,24 @@ const register = async (req, res) => {
     let canonicalLastName = (lastName || '').trim();
     if (!canonicalFirstName || !canonicalLastName) {
       const parts = (name || '').trim().split(/\s+/).filter(Boolean);
-      if ((!canonicalLastName || canonicalLastName.length === 0) && parts.length > 0) {
+      if (
+        (!canonicalLastName || canonicalLastName.length === 0) &&
+        parts.length > 0
+      ) {
         canonicalLastName = parts[parts.length - 1];
       }
-      if ((!canonicalFirstName || canonicalFirstName.length === 0) && parts.length > 0) {
-        canonicalFirstName = parts.slice(0, Math.max(0, parts.length - 1)).join(' ');
+      if (
+        (!canonicalFirstName || canonicalFirstName.length === 0) &&
+        parts.length > 0
+      ) {
+        canonicalFirstName = parts
+          .slice(0, Math.max(0, parts.length - 1))
+          .join(' ');
       }
     }
-    const canonicalName = (name && name.trim()) || `${canonicalFirstName} ${canonicalLastName}`.trim();
+    const canonicalName =
+      (name && name.trim()) ||
+      `${canonicalFirstName} ${canonicalLastName}`.trim();
 
     // Create user with firstName/lastName populated
     const user = await prisma.user.create({
@@ -78,7 +100,7 @@ const register = async (req, res) => {
         lastName: canonicalLastName || null,
         email,
         password: hashedPassword,
-        role: role || 'TENANT' // Default to TENANT if no role provided
+        role: role || 'TENANT', // Default to TENANT if no role provided
       },
       select: {
         id: true,
@@ -87,11 +109,15 @@ const register = async (req, res) => {
         lastName: true,
         email: true,
         role: true,
-        createdAt: true
-      }
+        createdAt: true,
+      },
     });
 
-    console.log('User created successfully:', { id: user.id, email: user.email, role: user.role });
+    console.log('User created successfully:', {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    });
 
     // 🏆 Initialize 5-star rating for new user
     try {
@@ -112,11 +138,11 @@ const register = async (req, res) => {
       try {
         await prisma.user.update({
           where: { id: user.id },
-          data: { 
+          data: {
             rank: 'NEW_USER',
             rankPoints: 0,
-            rankUpdatedAt: new Date()
-          }
+            rankUpdatedAt: new Date(),
+          },
         });
         console.log('✅ Default rank set manually for new user:', user.id);
       } catch (manualRankError) {
@@ -126,14 +152,14 @@ const register = async (req, res) => {
 
     // Generate JWT token for the new user
     const token = jwt.sign(
-      { 
+      {
         userId: user.id,
         email: user.email,
-        role: user.role
+        role: user.role,
       },
       process.env.JWT_SECRET,
-      { 
-        expiresIn: process.env.JWT_EXPIRES_IN || '7d' 
+      {
+        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
       }
     );
 
@@ -142,17 +168,17 @@ const register = async (req, res) => {
     res.status(201).json({
       message: 'User registered successfully.',
       user,
-      token
+      token,
     });
   } catch (error) {
     console.error('Registration error:', error);
     console.error('Error details:', {
       message: error.message,
       stack: error.stack,
-      name: error.name
+      name: error.name,
     });
     res.status(500).json({
-      error: 'Internal server error. Please try again later.'
+      error: 'Internal server error. Please try again later.',
     });
   }
 };
@@ -166,9 +192,12 @@ const login = async (req, res) => {
 
     // Validate required fields
     if (!email || !password) {
-      console.log('Missing required fields:', { email: !!email, password: !!password });
+      console.log('Missing required fields:', {
+        email: !!email,
+        password: !!password,
+      });
       return res.status(400).json({
-        error: 'Email and password are required.'
+        error: 'Email and password are required.',
       });
     }
 
@@ -176,29 +205,34 @@ const login = async (req, res) => {
     if (!process.env.JWT_SECRET) {
       console.error('JWT_SECRET is not configured');
       return res.status(500).json({
-        error: 'Server configuration error. Please contact administrator.'
+        error: 'Server configuration error. Please contact administrator.',
       });
     }
 
     // Find user by email
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: { email },
     });
 
     if (!user) {
       console.log('User not found for email:', email);
       return res.status(401).json({
-        error: 'Invalid email or password.'
+        error: 'Invalid email or password.',
       });
     }
 
-    console.log('User found:', { id: user.id, email: user.email, role: user.role });
+    console.log('User found:', {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    });
 
     // Check if user has a password (social login users might not have passwords)
     if (!user.password) {
       console.log('User has no password (social login user):', email);
       return res.status(401).json({
-        error: 'This account was created via social login. Please use the social login option.'
+        error:
+          'This account was created via social login. Please use the social login option.',
       });
     }
 
@@ -208,7 +242,7 @@ const login = async (req, res) => {
     if (!isPasswordValid) {
       console.log('Invalid password for user:', email);
       return res.status(401).json({
-        error: 'Invalid email or password.'
+        error: 'Invalid email or password.',
       });
     }
 
@@ -216,14 +250,14 @@ const login = async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { 
+      {
         userId: user.id,
         email: user.email,
-        role: user.role
+        role: user.role,
       },
       process.env.JWT_SECRET,
-      { 
-        expiresIn: process.env.JWT_EXPIRES_IN || '7d' 
+      {
+        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
       }
     );
 
@@ -235,17 +269,17 @@ const login = async (req, res) => {
     res.json({
       message: 'Login successful.',
       user: userWithoutPassword,
-      token
+      token,
     });
   } catch (error) {
     console.error('Login error:', error);
     console.error('Error details:', {
       message: error.message,
       stack: error.stack,
-      name: error.name
+      name: error.name,
     });
     res.status(500).json({
-      error: 'Internal server error. Please try again later.'
+      error: 'Internal server error. Please try again later.',
     });
   }
 };
@@ -255,12 +289,12 @@ const getMe = async (req, res) => {
   try {
     // User info is already attached to req.user by the middleware
     res.json({
-      user: req.user
+      user: req.user,
     });
   } catch (error) {
     console.error('Get me error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
@@ -274,14 +308,14 @@ const changePassword = async (req, res) => {
     // Validate required fields
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
-        error: 'Current password and new password are required.'
+        error: 'Current password and new password are required.',
       });
     }
 
     // Validate new password length
     if (newPassword.length < 8) {
       return res.status(400).json({
-        error: 'New password must be at least 8 characters long.'
+        error: 'New password must be at least 8 characters long.',
       });
     }
 
@@ -290,21 +324,24 @@ const changePassword = async (req, res) => {
       where: { id: userId },
       select: {
         id: true,
-        password: true
-      }
+        password: true,
+      },
     });
 
     if (!user) {
       return res.status(404).json({
-        error: 'User not found.'
+        error: 'User not found.',
       });
     }
 
     // Verify current password
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    const isCurrentPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.password
+    );
     if (!isCurrentPasswordValid) {
       return res.status(401).json({
-        error: 'Current password is incorrect.'
+        error: 'Current password is incorrect.',
       });
     }
 
@@ -315,23 +352,18 @@ const changePassword = async (req, res) => {
     // Update password
     await prisma.user.update({
       where: { id: userId },
-      data: { password: hashedNewPassword }
+      data: { password: hashedNewPassword },
     });
 
     res.json({
-      message: 'Password updated successfully.'
+      message: 'Password updated successfully.',
     });
   } catch (error) {
     console.error('Change password error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
 
-export {
-  register,
-  login,
-  getMe,
-  changePassword
-}; 
+export { register, login, getMe, changePassword };

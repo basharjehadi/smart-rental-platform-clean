@@ -1,10 +1,10 @@
 /**
  * 📝 Review Publisher Job
- * 
+ *
  * This job runs hourly to publish reviews based on specific criteria:
  * 1. Publish pair when both reviews are SUBMITTED
  * 2. Publish single review when publishAfter <= now()
- * 
+ *
  * After publishing, it calls computeUserAggregate to update user ratings and ranks.
  */
 
@@ -18,7 +18,7 @@ import { computeUserAggregate } from '../services/reviews/aggregates.js';
 export async function publishReviews() {
   try {
     console.log('🕐 Starting review publisher job...');
-    
+
     const startTime = Date.now();
     let publishedCount = 0;
     let errorCount = 0;
@@ -35,8 +35,9 @@ export async function publishReviews() {
 
     const duration = Date.now() - startTime;
     console.log(`✅ Review publisher job completed in ${duration}ms`);
-    console.log(`📊 Published: ${publishedCount} reviews, Errors: ${errorCount}`);
-
+    console.log(
+      `📊 Published: ${publishedCount} reviews, Errors: ${errorCount}`
+    );
   } catch (error) {
     console.error('❌ Error in review publisher job:', error);
     throw error;
@@ -53,13 +54,13 @@ async function publishReviewPairs() {
       by: ['leaseId', 'reviewStage'],
       where: {
         status: 'SUBMITTED',
-        leaseId: { not: null }
+        leaseId: { not: null },
       },
       having: {
         leaseId: {
-          _count: { gte: 2 }
-        }
-      }
+          _count: { gte: 2 },
+        },
+      },
     });
 
     console.log(`📋 Found ${reviewPairs.length} potential review pairs`);
@@ -73,36 +74,43 @@ async function publishReviewPairs() {
           where: {
             leaseId: pair.leaseId,
             reviewStage: pair.reviewStage,
-            status: 'SUBMITTED'
+            status: 'SUBMITTED',
           },
           select: {
             id: true,
-            targetTenantGroupId: true
-          }
+            targetTenantGroupId: true,
+          },
         });
 
         if (reviews.length >= 2) {
           // Publish all reviews in this pair
           await prisma.review.updateMany({
             where: {
-              id: { in: reviews.map(r => r.id) }
+              id: { in: reviews.map((r) => r.id) },
             },
             data: {
               status: 'PUBLISHED',
-              publishedAt: new Date()
-            }
+              publishedAt: new Date(),
+            },
           });
 
           // Update user aggregates for all target tenant groups
           for (const review of reviews) {
-            await computeUserAggregateForTenantGroup(review.targetTenantGroupId);
+            await computeUserAggregateForTenantGroup(
+              review.targetTenantGroupId
+            );
           }
 
           publishedCount += reviews.length;
-          console.log(`✅ Published ${reviews.length} reviews for lease ${pair.leaseId}, stage ${pair.reviewStage}`);
+          console.log(
+            `✅ Published ${reviews.length} reviews for lease ${pair.leaseId}, stage ${pair.reviewStage}`
+          );
         }
       } catch (error) {
-        console.error(`❌ Error publishing review pair for lease ${pair.leaseId}:`, error);
+        console.error(
+          `❌ Error publishing review pair for lease ${pair.leaseId}:`,
+          error
+        );
       }
     }
 
@@ -120,22 +128,24 @@ async function publishSingleReviews() {
   try {
     const { getCurrentWarsawTime } = await import('../utils/dateUtils.js');
     const now = getCurrentWarsawTime();
-    
+
     // Find reviews that are ready to publish
     const reviewsToPublish = await prisma.review.findMany({
       where: {
         status: 'SUBMITTED',
-        publishAfter: { lte: now }
+        publishAfter: { lte: now },
       },
       select: {
         id: true,
         targetTenantGroupId: true,
         leaseId: true,
-        reviewStage: true
-      }
+        reviewStage: true,
+      },
     });
 
-    console.log(`📋 Found ${reviewsToPublish.length} single reviews ready to publish`);
+    console.log(
+      `📋 Found ${reviewsToPublish.length} single reviews ready to publish`
+    );
 
     let publishedCount = 0;
 
@@ -146,15 +156,17 @@ async function publishSingleReviews() {
           where: { id: review.id },
           data: {
             status: 'PUBLISHED',
-            publishedAt: new Date()
-          }
+            publishedAt: new Date(),
+          },
         });
 
         // Update user aggregate
         await computeUserAggregateForTenantGroup(review.targetTenantGroupId);
 
         publishedCount++;
-        console.log(`✅ Published single review ${review.id} for lease ${review.leaseId}, stage ${review.reviewStage}`);
+        console.log(
+          `✅ Published single review ${review.id} for lease ${review.leaseId}, stage ${review.reviewStage}`
+        );
       } catch (error) {
         console.error(`❌ Error publishing review ${review.id}:`, error);
       }
@@ -173,7 +185,9 @@ async function publishSingleReviews() {
  */
 async function computeUserAggregateForTenantGroup(tenantGroupId) {
   try {
-    console.log(`🧮 Computing user aggregate for tenant group: ${tenantGroupId}`);
+    console.log(
+      `🧮 Computing user aggregate for tenant group: ${tenantGroupId}`
+    );
 
     // Get the tenant group
     const tenantGroup = await prisma.tenantGroup.findUnique({
@@ -181,10 +195,10 @@ async function computeUserAggregateForTenantGroup(tenantGroupId) {
       include: {
         members: {
           include: {
-            user: true
-          }
-        }
-      }
+            user: true,
+          },
+        },
+      },
     });
 
     if (!tenantGroup) {
@@ -208,9 +222,11 @@ async function computeUserAggregateForTenantGroup(tenantGroupId) {
     }
 
     console.log(`✅ User aggregate computed for tenant group ${tenantGroupId}`);
-
   } catch (error) {
-    console.error(`❌ Error computing user aggregate for tenant group ${tenantGroupId}:`, error);
+    console.error(
+      `❌ Error computing user aggregate for tenant group ${tenantGroupId}:`,
+      error
+    );
   }
 }
 
@@ -232,7 +248,7 @@ export async function getJobStats() {
       prisma.review.count({ where: { status: 'PENDING' } }),
       prisma.review.count({ where: { status: 'SUBMITTED' } }),
       prisma.review.count({ where: { status: 'PUBLISHED' } }),
-      prisma.review.count({ where: { status: 'BLOCKED' } })
+      prisma.review.count({ where: { status: 'BLOCKED' } }),
     ]);
 
     return {
@@ -240,7 +256,7 @@ export async function getJobStats() {
       pendingReviews: pending,
       submittedReviews: submitted,
       publishedReviews: published,
-      blockedReviews: blocked
+      blockedReviews: blocked,
     };
   } catch (error) {
     console.error('❌ Error getting job stats:', error);
@@ -252,5 +268,5 @@ export async function getJobStats() {
 export default {
   publishReviews,
   triggerReviewPublishing,
-  getJobStats
+  getJobStats,
 };

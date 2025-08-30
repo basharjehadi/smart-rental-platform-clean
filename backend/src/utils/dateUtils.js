@@ -1,9 +1,9 @@
 /**
  * 📅 Centralized Date Utilities
- * 
+ *
  * All date math operations use Europe/Warsaw timezone to ensure consistency
  * across the review system, lease status checker, and other date-sensitive operations.
- * 
+ *
  * This prevents timezone-related bugs and ensures publishAfter calculations
  * are consistent with job comparisons.
  */
@@ -42,7 +42,7 @@ export function fromWarsawTime(warsawDate) {
 /**
  * Add days to a date, handling DST boundaries correctly
  * Uses Warsaw timezone for all calculations
- * 
+ *
  * @param {Date} date - Base date (will be converted to Warsaw timezone)
  * @param {number} days - Number of days to add (can be negative)
  * @returns {Date} New date in Warsaw timezone
@@ -57,7 +57,7 @@ export function addDays(date, days) {
 /**
  * Add days to a date and return as UTC
  * Useful for storing in database while maintaining Warsaw timezone logic
- * 
+ *
  * @param {Date} date - Base date (will be converted to Warsaw timezone)
  * @param {number} days - Number of days to add
  * @returns {Date} New date in UTC
@@ -70,7 +70,7 @@ export function addDaysUTC(date, days) {
 /**
  * Calculate publishAfter date for reviews
  * Always adds 14 days to lease end date in Warsaw timezone
- * 
+ *
  * @param {Date} leaseEndDate - Lease end date
  * @returns {Date} publishAfter date in UTC (for database storage)
  */
@@ -79,20 +79,22 @@ export function calculatePublishAfter(leaseEndDate) {
   // Convert to UTC for database storage by creating a new Date from the ISO string
   const utcDate = new Date(warsawResult.toISOString());
   // Ensure it's treated as UTC
-  return new Date(Date.UTC(
-    utcDate.getUTCFullYear(),
-    utcDate.getUTCMonth(),
-    utcDate.getUTCDate(),
-    utcDate.getUTCHours(),
-    utcDate.getUTCMinutes(),
-    utcDate.getUTCSeconds(),
-    utcDate.getUTCMilliseconds()
-  ));
+  return new Date(
+    Date.UTC(
+      utcDate.getUTCFullYear(),
+      utcDate.getUTCMonth(),
+      utcDate.getUTCDate(),
+      utcDate.getUTCHours(),
+      utcDate.getUTCMinutes(),
+      utcDate.getUTCSeconds(),
+      utcDate.getUTCMilliseconds()
+    )
+  );
 }
 
 /**
  * Check if a date is in the past relative to current Warsaw time
- * 
+ *
  * @param {Date} date - Date to check
  * @returns {boolean} true if date is in the past
  */
@@ -104,7 +106,7 @@ export function isPastDate(date) {
 
 /**
  * Check if a date is in the future relative to current Warsaw time
- * 
+ *
  * @param {Date} date - Date to check
  * @returns {boolean} true if date is in the future
  */
@@ -117,7 +119,7 @@ export function isFutureDate(date) {
 /**
  * Get the difference in days between two dates
  * Uses Warsaw timezone for accurate day boundary calculations
- * 
+ *
  * @param {Date} date1 - First date
  * @param {Date} date2 - Second date
  * @returns {number} Difference in days (positive if date2 > date1)
@@ -125,16 +127,16 @@ export function isFutureDate(date) {
 export function getDaysDifference(date1, date2) {
   const warsawDate1 = toWarsawTime(date1);
   const warsawDate2 = toWarsawTime(date2);
-  
+
   const diffTime = warsawDate2.getTime() - warsawDate1.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
+
   return diffDays;
 }
 
 /**
  * Format a date in Warsaw timezone for display
- * 
+ *
  * @param {Date} date - Date to format
  * @param {string} formatString - Date-fns format string
  * @returns {string} Formatted date string
@@ -146,7 +148,7 @@ export function formatWarsawDate(date, formatString = 'yyyy-MM-dd HH:mm:ss') {
 
 /**
  * Get the start of day in Warsaw timezone
- * 
+ *
  * @param {Date} date - Date to get start of day for
  * @returns {Date} Start of day in Warsaw timezone
  */
@@ -159,7 +161,7 @@ export function getStartOfDayWarsaw(date) {
 
 /**
  * Get the end of day in Warsaw timezone
- * 
+ *
  * @param {Date} date - Date to get end of day for
  * @returns {Date} End of day in Warsaw timezone
  */
@@ -173,7 +175,7 @@ export function getEndOfDayWarsaw(date) {
 /**
  * Check if current time is within a specific hour range in Warsaw timezone
  * Useful for cron job scheduling
- * 
+ *
  * @param {number} startHour - Start hour (0-23)
  * @param {number} endHour - End hour (0-23)
  * @returns {boolean} true if current time is within the range
@@ -181,7 +183,7 @@ export function getEndOfDayWarsaw(date) {
 export function isWithinHourRange(startHour, endHour) {
   const warsawNow = getCurrentWarsawTime();
   const currentHour = warsawNow.getHours();
-  
+
   if (startHour <= endHour) {
     // Same day range (e.g., 9:00 - 17:00)
     return currentHour >= startHour && currentHour < endHour;
@@ -194,19 +196,19 @@ export function isWithinHourRange(startHour, endHour) {
 /**
  * Get the next occurrence of a specific hour in Warsaw timezone
  * Useful for scheduling future jobs
- * 
+ *
  * @param {number} hour - Target hour (0-23)
  * @returns {Date} Next occurrence of the hour
  */
 export function getNextHourOccurrence(hour) {
   const warsawNow = getCurrentWarsawTime();
   const nextHour = new Date(warsawNow);
-  
+
   if (warsawNow.getHours() >= hour) {
     // Target hour has passed today, get tomorrow
     nextHour.setDate(nextHour.getDate() + 1);
   }
-  
+
   nextHour.setHours(hour, 0, 0, 0);
   // Return the date in the same timezone context for testing
   return nextHour;
@@ -214,7 +216,7 @@ export function getNextHourOccurrence(hour) {
 
 /**
  * Validate that a date is a valid Date object
- * 
+ *
  * @param {any} date - Date to validate
  * @returns {boolean} true if valid date
  */
@@ -224,7 +226,7 @@ export function isValidDate(date) {
 
 /**
  * Parse a date string and convert to Warsaw timezone
- * 
+ *
  * @param {string} dateString - Date string to parse
  * @returns {Date|null} Date in Warsaw timezone, or null if invalid
  */

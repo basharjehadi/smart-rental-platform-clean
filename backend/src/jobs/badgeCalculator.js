@@ -10,19 +10,21 @@ const prisma = new PrismaClient();
  */
 export async function runBadgeCalculation() {
   const startTime = new Date();
-  console.log(`🕐 Starting nightly badge calculation at ${startTime.toISOString()}`);
+  console.log(
+    `🕐 Starting nightly badge calculation at ${startTime.toISOString()}`
+  );
 
   try {
     // Get all active users
     const users = await prisma.user.findMany({
       where: {
-        isSuspended: false
+        isSuspended: false,
       },
       select: {
         id: true,
         email: true,
-        role: true
-      }
+        role: true,
+      },
     });
 
     console.log(`📊 Processing ${users.length} users for badge calculation`);
@@ -32,8 +34,8 @@ export async function runBadgeCalculation() {
       return;
     }
 
-    const userIds = users.map(user => user.id);
-    
+    const userIds = users.map((user) => user.id);
+
     // Calculate badges for all users
     const results = await calculateBadgesForUsers(userIds);
 
@@ -50,10 +52,12 @@ export async function runBadgeCalculation() {
         if (result.badgesEarned.length > 0) {
           totalNewBadges += result.badgesEarned.length;
           usersWithNewBadges++;
-          
-          const user = users.find(u => u.id === userId);
-          console.log(`🏆 User ${user?.email || userId} earned ${result.badgesEarned.length} new badge(s):`, 
-            result.badgesEarned.map(b => b.badgeId).join(', '));
+
+          const user = users.find((u) => u.id === userId);
+          console.log(
+            `🏆 User ${user?.email || userId} earned ${result.badgesEarned.length} new badge(s):`,
+            result.badgesEarned.map((b) => b.badgeId).join(', ')
+          );
         }
       }
     }
@@ -73,7 +77,6 @@ export async function runBadgeCalculation() {
       const avgTimePerUser = duration / users.length;
       console.log(`   - Average time per user: ${avgTimePerUser.toFixed(2)}ms`);
     }
-
   } catch (error) {
     console.error('❌ Fatal error in badge calculation job:', error);
     throw error;
@@ -97,12 +100,12 @@ export async function calculateUserBadges(userId) {
   try {
     const { calculateUserBadges } = await import('../services/badges.js');
     const result = await calculateUserBadges(userId);
-    
+
     console.log(`✅ Badge calculation completed for user ${userId}:`, {
       totalBadges: result.totalBadges,
-      newBadges: result.badgesEarned.length
+      newBadges: result.badgesEarned.length,
     });
-    
+
     return result;
   } catch (error) {
     console.error(`❌ Error calculating badges for user ${userId}:`, error);
@@ -116,31 +119,32 @@ export async function calculateUserBadges(userId) {
 export async function getBadgeCalculationStats() {
   try {
     const totalUsers = await prisma.user.count({
-      where: { isSuspended: false }
+      where: { isSuspended: false },
     });
 
     const totalBadges = await prisma.userBadge.count({
-      where: { isActive: true }
+      where: { isActive: true },
     });
 
     const badgesByCategory = await prisma.userBadge.groupBy({
       by: ['badgeId'],
       where: { isActive: true },
       _count: {
-        id: true
-      }
+        id: true,
+      },
     });
 
     const totalUserBadges = await prisma.userBadge.groupBy({
       by: ['userId'],
       where: { isActive: true },
       _count: {
-        id: true
-      }
+        id: true,
+      },
     });
 
     const usersWithBadges = totalUserBadges.length;
-    const avgBadgesPerUser = usersWithBadges > 0 ? totalBadges / usersWithBadges : 0;
+    const avgBadgesPerUser =
+      usersWithBadges > 0 ? totalBadges / usersWithBadges : 0;
 
     return {
       totalUsers,
@@ -151,9 +155,8 @@ export async function getBadgeCalculationStats() {
         acc[item.badgeId] = item._count.id;
         return acc;
       }, {}),
-      lastCalculation: new Date().toISOString()
+      lastCalculation: new Date().toISOString(),
     };
-
   } catch (error) {
     console.error('Error getting badge calculation stats:', error);
     throw error;
@@ -165,17 +168,21 @@ export async function getBadgeCalculationStats() {
  */
 export function initializeBadgeCalculationJob() {
   // Schedule badge calculation to run every day at 2:00 AM
-  cron.schedule('0 2 * * *', async () => {
-    console.log('🕐 Nightly badge calculation job triggered');
-    try {
-      await runBadgeCalculation();
-    } catch (error) {
-      console.error('❌ Nightly badge calculation job failed:', error);
+  cron.schedule(
+    '0 2 * * *',
+    async () => {
+      console.log('🕐 Nightly badge calculation job triggered');
+      try {
+        await runBadgeCalculation();
+      } catch (error) {
+        console.error('❌ Nightly badge calculation job failed:', error);
+      }
+    },
+    {
+      scheduled: true,
+      timezone: 'UTC',
     }
-  }, {
-    scheduled: true,
-    timezone: 'UTC'
-  });
+  );
 
   console.log('✅ Badge calculation job scheduled: daily at 2:00 AM UTC');
 }
@@ -195,7 +202,7 @@ export async function cleanup() {
 // Auto-initialize if this file is run directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   console.log('🚀 Starting badge calculation service...');
-  
+
   // Run immediate calculation
   runBadgeCalculation()
     .then(() => {
@@ -215,5 +222,5 @@ export default {
   calculateUserBadges,
   getBadgeCalculationStats,
   initializeBadgeCalculationJob,
-  cleanup
+  cleanup,
 };

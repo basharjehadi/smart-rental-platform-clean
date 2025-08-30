@@ -10,7 +10,7 @@ export const generateBilingualContractHTML = (contractData) => {
     rentAmount,
     depositAmount,
     leaseDuration,
-    houseRules
+    houseRules,
   } = contractData;
 
   // Format dates
@@ -18,7 +18,7 @@ export const generateBilingualContractHTML = (contractData) => {
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
@@ -26,13 +26,16 @@ export const generateBilingualContractHTML = (contractData) => {
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('pl-PL', {
       style: 'currency',
-      currency: 'PLN'
+      currency: 'PLN',
     }).format(amount);
   };
 
   // Get full names
-  const landlordFullName = `${landlord.firstName || ''} ${landlord.lastName || ''}`.trim() || landlord.name;
-  const tenantFullName = `${tenant.firstName || ''} ${tenant.lastName || ''}`.trim() || tenant.name;
+  const landlordFullName =
+    `${landlord.firstName || ''} ${landlord.lastName || ''}`.trim() ||
+    landlord.name;
+  const tenantFullName =
+    `${tenant.firstName || ''} ${tenant.lastName || ''}`.trim() || tenant.name;
 
   // Helper function to format identity information
   const formatIdentityInfo = (person, type) => {
@@ -361,50 +364,76 @@ export const generateBilingualContractHTML = (contractData) => {
             <table class="bilingual-table">
                 <tr>
                     <td>
-                        ${houseRules && houseRules.rulesText ? `
+                        ${
+                          houseRules && houseRules.rulesText
+                            ? `
                             <div style="background-color: #fff3cd; padding: 10px; border-radius: 4px; border-left: 4px solid #ffc107; margin-bottom: 10px;">
                                 <strong>House Rules Provided by Landlord:</strong><br />
                                 <div style="white-space: pre-wrap; margin-top: 8px; font-size: 11px; line-height: 1.4;">
                                     ${houseRules.rulesText}
                                 </div>
                             </div>
-                        ` : ''}
-                        ${houseRules && houseRules.rulesPdf ? `
+                        `
+                            : ''
+                        }
+                        ${
+                          houseRules && houseRules.rulesPdf
+                            ? `
                             <div style="background-color: #d1ecf1; padding: 10px; border-radius: 4px; border-left: 4px solid #17a2b8; margin-bottom: 10px;">
                                 <strong>📄 Additional House Rules Document:</strong><br />
                                 <em>See attached PDF file provided by the landlord for detailed house rules and regulations.</em>
                             </div>
-                        ` : ''}
-                        ${(!houseRules || (!houseRules.rulesText && !houseRules.rulesPdf)) ? `
+                        `
+                            : ''
+                        }
+                        ${
+                          !houseRules ||
+                          (!houseRules.rulesText && !houseRules.rulesPdf)
+                            ? `
                             <div style="background-color: #f8f9fa; padding: 10px; border-radius: 4px; border-left: 4px solid #6c757d; font-style: italic; color: #6c757d;">
                                 No specific house rules have been provided by the landlord for this property.
                             </div>
-                        ` : ''}
+                        `
+                            : ''
+                        }
                         <div style="background-color: #e8f5e8; padding: 10px; border-radius: 4px; border-left: 4px solid #28a745; margin-top: 10px;">
                             <strong>☑ Tenant Acknowledgment:</strong><br />
                             <em>The tenant confirms understanding and acceptance of the house rules provided by the landlord.</em>
                         </div>
                     </td>
                     <td>
-                        ${houseRules && houseRules.rulesText ? `
+                        ${
+                          houseRules && houseRules.rulesText
+                            ? `
                             <div style="background-color: #fff3cd; padding: 10px; border-radius: 4px; border-left: 4px solid #ffc107; margin-bottom: 10px;">
                                 <strong>Zasady Najmu Określone przez Wynajmującego:</strong><br />
                                 <div style="white-space: pre-wrap; margin-top: 8px; font-size: 11px; line-height: 1.4;">
                                     ${houseRules.rulesText}
                                 </div>
                             </div>
-                        ` : ''}
-                        ${houseRules && houseRules.rulesPdf ? `
+                        `
+                            : ''
+                        }
+                        ${
+                          houseRules && houseRules.rulesPdf
+                            ? `
                             <div style="background-color: #d1ecf1; padding: 10px; border-radius: 4px; border-left: 4px solid #17a2b8; margin-bottom: 10px;">
                                 <strong>📄 Dodatkowy Dokument Zasad:</strong><br />
                                 <em>Zobacz załączony plik PDF dostarczony przez wynajmującego, zawierający szczegółowe zasady i regulamin.</em>
                             </div>
-                        ` : ''}
-                        ${(!houseRules || (!houseRules.rulesText && !houseRules.rulesPdf)) ? `
+                        `
+                            : ''
+                        }
+                        ${
+                          !houseRules ||
+                          (!houseRules.rulesText && !houseRules.rulesPdf)
+                            ? `
                             <div style="background-color: #f8f9fa; padding: 10px; border-radius: 4px; border-left: 4px solid #6c757d; font-style: italic; color: #6c757d;">
                                 Nie określono szczególnych zasad najmu dla tej nieruchomości.
                             </div>
-                        ` : ''}
+                        `
+                            : ''
+                        }
                         <div style="background-color: #e8f5e8; padding: 10px; border-radius: 4px; border-left: 4px solid #28a745; margin-top: 10px;">
                             <strong>☑ Potwierdzenie Najemcy:</strong><br />
                             <em>Najemca potwierdza zrozumienie i akceptację zasad najmu określonych przez wynajmującego.</em>
@@ -441,4 +470,4 @@ export const generateBilingualContractHTML = (contractData) => {
     </body>
     </html>
   `;
-}; 
+};

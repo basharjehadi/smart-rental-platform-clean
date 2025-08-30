@@ -7,7 +7,7 @@ import ReviewCardWithChips from '../ReviewCardWithChips';
 // Mock the CountdownTimer component
 jest.mock('../CountdownTimer', () => {
   return function MockCountdownTimer({ targetDate }) {
-    return <span data-testid="countdown-timer">2d 5h</span>;
+    return <span data-testid='countdown-timer'>2d 5h</span>;
   };
 });
 
@@ -15,20 +15,16 @@ jest.mock('../CountdownTimer', () => {
 jest.mock('../ReviewStatusChip', () => {
   return function MockReviewStatusChip({ status, isBlind }) {
     return (
-      <div data-testid="review-status-chip">
+      <div data-testid='review-status-chip'>
         <span>{status}</span>
-        {isBlind && <span data-testid="blind-indicator">BLIND</span>}
+        {isBlind && <span data-testid='blind-indicator'>BLIND</span>}
       </div>
     );
   };
 });
 
-const renderWithI18n = (component) => {
-  return render(
-    <I18nextProvider i18n={i18n}>
-      {component}
-    </I18nextProvider>
-  );
+const renderWithI18n = component => {
+  return render(<I18nextProvider i18n={i18n}>{component}</I18nextProvider>);
 };
 
 describe('ReviewCardWithChips - Role-Based Visibility', () => {
@@ -45,16 +41,16 @@ describe('ReviewCardWithChips - Role-Based Visibility', () => {
     publishAfter: '2025-01-16T00:00:00Z', // 14 days from submission
     property: {
       name: 'Test Property',
-      address: '123 Test St'
+      address: '123 Test St',
     },
     landlord: {
       name: 'John Landlord',
-      profileImage: null
+      profileImage: null,
     },
     tenant: {
       name: 'Jane Tenant',
-      profileImage: null
-    }
+      profileImage: null,
+    },
   };
 
   describe('Double-Blind Review Visibility', () => {
@@ -64,17 +60,21 @@ describe('ReviewCardWithChips - Role-Based Visibility', () => {
         <ReviewCardWithChips
           review={mockReview}
           isLandlord={false}
-          currentUserId="user-2" // Different from reviewerId
+          currentUserId='user-2' // Different from reviewerId
           onWriteReview={jest.fn()}
         />
       );
 
       // Rating should be hidden
       expect(screen.queryByText('4')).not.toBeInTheDocument();
-      expect(screen.queryByText('Great experience with this landlord!')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Great experience with this landlord!')
+      ).not.toBeInTheDocument();
 
       // Should show hidden content message
-      expect(screen.getByText('Content hidden until published')).toBeInTheDocument();
+      expect(
+        screen.getByText('Content hidden until published')
+      ).toBeInTheDocument();
       expect(screen.getByText('Publishes in')).toBeInTheDocument();
       expect(screen.getByTestId('countdown-timer')).toBeInTheDocument();
     });
@@ -85,17 +85,21 @@ describe('ReviewCardWithChips - Role-Based Visibility', () => {
         <ReviewCardWithChips
           review={mockReview}
           isLandlord={false}
-          currentUserId="user-1" // Same as reviewerId
+          currentUserId='user-1' // Same as reviewerId
           onWriteReview={jest.fn()}
         />
       );
 
       // Rating should be visible
       expect(screen.getByText('4')).toBeInTheDocument();
-      expect(screen.getByText('Great experience with this landlord!')).toBeInTheDocument();
+      expect(
+        screen.getByText('Great experience with this landlord!')
+      ).toBeInTheDocument();
 
       // Should not show hidden content message
-      expect(screen.queryByText('Content hidden until published')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Content hidden until published')
+      ).not.toBeInTheDocument();
     });
 
     test('should show double-blind countdown chip when status is SUBMITTED with publishAfter', () => {
@@ -103,7 +107,7 @@ describe('ReviewCardWithChips - Role-Based Visibility', () => {
         <ReviewCardWithChips
           review={mockReview}
           isLandlord={false}
-          currentUserId="user-2"
+          currentUserId='user-2'
           onWriteReview={jest.fn()}
         />
       );
@@ -120,43 +124,49 @@ describe('ReviewCardWithChips - Role-Based Visibility', () => {
         ...mockReview,
         status: 'PUBLISHED',
         publishAfter: null,
-        publishedAt: '2025-01-16T00:00:00Z'
+        publishedAt: '2025-01-16T00:00:00Z',
       };
 
       renderWithI18n(
         <ReviewCardWithChips
           review={publishedReview}
           isLandlord={false}
-          currentUserId="user-2"
+          currentUserId='user-2'
           onWriteReview={jest.fn()}
         />
       );
 
       // Content should be visible even to counterpart
       expect(screen.getByText('4')).toBeInTheDocument();
-      expect(screen.getByText('Great experience with this landlord!')).toBeInTheDocument();
-      expect(screen.queryByText('Content hidden until published')).not.toBeInTheDocument();
+      expect(
+        screen.getByText('Great experience with this landlord!')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('Content hidden until published')
+      ).not.toBeInTheDocument();
     });
 
     test('should show content for pending reviews', () => {
       const pendingReview = {
         ...mockReview,
         status: 'PENDING',
-        publishAfter: null
+        publishAfter: null,
       };
 
       renderWithI18n(
         <ReviewCardWithChips
           review={pendingReview}
           isLandlord={false}
-          currentUserId="user-2"
+          currentUserId='user-2'
           onWriteReview={jest.fn()}
         />
       );
 
       // Content should be visible
       expect(screen.getByText('4')).toBeInTheDocument();
-      expect(screen.getByText('Great experience with this landlord!')).toBeInTheDocument();
+      expect(
+        screen.getByText('Great experience with this landlord!')
+      ).toBeInTheDocument();
     });
   });
 
@@ -164,40 +174,44 @@ describe('ReviewCardWithChips - Role-Based Visibility', () => {
     test('should handle missing publishAfter date', () => {
       const reviewWithoutPublishAfter = {
         ...mockReview,
-        publishAfter: null
+        publishAfter: null,
       };
 
       renderWithI18n(
         <ReviewCardWithChips
           review={reviewWithoutPublishAfter}
           isLandlord={false}
-          currentUserId="user-2"
+          currentUserId='user-2'
           onWriteReview={jest.fn()}
         />
       );
 
       // Should not be considered double-blind
-      expect(screen.queryByText('Content hidden until published')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Content hidden until published')
+      ).not.toBeInTheDocument();
       expect(screen.getByText('4')).toBeInTheDocument();
     });
 
     test('should handle expired publishAfter date', () => {
       const reviewWithExpiredPublishAfter = {
         ...mockReview,
-        publishAfter: '2025-01-01T00:00:00Z' // Past date
+        publishAfter: '2025-01-01T00:00:00Z', // Past date
       };
 
       renderWithI18n(
         <ReviewCardWithChips
           review={reviewWithExpiredPublishAfter}
           isLandlord={false}
-          currentUserId="user-2"
+          currentUserId='user-2'
           onWriteReview={jest.fn()}
         />
       );
 
       // Should not be considered double-blind
-      expect(screen.queryByText('Content hidden until published')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Content hidden until published')
+      ).not.toBeInTheDocument();
       expect(screen.getByText('4')).toBeInTheDocument();
     });
 
@@ -205,20 +219,22 @@ describe('ReviewCardWithChips - Role-Based Visibility', () => {
       const reviewWithoutContent = {
         ...mockReview,
         rating: null,
-        comment: null
+        comment: null,
       };
 
       renderWithI18n(
         <ReviewCardWithChips
           review={reviewWithoutContent}
           isLandlord={false}
-          currentUserId="user-2"
+          currentUserId='user-2'
           onWriteReview={jest.fn()}
         />
       );
 
       // Should not crash and should show hidden content message
-      expect(screen.getByText('Content hidden until published')).toBeInTheDocument();
+      expect(
+        screen.getByText('Content hidden until published')
+      ).toBeInTheDocument();
     });
   });
 
@@ -228,7 +244,7 @@ describe('ReviewCardWithChips - Role-Based Visibility', () => {
         <ReviewCardWithChips
           review={mockReview}
           isLandlord={true}
-          currentUserId="user-2"
+          currentUserId='user-2'
           onWriteReview={jest.fn()}
         />
       );
@@ -242,7 +258,7 @@ describe('ReviewCardWithChips - Role-Based Visibility', () => {
         <ReviewCardWithChips
           review={mockReview}
           isLandlord={false}
-          currentUserId="user-2"
+          currentUserId='user-2'
           onWriteReview={jest.fn()}
         />
       );
@@ -256,19 +272,21 @@ describe('ReviewCardWithChips - Role-Based Visibility', () => {
     test('should show correct stage label for MOVE_IN', () => {
       const moveInReview = {
         ...mockReview,
-        reviewStage: 'MOVE_IN'
+        reviewStage: 'MOVE_IN',
       };
 
       renderWithI18n(
         <ReviewCardWithChips
           review={moveInReview}
           isLandlord={false}
-          currentUserId="user-1"
+          currentUserId='user-1'
           onWriteReview={jest.fn()}
         />
       );
 
-      expect(screen.getByText('Move-in check (no score impact)')).toBeInTheDocument();
+      expect(
+        screen.getByText('Move-in check (no score impact)')
+      ).toBeInTheDocument();
     });
 
     test('should show correct stage label for END_OF_LEASE', () => {
@@ -276,12 +294,14 @@ describe('ReviewCardWithChips - Role-Based Visibility', () => {
         <ReviewCardWithChips
           review={mockReview}
           isLandlord={false}
-          currentUserId="user-1"
+          currentUserId='user-1'
           onWriteReview={jest.fn()}
         />
       );
 
-      expect(screen.getByText('Lease end review (affects score)')).toBeInTheDocument();
+      expect(
+        screen.getByText('Lease end review (affects score)')
+      ).toBeInTheDocument();
     });
   });
 });

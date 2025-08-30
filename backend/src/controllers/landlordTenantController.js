@@ -1,5 +1,9 @@
 import { prisma } from '../utils/prisma.js';
-import { getUnifiedPaymentData, getPaymentStatus, getUpcomingPayments } from '../services/paymentService.js';
+import {
+  getUnifiedPaymentData,
+  getPaymentStatus,
+  getUpcomingPayments,
+} from '../services/paymentService.js';
 
 // Get all tenants for a landlord
 export const getLandlordTenants = async (req, res) => {
@@ -10,24 +14,28 @@ export const getLandlordTenants = async (req, res) => {
 
     // Very simple test - just return basic info
     console.log('🔍 Testing basic functionality...');
-    
+
     // Let's test the database queries now
     console.log('🔍 Testing database queries...');
 
     // Get all PAID offers (only show tenants after payment is completed)
-    console.log('🔍 Looking for offers with landlordId:', landlordId, 'and status: PAID');
-    
+    console.log(
+      '🔍 Looking for offers with landlordId:',
+      landlordId,
+      'and status: PAID'
+    );
+
     const paidOffers = await prisma.offer.findMany({
       where: {
         organization: {
-          members: { some: { userId: landlordId } }
+          members: { some: { userId: landlordId } },
         },
         status: 'PAID',
         // Exclude unwinded/cancelled bookings
         moveInVerificationStatus: { not: 'CANCELLED' },
         rentalRequest: {
-          NOT: { status: 'CANCELLED' }
-        }
+          NOT: { status: 'CANCELLED' },
+        },
       },
       include: {
         rentalRequest: {
@@ -45,14 +53,14 @@ export const getLandlordTenants = async (req, res) => {
                         firstName: true,
                         lastName: true,
                         phoneNumber: true,
-                        profileImage: true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+                        profileImage: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
         property: {
           select: {
@@ -65,13 +73,13 @@ export const getLandlordTenants = async (req, res) => {
             propertyType: true,
             bedrooms: true,
             bathrooms: true,
-            size: true
-          }
-        }
+            size: true,
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
     });
 
     console.log('📊 Found paid offers:', paidOffers.length);
@@ -80,7 +88,7 @@ export const getLandlordTenants = async (req, res) => {
     // Also check all offers for this landlord
     const allOffersForLandlord = await prisma.offer.findMany({
       where: {
-        organization: { members: { some: { userId: landlordId } } }
+        organization: { members: { some: { userId: landlordId } } },
       },
       include: {
         rentalRequest: {
@@ -96,99 +104,112 @@ export const getLandlordTenants = async (req, res) => {
                         name: true,
                         email: true,
                         firstName: true,
-                        lastName: true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+                        lastName: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
-        property: true
-      }
+        property: true,
+      },
     });
-    
-    console.log('📊 All offers for this landlord:', allOffersForLandlord.length);
-    allOffersForLandlord.forEach(offer => {
+
+    console.log(
+      '📊 All offers for this landlord:',
+      allOffersForLandlord.length
+    );
+    allOffersForLandlord.forEach((offer) => {
       const primaryMember = offer.rentalRequest?.tenantGroup?.members?.[0];
       const tenant = primaryMember?.user;
-      console.log(`Offer ID: ${offer.id}, Status: ${offer.status}, Tenant: ${tenant?.name}`);
+      console.log(
+        `Offer ID: ${offer.id}, Status: ${offer.status}, Tenant: ${tenant?.name}`
+      );
     });
 
     // Now let's process the data and return real tenants
     console.log('✅ Processing tenant data...');
 
     // Transform data to tenant format
-    const tenants = await Promise.all(paidOffers.map(async (offer) => {
-      // Get the primary tenant from the tenant group
-      const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
-      const tenant = primaryMember?.user;
-      
-      // Use unified payment service for consistent data
-      const paymentData = await getUnifiedPaymentData(tenant.id, landlordId);
-      
-      // Calculate payment status based on unified data
-      let paymentStatus = 'paid';
-      if (paymentData.paymentStatus === 'pending' || paymentData.paymentStatus === 'overdue') {
-        paymentStatus = paymentData.paymentStatus;
-      }
+    const tenants = await Promise.all(
+      paidOffers.map(async (offer) => {
+        // Get the primary tenant from the tenant group
+        const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
+        const tenant = primaryMember?.user;
 
-      // Calculate days rented
-      const moveInDate = new Date(offer.rentalRequest.moveInDate);
-      const today = new Date();
-      const daysRented = Math.floor((today - moveInDate) / (1000 * 60 * 60 * 24));
+        // Use unified payment service for consistent data
+        const paymentData = await getUnifiedPaymentData(tenant.id, landlordId);
 
-      // Get next payment date from upcoming payments
-      const upcomingPayments = await getUpcomingPayments(tenant.id);
-      const nextPayment = upcomingPayments.length > 0 ? upcomingPayments[0] : null;
-
-      return {
-        offerId: offer.id,
-        id: tenant.id,
-        name: tenant.firstName && tenant.lastName 
-          ? `${tenant.firstName} ${tenant.lastName}`
-          : tenant.name,
-        email: tenant.email,
-        phone: tenant.phoneNumber,
-        profileImage: tenant.profileImage || null,
-        moveInDate: offer.rentalRequest.moveInDate,
-        monthlyRent: offer.rentAmount,
-        securityDeposit: offer.depositAmount,
-        paymentStatus: paymentStatus,
-        totalPaid: paymentData.totalPaid || 0,
-        onTimePayments: paymentData.onTimePayments || 0,
-        daysRented: Math.max(0, daysRented),
-        nextPaymentDate: nextPayment?.dueDate,
-        rentalRequestId: offer.rentalRequest.id,
-        property: {
-          id: offer.property.id,
-          title: offer.property.name,
-          address: offer.property.address,
-          district: offer.property.district || null,
-          city: offer.property.city,
-          zipCode: offer.property.zipCode,
-          propertyType: offer.property.propertyType,
-          bedrooms: offer.property.bedrooms,
-          bathrooms: offer.property.bathrooms,
-          size: offer.property.size
+        // Calculate payment status based on unified data
+        let paymentStatus = 'paid';
+        if (
+          paymentData.paymentStatus === 'pending' ||
+          paymentData.paymentStatus === 'overdue'
+        ) {
+          paymentStatus = paymentData.paymentStatus;
         }
-      };
-    }));
+
+        // Calculate days rented
+        const moveInDate = new Date(offer.rentalRequest.moveInDate);
+        const today = new Date();
+        const daysRented = Math.floor(
+          (today - moveInDate) / (1000 * 60 * 60 * 24)
+        );
+
+        // Get next payment date from upcoming payments
+        const upcomingPayments = await getUpcomingPayments(tenant.id);
+        const nextPayment =
+          upcomingPayments.length > 0 ? upcomingPayments[0] : null;
+
+        return {
+          offerId: offer.id,
+          id: tenant.id,
+          name:
+            tenant.firstName && tenant.lastName
+              ? `${tenant.firstName} ${tenant.lastName}`
+              : tenant.name,
+          email: tenant.email,
+          phone: tenant.phoneNumber,
+          profileImage: tenant.profileImage || null,
+          moveInDate: offer.rentalRequest.moveInDate,
+          monthlyRent: offer.rentAmount,
+          securityDeposit: offer.depositAmount,
+          paymentStatus: paymentStatus,
+          totalPaid: paymentData.totalPaid || 0,
+          onTimePayments: paymentData.onTimePayments || 0,
+          daysRented: Math.max(0, daysRented),
+          nextPaymentDate: nextPayment?.dueDate,
+          rentalRequestId: offer.rentalRequest.id,
+          property: {
+            id: offer.property.id,
+            title: offer.property.name,
+            address: offer.property.address,
+            district: offer.property.district || null,
+            city: offer.property.city,
+            zipCode: offer.property.zipCode,
+            propertyType: offer.property.propertyType,
+            bedrooms: offer.property.bedrooms,
+            bathrooms: offer.property.bathrooms,
+            size: offer.property.size,
+          },
+        };
+      })
+    );
 
     console.log('✅ Returning tenants:', tenants.length);
     console.log('✅ Tenants data:', JSON.stringify(tenants, null, 2));
 
     res.json({
       success: true,
-      tenants: tenants
+      tenants: tenants,
     });
-
   } catch (error) {
     console.error('❌ Error fetching landlord tenants:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch tenants'
+      error: 'Failed to fetch tenants',
     });
   }
 };
@@ -198,8 +219,13 @@ export const getLandlordTenantDetails = async (req, res) => {
   try {
     const landlordId = req.user.id;
     const { tenantId } = req.params;
-    
-    console.log('🔍 Fetching tenant details for landlord:', landlordId, 'tenant:', tenantId);
+
+    console.log(
+      '🔍 Fetching tenant details for landlord:',
+      landlordId,
+      'tenant:',
+      tenantId
+    );
 
     // Get the specific tenant's paid offer
     const paidOffer = await prisma.offer.findFirst({
@@ -207,8 +233,8 @@ export const getLandlordTenantDetails = async (req, res) => {
         organization: { members: { some: { userId: landlordId } } },
         status: 'PAID',
         rentalRequest: {
-          tenantId: tenantId
-        }
+          tenantId: tenantId,
+        },
       },
       select: {
         id: true,
@@ -232,14 +258,14 @@ export const getLandlordTenantDetails = async (req, res) => {
                         firstName: true,
                         lastName: true,
                         phoneNumber: true,
-                        profileImage: true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+                        profileImage: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
         property: {
           select: {
@@ -251,23 +277,23 @@ export const getLandlordTenantDetails = async (req, res) => {
             propertyType: true,
             bedrooms: true,
             bathrooms: true,
-            size: true
-          }
-        }
-      }
+            size: true,
+          },
+        },
+      },
     });
 
     if (!paidOffer) {
       return res.status(404).json({
         success: false,
-        error: 'Tenant not found or not associated with this landlord'
+        error: 'Tenant not found or not associated with this landlord',
       });
     }
 
     // Get contract information
     const contract = await prisma.contract.findFirst({
       where: {
-        rentalRequestId: paidOffer.rentalRequest.id
+        rentalRequestId: paidOffer.rentalRequest.id,
       },
       select: {
         id: true,
@@ -275,8 +301,8 @@ export const getLandlordTenantDetails = async (req, res) => {
         status: true,
         pdfUrl: true,
         signedAt: true,
-        createdAt: true
-      }
+        createdAt: true,
+      },
     });
 
     // Use unified payment service for consistent data
@@ -286,7 +312,7 @@ export const getLandlordTenantDetails = async (req, res) => {
       console.log('✅ Payment data retrieved successfully:', {
         totalPayments: paymentData.payments?.length || 0,
         totalPaid: paymentData.totalPaid || 0,
-        paymentStatus: paymentData.paymentStatus || 'unknown'
+        paymentStatus: paymentData.paymentStatus || 'unknown',
       });
     } catch (error) {
       console.error('❌ Error getting unified payment data:', error);
@@ -295,10 +321,10 @@ export const getLandlordTenantDetails = async (req, res) => {
         payments: [],
         totalPaid: 0,
         paymentStatus: 'unknown',
-        onTimePayments: 0
+        onTimePayments: 0,
       };
     }
-    
+
     // Calculate lease dates correctly (using months, not years)
     // Use offer's leaseStartDate if available, otherwise fall back to moveInDate
     let leaseStartDate;
@@ -314,11 +340,16 @@ export const getLandlordTenantDetails = async (req, res) => {
     // Validate that lease start date is not in the future (unless it's a future lease)
     const today = new Date();
     if (leaseStartDate > today) {
-      console.log('⚠️ Warning: Lease start date is in the future:', leaseStartDate);
+      console.log(
+        '⚠️ Warning: Lease start date is in the future:',
+        leaseStartDate
+      );
     }
 
     const leaseEndDate = new Date(leaseStartDate);
-    leaseEndDate.setMonth(leaseEndDate.getMonth() + (paidOffer.leaseDuration || 12));
+    leaseEndDate.setMonth(
+      leaseEndDate.getMonth() + (paidOffer.leaseDuration || 12)
+    );
 
     // Log lease date calculations for debugging
     console.log('🔍 Lease Date Debug Info:', {
@@ -327,15 +358,18 @@ export const getLandlordTenantDetails = async (req, res) => {
       calculatedLeaseStartDate: leaseStartDate,
       calculatedLeaseEndDate: leaseEndDate,
       leaseDuration: paidOffer.leaseDuration,
-      today: today
+      today: today,
     });
 
     // Calculate days rented
-    const daysRented = Math.floor((today - leaseStartDate) / (1000 * 60 * 60 * 24));
+    const daysRented = Math.floor(
+      (today - leaseStartDate) / (1000 * 60 * 60 * 24)
+    );
 
     // Get next payment date using unified payment service
     const upcomingPayments = await getUpcomingPayments(tenant.id);
-    const nextPayment = upcomingPayments.length > 0 ? upcomingPayments[0] : null;
+    const nextPayment =
+      upcomingPayments.length > 0 ? upcomingPayments[0] : null;
     const nextPaymentDate = nextPayment ? nextPayment.dueDate : null;
 
     // TODO: Remove this query once payment table structure is fixed
@@ -348,15 +382,15 @@ export const getLandlordTenantDetails = async (req, res) => {
     const recentActivity = [
       {
         description: 'Lease agreement signed',
-        date: paidOffer.createdAt
-      }
+        date: paidOffer.createdAt,
+      },
     ];
 
     // Add first payment activity if payments exist
     if (paymentData.payments && paymentData.payments.length > 0) {
       recentActivity.push({
         description: 'First payment received',
-        date: paymentData.payments[0].date
+        date: paymentData.payments[0].date,
       });
     }
 
@@ -366,9 +400,10 @@ export const getLandlordTenantDetails = async (req, res) => {
 
     const tenantData = {
       id: tenant.id,
-      name: tenant.firstName && tenant.lastName 
-        ? `${tenant.firstName} ${tenant.lastName}`
-        : tenant.name,
+      name:
+        tenant.firstName && tenant.lastName
+          ? `${tenant.firstName} ${tenant.lastName}`
+          : tenant.name,
       email: tenant.email,
       phone: tenant.phoneNumber,
       profileImage: tenant.profileImage,
@@ -397,22 +432,21 @@ export const getLandlordTenantDetails = async (req, res) => {
         propertyType: paidOffer.property.propertyType,
         bedrooms: paidOffer.property.bedrooms,
         bathrooms: paidOffer.property.bathrooms,
-        size: paidOffer.property.size
-      }
+        size: paidOffer.property.size,
+      },
     };
 
     console.log('✅ Returning tenant details for:', tenant.name);
 
     res.json({
       success: true,
-      tenant: tenantData
+      tenant: tenantData,
     });
-
   } catch (error) {
     console.error('❌ Error fetching tenant details:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch tenant details'
+      error: 'Failed to fetch tenant details',
     });
   }
 };
@@ -423,14 +457,19 @@ export const getLandlordTenantOffer = async (req, res) => {
     const { rentalRequestId } = req.params;
     const landlordId = req.user.id;
 
-    console.log('🔍 Getting offer data for rental request:', rentalRequestId, 'by landlord:', landlordId);
+    console.log(
+      '🔍 Getting offer data for rental request:',
+      rentalRequestId,
+      'by landlord:',
+      landlordId
+    );
 
     // Find the paid offer for this rental request
     const paidOffer = await prisma.offer.findFirst({
       where: {
         rentalRequestId: parseInt(rentalRequestId),
         organization: { members: { some: { userId: landlordId } } },
-        status: 'PAID'
+        status: 'PAID',
       },
       include: {
         rentalRequest: {
@@ -450,10 +489,10 @@ export const getLandlordTenantOffer = async (req, res) => {
                 street: true,
                 city: true,
                 zipCode: true,
-                country: true
-              }
-            }
-          }
+                country: true,
+              },
+            },
+          },
         },
         landlord: {
           select: {
@@ -465,8 +504,8 @@ export const getLandlordTenantOffer = async (req, res) => {
             dowodOsobistyNumber: true,
             phoneNumber: true,
             address: true,
-            signatureBase64: true
-          }
+            signatureBase64: true,
+          },
         },
         property: {
           select: {
@@ -478,16 +517,16 @@ export const getLandlordTenantOffer = async (req, res) => {
             propertyType: true,
             bedrooms: true,
             bathrooms: true,
-            size: true
-          }
-        }
-      }
+            size: true,
+          },
+        },
+      },
     });
 
     if (!paidOffer) {
       return res.status(404).json({
         success: false,
-        error: 'Paid offer not found for this rental request'
+        error: 'Paid offer not found for this rental request',
       });
     }
 
@@ -495,15 +534,13 @@ export const getLandlordTenantOffer = async (req, res) => {
 
     res.json({
       success: true,
-      offer: paidOffer
+      offer: paidOffer,
     });
-
   } catch (error) {
     console.error('❌ Error getting landlord tenant offer:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to get offer data'
+      error: 'Failed to get offer data',
     });
   }
 };
-

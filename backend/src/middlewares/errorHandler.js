@@ -6,21 +6,21 @@ export const errorHandler = (err, req, res, next) => {
     url: req.url,
     method: req.method,
     body: req.body,
-    user: req.user?.id
+    user: req.user?.id,
   });
 
   // Handle Prisma errors
   if (err.code === 'P2002') {
     return res.status(409).json({
       error: 'Duplicate entry',
-      message: 'This record already exists'
+      message: 'This record already exists',
     });
   }
 
   if (err.code === 'P2025') {
     return res.status(404).json({
       error: 'Record not found',
-      message: 'The requested record was not found'
+      message: 'The requested record was not found',
     });
   }
 
@@ -29,7 +29,7 @@ export const errorHandler = (err, req, res, next) => {
     return res.status(400).json({
       error: 'Validation failed',
       message: err.message,
-      details: err.details
+      details: err.details,
     });
   }
 
@@ -37,14 +37,14 @@ export const errorHandler = (err, req, res, next) => {
   if (err.name === 'JsonWebTokenError') {
     return res.status(401).json({
       error: 'Invalid token',
-      message: 'Please log in again'
+      message: 'Please log in again',
     });
   }
 
   if (err.name === 'TokenExpiredError') {
     return res.status(401).json({
       error: 'Token expired',
-      message: 'Please log in again'
+      message: 'Please log in again',
     });
   }
 
@@ -52,14 +52,14 @@ export const errorHandler = (err, req, res, next) => {
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({
       error: 'File too large',
-      message: 'File size exceeds the limit'
+      message: 'File size exceeds the limit',
     });
   }
 
   if (err.code === 'LIMIT_UNEXPECTED_FILE') {
     return res.status(400).json({
       error: 'Unexpected file',
-      message: 'Unexpected file field'
+      message: 'Unexpected file field',
     });
   }
 
@@ -67,7 +67,7 @@ export const errorHandler = (err, req, res, next) => {
   if (err.type === 'StripeCardError') {
     return res.status(400).json({
       error: 'Payment failed',
-      message: err.message
+      message: err.message,
     });
   }
 
@@ -77,8 +77,11 @@ export const errorHandler = (err, req, res, next) => {
 
   res.status(statusCode).json({
     error: 'Something went wrong',
-    message: process.env.NODE_ENV === 'development' ? message : 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    message:
+      process.env.NODE_ENV === 'development'
+        ? message
+        : 'Internal server error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
 
@@ -94,6 +97,6 @@ export const notFoundHandler = (req, res) => {
   res.status(404).json({
     error: 'Route not found',
     message: `Cannot ${req.method} ${req.originalUrl}`,
-    path: req.originalUrl
+    path: req.originalUrl,
   });
-}; 
+};

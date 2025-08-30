@@ -1,19 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowLeft, Shield, CreditCard, Building, Wallet, MessageCircle, RefreshCw, Home, MapPin, Calendar, User, HelpCircle, Star, Users } from 'lucide-react';
+import {
+  ArrowLeft,
+  Shield,
+  CreditCard,
+  Building,
+  Wallet,
+  MessageCircle,
+  RefreshCw,
+  Home,
+  MapPin,
+  Calendar,
+  User,
+  HelpCircle,
+  Star,
+  Users,
+} from 'lucide-react';
 import RatingDisplay from '../components/RatingDisplay';
 
 const PaymentPage = () => {
   const [offer, setOffer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('credit-card');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] =
+    useState('credit-card');
   const [paymentForm, setPaymentForm] = useState({
     cardNumber: '1234 5678 9012 3456',
     cardholderName: 'Anna Kowalski',
     expiryDate: '',
-    cvv: '123'
+    cvv: '123',
   });
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -22,7 +38,7 @@ const PaymentPage = () => {
   const [showLandlordReviews, setShowLandlordReviews] = useState(false);
   const [landlordReviews, setLandlordReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
-  
+
   const { api } = useAuth();
   const navigate = useNavigate();
   const { offerId } = useParams();
@@ -43,14 +59,14 @@ const PaymentPage = () => {
     }
   }, [offerId, location.state]);
 
-  const fetchOfferById = async (id) => {
+  const fetchOfferById = async id => {
     try {
       setLoading(true);
       setError('');
-      
+
       const response = await api.get(`/tenant/offer/${id}`);
       const offerData = response.data.offer;
-      
+
       if (offerData) {
         setOffer(offerData);
       } else {
@@ -68,8 +84,10 @@ const PaymentPage = () => {
     try {
       setLoading(true);
       const response = await api.get('/tenant/offers');
-      const acceptedOffer = response.data.offers.find(o => o.status === 'ACCEPTED');
-      
+      const acceptedOffer = response.data.offers.find(
+        o => o.status === 'ACCEPTED'
+      );
+
       if (acceptedOffer) {
         setOffer(acceptedOffer);
       } else {
@@ -83,20 +101,22 @@ const PaymentPage = () => {
     }
   };
 
-  const handlePaymentMethodChange = (method) => {
+  const handlePaymentMethodChange = method => {
     setSelectedPaymentMethod(method);
   };
 
   const handleInputChange = (field, value) => {
     setPaymentForm(prev => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
   const handlePaySecurely = async () => {
     if (!agreedToTerms) {
-      alert('Please agree to the Terms of Service and Safety Protection Policy.');
+      alert(
+        'Please agree to the Terms of Service and Safety Protection Policy.'
+      );
       return;
     }
 
@@ -124,33 +144,38 @@ const PaymentPage = () => {
       // Step 3: Confirming with landlord
       await new Promise(resolve => setTimeout(resolve, 2500));
       console.log('Step 3: Confirming with landlord - completed');
-      
-      console.log('Skipping direct offer PAID patch. Completing via mock payment endpoint...');
-      
+
+      console.log(
+        'Skipping direct offer PAID patch. Completing via mock payment endpoint...'
+      );
+
       // Create payment record for DEPOSIT_AND_FIRST_MONTH
       console.log('Creating payment record...');
-      const paymentResponse = await api.post('/payments/complete-mock-payment', {
-        paymentId: `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        amount: totalAmount,
-        purpose: 'DEPOSIT_AND_FIRST_MONTH',
-        offerId: offer.id,
-        selectedPayments: [] // Not needed for deposit + first month
-      });
+      const paymentResponse = await api.post(
+        '/payments/complete-mock-payment',
+        {
+          paymentId: `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          amount: totalAmount,
+          purpose: 'DEPOSIT_AND_FIRST_MONTH',
+          offerId: offer.id,
+          selectedPayments: [], // Not needed for deposit + first month
+        }
+      );
       console.log('Payment record created:', paymentResponse.data);
-      
+
       // Close modal and navigate to success page (first-time payment)
       setShowProcessingModal(false);
       console.log('Navigating to payment success page...');
-      navigate('/payment-success', { 
-        state: { 
+      navigate('/payment-success', {
+        state: {
           paymentType: 'deposit_and_first_month',
           paymentData: {
             depositAmount: securityDeposit,
             firstMonthRent: firstMonthRent,
-            paymentGateway: 'MOCK'
+            paymentGateway: 'MOCK',
           },
-          totalAmount: totalAmount
-        } 
+          totalAmount: totalAmount,
+        },
       });
     } catch (error) {
       console.error('Payment error:', error);
@@ -164,71 +189,75 @@ const PaymentPage = () => {
     }
   };
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = amount => {
     return new Intl.NumberFormat('pl-PL', {
       style: 'currency',
-      currency: 'PLN'
+      currency: 'PLN',
     }).format(amount);
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = dateString => {
     return new Date(dateString).toLocaleDateString('pl-PL', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric'
+      year: 'numeric',
     });
   };
 
-  const getImageUrl = (imagePath) => {
+  const getImageUrl = imagePath => {
     if (!imagePath) return '';
-    
+
     // If it's already a full URL, return as is
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
       return imagePath;
     }
-    
+
     // If it's a relative path, construct full URL
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     return `${baseUrl}${imagePath}`;
   };
 
   // Get property type display name
-  const getPropertyTypeDisplay = (type) => {
+  const getPropertyTypeDisplay = type => {
     if (!type) return 'Apartment';
-    
+
     const typeMap = {
-      'apartment': 'Apartment',
-      'house': 'House',
-      'studio': 'Studio',
-      'room': 'Room',
+      apartment: 'Apartment',
+      house: 'House',
+      studio: 'Studio',
+      room: 'Room',
       'shared room': 'Shared Room',
-      'APARTMENT': 'Apartment',
-      'HOUSE': 'House',
-      'STUDIO': 'Studio',
-      'ROOM': 'Room',
-      'SHARED_ROOM': 'Shared Room'
+      APARTMENT: 'Apartment',
+      HOUSE: 'House',
+      STUDIO: 'Studio',
+      ROOM: 'Room',
+      SHARED_ROOM: 'Shared Room',
     };
-    return typeMap[type.toLowerCase()] || type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+    return (
+      typeMap[type.toLowerCase()] ||
+      type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()
+    );
   };
 
   // Mask landlord's last name for privacy
-  const maskLandlordName = (fullName) => {
+  const maskLandlordName = fullName => {
     if (!fullName) return 'Landlord';
-    
+
     // If offer is paid, show full name
     if (offer?.status === 'PAID' || offer?.isPaid === true) {
       return fullName;
     }
-    
+
     const nameParts = fullName.trim().split(' ');
-    
+
     if (nameParts.length >= 2) {
       const firstName = nameParts[0];
       const lastName = nameParts[nameParts.length - 1];
-      
+
       // Mask the last name (show first letter, rest as asterisks)
-      const maskedLastName = lastName.charAt(0) + '*'.repeat(lastName.length - 1);
-      
+      const maskedLastName =
+        lastName.charAt(0) + '*'.repeat(lastName.length - 1);
+
       return `${firstName} ${maskedLastName}`;
     } else {
       // If only one name, mask it partially
@@ -241,7 +270,7 @@ const PaymentPage = () => {
   };
 
   // Build profile photo URL like rental request card logic
-  const getProfilePhotoUrl = (photoPath) => {
+  const getProfilePhotoUrl = photoPath => {
     if (!photoPath) return null;
     // Already full URL
     if (photoPath.startsWith('http://') || photoPath.startsWith('https://')) {
@@ -270,8 +299,11 @@ const PaymentPage = () => {
     rank: offer?.landlord?.rank || 'NEW_USER',
     rankPoints: offer?.landlord?.rankPoints || 0,
     profileImage: offer?.landlord?.profileImage || null,
-    memberSince: offer?.landlord?.createdAt ? new Date(offer.landlord.createdAt).getFullYear() : 'Not available',
-    responseTime: offer?.landlord?.responseTime || 'Response time not available'
+    memberSince: offer?.landlord?.createdAt
+      ? new Date(offer.landlord.createdAt).getFullYear()
+      : 'Not available',
+    responseTime:
+      offer?.landlord?.responseTime || 'Response time not available',
   };
 
   const fetchLandlordReviews = async () => {
@@ -279,8 +311,24 @@ const PaymentPage = () => {
       setReviewsLoading(true);
       // TODO: Replace with API endpoint for landlord reviews
       const mock = [
-        { id: 1, tenantName: 'Anna Nowak', propertyName: 'City Center Loft', rating: 5, comment: 'Very responsive and professional.', reviewDate: '2024-05-12', reviewStage: 'Lease End' },
-        { id: 2, tenantName: 'Piotr Kowalski', propertyName: 'Green Park Flat', rating: 4, comment: 'Good experience overall, minor delays once.', reviewDate: '2024-03-18', reviewStage: 'Move-in' }
+        {
+          id: 1,
+          tenantName: 'Anna Nowak',
+          propertyName: 'City Center Loft',
+          rating: 5,
+          comment: 'Very responsive and professional.',
+          reviewDate: '2024-05-12',
+          reviewStage: 'Lease End',
+        },
+        {
+          id: 2,
+          tenantName: 'Piotr Kowalski',
+          propertyName: 'Green Park Flat',
+          rating: 4,
+          comment: 'Good experience overall, minor delays once.',
+          reviewDate: '2024-03-18',
+          reviewStage: 'Move-in',
+        },
       ];
       setLandlordReviews(mock);
     } finally {
@@ -290,29 +338,41 @@ const PaymentPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-primary flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading payment details...</p>
+      <div className='min-h-screen bg-primary flex items-center justify-center'>
+        <div className='text-center'>
+          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4'></div>
+          <p className='text-gray-600'>Loading payment details...</p>
         </div>
       </div>
     );
   }
 
   if (error || !offer) {
-  return (
-      <div className="min-h-screen bg-primary flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto">
-          <div className="text-red-500 mb-4">
-            <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+    return (
+      <div className='min-h-screen bg-primary flex items-center justify-center'>
+        <div className='text-center max-w-md mx-auto'>
+          <div className='text-red-500 mb-4'>
+            <svg
+              className='w-16 h-16 mx-auto mb-4'
+              fill='none'
+              stroke='currentColor'
+              viewBox='0 0 24 24'
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth={2}
+                d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z'
+              />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Something went wrong</h2>
-          <p className="text-gray-600 mb-6">{error || 'Offer not found'}</p>
-          <button 
+          <h2 className='text-xl font-semibold text-gray-900 mb-2'>
+            Something went wrong
+          </h2>
+          <p className='text-gray-600 mb-6'>{error || 'Offer not found'}</p>
+          <button
             onClick={() => navigate('/my-offers')}
-            className="btn-primary"
+            className='btn-primary'
           >
             Back to Offers
           </button>
@@ -324,19 +384,23 @@ const PaymentPage = () => {
   // Calculate first month rent (prorated only if not moving in on the 1st)
   const calculateFirstMonthRent = () => {
     if (!offer.availableFrom || !offer.rentAmount) return 0;
-    
+
     const moveInDate = new Date(offer.availableFrom);
     const moveInDay = moveInDate.getDate();
-    
+
     // If moving in on the 1st of the month, it's a full month
     if (moveInDay === 1) {
       return offer.rentAmount;
     }
-    
+
     // Otherwise, calculate prorated amount
-    const daysInMonth = new Date(moveInDate.getFullYear(), moveInDate.getMonth() + 1, 0).getDate();
+    const daysInMonth = new Date(
+      moveInDate.getFullYear(),
+      moveInDate.getMonth() + 1,
+      0
+    ).getDate();
     const daysFromMoveIn = daysInMonth - moveInDay + 1; // Days from move-in to end of month
-    
+
     return Math.round((offer.rentAmount * daysFromMoveIn) / daysInMonth);
   };
 
@@ -354,125 +418,158 @@ const PaymentPage = () => {
   const finalTotal = totalAmount + serviceFee;
 
   return (
-    <div className="min-h-screen bg-primary">
+    <div className='min-h-screen bg-primary'>
       {/* Header */}
-      <header className="header-modern px-6 py-4">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center space-x-4">
+      <header className='header-modern px-6 py-4'>
+        <div className='flex items-center justify-between max-w-7xl mx-auto'>
+          <div className='flex items-center space-x-4'>
             <button
               onClick={() => navigate('/my-offers')}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors duration-200"
+              className='flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors duration-200'
             >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="font-medium">Back to Offers</span>
+              <ArrowLeft className='w-5 h-5' />
+              <span className='font-medium'>Back to Offers</span>
             </button>
-            <div className="h-6 w-px bg-gray-300"></div>
+            <div className='h-6 w-px bg-gray-300'></div>
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">Complete Your Payment</h1>
-              <p className="text-sm text-gray-600">Secure your rental with our 100% protected payment system</p>
+              <h1 className='text-xl font-semibold text-gray-900'>
+                Complete Your Payment
+              </h1>
+              <p className='text-sm text-gray-600'>
+                Secure your rental with our 100% protected payment system
+              </p>
             </div>
           </div>
         </div>
       </header>
 
       {/* Top Banner */}
-      <div className="bg-green-50 border-b border-green-200">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-            <div className="flex items-center space-x-2 text-green-700">
-              <MessageCircle className="w-4 h-4" />
+      <div className='bg-green-50 border-b border-green-200'>
+        <div className='max-w-7xl mx-auto px-6 py-4'>
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-6 text-sm'>
+            <div className='flex items-center space-x-2 text-green-700'>
+              <MessageCircle className='w-4 h-4' />
               <div>
-                <div className="font-medium">24/7 Support</div>
-                <div className="text-xs">Expert help when you need it</div>
+                <div className='font-medium'>24/7 Support</div>
+                <div className='text-xs'>Expert help when you need it</div>
               </div>
             </div>
-            <div className="flex items-center space-x-2 text-green-700">
-              <RefreshCw className="w-4 h-4" />
+            <div className='flex items-center space-x-2 text-green-700'>
+              <RefreshCw className='w-4 h-4' />
               <div>
-                <div className="font-medium">Easy Disputes</div>
-                <div className="text-xs">Simple resolution process</div>
-          </div>
-          </div>
-            <div className="flex items-center space-x-2 text-green-700">
-              <Home className="w-4 h-4" />
+                <div className='font-medium'>Easy Disputes</div>
+                <div className='text-xs'>Simple resolution process</div>
+              </div>
+            </div>
+            <div className='flex items-center space-x-2 text-green-700'>
+              <Home className='w-4 h-4' />
               <div>
-                <div className="font-medium">How it works</div>
-                <div className="text-xs">Your payment is held in secure escrow. After check-in, you have 24 hours to report any issues. If the property doesn't match what was advertised, we'll help resolve the issue or provide a full refund.</div>
-          </div>
+                <div className='font-medium'>How it works</div>
+                <div className='text-xs'>
+                  Your payment is held in secure escrow. After check-in, you
+                  have 24 hours to report any issues. If the property doesn't
+                  match what was advertised, we'll help resolve the issue or
+                  provide a full refund.
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <main className='max-w-7xl mx-auto px-6 py-8'>
+        <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
           {/* Left Column - Payment Details */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className='lg:col-span-2 space-y-6'>
             {/* Payment Protection Card */}
-            <div className="card-modern border-green-200 bg-green-50">
-              <div className="p-6">
-                <div className="flex items-center space-x-2 mb-4">
-                  <Shield className="w-5 h-5 text-green-600" />
-                  <h2 className="text-lg font-semibold text-green-900">Your Payment is 100% Protected</h2>
+            <div className='card-modern border-green-200 bg-green-50'>
+              <div className='p-6'>
+                <div className='flex items-center space-x-2 mb-4'>
+                  <Shield className='w-5 h-5 text-green-600' />
+                  <h2 className='text-lg font-semibold text-green-900'>
+                    Your Payment is 100% Protected
+                  </h2>
                 </div>
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                      <span className="text-green-600 font-bold">$</span>
+                <div className='grid grid-cols-2 gap-4 mb-6'>
+                  <div className='flex items-center space-x-3'>
+                    <div className='w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center'>
+                      <span className='text-green-600 font-bold'>$</span>
                     </div>
                     <div>
-                      <div className="font-medium text-green-900">Secure Escrow</div>
-                      <div className="text-sm text-green-700">Money held safely until check-in</div>
+                      <div className='font-medium text-green-900'>
+                        Secure Escrow
+                      </div>
+                      <div className='text-sm text-green-700'>
+                        Money held safely until check-in
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                      <span className="text-green-600 font-bold">24h</span>
+                  <div className='flex items-center space-x-3'>
+                    <div className='w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center'>
+                      <span className='text-green-600 font-bold'>24h</span>
                     </div>
                     <div>
-                      <div className="font-medium text-green-900">24h Protection</div>
-                      <div className="text-sm text-green-700">Full refund if property differs</div>
+                      <div className='font-medium text-green-900'>
+                        24h Protection
+                      </div>
+                      <div className='text-sm text-green-700'>
+                        Full refund if property differs
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                      <MessageCircle className="w-4 h-4 text-green-600" />
+                  <div className='flex items-center space-x-3'>
+                    <div className='w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center'>
+                      <MessageCircle className='w-4 h-4 text-green-600' />
                     </div>
                     <div>
-                      <div className="font-medium text-green-900">24/7 Support</div>
-                      <div className="text-sm text-green-700">Expert help when you need it</div>
+                      <div className='font-medium text-green-900'>
+                        24/7 Support
+                      </div>
+                      <div className='text-sm text-green-700'>
+                        Expert help when you need it
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                      <RefreshCw className="w-4 h-4 text-green-600" />
+                  <div className='flex items-center space-x-3'>
+                    <div className='w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center'>
+                      <RefreshCw className='w-4 h-4 text-green-600' />
                     </div>
                     <div>
-                      <div className="font-medium text-green-900">Easy Disputes</div>
-                      <div className="text-sm text-green-700">Simple resolution process</div>
+                      <div className='font-medium text-green-900'>
+                        Easy Disputes
+                      </div>
+                      <div className='text-sm text-green-700'>
+                        Simple resolution process
+                      </div>
                     </div>
                   </div>
-          </div>
-                <div className="border-t border-green-200 pt-4">
-                  <p className="text-sm text-green-800">
-                    <strong>How it works:</strong> Your payment is held in secure escrow. After check-in, you have 24 hours to report any issues. If the property doesn't match what was advertised, we'll help resolve the issue or provide a full refund.
+                </div>
+                <div className='border-t border-green-200 pt-4'>
+                  <p className='text-sm text-green-800'>
+                    <strong>How it works:</strong> Your payment is held in
+                    secure escrow. After check-in, you have 24 hours to report
+                    any issues. If the property doesn't match what was
+                    advertised, we'll help resolve the issue or provide a full
+                    refund.
                   </p>
                 </div>
               </div>
             </div>
 
             {/* Payment Method Selection */}
-            <div className="card-modern">
-              <div className="p-6">
-                <div className="flex items-center space-x-2 mb-4">
-                  <CreditCard className="w-5 h-5 text-gray-600" />
-                  <h2 className="text-lg font-semibold text-gray-900">Choose Payment Method</h2>
-          </div>
+            <div className='card-modern'>
+              <div className='p-6'>
+                <div className='flex items-center space-x-2 mb-4'>
+                  <CreditCard className='w-5 h-5 text-gray-600' />
+                  <h2 className='text-lg font-semibold text-gray-900'>
+                    Choose Payment Method
+                  </h2>
+                </div>
 
                 {/* Payment Method Options */}
-                <div className="grid grid-cols-3 gap-4 mb-6">
-          <button
+                <div className='grid grid-cols-3 gap-4 mb-6'>
+                  <button
                     onClick={() => handlePaymentMethodChange('credit-card')}
                     className={`p-4 rounded-lg border-2 transition-colors ${
                       selectedPaymentMethod === 'credit-card'
@@ -480,12 +577,12 @@ const PaymentPage = () => {
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <div className="flex items-center space-x-2">
-                      <CreditCard className="w-5 h-5 text-gray-600" />
-                      <span className="font-medium">Credit Card</span>
+                    <div className='flex items-center space-x-2'>
+                      <CreditCard className='w-5 h-5 text-gray-600' />
+                      <span className='font-medium'>Credit Card</span>
                     </div>
-          </button>
-                  
+                  </button>
+
                   <button
                     onClick={() => handlePaymentMethodChange('bank-transfer')}
                     className={`p-4 rounded-lg border-2 transition-colors ${
@@ -494,12 +591,12 @@ const PaymentPage = () => {
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <div className="flex items-center space-x-2">
-                      <Building className="w-5 h-5 text-gray-600" />
-                      <span className="font-medium">Bank Transfer</span>
-        </div>
+                    <div className='flex items-center space-x-2'>
+                      <Building className='w-5 h-5 text-gray-600' />
+                      <span className='font-medium'>Bank Transfer</span>
+                    </div>
                   </button>
-                  
+
                   <button
                     onClick={() => handlePaymentMethodChange('digital-wallet')}
                     className={`p-4 rounded-lg border-2 transition-colors ${
@@ -508,110 +605,149 @@ const PaymentPage = () => {
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <div className="flex items-center space-x-2">
-                      <Wallet className="w-5 h-5 text-gray-600" />
-                      <span className="font-medium">Digital Wallet</span>
-      </div>
+                    <div className='flex items-center space-x-2'>
+                      <Wallet className='w-5 h-5 text-gray-600' />
+                      <span className='font-medium'>Digital Wallet</span>
+                    </div>
                   </button>
-    </div>
+                </div>
 
                 {/* Credit Card Form */}
                 {selectedPaymentMethod === 'credit-card' && (
-                  <div className="space-y-4">
+                  <div className='space-y-4'>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Card Number</label>
+                      <label className='block text-sm font-medium text-gray-700 mb-2'>
+                        Card Number
+                      </label>
                       <input
-                        type="text"
+                        type='text'
                         value={paymentForm.cardNumber}
-                        onChange={(e) => handleInputChange('cardNumber', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="1234 5678 9012 3456"
+                        onChange={e =>
+                          handleInputChange('cardNumber', e.target.value)
+                        }
+                        className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                        placeholder='1234 5678 9012 3456'
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className='grid grid-cols-2 gap-4'>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Cardholder Name</label>
+                        <label className='block text-sm font-medium text-gray-700 mb-2'>
+                          Cardholder Name
+                        </label>
                         <input
-                          type="text"
+                          type='text'
                           value={paymentForm.cardholderName}
-                          onChange={(e) => handleInputChange('cardholderName', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Anna Kowalski"
+                          onChange={e =>
+                            handleInputChange('cardholderName', e.target.value)
+                          }
+                          className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                          placeholder='Anna Kowalski'
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className='grid grid-cols-2 gap-2'>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Expiry Date</label>
+                          <label className='block text-sm font-medium text-gray-700 mb-2'>
+                            Expiry Date
+                          </label>
                           <input
-                            type="text"
+                            type='text'
                             value={paymentForm.expiryDate}
-                            onChange={(e) => handleInputChange('expiryDate', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            placeholder="MM/YY"
+                            onChange={e =>
+                              handleInputChange('expiryDate', e.target.value)
+                            }
+                            className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                            placeholder='MM/YY'
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">CVV</label>
+                          <label className='block text-sm font-medium text-gray-700 mb-2'>
+                            CVV
+                          </label>
                           <input
-                            type="text"
+                            type='text'
                             value={paymentForm.cvv}
-                            onChange={(e) => handleInputChange('cvv', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            placeholder="123"
+                            onChange={e =>
+                              handleInputChange('cvv', e.target.value)
+                            }
+                            className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                            placeholder='123'
                           />
                         </div>
-          </div>
-        </div>
-      </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
 
             {/* Payment Protection Steps */}
-            <div className="card-modern">
-              <div className="p-6">
-                <div className="flex items-center space-x-2 mb-4">
-                  <Shield className="w-5 h-5 text-gray-600" />
-                  <h2 className="text-lg font-semibold text-gray-900">How Your Payment is Protected</h2>
+            <div className='card-modern'>
+              <div className='p-6'>
+                <div className='flex items-center space-x-2 mb-4'>
+                  <Shield className='w-5 h-5 text-gray-600' />
+                  <h2 className='text-lg font-semibold text-gray-900'>
+                    How Your Payment is Protected
+                  </h2>
                 </div>
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-sm">1</div>
+                <div className='space-y-4'>
+                  <div className='flex items-start space-x-3'>
+                    <div className='w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-sm'>
+                      1
+                    </div>
                     <div>
-                      <div className="font-medium text-gray-900">Payment goes to secure escrow</div>
-                      <div className="text-sm text-gray-600">Your money is held safely, not sent to landlord immediately</div>
+                      <div className='font-medium text-gray-900'>
+                        Payment goes to secure escrow
+                      </div>
+                      <div className='text-sm text-gray-600'>
+                        Your money is held safely, not sent to landlord
+                        immediately
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-sm">2</div>
+                  <div className='flex items-start space-x-3'>
+                    <div className='w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-sm'>
+                      2
+                    </div>
                     <div>
-                      <div className="font-medium text-gray-900">You check in and inspect the property</div>
-                      <div className="text-sm text-gray-600">Take your time to ensure everything matches the offer</div>
+                      <div className='font-medium text-gray-900'>
+                        You check in and inspect the property
+                      </div>
+                      <div className='text-sm text-gray-600'>
+                        Take your time to ensure everything matches the offer
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-start space-x-3">
-                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-sm">3</div>
+                  <div className='flex items-start space-x-3'>
+                    <div className='w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-sm'>
+                      3
+                    </div>
                     <div>
-                      <div className="font-medium text-gray-900">24-hour protection window begins</div>
-                      <div className="text-sm text-gray-600">Report any issues or get automatic release to landlord</div>
+                      <div className='font-medium text-gray-900'>
+                        24-hour protection window begins
+                      </div>
+                      <div className='text-sm text-gray-600'>
+                        Report any issues or get automatic release to landlord
+                      </div>
                     </div>
                   </div>
-          </div>
-        </div>
-      </div>
+                </div>
+              </div>
+            </div>
 
             {/* Terms Agreement */}
-            <div className="card-modern">
-              <div className="p-6">
-                <label className="flex items-start space-x-3 cursor-pointer">
+            <div className='card-modern'>
+              <div className='p-6'>
+                <label className='flex items-start space-x-3 cursor-pointer'>
                   <input
-                    type="checkbox"
+                    type='checkbox'
                     checked={agreedToTerms}
-                    onChange={(e) => setAgreedToTerms(e.target.checked)}
-                    className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    onChange={e => setAgreedToTerms(e.target.checked)}
+                    className='mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'
                   />
-                  <span className="text-sm text-gray-700">
-                    I agree to the Terms of Service and Safety Protection Policy. I understand that my payment is held in escrow and protected for 24 hours after check-in.
+                  <span className='text-sm text-gray-700'>
+                    I agree to the Terms of Service and Safety Protection
+                    Policy. I understand that my payment is held in escrow and
+                    protected for 24 hours after check-in.
                   </span>
                 </label>
               </div>
@@ -621,79 +757,97 @@ const PaymentPage = () => {
             <button
               onClick={handlePaySecurely}
               disabled={!agreedToTerms || isProcessing}
-              className="w-full bg-green-600 text-white py-4 px-6 rounded-lg font-semibold text-lg flex items-center justify-center space-x-2 hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className='w-full bg-green-600 text-white py-4 px-6 rounded-lg font-semibold text-lg flex items-center justify-center space-x-2 hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
             >
-              <Shield className="w-5 h-5" />
-              <span>{isProcessing ? 'Processing Payment...' : `Pay Securely - ${formatCurrency(finalTotal)}`}</span>
+              <Shield className='w-5 h-5' />
+              <span>
+                {isProcessing
+                  ? 'Processing Payment...'
+                  : `Pay Securely - ${formatCurrency(finalTotal)}`}
+              </span>
             </button>
           </div>
 
           {/* Right Column - Order Summary */}
-          <div className="space-y-6">
+          <div className='space-y-6'>
             {/* Property Details */}
-            <div className="card-modern">
-              <div className="p-6">
-                <div className="w-full h-32 bg-gray-200 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+            <div className='card-modern'>
+              <div className='p-6'>
+                <div className='w-full h-32 bg-gray-200 rounded-lg mb-4 flex items-center justify-center overflow-hidden'>
                   {offer?.property?.images ? (
                     (() => {
                       try {
-                        const images = typeof offer.property.images === 'string' ? JSON.parse(offer.property.images) : offer.property.images;
+                        const images =
+                          typeof offer.property.images === 'string'
+                            ? JSON.parse(offer.property.images)
+                            : offer.property.images;
                         return images && images.length > 0 ? (
-                          <img 
-                            src={getImageUrl(images[0])} 
-                            alt="Property" 
-                            className="w-full h-full object-cover"
+                          <img
+                            src={getImageUrl(images[0])}
+                            alt='Property'
+                            className='w-full h-full object-cover'
                           />
                         ) : (
-                          <Home className="w-8 h-8 text-gray-400" />
+                          <Home className='w-8 h-8 text-gray-400' />
                         );
                       } catch (error) {
-                        return <Home className="w-8 h-8 text-gray-400" />;
+                        return <Home className='w-8 h-8 text-gray-400' />;
                       }
                     })()
                   ) : (
-                    <Home className="w-8 h-8 text-gray-400" />
+                    <Home className='w-8 h-8 text-gray-400' />
                   )}
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {offer.propertyTitle || offer.property?.name || 'Modern apartment in central Warsaw'}
+                <h3 className='text-lg font-semibold text-gray-900 mb-2'>
+                  {offer.propertyTitle ||
+                    offer.property?.name ||
+                    'Modern apartment in central Warsaw'}
                 </h3>
-                <p className="text-sm text-gray-600 mb-3">
-                  {getPropertyTypeDisplay(offer.property?.propertyType || offer.propertyType)}, {offer.property?.bedrooms || 2} rooms
+                <p className='text-sm text-gray-600 mb-3'>
+                  {getPropertyTypeDisplay(
+                    offer.property?.propertyType || offer.propertyType
+                  )}
+                  , {offer.property?.bedrooms || 2} rooms
                 </p>
-                <div className="inline-block bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium mb-4">
+                <div className='inline-block bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium mb-4'>
                   Accepted
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <MapPin className="w-4 h-4" />
+                <div className='space-y-2'>
+                  <div className='flex items-center space-x-2 text-sm text-gray-600'>
+                    <MapPin className='w-4 h-4' />
                     <span>
                       {(() => {
-                        if (!offer.propertyAddress) return 'ul. Krakowska ***, Warszawa';
-                        
+                        if (!offer.propertyAddress)
+                          return 'ul. Krakowska ***, Warszawa';
+
                         // Format address to show only street, district, and city (privacy)
-                        const parts = offer.propertyAddress.split(',').map(part => part.trim()).filter(part => part.length > 0);
-                        
+                        const parts = offer.propertyAddress
+                          .split(',')
+                          .map(part => part.trim())
+                          .filter(part => part.length > 0);
+
                         if (parts.length >= 3) {
                           // Extract street name (remove house number), postcode, and city
                           let street = parts[0];
                           const city = parts[2];
-                          
+
                           // Remove house number from street (e.g., "Jarochowskiego 97/19" -> "Jarochowskiego")
                           street = street.replace(/\s+\d+.*$/, '');
-                          
+
                           // Try to get district from property data if available
                           const district = offer.property?.district || '';
-                          
-                          return district ? `${street}, ${district}, ${city}` : `${street}, ${city}`;
+
+                          return district
+                            ? `${street}, ${district}, ${city}`
+                            : `${street}, ${city}`;
                         } else if (parts.length === 2) {
                           // If only 2 parts, assume it's street and city
                           let street = parts[0];
                           const city = parts[1];
-                          
+
                           // Remove house number from street
                           street = street.replace(/\s+\d+.*$/, '');
-                          
+
                           return `${street}, ${city}`;
                         } else {
                           // If only 1 part, remove house number and return
@@ -703,111 +857,151 @@ const PaymentPage = () => {
                         }
                       })()}
                     </span>
-                    <span className="text-blue-600 text-xs">Protected</span>
+                    <span className='text-blue-600 text-xs'>Protected</span>
                   </div>
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <Home className="w-4 h-4" />
-                    <span>{offer.propertyAddress?.split(',')[2]?.trim() || 'Warszawa, Mokotów'}</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <Calendar className="w-4 h-4" />
-                    <span>Move-in: {formatDate(offer.availableFrom)}</span>
-          </div>
-        </div>
-      </div>
-        </div>
-
-        {/* Payment Breakdown */}
-            <div className="card-modern">
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Breakdown</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-                    <span className="text-gray-600">
-                      {isFirstMonthProrated() ? 'First month (prorated)' : 'First month rent'}
+                  <div className='flex items-center space-x-2 text-sm text-gray-600'>
+                    <Home className='w-4 h-4' />
+                    <span>
+                      {offer.propertyAddress?.split(',')[2]?.trim() ||
+                        'Warszawa, Mokotów'}
                     </span>
-                    <span className="font-semibold">{formatCurrency(firstMonthRent)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Security deposit</span>
-                    <span className="font-semibold">{formatCurrency(securityDeposit)}</span>
+                  <div className='flex items-center space-x-2 text-sm text-gray-600'>
+                    <Calendar className='w-4 h-4' />
+                    <span>Move-in: {formatDate(offer.availableFrom)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Service fee</span>
-                    <span className="font-semibold">{formatCurrency(serviceFee)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Breakdown */}
+            <div className='card-modern'>
+              <div className='p-6'>
+                <h3 className='text-lg font-semibold text-gray-900 mb-4'>
+                  Payment Breakdown
+                </h3>
+                <div className='space-y-3'>
+                  <div className='flex justify-between'>
+                    <span className='text-gray-600'>
+                      {isFirstMonthProrated()
+                        ? 'First month (prorated)'
+                        : 'First month rent'}
+                    </span>
+                    <span className='font-semibold'>
+                      {formatCurrency(firstMonthRent)}
+                    </span>
                   </div>
-                  <div className="border-t pt-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-900 font-semibold">Total amount</span>
-                      <span className="text-green-600 font-bold">{formatCurrency(finalTotal)}</span>
+                  <div className='flex justify-between'>
+                    <span className='text-gray-600'>Security deposit</span>
+                    <span className='font-semibold'>
+                      {formatCurrency(securityDeposit)}
+                    </span>
+                  </div>
+                  <div className='flex justify-between'>
+                    <span className='text-gray-600'>Service fee</span>
+                    <span className='font-semibold'>
+                      {formatCurrency(serviceFee)}
+                    </span>
+                  </div>
+                  <div className='border-t pt-3'>
+                    <div className='flex justify-between'>
+                      <span className='text-gray-900 font-semibold'>
+                        Total amount
+                      </span>
+                      <span className='text-green-600 font-bold'>
+                        {formatCurrency(finalTotal)}
+                      </span>
                     </div>
                   </div>
                 </div>
-                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Shield className="w-4 h-4 text-green-600" />
-                    <span className="font-medium text-green-900">Protected by Escrow</span>
+                <div className='mt-4 p-3 bg-green-50 border border-green-200 rounded-lg'>
+                  <div className='flex items-center space-x-2 mb-2'>
+                    <Shield className='w-4 h-4 text-green-600' />
+                    <span className='font-medium text-green-900'>
+                      Protected by Escrow
+                    </span>
                   </div>
-                  <p className="text-sm text-green-800">
-                    This amount will be held safely in escrow and only released to the landlord 24 hours after your successful check-in.
+                  <p className='text-sm text-green-800'>
+                    This amount will be held safely in escrow and only released
+                    to the landlord 24 hours after your successful check-in.
                   </p>
                 </div>
               </div>
             </div>
 
             {/* Landlord Profile */}
-            <div className="card-modern">
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Landlord</h3>
-                <div className="flex items-center space-x-3 mb-4">
+            <div className='card-modern'>
+              <div className='p-6'>
+                <h3 className='text-lg font-semibold text-gray-900 mb-4'>
+                  Landlord
+                </h3>
+                <div className='flex items-center space-x-3 mb-4'>
                   {landlordData.profileImage ? (
-                    <img src={getProfilePhotoUrl(landlordData.profileImage)} alt="Landlord" className="w-12 h-12 rounded-full object-cover" />
+                    <img
+                      src={getProfilePhotoUrl(landlordData.profileImage)}
+                      alt='Landlord'
+                      className='w-12 h-12 rounded-full object-cover'
+                    />
                   ) : (
-                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                      <Users className="w-6 h-6 text-gray-400" />
+                    <div className='w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center'>
+                      <Users className='w-6 h-6 text-gray-400' />
                     </div>
                   )}
                   <div>
-                    <div className="font-semibold text-gray-900">{maskLandlordName(landlordData.name)}</div>
-                    <div className="text-sm text-gray-600">Contact details available after payment</div>
+                    <div className='font-semibold text-gray-900'>
+                      {maskLandlordName(landlordData.name)}
+                    </div>
+                    <div className='text-sm text-gray-600'>
+                      Contact details available after payment
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <RatingDisplay 
-                    averageRating={landlordData.rating} 
-                    totalReviews={landlordData.reviews} 
-                    size="small"
+                <div className='space-y-2'>
+                  <RatingDisplay
+                    averageRating={landlordData.rating}
+                    totalReviews={landlordData.reviews}
+                    size='small'
                   />
-                  <div className="text-xs inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-                    {offer?.landlord?.rankInfo?.icon || '⭐'} {offer?.landlord?.rankInfo?.name || String(landlordData.rank).replace('_',' ')}
+                  <div className='text-xs inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800'>
+                    {offer?.landlord?.rankInfo?.icon || '⭐'}{' '}
+                    {offer?.landlord?.rankInfo?.name ||
+                      String(landlordData.rank).replace('_', ' ')}
                   </div>
-                  <div className="text-sm text-gray-600">Since {landlordData.memberSince}</div>
+                  <div className='text-sm text-gray-600'>
+                    Since {landlordData.memberSince}
+                  </div>
                 </div>
                 <button
-                  onClick={() => { setShowLandlordReviews(true); fetchLandlordReviews(); }}
-                  className="mt-3 text-sm text-blue-600 underline"
+                  onClick={() => {
+                    setShowLandlordReviews(true);
+                    fetchLandlordReviews();
+                  }}
+                  className='mt-3 text-sm text-blue-600 underline'
                 >
                   View reviews from previous tenants
                 </button>
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    Full contact details will be available after payment completion to protect both parties.
+                <div className='mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg'>
+                  <p className='text-sm text-blue-800'>
+                    Full contact details will be available after payment
+                    completion to protect both parties.
                   </p>
                 </div>
               </div>
             </div>
 
             {/* Need Help */}
-            <div className="card-modern">
-              <div className="p-6">
-                <div className="flex items-center space-x-2 mb-3">
-                  <HelpCircle className="w-5 h-5 text-gray-600" />
-                  <h3 className="text-lg font-semibold text-gray-900">Need Help?</h3>
+            <div className='card-modern'>
+              <div className='p-6'>
+                <div className='flex items-center space-x-2 mb-3'>
+                  <HelpCircle className='w-5 h-5 text-gray-600' />
+                  <h3 className='text-lg font-semibold text-gray-900'>
+                    Need Help?
+                  </h3>
                 </div>
-                <p className="text-sm text-gray-600 mb-4">
+                <p className='text-sm text-gray-600 mb-4'>
                   Our support team is available 24/7 to help with your rental.
                 </p>
-                <button className="w-full text-blue-600 hover:text-blue-700 font-medium text-sm">
+                <button className='w-full text-blue-600 hover:text-blue-700 font-medium text-sm'>
                   Contact Support
                 </button>
               </div>
@@ -818,70 +1012,102 @@ const PaymentPage = () => {
 
       {/* Payment Processing Modal */}
       {showProcessingModal && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+        <div className='fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50'>
+          <div className='bg-white rounded-lg p-8 max-w-md w-full mx-4'>
             {/* Loading Spinner */}
-            <div className="flex justify-center mb-6">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className='flex justify-center mb-6'>
+              <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600'></div>
             </div>
 
             {/* Title */}
-            <h2 className="text-xl font-semibold text-gray-900 text-center mb-2">
+            <h2 className='text-xl font-semibold text-gray-900 text-center mb-2'>
               Processing Your Payment
             </h2>
-            
+
             {/* Description */}
-            <p className="text-gray-600 text-center mb-6">
+            <p className='text-gray-600 text-center mb-6'>
               Securing your rental and setting up escrow protection...
             </p>
 
             {/* Processing Steps */}
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                  processingStep >= 1 ? 'bg-green-500' : 'bg-gray-300'
-                }`}>
+            <div className='space-y-4'>
+              <div className='flex items-center space-x-3'>
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                    processingStep >= 1 ? 'bg-green-500' : 'bg-gray-300'
+                  }`}
+                >
                   {processingStep >= 1 ? (
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <svg
+                      className='w-4 h-4 text-white'
+                      fill='none'
+                      stroke='currentColor'
+                      viewBox='0 0 24 24'
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth={2}
+                        d='M5 13l4 4L19 7'
+                      />
                     </svg>
                   ) : (
-                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                    <div className='w-2 h-2 bg-white rounded-full'></div>
                   )}
                 </div>
-                <span className={`text-sm ${processingStep >= 1 ? 'text-gray-900' : 'text-gray-500'}`}>
+                <span
+                  className={`text-sm ${processingStep >= 1 ? 'text-gray-900' : 'text-gray-500'}`}
+                >
                   Payment authorized
                 </span>
               </div>
 
-              <div className="flex items-center space-x-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                  processingStep >= 2 ? 'bg-green-500' : 'bg-gray-300'
-                }`}>
+              <div className='flex items-center space-x-3'>
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                    processingStep >= 2 ? 'bg-green-500' : 'bg-gray-300'
+                  }`}
+                >
                   {processingStep >= 2 ? (
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <svg
+                      className='w-4 h-4 text-white'
+                      fill='none'
+                      stroke='currentColor'
+                      viewBox='0 0 24 24'
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth={2}
+                        d='M5 13l4 4L19 7'
+                      />
                     </svg>
                   ) : (
-                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                    <div className='w-2 h-2 bg-white rounded-full'></div>
                   )}
                 </div>
-                <span className={`text-sm ${processingStep >= 2 ? 'text-gray-900' : 'text-gray-500'}`}>
+                <span
+                  className={`text-sm ${processingStep >= 2 ? 'text-gray-900' : 'text-gray-500'}`}
+                >
                   Funds moved to secure escrow
                 </span>
               </div>
 
-              <div className="flex items-center space-x-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                  processingStep >= 3 ? 'bg-blue-500' : 'bg-gray-300'
-                }`}>
+              <div className='flex items-center space-x-3'>
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                    processingStep >= 3 ? 'bg-blue-500' : 'bg-gray-300'
+                  }`}
+                >
                   {processingStep >= 3 ? (
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                    <div className='animate-spin rounded-full h-3 w-3 border-b-2 border-white'></div>
                   ) : (
-                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                    <div className='w-2 h-2 bg-white rounded-full'></div>
                   )}
                 </div>
-                <span className={`text-sm ${processingStep >= 3 ? 'text-gray-900' : 'text-gray-500'}`}>
+                <span
+                  className={`text-sm ${processingStep >= 3 ? 'text-gray-900' : 'text-gray-500'}`}
+                >
                   Confirming with landlord...
                 </span>
               </div>
@@ -892,55 +1118,83 @@ const PaymentPage = () => {
 
       {/* Landlord Reviews Modal */}
       {showLandlordReviews && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Landlord Reviews</h2>
+        <div className='fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50'>
+          <div className='bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto'>
+            <div className='flex items-center justify-between mb-4'>
+              <h2 className='text-xl font-semibold text-gray-900'>
+                Landlord Reviews
+              </h2>
               <button
                 onClick={() => setShowLandlordReviews(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className='text-gray-400 hover:text-gray-600'
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className='w-6 h-6'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M6 18L18 6M6 6l12 12'
+                  />
                 </svg>
               </button>
             </div>
-            
+
             {reviewsLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading reviews...</p>
+              <div className='text-center py-8'>
+                <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4'></div>
+                <p className='text-gray-600'>Loading reviews...</p>
               </div>
             ) : landlordReviews.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-600">No reviews available yet.</p>
+              <div className='text-center py-8'>
+                <p className='text-gray-600'>No reviews available yet.</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {landlordReviews.map((review) => (
-                  <div key={review.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <div className="flex items-center space-x-1">
+              <div className='space-y-4'>
+                {landlordReviews.map(review => (
+                  <div
+                    key={review.id}
+                    className='border border-gray-200 rounded-lg p-4'
+                  >
+                    <div className='flex items-center justify-between mb-2'>
+                      <div className='flex items-center space-x-2'>
+                        <div className='flex items-center space-x-1'>
                           {[...Array(5)].map((_, i) => (
                             <Star
                               key={i}
                               className={`w-4 h-4 ${
-                                i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                                i < review.rating
+                                  ? 'text-yellow-400 fill-current'
+                                  : 'text-gray-300'
                               }`}
                             />
                           ))}
                         </div>
-                        <span className="text-sm font-medium text-gray-900">{review.rating}/5</span>
+                        <span className='text-sm font-medium text-gray-900'>
+                          {review.rating}/5
+                        </span>
                       </div>
-                      <span className="text-xs text-gray-500">{review.reviewDate}</span>
+                      <span className='text-xs text-gray-500'>
+                        {review.reviewDate}
+                      </span>
                     </div>
-                    <div className="mb-2">
-                      <span className="text-sm font-medium text-gray-900">{review.tenantName}</span>
-                      <span className="text-sm text-gray-600"> • {review.propertyName}</span>
+                    <div className='mb-2'>
+                      <span className='text-sm font-medium text-gray-900'>
+                        {review.tenantName}
+                      </span>
+                      <span className='text-sm text-gray-600'>
+                        {' '}
+                        • {review.propertyName}
+                      </span>
                     </div>
-                    <p className="text-sm text-gray-700 mb-2">{review.comment}</p>
-                    <div className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                    <p className='text-sm text-gray-700 mb-2'>
+                      {review.comment}
+                    </p>
+                    <div className='inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium'>
                       {review.reviewStage}
                     </div>
                   </div>
@@ -954,4 +1208,4 @@ const PaymentPage = () => {
   );
 };
 
-export default PaymentPage; 
+export default PaymentPage;

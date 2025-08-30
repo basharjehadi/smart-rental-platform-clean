@@ -1,5 +1,8 @@
 import { PrismaClient } from '@prisma/client';
-import { getLandlordPaymentData, getLandlordMonthlyRevenue } from '../services/paymentService.js';
+import {
+  getLandlordPaymentData,
+  getLandlordMonthlyRevenue,
+} from '../services/paymentService.js';
 
 const prisma = new PrismaClient();
 
@@ -11,8 +14,8 @@ const getLandlordDashboard = async (req, res) => {
     const properties = await prisma.property.findMany({
       where: {
         organization: {
-          members: { some: { userId: landlordId } }
-        }
+          members: { some: { userId: landlordId } },
+        },
       },
       include: {
         offers: {
@@ -25,28 +28,46 @@ const getLandlordDashboard = async (req, res) => {
                       where: { isPrimary: true },
                       include: {
                         user: {
-                          select: { id: true, firstName: true, lastName: true, email: true }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                          select: {
+                            id: true,
+                            firstName: true,
+                            lastName: true,
+                            email: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     // Calculate portfolio metrics based on offers
     const totalProperties = properties.length;
-    const totalOffers = properties.reduce((sum, property) => sum + property.offers.length, 0);
+    const totalOffers = properties.reduce(
+      (sum, property) => sum + property.offers.length,
+      0
+    );
     // Only count PAID offers that were not cancelled via move-in review
-    const activeOffers = properties.reduce((sum, property) => 
-      sum + property.offers.filter(offer => offer.status === 'PAID' && offer.moveInVerificationStatus !== 'CANCELLED').length, 0
+    const activeOffers = properties.reduce(
+      (sum, property) =>
+        sum +
+        property.offers.filter(
+          (offer) =>
+            offer.status === 'PAID' &&
+            offer.moveInVerificationStatus !== 'CANCELLED'
+        ).length,
+      0
     );
     const vacantProperties = totalProperties - activeOffers;
-    const occupancyRate = totalProperties > 0 ? Math.round((activeOffers / totalProperties) * 100) : 0;
+    const occupancyRate =
+      totalProperties > 0
+        ? Math.round((activeOffers / totalProperties) * 100)
+        : 0;
 
     // Calculate monthly revenue based on actual payments (prorated first month + rent payments)
     const monthlyRevenue = await getLandlordMonthlyRevenue(landlordId);
@@ -55,61 +76,10 @@ const getLandlordDashboard = async (req, res) => {
     const recentTenants = await prisma.offer.findMany({
       where: {
         organization: {
-          members: { some: { userId: landlordId } }
-        },
-        status: 'PAID',
-        moveInVerificationStatus: { not: 'CANCELLED' }
-      },
-      include: {
-        property: true,
-        rentalRequest: {
-          include: {
-            tenantGroup: {
-              include: {
-                members: {
-                  where: { isPrimary: true },
-                  include: {
-                    user: { select: { id: true, firstName: true, lastName: true, email: true } }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 3
-    });
-
-    const tenantData = recentTenants.map(offer => {
-      const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
-      const tenant = primaryMember?.user || {};
-      const tenantName = tenant.firstName && tenant.lastName 
-        ? `${tenant.firstName} ${tenant.lastName}`
-        : tenant.email || 'Tenant';
-      
-      return {
-        name: tenantName,
-        property: offer.property?.title || offer.property?.name || 'Property',
-        status: 'Paid'
-      };
-    });
-
-    // Get upcoming tasks (lease renewals, inspections, etc.)
-    const upcomingTasks = [];
-    
-    // Add lease renewals based on offer end dates
-    const expiringOffers = await prisma.offer.findMany({
-      where: {
-        organization: {
-          members: { some: { userId: landlordId } }
+          members: { some: { userId: landlordId } },
         },
         status: 'PAID',
         moveInVerificationStatus: { not: 'CANCELLED' },
-        leaseEndDate: {
-          gte: new Date(),
-          lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Next 30 days
-        }
       },
       include: {
         property: true,
@@ -125,29 +95,88 @@ const getLandlordDashboard = async (req, res) => {
                         id: true,
                         firstName: true,
                         lastName: true,
-                        name: true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                        email: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
     });
 
-    expiringOffers.forEach(offer => {
+    const tenantData = recentTenants.map((offer) => {
+      const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
+      const tenant = primaryMember?.user || {};
+      const tenantName =
+        tenant.firstName && tenant.lastName
+          ? `${tenant.firstName} ${tenant.lastName}`
+          : tenant.email || 'Tenant';
+
+      return {
+        name: tenantName,
+        property: offer.property?.title || offer.property?.name || 'Property',
+        status: 'Paid',
+      };
+    });
+
+    // Get upcoming tasks (lease renewals, inspections, etc.)
+    const upcomingTasks = [];
+
+    // Add lease renewals based on offer end dates
+    const expiringOffers = await prisma.offer.findMany({
+      where: {
+        organization: {
+          members: { some: { userId: landlordId } },
+        },
+        status: 'PAID',
+        moveInVerificationStatus: { not: 'CANCELLED' },
+        leaseEndDate: {
+          gte: new Date(),
+          lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Next 30 days
+        },
+      },
+      include: {
+        property: true,
+        rentalRequest: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expiringOffers.forEach((offer) => {
       // Get the primary tenant from the tenant group
       const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
       const tenant = primaryMember?.user;
-      
+
       upcomingTasks.push({
         title: 'Lease Renewal Due',
         description: `${tenant?.firstName || ''} ${tenant?.lastName || ''} - ${offer.property.title || offer.property.name}`,
         type: 'renewal',
         bgColor: 'bg-red-50',
-        date: offer.leaseEndDate
+        date: offer.leaseEndDate,
       });
     });
 
@@ -156,14 +185,14 @@ const getLandlordDashboard = async (req, res) => {
       title: 'Property Inspection',
       description: 'Żoliborz Studios - Dec 20',
       type: 'inspection',
-      bgColor: 'bg-yellow-50'
+      bgColor: 'bg-yellow-50',
     });
 
     upcomingTasks.push({
       title: 'Rent Collection',
       description: 'Follow-up required - Dec 25',
       type: 'collection',
-      bgColor: 'bg-blue-50'
+      bgColor: 'bg-blue-50',
     });
 
     // Use unified payment service for consistent data
@@ -180,12 +209,17 @@ const getLandlordDashboard = async (req, res) => {
       property: 'Sample Property',
       rating: 5,
       comment: 'Great landlord, very responsive!',
-      date: new Date()
+      date: new Date(),
     });
 
-    const averageRating = allReviews.length > 0 
-      ? Math.round((allReviews.reduce((sum, review) => sum + review.rating, 0) / allReviews.length) * 10) / 10
-      : 0;
+    const averageRating =
+      allReviews.length > 0
+        ? Math.round(
+            (allReviews.reduce((sum, review) => sum + review.rating, 0) /
+              allReviews.length) *
+              10
+          ) / 10
+        : 0;
 
     // Get maintenance requests - Since maintenance requests are not implemented yet, we'll use mock data
     const maintenanceRequests = [];
@@ -196,21 +230,21 @@ const getLandlordDashboard = async (req, res) => {
       title: 'Heating System Repair',
       tenant: 'John Doe',
       property: 'Sample Property',
-      status: 'In Progress'
+      status: 'In Progress',
     });
 
     // Get upcoming renewals count - Fixed query to go through offers
     const upcomingRenewals = await prisma.offer.count({
       where: {
         organization: {
-          members: { some: { userId: landlordId } }
+          members: { some: { userId: landlordId } },
         },
         status: 'PAID',
         leaseEndDate: {
           gte: new Date(),
-          lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Next 30 days
-        }
-      }
+          lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Next 30 days
+        },
+      },
     });
 
     const dashboardData = {
@@ -233,7 +267,7 @@ const getLandlordDashboard = async (req, res) => {
 
       // Aggregated data
       averageRating: 4.5, // Mock data for now
-      totalReviews: 1 // Mock data for now
+      totalReviews: 1, // Mock data for now
     };
 
     res.json(dashboardData);
@@ -243,6 +277,4 @@ const getLandlordDashboard = async (req, res) => {
   }
 };
 
-export {
-  getLandlordDashboard
-}; 
+export { getLandlordDashboard };

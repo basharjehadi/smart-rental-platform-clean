@@ -23,8 +23,8 @@ export const getUserIdentity = async (req, res) => {
         dowodOsobistyNumber: true,
         address: true,
         profileImage: true,
-        signatureBase64: true
-      }
+        signatureBase64: true,
+      },
     });
 
     if (!user) {
@@ -70,8 +70,8 @@ export const getUserProfile = async (req, res) => {
         identityDocument: true,
         isVerified: true,
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     if (!user) {
@@ -105,13 +105,13 @@ export const updateUserProfile = async (req, res) => {
       profession,
       dowodOsobistyNumber,
       address,
-      profileImage
+      profileImage,
     } = req.body;
 
     // Validate required fields based on role
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true }
+      select: { role: true },
     });
 
     if (!user) {
@@ -125,7 +125,8 @@ export const updateUserProfile = async (req, res) => {
     if (lastName !== undefined) updateData.lastName = lastName;
     if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
     if (citizenship !== undefined) updateData.citizenship = citizenship;
-    if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+    if (dateOfBirth !== undefined)
+      updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
     if (street !== undefined) updateData.street = street;
     if (city !== undefined) updateData.city = city;
     if (zipCode !== undefined) updateData.zipCode = zipCode;
@@ -136,13 +137,16 @@ export const updateUserProfile = async (req, res) => {
     if (user.role === 'TENANT') {
       // Tenant-specific fields
       if (pesel !== undefined) updateData.pesel = pesel;
-      if (passportNumber !== undefined) updateData.passportNumber = passportNumber;
-      if (kartaPobytuNumber !== undefined) updateData.kartaPobytuNumber = kartaPobytuNumber;
+      if (passportNumber !== undefined)
+        updateData.passportNumber = passportNumber;
+      if (kartaPobytuNumber !== undefined)
+        updateData.kartaPobytuNumber = kartaPobytuNumber;
       if (address !== undefined) updateData.address = address; // Allow address for tenants too
     } else if (user.role === 'LANDLORD') {
       // Landlord-specific fields - handle both PESEL and ID card number
       if (pesel !== undefined) updateData.pesel = pesel;
-      if (dowodOsobistyNumber !== undefined) updateData.dowodOsobistyNumber = dowodOsobistyNumber;
+      if (dowodOsobistyNumber !== undefined)
+        updateData.dowodOsobistyNumber = dowodOsobistyNumber;
       if (address !== undefined) updateData.address = address;
     }
 
@@ -152,7 +156,10 @@ export const updateUserProfile = async (req, res) => {
     }
 
     // Validate phone number format (basic validation)
-    if (updateData.phoneNumber && !/^[\+]?[0-9\s\-\(\)]{9,15}$/.test(updateData.phoneNumber)) {
+    if (
+      updateData.phoneNumber &&
+      !/^[\+]?[0-9\s\-\(\)]{9,15}$/.test(updateData.phoneNumber)
+    ) {
       return res.status(400).json({ error: 'Invalid phone number format' });
     }
 
@@ -180,13 +187,13 @@ export const updateUserProfile = async (req, res) => {
         dowodOsobistyNumber: true,
         address: true,
         profileImage: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
     res.json({
       message: 'Profile updated successfully',
-      user: updatedUser
+      user: updatedUser,
     });
   } catch (error) {
     console.error('Update user profile error:', error);
@@ -206,13 +213,13 @@ export const updateUserIdentity = async (req, res) => {
       kartaPobytuNumber,
       phoneNumber,
       dowodOsobistyNumber,
-      address
+      address,
     } = req.body;
 
     // Validate required fields based on role
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true }
+      select: { role: true },
     });
 
     if (!user) {
@@ -224,7 +231,9 @@ export const updateUserIdentity = async (req, res) => {
     if (user.role === 'TENANT') {
       // Tenant-specific validation
       if (!firstName || !lastName) {
-        return res.status(400).json({ error: 'First name and last name are required for tenants' });
+        return res
+          .status(400)
+          .json({ error: 'First name and last name are required for tenants' });
       }
       updateData.firstName = firstName;
       updateData.lastName = lastName;
@@ -236,7 +245,9 @@ export const updateUserIdentity = async (req, res) => {
     } else if (user.role === 'LANDLORD') {
       // Landlord-specific validation
       if (!firstName || !lastName) {
-        return res.status(400).json({ error: 'First name and last name are required for landlords' });
+        return res.status(400).json({
+          error: 'First name and last name are required for landlords',
+        });
       }
       updateData.firstName = firstName;
       updateData.lastName = lastName;
@@ -260,13 +271,13 @@ export const updateUserIdentity = async (req, res) => {
         kartaPobytuNumber: true,
         phoneNumber: true,
         dowodOsobistyNumber: true,
-        address: true
-      }
+        address: true,
+      },
     });
 
     res.json({
       message: 'Identity data updated successfully',
-      user: updatedUser
+      user: updatedUser,
     });
   } catch (error) {
     console.error('Update user identity error:', error);
@@ -291,13 +302,13 @@ export const saveUserSignature = async (req, res) => {
         id: true,
         firstName: true,
         lastName: true,
-        signatureBase64: true
-      }
+        signatureBase64: true,
+      },
     });
 
     res.json({
       message: 'Signature saved successfully',
-      user: updatedUser
+      user: updatedUser,
     });
   } catch (error) {
     console.error('Save user signature error:', error);
@@ -319,10 +330,10 @@ export const saveContractSignatures = async (req, res) => {
         tenant: true,
         offer: {
           include: {
-            landlord: true
-          }
-        }
-      }
+            landlord: true,
+          },
+        },
+      },
     });
 
     if (!rentalRequest) {
@@ -330,11 +341,15 @@ export const saveContractSignatures = async (req, res) => {
     }
 
     // Check if user is tenant or landlord
-    const isTenant = rentalRequest.tenantId === userId;
+    const isTenant = rentalRequest.tenantGroup?.members?.some(
+      (m) => m.userId === userId
+    );
     const isLandlord = rentalRequest.offer?.landlordId === userId;
 
     if (!isTenant && !isLandlord) {
-      return res.status(403).json({ error: 'Unauthorized to sign this contract' });
+      return res
+        .status(403)
+        .json({ error: 'Unauthorized to sign this contract' });
     }
 
     // Create or update contract signature
@@ -342,19 +357,21 @@ export const saveContractSignatures = async (req, res) => {
       where: { rentalRequestId },
       update: {
         tenantSignatureBase64: isTenant ? tenantSignatureBase64 : undefined,
-        landlordSignatureBase64: isLandlord ? landlordSignatureBase64 : undefined,
-        signedAt: new Date()
+        landlordSignatureBase64: isLandlord
+          ? landlordSignatureBase64
+          : undefined,
+        signedAt: new Date(),
       },
       create: {
         rentalRequestId,
         tenantSignatureBase64: isTenant ? tenantSignatureBase64 : null,
-        landlordSignatureBase64: isLandlord ? landlordSignatureBase64 : null
-      }
+        landlordSignatureBase64: isLandlord ? landlordSignatureBase64 : null,
+      },
     });
 
     res.json({
       message: 'Contract signatures saved successfully',
-      contractSignature
+      contractSignature,
     });
   } catch (error) {
     console.error('Save contract signatures error:', error);
@@ -375,10 +392,10 @@ export const getContractSignatures = async (req, res) => {
         tenant: true,
         offer: {
           include: {
-            landlord: true
-          }
-        }
-      }
+            landlord: true,
+          },
+        },
+      },
     });
 
     if (!rentalRequest) {
@@ -386,20 +403,24 @@ export const getContractSignatures = async (req, res) => {
     }
 
     // Check if user is tenant or landlord
-    const isTenant = rentalRequest.tenantId === userId;
+    const isTenant = rentalRequest.tenantGroup?.members?.some(
+      (m) => m.userId === userId
+    );
     const isLandlord = rentalRequest.offer?.landlordId === userId;
 
     if (!isTenant && !isLandlord) {
-      return res.status(403).json({ error: 'Unauthorized to view this contract' });
+      return res
+        .status(403)
+        .json({ error: 'Unauthorized to view this contract' });
     }
 
     const contractSignature = await prisma.contractSignature.findUnique({
-      where: { rentalRequestId }
+      where: { rentalRequestId },
     });
 
     res.json({
       contractSignature,
-      userRole: isTenant ? 'TENANT' : 'LANDLORD'
+      userRole: isTenant ? 'TENANT' : 'LANDLORD',
     });
   } catch (error) {
     console.error('Get contract signatures error:', error);
@@ -416,16 +437,21 @@ export const uploadIdentityDocument = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         error: 'No file uploaded',
-        message: 'Please select a file to upload'
+        message: 'Please select a file to upload',
       });
     }
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/jpg',
+      'application/pdf',
+    ];
     if (!allowedTypes.includes(req.file.mimetype)) {
       return res.status(400).json({
         error: 'Invalid file type',
-        message: 'Only JPEG, PNG, and PDF files are allowed'
+        message: 'Only JPEG, PNG, and PDF files are allowed',
       });
     }
 
@@ -434,7 +460,7 @@ export const uploadIdentityDocument = async (req, res) => {
     if (req.file.size > maxSize) {
       return res.status(400).json({
         error: 'File too large',
-        message: 'File size must be less than 10MB'
+        message: 'File size must be less than 10MB',
       });
     }
 
@@ -444,18 +470,18 @@ export const uploadIdentityDocument = async (req, res) => {
 
     // Get GDPR consent data from request body
     const { gdprConsent, gdprConsentDate } = req.body;
-    
+
     // Prepare update data
     const updateData = {
-      identityDocument: filename
+      identityDocument: filename,
     };
-    
+
     // Add GDPR consent data if provided
     if (gdprConsent === 'true' && gdprConsentDate) {
       updateData.gdprConsent = true;
       updateData.gdprConsentDate = new Date(gdprConsentDate);
     }
-    
+
     // Set KYC status to PENDING when documents are uploaded
     updateData.kycStatus = 'PENDING';
     updateData.kycSubmittedAt = new Date();
@@ -473,11 +499,13 @@ export const uploadIdentityDocument = async (req, res) => {
         gdprConsentDate: true,
         kycStatus: true,
         kycSubmittedAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
 
-    console.log(`✅ Identity document uploaded for user ${userId}: ${filename}`);
+    console.log(
+      `✅ Identity document uploaded for user ${userId}: ${filename}`
+    );
 
     res.status(200).json({
       success: true,
@@ -487,15 +515,14 @@ export const uploadIdentityDocument = async (req, res) => {
         filePath: filePath,
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
-        uploadedAt: updatedUser.updatedAt
-      }
+        uploadedAt: updatedUser.updatedAt,
+      },
     });
-
   } catch (error) {
     console.error('Upload identity document error:', error);
     res.status(500).json({
       error: 'Failed to upload identity document',
-      message: 'An error occurred while processing your upload'
+      message: 'An error occurred while processing your upload',
     });
   }
 };
@@ -504,7 +531,7 @@ export const uploadIdentityDocument = async (req, res) => {
 export const getProfileStatus = async (req, res) => {
   try {
     const userId = req.user.id;
-    
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -525,8 +552,8 @@ export const getProfileStatus = async (req, res) => {
         signatureBase64: true,
         profileImage: true,
         phoneVerified: true,
-        emailVerified: true
-      }
+        emailVerified: true,
+      },
     });
 
     if (!user) {
@@ -536,20 +563,26 @@ export const getProfileStatus = async (req, res) => {
     // Define required fields for different user roles
     const REQUIRED_FIELDS = {
       TENANT: [
-        'firstName', 'lastName', 'pesel', 'passportNumber', 
-        'kartaPobytuNumber', 'phoneNumber', 'address'
+        'firstName',
+        'lastName',
+        'pesel',
+        'passportNumber',
+        'kartaPobytuNumber',
+        'phoneNumber',
+        'address',
       ],
       LANDLORD: [
-        'firstName', 'lastName', 'dowodOsobistyNumber', 
-        'phoneNumber', 'address'
+        'firstName',
+        'lastName',
+        'dowodOsobistyNumber',
+        'phoneNumber',
+        'address',
       ],
-      ADMIN: [
-        'firstName', 'lastName', 'phoneNumber'
-      ]
+      ADMIN: ['firstName', 'lastName', 'phoneNumber'],
     };
 
     const requiredFields = REQUIRED_FIELDS[user.role] || [];
-    const missingFields = requiredFields.filter(field => {
+    const missingFields = requiredFields.filter((field) => {
       const value = user[field];
       return !value || value.trim() === '';
     });
@@ -593,18 +626,24 @@ export const getProfileStatus = async (req, res) => {
     }
 
     // Calculate completion percentage
-    const totalRequirements = requiredFields.length + verificationRequirements.length;
-    const completedRequirements = (requiredFields.length - missingFields.length) + 
-                                 (verificationRequirements.length - missingVerifications.length);
-    
-    const completionPercentage = Math.round((completedRequirements / totalRequirements) * 100);
+    const totalRequirements =
+      requiredFields.length + verificationRequirements.length;
+    const completedRequirements =
+      requiredFields.length -
+      missingFields.length +
+      (verificationRequirements.length - missingVerifications.length);
+
+    const completionPercentage = Math.round(
+      (completedRequirements / totalRequirements) * 100
+    );
 
     // Profile is complete if all required fields and verifications are done
-    const isComplete = missingFields.length === 0 && 
-                      !missingVerifications.includes('emailVerified') &&
-                      !missingVerifications.includes('phoneVerified') &&
-                      !missingVerifications.includes('kycVerified') &&
-                      !missingVerifications.includes('gdprConsent');
+    const isComplete =
+      missingFields.length === 0 &&
+      !missingVerifications.includes('emailVerified') &&
+      !missingVerifications.includes('phoneVerified') &&
+      !missingVerifications.includes('kycVerified') &&
+      !missingVerifications.includes('gdprConsent');
 
     res.json({
       isComplete,
@@ -619,7 +658,7 @@ export const getProfileStatus = async (req, res) => {
       hasSignature: !!user.signatureBase64,
       hasProfilePhoto: !!user.profileImage,
       phoneVerified: user.phoneVerified,
-      emailVerified: user.emailVerified
+      emailVerified: user.emailVerified,
     });
   } catch (error) {
     console.error('Profile status check error:', error);
@@ -632,7 +671,7 @@ export const uploadProfilePhoto = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
-        error: 'No photo file provided.'
+        error: 'No photo file provided.',
       });
     }
 
@@ -643,14 +682,14 @@ export const uploadProfilePhoto = async (req, res) => {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
     if (!validTypes.includes(file.mimetype)) {
       return res.status(400).json({
-        error: 'Invalid file type. Only JPG, JPEG, and PNG files are allowed.'
+        error: 'Invalid file type. Only JPG, JPEG, and PNG files are allowed.',
       });
     }
 
     // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
       return res.status(400).json({
-        error: 'File size must be less than 5MB.'
+        error: 'File size must be less than 5MB.',
       });
     }
 
@@ -661,17 +700,17 @@ export const uploadProfilePhoto = async (req, res) => {
     // Update user profile with photo URL
     await prisma.user.update({
       where: { id: userId },
-      data: { profileImage: photoUrl }
+      data: { profileImage: photoUrl },
     });
 
     res.json({
       message: 'Profile photo uploaded successfully.',
-      photoUrl: photoUrl
+      photoUrl: photoUrl,
     });
   } catch (error) {
     console.error('Upload profile photo error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
@@ -684,16 +723,21 @@ export const deleteProfilePhoto = async (req, res) => {
     // Get current user to find existing photo
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { profileImage: true }
+      select: { profileImage: true },
     });
 
     if (user?.profileImage) {
       // Delete file from filesystem
       const fs = await import('fs');
       const path = await import('path');
-      
+
       // Construct path to profile_images directory
-      const photoPath = path.join(process.cwd(), 'uploads', 'profile_images', user.profileImage);
+      const photoPath = path.join(
+        process.cwd(),
+        'uploads',
+        'profile_images',
+        user.profileImage
+      );
       if (fs.existsSync(photoPath)) {
         fs.unlinkSync(photoPath);
       }
@@ -702,16 +746,16 @@ export const deleteProfilePhoto = async (req, res) => {
     // Update user to remove photo reference
     await prisma.user.update({
       where: { id: userId },
-      data: { profileImage: null }
+      data: { profileImage: null },
     });
 
     res.json({
-      message: 'Profile photo deleted successfully.'
+      message: 'Profile photo deleted successfully.',
     });
   } catch (error) {
     console.error('Delete profile photo error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
@@ -723,14 +767,14 @@ export const getPendingKYC = async (req, res) => {
     if (req.user.role !== 'ADMIN') {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'Only admins can access this endpoint'
+        message: 'Only admins can access this endpoint',
       });
     }
 
     const pendingKYC = await prisma.user.findMany({
       where: {
         kycStatus: 'PENDING',
-        identityDocument: { not: null }
+        identityDocument: { not: null },
       },
       select: {
         id: true,
@@ -743,23 +787,22 @@ export const getPendingKYC = async (req, res) => {
         kycSubmittedAt: true,
         gdprConsent: true,
         gdprConsentDate: true,
-        createdAt: true
+        createdAt: true,
       },
       orderBy: {
-        kycSubmittedAt: 'asc'
-      }
+        kycSubmittedAt: 'asc',
+      },
     });
 
     res.status(200).json({
       success: true,
-      data: pendingKYC
+      data: pendingKYC,
     });
-
   } catch (error) {
     console.error('Get pending KYC error:', error);
     res.status(500).json({
       error: 'Failed to get pending KYC',
-      message: 'An error occurred while fetching pending KYC submissions'
+      message: 'An error occurred while fetching pending KYC submissions',
     });
   }
 };
@@ -773,7 +816,7 @@ export const reviewKYC = async (req, res) => {
     if (req.user.role !== 'ADMIN') {
       return res.status(403).json({
         error: 'Access denied',
-        message: 'Only admins can access this endpoint'
+        message: 'Only admins can access this endpoint',
       });
     }
 
@@ -781,7 +824,7 @@ export const reviewKYC = async (req, res) => {
     if (!['APPROVED', 'REJECTED'].includes(action)) {
       return res.status(400).json({
         error: 'Invalid action',
-        message: 'Action must be either APPROVED or REJECTED'
+        message: 'Action must be either APPROVED or REJECTED',
       });
     }
 
@@ -791,21 +834,21 @@ export const reviewKYC = async (req, res) => {
       select: {
         id: true,
         kycStatus: true,
-        identityDocument: true
-      }
+        identityDocument: true,
+      },
     });
 
     if (!user) {
       return res.status(404).json({
         error: 'User not found',
-        message: 'The specified user does not exist'
+        message: 'The specified user does not exist',
       });
     }
 
     if (user.kycStatus !== 'PENDING') {
       return res.status(400).json({
         error: 'Invalid KYC status',
-        message: 'KYC is not in pending status'
+        message: 'KYC is not in pending status',
       });
     }
 
@@ -813,7 +856,7 @@ export const reviewKYC = async (req, res) => {
     const updateData = {
       kycStatus: action,
       kycReviewedAt: new Date(),
-      kycReviewedBy: req.user.id
+      kycReviewedBy: req.user.id,
     };
 
     if (action === 'APPROVED') {
@@ -833,23 +876,24 @@ export const reviewKYC = async (req, res) => {
         kycStatus: true,
         kycReviewedAt: true,
         kycRejectionReason: true,
-        isVerified: true
-      }
+        isVerified: true,
+      },
     });
 
-    console.log(`✅ KYC ${action.toLowerCase()} for user ${userId} by admin ${req.user.id}`);
+    console.log(
+      `✅ KYC ${action.toLowerCase()} for user ${userId} by admin ${req.user.id}`
+    );
 
     res.status(200).json({
       success: true,
       message: `KYC ${action.toLowerCase()} successfully`,
-      data: updatedUser
+      data: updatedUser,
     });
-
   } catch (error) {
     console.error('Review KYC error:', error);
     res.status(500).json({
       error: 'Failed to review KYC',
-      message: 'An error occurred while reviewing KYC'
+      message: 'An error occurred while reviewing KYC',
     });
   }
 };
@@ -862,7 +906,7 @@ export const findUserByEmail = async (req, res) => {
     if (!email) {
       return res.status(400).json({
         error: 'Email is required',
-        message: 'Please provide an email address'
+        message: 'Please provide an email address',
       });
     }
 
@@ -874,14 +918,14 @@ export const findUserByEmail = async (req, res) => {
         name: true,
         email: true,
         role: true,
-        profileImage: true
-      }
+        profileImage: true,
+      },
     });
 
     if (!user) {
       return res.status(404).json({
         error: 'User not found',
-        message: 'No user found with that email address'
+        message: 'No user found with that email address',
       });
     }
 
@@ -889,20 +933,19 @@ export const findUserByEmail = async (req, res) => {
     if (user.id === req.user.id) {
       return res.status(400).json({
         error: 'Invalid request',
-        message: 'You cannot start a conversation with yourself'
+        message: 'You cannot start a conversation with yourself',
       });
     }
 
     res.json({
       success: true,
-      user
+      user,
     });
-
   } catch (error) {
     console.error('Find user by email error:', error);
     res.status(500).json({
       error: 'Failed to find user',
-      message: 'An error occurred while searching for the user'
+      message: 'An error occurred while searching for the user',
     });
   }
 };
@@ -912,11 +955,11 @@ export const getUserRank = async (req, res) => {
   try {
     const { userId } = req.params;
     const requestingUserId = req.user.id;
-    
+
     console.log('🔍 getUserRank called:', {
       requestedUserId: userId,
       requestingUserId: requestingUserId,
-      requestingUserRole: req.user.role
+      requestingUserRole: req.user.role,
     });
 
     // Users can view their own rank, admin can view all, landlords can view tenant ranks
@@ -925,26 +968,26 @@ export const getUserRank = async (req, res) => {
       if (req.user.role === 'LANDLORD') {
         const targetUser = await prisma.user.findUnique({
           where: { id: userId },
-          select: { role: true }
+          select: { role: true },
         });
-        
+
         if (!targetUser) {
           return res.status(404).json({
             error: 'User not found',
-            message: 'The specified user does not exist'
+            message: 'The specified user does not exist',
           });
         }
-        
+
         if (targetUser.role !== 'TENANT') {
           return res.status(403).json({
             error: 'Access denied',
-            message: 'Landlords can only view tenant ranks'
+            message: 'Landlords can only view tenant ranks',
           });
         }
       } else {
         return res.status(403).json({
           error: 'Access denied',
-          message: 'You can only view your own rank'
+          message: 'You can only view your own rank',
         });
       }
     }
@@ -960,27 +1003,30 @@ export const getUserRank = async (req, res) => {
         totalReviews: true,
         averageRating: true,
         createdAt: true,
-        lastActiveAt: true
-      }
+        lastActiveAt: true,
+      },
     });
 
     if (!user) {
       return res.status(404).json({
         error: 'User not found',
-        message: 'The specified user does not exist'
+        message: 'The specified user does not exist',
       });
     }
 
     // Import rank service dynamically to avoid circular dependencies
     let rankInfo, nextRankRequirements, nextRankInfo;
-    
+
     try {
       const rankService = (await import('../services/rankService.js')).default;
-      
+
       // Get rank information
       rankInfo = rankService.getRankInfo(user.rank);
-      nextRankRequirements = rankService.getNextRankRequirements(user.rank, user.role);
-      
+      nextRankRequirements = rankService.getNextRankRequirements(
+        user.rank,
+        user.role
+      );
+
       if (nextRankRequirements) {
         nextRankInfo = rankService.getRankInfo(nextRankRequirements.nextRank);
       }
@@ -993,7 +1039,7 @@ export const getUserRank = async (req, res) => {
         color: 'text-gray-500',
         bgColor: 'bg-gray-100',
         icon: '⭐',
-        requirements: 'Complete your first review to earn a rank'
+        requirements: 'Complete your first review to earn a rank',
       };
       nextRankRequirements = null;
       nextRankInfo = null;
@@ -1005,23 +1051,26 @@ export const getUserRank = async (req, res) => {
       totalReviews: user.totalReviews || 1,
       averageRating: user.averageRating || 5.0,
       rankInfo,
-      nextRankRequirements: nextRankRequirements ? {
-        ...nextRankRequirements,
-        nextRankInfo
-      } : null,
-      accountAge: Math.floor((new Date() - user.createdAt) / (1000 * 60 * 60 * 24))
+      nextRankRequirements: nextRankRequirements
+        ? {
+            ...nextRankRequirements,
+            nextRankInfo,
+          }
+        : null,
+      accountAge: Math.floor(
+        (new Date() - user.createdAt) / (1000 * 60 * 60 * 24)
+      ),
     };
 
     res.json({
       success: true,
-      data: rankData
+      data: rankData,
     });
-
   } catch (error) {
     console.error('Get user rank error:', error);
     res.status(500).json({
       error: 'Failed to get user rank',
-      message: 'An error occurred while fetching user rank'
+      message: 'An error occurred while fetching user rank',
     });
   }
-}; 
+};

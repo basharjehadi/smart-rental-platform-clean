@@ -19,16 +19,22 @@ const Chat: React.FC<ChatProps> = ({
   paymentStatus: initialPaymentStatus = 'PAID',
   className = '',
   selectedConversationId: externalSelectedConversationId,
-  onConversationSelect
+  onConversationSelect,
 }) => {
-  const [internalSelectedConversationId, setInternalSelectedConversationId] = useState<string | undefined>();
+  const [internalSelectedConversationId, setInternalSelectedConversationId] =
+    useState<string | undefined>();
   const [isTyping, setIsTyping] = useState(false);
-  const [conversationStatus, setConversationStatus] = useState<'PENDING' | 'ACTIVE' | 'ARCHIVED'>('PENDING');
-  const [offerStatus, setOfferStatus] = useState<'PENDING' | 'ACCEPTED' | 'REJECTED' | 'PAID'>('PENDING');
+  const [conversationStatus, setConversationStatus] = useState<
+    'PENDING' | 'ACTIVE' | 'ARCHIVED'
+  >('PENDING');
+  const [offerStatus, setOfferStatus] = useState<
+    'PENDING' | 'ACCEPTED' | 'REJECTED' | 'PAID'
+  >('PENDING');
   const [showPropertyPanel, setShowPropertyPanel] = useState(true);
-  
+
   // Use external selected conversation ID if provided, otherwise use internal state
-  const selectedConversationId = externalSelectedConversationId || internalSelectedConversationId;
+  const selectedConversationId =
+    externalSelectedConversationId || internalSelectedConversationId;
   const { user } = useAuth();
 
   const {
@@ -45,7 +51,7 @@ const Chat: React.FC<ChatProps> = ({
     activeConversation,
     isLoading,
     error,
-    loadConversations
+    loadConversations,
   } = useChat();
 
   // Fetch conversation and offer status when conversation is selected
@@ -54,24 +60,30 @@ const Chat: React.FC<ChatProps> = ({
       if (!selectedConversationId) return;
 
       try {
-        const response = await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:3001'}/api/messaging/conversations/${selectedConversationId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+        const response = await fetch(
+          `${(import.meta as any).env?.VITE_API_URL || 'http://localhost:3001'}/api/messaging/conversations/${selectedConversationId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+            },
           }
-        });
+        );
 
         if (response.ok) {
           const conversation = await response.json();
           setConversationStatus(conversation.status);
-          
+
           // If conversation has an offer, fetch its status
           if (conversation.offerId) {
-            const offerResponse = await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:3001'}/api/tenant/offer/${conversation.offerId}`, {
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            const offerResponse = await fetch(
+              `${(import.meta as any).env?.VITE_API_URL || 'http://localhost:3001'}/api/tenant/offer/${conversation.offerId}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem('token')}`,
+                },
               }
-            });
-            
+            );
+
             if (offerResponse.ok) {
               const offer = await offerResponse.json();
               setOfferStatus(offer.status);
@@ -116,7 +128,10 @@ const Chat: React.FC<ChatProps> = ({
 
   // Handle external conversation ID changes
   useEffect(() => {
-    if (externalSelectedConversationId && externalSelectedConversationId !== internalSelectedConversationId) {
+    if (
+      externalSelectedConversationId &&
+      externalSelectedConversationId !== internalSelectedConversationId
+    ) {
       setInternalSelectedConversationId(externalSelectedConversationId);
     }
   }, [externalSelectedConversationId, internalSelectedConversationId]);
@@ -152,22 +167,24 @@ const Chat: React.FC<ChatProps> = ({
   // Get conversation title for display
   const getConversationTitle = () => {
     if (!selectedConversationId) return 'Select a conversation';
-    
-    const conversation = conversations.find(c => c.id === selectedConversationId);
+
+    const conversation = conversations.find(
+      c => c.id === selectedConversationId
+    );
     if (!conversation) return 'Unknown conversation';
-    
+
     // Force Airbnb-style: show participant names only, not stored conversation title/property name
-    
+
     const otherParticipants = conversation.participants.filter(
       p => p.userId !== user?.id
     );
-    
+
     if (otherParticipants.length === 1) {
       return otherParticipants[0].user.name;
     } else if (otherParticipants.length > 1) {
       return `${otherParticipants[0].user.name} +${otherParticipants.length - 1}`;
     }
-    
+
     return 'Unknown';
   };
 
@@ -175,24 +192,30 @@ const Chat: React.FC<ChatProps> = ({
   const getConversationAvatar = () => {
     if (!selectedConversationId) return null;
 
-    const conversation = conversations.find(c => c.id === selectedConversationId);
+    const conversation = conversations.find(
+      c => c.id === selectedConversationId
+    );
     if (!conversation) return null;
 
     const otherParticipants = conversation.participants.filter(
       p => p.userId !== user?.id
     );
-    
+
     if (otherParticipants.length === 0) return null;
 
     const profileImage = otherParticipants[0]?.user?.profileImage || '';
     if (!profileImage) return null;
 
     // Build absolute URL for common stored formats
-    const serverBase = ((import.meta as any).env?.VITE_API_URL || 'http://localhost:3001').replace(/\/?api$/i, '');
+    const serverBase = (
+      (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001'
+    ).replace(/\/?api$/i, '');
 
     if (profileImage.startsWith('http')) return profileImage;
-    if (profileImage.startsWith('/uploads/')) return `${serverBase}${profileImage}`;
-    if (profileImage.startsWith('uploads/')) return `${serverBase}/${profileImage}`;
+    if (profileImage.startsWith('/uploads/'))
+      return `${serverBase}${profileImage}`;
+    if (profileImage.startsWith('uploads/'))
+      return `${serverBase}/${profileImage}`;
 
     // Fallback to default profile_images directory
     return `${serverBase}/uploads/profile_images/${profileImage}`;
@@ -200,7 +223,12 @@ const Chat: React.FC<ChatProps> = ({
 
   // Get property images for display
   const getPropertyImages = () => {
-    if (!activeConversation || !activeConversation.property || !activeConversation.property.images) return [];
+    if (
+      !activeConversation ||
+      !activeConversation.property ||
+      !activeConversation.property.images
+    )
+      return [];
     const imgs = activeConversation.property.images as any;
     try {
       if (Array.isArray(imgs)) return imgs;
@@ -214,9 +242,11 @@ const Chat: React.FC<ChatProps> = ({
   const isChatDisabled = conversationStatus !== 'ACTIVE';
 
   return (
-    <div className={`flex bg-white rounded-lg shadow-lg overflow-hidden ${className}`}>
+    <div
+      className={`flex bg-white rounded-lg shadow-lg overflow-hidden ${className}`}
+    >
       {/* Conversation List */}
-      <div className="w-80 border-r border-gray-200">
+      <div className='w-80 border-r border-gray-200'>
         <ConversationList
           conversations={conversations}
           selectedConversationId={selectedConversationId || null}
@@ -226,23 +256,33 @@ const Chat: React.FC<ChatProps> = ({
       </div>
 
       {/* Chat Window */}
-      <div className="flex-1 flex flex-col">
+      <div className='flex-1 flex flex-col'>
         {isChatDisabled ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center p-6">
-              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          <div className='flex-1 flex items-center justify-center'>
+            <div className='text-center p-6'>
+              <div className='w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4'>
+                <svg
+                  className='w-8 h-8 text-yellow-600'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z'
+                  />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className='text-lg font-semibold text-gray-900 mb-2'>
                 Chat is Locked
               </h3>
-              <p className="text-gray-600 mb-4">
-                {conversationStatus === 'PENDING' || conversationStatus === 'ARCHIVED'
+              <p className='text-gray-600 mb-4'>
+                {conversationStatus === 'PENDING' ||
+                conversationStatus === 'ARCHIVED'
                   ? 'This conversation is not active yet.'
-                  : 'Please complete payment to unlock this chat.'
-                }
+                  : 'Please complete payment to unlock this chat.'}
               </p>
             </div>
           </div>
@@ -262,25 +302,33 @@ const Chat: React.FC<ChatProps> = ({
               onMarkAsRead={async (messageIds: string[]) => {
                 if (!selectedConversationId || messageIds.length === 0) return;
                 try {
-                  await fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:3001'}/api/messaging/conversations/${selectedConversationId}/messages/read`, {
-                    method: 'PUT',
-                    headers: {
-                      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                      'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ messageIds })
-                  });
+                  await fetch(
+                    `${(import.meta as any).env?.VITE_API_URL || 'http://localhost:3001'}/api/messaging/conversations/${selectedConversationId}/messages/read`,
+                    {
+                      method: 'PUT',
+                      headers: {
+                        Authorization: `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({ messageIds }),
+                    }
+                  );
                   // Notify global chat badge provider to refresh immediately
-                  try { window.dispatchEvent(new Event('chat-unread-refresh')); } catch {}
+                  try {
+                    window.dispatchEvent(new Event('chat-unread-refresh'));
+                  } catch {}
                 } catch {
                   // ignore
                 }
               }}
-              showPropertyButton={!showPropertyPanel && !!(activeConversation && activeConversation.property)}
+              showPropertyButton={
+                !showPropertyPanel &&
+                !!(activeConversation && activeConversation.property)
+              }
               onShowProperty={() => setShowPropertyPanel(true)}
               userRole={user?.role}
             />
-            
+
             {/* Message Input */}
             <MessageInput
               onSendMessage={handleSendMessage}
@@ -288,8 +336,9 @@ const Chat: React.FC<ChatProps> = ({
               disabled={isChatDisabled}
             />
             {conversationStatus === 'ARCHIVED' && (
-              <div className="px-4 py-2 text-center text-xs text-gray-500 border-t border-gray-200 bg-gray-50">
-                Conversation archived. You can read past messages but cannot send new ones.
+              <div className='px-4 py-2 text-center text-xs text-gray-500 border-t border-gray-200 bg-gray-50'>
+                Conversation archived. You can read past messages but cannot
+                send new ones.
               </div>
             )}
           </>
@@ -297,93 +346,126 @@ const Chat: React.FC<ChatProps> = ({
       </div>
 
       {/* Property Details Panel (Right Side) */}
-      {showPropertyPanel && ((activeConversation && activeConversation.property) || selectedConversationId) ? (
-        <div className="w-80 border-l border-gray-200 bg-white">
-          <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Property</h3>
-              <button 
+      {showPropertyPanel &&
+      ((activeConversation && activeConversation.property) ||
+        selectedConversationId) ? (
+        <div className='w-80 border-l border-gray-200 bg-white'>
+          <div className='p-4 border-b border-gray-200'>
+            <div className='flex items-center justify-between'>
+              <h3 className='text-lg font-semibold text-gray-900'>Property</h3>
+              <button
                 onClick={() => setShowPropertyPanel(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className='text-gray-400 hover:text-gray-600 transition-colors'
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className='w-5 h-5'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M6 18L18 6M6 6l12 12'
+                  />
                 </svg>
               </button>
             </div>
           </div>
-          <div className="p-4">
+          <div className='p-4'>
             {activeConversation && activeConversation.property ? (
-              <div className="space-y-4">
+              <div className='space-y-4'>
                 {/* Property Image */}
-                <div className="w-full h-48 bg-gray-200 rounded-lg overflow-hidden">
+                <div className='w-full h-48 bg-gray-200 rounded-lg overflow-hidden'>
                   {getPropertyImages().length > 0 ? (
                     <img
                       src={`http://localhost:3001${getPropertyImages()[0]}`}
                       alt={activeConversation.property.name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
+                      className='w-full h-full object-cover'
+                      onError={e => {
                         console.log('Failed to load property image');
                         e.currentTarget.style.display = 'none';
                       }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    <div className='w-full h-full flex items-center justify-center'>
+                      <svg
+                        className='w-12 h-12 text-gray-400'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                      >
+                        <path
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          strokeWidth={2}
+                          d='M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'
+                        />
                       </svg>
                     </div>
                   )}
                 </div>
                 {/* Property Details */}
-                <div className="space-y-3">
-                  <h4 className="text-lg font-medium text-gray-900">
+                <div className='space-y-3'>
+                  <h4 className='text-lg font-medium text-gray-900'>
                     {activeConversation.property.name}
                   </h4>
                   {/* Full Address */}
-                  <div className="space-y-1">
-                    <p className="text-sm text-gray-600">
+                  <div className='space-y-1'>
+                    <p className='text-sm text-gray-600'>
                       {activeConversation.property.address}
                     </p>
-                    <p className="text-sm text-gray-600">
-                      {activeConversation.property.district && `${activeConversation.property.district}, `}
+                    <p className='text-sm text-gray-600'>
+                      {activeConversation.property.district &&
+                        `${activeConversation.property.district}, `}
                       {activeConversation.property.city}
-                      {activeConversation.property.zipCode && `, ${activeConversation.property.zipCode}`}
+                      {activeConversation.property.zipCode &&
+                        `, ${activeConversation.property.zipCode}`}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className='text-sm text-gray-500'>
                       {activeConversation.property.country}
                     </p>
                   </div>
                   {/* Property Specifications */}
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="bg-gray-50 p-2 rounded">
-                      <span className="text-gray-500">Type:</span>
-                      <p className="font-medium text-gray-900 capitalize">
+                  <div className='grid grid-cols-2 gap-3 text-sm'>
+                    <div className='bg-gray-50 p-2 rounded'>
+                      <span className='text-gray-500'>Type:</span>
+                      <p className='font-medium text-gray-900 capitalize'>
                         {activeConversation.property.propertyType?.toLowerCase()}
                       </p>
                     </div>
-                    <div className="bg-gray-50 p-2 rounded">
-                      <span className="text-gray-500">Size:</span>
-                      <p className="font-medium text-gray-900">
-                        {activeConversation.property.size ? `${activeConversation.property.size}m²` : 'N/A'}
+                    <div className='bg-gray-50 p-2 rounded'>
+                      <span className='text-gray-500'>Size:</span>
+                      <p className='font-medium text-gray-900'>
+                        {activeConversation.property.size
+                          ? `${activeConversation.property.size}m²`
+                          : 'N/A'}
                       </p>
                     </div>
                   </div>
                   {/* Rental Information */}
-                  <div className="bg-blue-50 p-3 rounded-lg space-y-2">
-                    <h5 className="text-sm font-medium text-blue-800">Rental Details</h5>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className='bg-blue-50 p-3 rounded-lg space-y-2'>
+                    <h5 className='text-sm font-medium text-blue-800'>
+                      Rental Details
+                    </h5>
+                    <div className='grid grid-cols-2 gap-2 text-sm'>
                       <div>
-                        <span className="text-blue-600">Monthly Rent:</span>
-                        <p className="font-medium text-blue-900">
-                          {activeConversation.offer?.rentAmount ? `${activeConversation.offer.rentAmount} PLN` : 
-                           activeConversation.property.monthlyRent ? `${activeConversation.property.monthlyRent} PLN` : 'N/A'}
+                        <span className='text-blue-600'>Monthly Rent:</span>
+                        <p className='font-medium text-blue-900'>
+                          {activeConversation.offer?.rentAmount
+                            ? `${activeConversation.offer.rentAmount} PLN`
+                            : activeConversation.property.monthlyRent
+                              ? `${activeConversation.property.monthlyRent} PLN`
+                              : 'N/A'}
                         </p>
                       </div>
                       <div>
-                        <span className="text-blue-600">Deposit:</span>
-                        <p className="font-medium text-blue-900">
-                          {activeConversation.offer?.depositAmount ? `${activeConversation.offer.depositAmount} PLN` : 'N/A'}
+                        <span className='text-blue-600'>Deposit:</span>
+                        <p className='font-medium text-blue-900'>
+                          {activeConversation.offer?.depositAmount
+                            ? `${activeConversation.offer.depositAmount} PLN`
+                            : 'N/A'}
                         </p>
                       </div>
                     </div>
@@ -391,7 +473,7 @@ const Chat: React.FC<ChatProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="text-center text-gray-500 py-8">
+              <div className='text-center text-gray-500 py-8'>
                 <p>Select a conversation to view property details</p>
               </div>
             )}

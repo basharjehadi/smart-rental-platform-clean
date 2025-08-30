@@ -29,13 +29,13 @@ const createRentalRequest = async (req, res) => {
       mustHaveFeatures,
       flexibleOnMoveInDate,
       occupants, // Array of {name, role} for business tenants
-      rentalType
+      rentalType,
     } = req.body;
 
     // Validate required fields
     if (!title || !location || !moveInDate || !budget) {
       return res.status(400).json({
-        error: 'Title, location, moveInDate, and budget are required.'
+        error: 'Title, location, moveInDate, and budget are required.',
       });
     }
 
@@ -43,22 +43,29 @@ const createRentalRequest = async (req, res) => {
     const moveInDateObj = new Date(moveInDate);
     if (moveInDateObj <= new Date()) {
       return res.status(400).json({
-        error: 'Move-in date must be in the future.'
+        error: 'Move-in date must be in the future.',
       });
     }
 
     // Validate budget is positive
     if (budget <= 0) {
       return res.status(400).json({
-        error: 'Budget must be a positive number.'
+        error: 'Budget must be a positive number.',
       });
     }
 
     // Validate property type and set bedrooms automatically
-    const validPropertyTypes = ['Room', 'Shared Room', 'Studio', 'Apartment', 'House'];
+    const validPropertyTypes = [
+      'Room',
+      'Shared Room',
+      'Studio',
+      'Apartment',
+      'House',
+    ];
     if (propertyType && !validPropertyTypes.includes(propertyType)) {
       return res.status(400).json({
-        error: 'Invalid property type. Must be one of: Room, Shared Room, Studio, Apartment, House.'
+        error:
+          'Invalid property type. Must be one of: Room, Shared Room, Studio, Apartment, House.',
       });
     }
 
@@ -70,8 +77,16 @@ const createRentalRequest = async (req, res) => {
     }
 
     // Normalize budget range: if only single budget is provided, use it for both from/to
-    const finalBudgetFromValue = budgetFrom ? parseFloat(budgetFrom) : (budget ? parseFloat(budget) : null);
-    const finalBudgetToValue = budgetTo ? parseFloat(budgetTo) : (budget ? parseFloat(budget) : null);
+    const finalBudgetFromValue = budgetFrom
+      ? parseFloat(budgetFrom)
+      : budget
+        ? parseFloat(budget)
+        : null;
+    const finalBudgetToValue = budgetTo
+      ? parseFloat(budgetTo)
+      : budget
+        ? parseFloat(budget)
+        : null;
 
     // 🚀 SCALABILITY: Create rental request with transaction
     const result = await prisma.$transaction(async (tx) => {
@@ -81,13 +96,15 @@ const createRentalRequest = async (req, res) => {
       // Check if user is a business tenant (has organization membership)
       const organizationMembership = await tx.organizationMember.findFirst({
         where: { userId: req.user.id },
-        include: { organization: true }
+        include: { organization: true },
       });
 
       if (organizationMembership) {
         // Business tenant - validate occupants and use organization
         if (!occupants || !Array.isArray(occupants) || occupants.length === 0) {
-          throw new Error('Business tenants must provide occupants array with at least one occupant');
+          throw new Error(
+            'Business tenants must provide occupants array with at least one occupant'
+          );
         }
 
         // Validate occupants structure
@@ -102,7 +119,7 @@ const createRentalRequest = async (req, res) => {
         // Check if user already has a tenant group for this organization
         const existingTenantGroup = await tx.tenantGroupMember.findFirst({
           where: { userId: req.user.id },
-          include: { tenantGroup: true }
+          include: { tenantGroup: true },
         });
 
         if (existingTenantGroup) {
@@ -112,8 +129,8 @@ const createRentalRequest = async (req, res) => {
           // Create new tenant group for business tenant
           const newTenantGroup = await tx.tenantGroup.create({
             data: {
-              name: `Business Group - ${organizationMembership.organization.name}`
-            }
+              name: `Business Group - ${organizationMembership.organization.name}`,
+            },
           });
 
           // Add user as primary member
@@ -121,8 +138,8 @@ const createRentalRequest = async (req, res) => {
             data: {
               userId: req.user.id,
               tenantGroupId: newTenantGroup.id,
-              isPrimary: true
-            }
+              isPrimary: true,
+            },
           });
 
           tenantGroupId = newTenantGroup.id;
@@ -133,11 +150,15 @@ const createRentalRequest = async (req, res) => {
         const memberships = await tx.tenantGroupMember.findMany({
           where: { userId: req.user.id },
           include: { tenantGroup: { include: { members: true } } },
-          orderBy: { joinedAt: 'desc' }
+          orderBy: { joinedAt: 'desc' },
         });
 
-        const multiMember = memberships.find(m => (m.tenantGroup?.members?.length || 0) > 1);
-        const soloMember = memberships.find(m => (m.tenantGroup?.members?.length || 0) === 1);
+        const multiMember = memberships.find(
+          (m) => (m.tenantGroup?.members?.length || 0) > 1
+        );
+        const soloMember = memberships.find(
+          (m) => (m.tenantGroup?.members?.length || 0) === 1
+        );
 
         // If client explicitly says 'solo' or 'group', honor it
         if (rentalType === 'group' && multiMember) {
@@ -146,8 +167,16 @@ const createRentalRequest = async (req, res) => {
           tenantGroupId = soloMember.tenantGroup.id;
         } else if (rentalType === 'group' && !multiMember) {
           // No existing group; create one and add only the user for now
-          const newGroup = await tx.tenantGroup.create({ data: { name: `Group - ${req.user.name || req.user.email}` } });
-          await tx.tenantGroupMember.create({ data: { userId: req.user.id, tenantGroupId: newGroup.id, isPrimary: true } });
+          const newGroup = await tx.tenantGroup.create({
+            data: { name: `Group - ${req.user.name || req.user.email}` },
+          });
+          await tx.tenantGroupMember.create({
+            data: {
+              userId: req.user.id,
+              tenantGroupId: newGroup.id,
+              isPrimary: true,
+            },
+          });
           tenantGroupId = newGroup.id;
         } else if (multiMember) {
           tenantGroupId = multiMember.tenantGroup.id;
@@ -155,10 +184,16 @@ const createRentalRequest = async (req, res) => {
           tenantGroupId = soloMember.tenantGroup.id;
         } else {
           const newTenantGroup = await tx.tenantGroup.create({
-            data: { name: `Private Group - ${req.user.name || req.user.email}` }
+            data: {
+              name: `Private Group - ${req.user.name || req.user.email}`,
+            },
           });
           await tx.tenantGroupMember.create({
-            data: { userId: req.user.id, tenantGroupId: newTenantGroup.id, isPrimary: true }
+            data: {
+              userId: req.user.id,
+              tenantGroupId: newTenantGroup.id,
+              isPrimary: true,
+            },
           });
           tenantGroupId = newTenantGroup.id;
         }
@@ -187,7 +222,7 @@ const createRentalRequest = async (req, res) => {
           mustHaveFeatures: mustHaveFeatures || null,
           flexibleOnMoveInDate: flexibleOnMoveInDate || false,
           tenantGroupId, // Link to tenant group instead of tenantId
-          poolStatus: 'ACTIVE' // Start in active pool
+          poolStatus: 'ACTIVE', // Start in active pool
         },
         include: {
           tenantGroup: {
@@ -199,14 +234,14 @@ const createRentalRequest = async (req, res) => {
                       id: true,
                       name: true,
                       email: true,
-                      role: true
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
+                      role: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       });
 
       return { rentalRequest, tenantGroupId, organizationId };
@@ -214,8 +249,12 @@ const createRentalRequest = async (req, res) => {
 
     // 🚀 Run matching OUTSIDE the transaction to avoid cross-client conflicts
     try {
-      const matchCount = await requestPoolService.addToPool(result.rentalRequest);
-      console.log(`🏊 Request ${result.rentalRequest.id} added to pool with ${matchCount} matches`);
+      const matchCount = await requestPoolService.addToPool(
+        result.rentalRequest
+      );
+      console.log(
+        `🏊 Request ${result.rentalRequest.id} added to pool with ${matchCount} matches`
+      );
     } catch (error) {
       console.error('❌ Error adding request to pool (post-tx):', error);
     }
@@ -225,7 +264,7 @@ const createRentalRequest = async (req, res) => {
       rentalRequest: result.rentalRequest,
       tenantGroupId: result.tenantGroupId,
       organizationId: result.organizationId,
-      poolStatus: 'ACTIVE'
+      poolStatus: 'ACTIVE',
     });
   } catch (error) {
     console.error('Create rental request error:', error);
@@ -233,11 +272,12 @@ const createRentalRequest = async (req, res) => {
       message: error.message,
       stack: error.stack,
       code: error.code,
-      meta: error.meta
+      meta: error.meta,
     });
     res.status(500).json({
       error: 'Internal server error.',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details:
+        process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
@@ -246,397 +286,474 @@ const createRentalRequest = async (req, res) => {
 const getAllActiveRequests = async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
- 
+
     // Resolve organizations the current user belongs to
     const _orgMemberships = await prisma.organizationMember.findMany({
       where: { userId: req.user.id },
-      select: { organizationId: true }
+      select: { organizationId: true },
     });
-    const _orgIds = _orgMemberships.map(m => m.organizationId);
+    const _orgIds = _orgMemberships.map((m) => m.organizationId);
 
-     // 1) Pending (unresponded, unseen) via pool service (already excludes declined)
-     const poolRequests = await requestPoolService.getRequestsForLandlordUser(
-       req.user.id,
-       parseInt(page),
-       parseInt(limit)
-     );
- 
-     const mapBestProperty = (match) => {
-       const bestProperty = match.property || match.rentalRequest.bestMatchingProperty || null;
-       if (!bestProperty) return null;
-       return {
-         id: bestProperty.id,
-         name: bestProperty.name,
-         city: bestProperty.city,
-         address: bestProperty.address,
-         rent: `${bestProperty.monthlyRent.toLocaleString('pl-PL')} zł`,
-         available: bestProperty.availableFrom ? new Date(bestProperty.availableFrom).toISOString() : null,
-         bedrooms: bestProperty.bedrooms,
-         propertyType: bestProperty.propertyType,
-         furnished: bestProperty.furnished,
-         parking: bestProperty.parking,
-         petsAllowed: bestProperty.petsAllowed
-       };
-     };
- 
-     const normalizePending = poolRequests.requests.map((match) => {
-       // Get the primary tenant from the tenant group
-       const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
-       const tenant = primaryMember?.user;
-       
-       return {
-         ...match.rentalRequest,
-         matchScore: match.matchScore,
-         matchReason: match.matchReason,
-         budgetRange: match.rentalRequest.budgetFrom && match.rentalRequest.budgetTo 
-           ? `${match.rentalRequest.budgetFrom} - ${match.rentalRequest.budgetTo} PLN`
-           : match.rentalRequest.budget 
-           ? `${match.rentalRequest.budget} PLN`
-           : 'Budget not specified',
-         tenant: {
-           id: tenant?.id,
-           name: tenant?.name,
-           email: tenant?.email,
-           firstName: tenant?.firstName,
-           lastName: tenant?.lastName,
-           profileImage: tenant?.profileImage,
-           phoneNumber: tenant?.phoneNumber,
-           occupation: tenant?.profession, // Map profession to occupation for frontend
-           dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
-           age: tenant?.dateOfBirth
-             ? Math.max(18, Math.floor((Date.now() - new Date(tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
-             : null,
-           rating: tenant?.averageRating ?? 5.0,
-           reviews: tenant?.totalReviews ?? 1,
-           rank: tenant?.rank
-         },
-         landlord: null, // RentalRequest doesn't have landlord field
-         propertyMatch: mapBestProperty(match),
-         status: 'pending'
-       };
-     });
- 
-     // 2) Offered (responded=true and an offer from this landlord exists)
-     const offeredMatchesRaw = await prisma.landlordRequestMatch.findMany({
-       where: {
-         organizationId: { in: _orgIds },
-         isResponded: true,
-         status: 'ACTIVE',
-         rentalRequest: { poolStatus: 'ACTIVE', expiresAt: { gt: new Date() } }
-       },
-       include: {
-         rentalRequest: {
-           include: {
-             tenantGroup: {
-               include: {
-                 members: {
-                   include: {
-                     user: {
-                       select: {
-                         id: true,
-                         name: true,
-                         email: true,
-                         firstName: true,
-                         lastName: true,
-                         profileImage: true,
-                         phoneNumber: true,
-                         profession: true,
-                         dateOfBirth: true,
-                         averageRating: true,
-                         totalReviews: true,
-                         rank: true
-                       }
-                     }
-                   }
-                 }
-               }
-             },
-             offers: { 
-               where: { organizationId: { in: _orgIds } }, 
-               select: { 
-                 id: true,
-                 organization: {
-                   select: {
-                     id: true,
-                     name: true,
-                     isPersonal: true
-                   }
-                 }
-               }
-             }
-           }
-         },
-         property: {
-           select: { id: true, name: true, address: true, city: true, monthlyRent: true, propertyType: true, bedrooms: true, furnished: true, parking: true, petsAllowed: true, availableFrom: true }
-         }
-       },
-       orderBy: [{ matchScore: 'desc' }, { createdAt: 'desc' }],
-       take: parseInt(limit)
-     });
- 
-     const offeredMatches = offeredMatchesRaw.filter(m => (m.rentalRequest.offers || []).length > 0);
-     const normalizeOffered = offeredMatches.map((match) => {
-       // Get the primary tenant from the tenant group
-       const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
-       const tenant = primaryMember?.user;
-       
-       return {
-         ...match.rentalRequest,
-         matchScore: match.matchScore,
-         matchReason: match.matchReason,
-         budgetRange: match.rentalRequest.budgetFrom && match.rentalRequest.budgetTo 
-           ? `${match.rentalRequest.budgetFrom} - ${match.rentalRequest.budgetTo} PLN`
-           : match.rentalRequest.budget 
-           ? `${match.rentalRequest.budget} PLN`
-           : 'Budget not specified',
-         tenant: {
-           id: tenant?.id,
-           name: tenant?.name,
-           email: tenant?.email,
-           firstName: tenant?.firstName,
-           lastName: tenant?.lastName,
-           profileImage: tenant?.profileImage,
-           phoneNumber: tenant?.phoneNumber,
-           occupation: tenant?.profession, // Map profession to occupation for frontend
-           dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
-           age: tenant?.dateOfBirth
-             ? Math.max(18, Math.floor((Date.now() - new Date(tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
-             : null,
-           rating: tenant?.averageRating ?? 5.0,
-           reviews: tenant?.totalReviews ?? 1,
-           rank: tenant?.rank
-         },
-         propertyMatch: mapBestProperty(match),
-         status: 'offered'
-       };
-     });
- 
-          // 3) Accepted (property rented - request accepted)
-     // Find rental requests where this landlord has a PAID offer and the property is RENTED
-     const acceptedOffers = await prisma.offer.findMany({
-       where: {
-         organizationId: { in: _orgIds },
-         status: 'PAID' // Offer has been paid for
-       },
-       include: {
-         rentalRequest: {
-           include: {
-             tenantGroup: {
-               include: {
-                 members: {
-                   include: {
-                     user: {
-                       select: {
-                         id: true,
-                         name: true,
-                         email: true,
-                         firstName: true,
-                         lastName: true,
-                         profileImage: true,
-                         phoneNumber: true,
-                         profession: true,
-                         dateOfBirth: true,
-                         averageRating: true,
-                         totalReviews: true,
-                         rank: true
-                       }
-                     }
-                   }
-                 }
-               }
-             }
-           }
-         },
-         organization: {
-           select: {
-             id: true,
-             name: true,
-             isPersonal: true
-           }
-         },
-         property: {
-           select: { id: true, name: true, address: true, city: true, monthlyRent: true, propertyType: true, bedrooms: true, furnished: true, parking: true, petsAllowed: true, availableFrom: true, status: true }
-         }
-       },
-       orderBy: [{ updatedAt: 'desc' }],
-       take: parseInt(limit)
-     });
+    // 1) Pending (unresponded, unseen) via pool service (already excludes declined)
+    const poolRequests = await requestPoolService.getRequestsForLandlordUser(
+      req.user.id,
+      parseInt(page),
+      parseInt(limit)
+    );
 
-     // Filter to only include offers where the property status is RENTED
-     const acceptedOffersFiltered = acceptedOffers.filter(offer => 
-       offer.property && offer.property.status === 'RENTED'
-     );
+    const mapBestProperty = (match) => {
+      const bestProperty =
+        match.property || match.rentalRequest.bestMatchingProperty || null;
+      if (!bestProperty) return null;
+      return {
+        id: bestProperty.id,
+        name: bestProperty.name,
+        city: bestProperty.city,
+        address: bestProperty.address,
+        rent: `${bestProperty.monthlyRent.toLocaleString('pl-PL')} zł`,
+        available: bestProperty.availableFrom
+          ? new Date(bestProperty.availableFrom).toISOString()
+          : null,
+        bedrooms: bestProperty.bedrooms,
+        propertyType: bestProperty.propertyType,
+        furnished: bestProperty.furnished,
+        parking: bestProperty.parking,
+        petsAllowed: bestProperty.petsAllowed,
+      };
+    };
 
-     const normalizeAccepted = acceptedOffersFiltered.map((offer) => {
-       // Get the primary tenant from the tenant group
-       const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
-       const tenant = primaryMember?.user;
-       
-       return {
-         ...offer.rentalRequest,
-         matchScore: 0, // Offers don't have matchScore
-         matchReason: 'Property rented - request accepted',
-         budgetRange: offer.rentalRequest.budgetFrom && offer.rentalRequest.budgetTo 
-           ? `${offer.rentalRequest.budgetFrom} - ${offer.rentalRequest.budgetTo} PLN`
-           : offer.rentalRequest.budget 
-           ? `${offer.rentalRequest.budget} PLN`
-           : 'Budget not specified',
-         tenant: {
-           id: tenant?.id,
-           name: tenant?.name,
-           email: tenant?.email,
-           firstName: tenant?.firstName,
-           lastName: tenant?.lastName,
-           profileImage: tenant?.profileImage,
-           phoneNumber: tenant?.phoneNumber,
-           occupation: tenant?.profession, // Map profession to occupation for frontend
-           dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
-           age: tenant?.dateOfBirth
-             ? Math.max(18, Math.floor((Date.now() - new Date(tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
-             : null,
-           rating: tenant?.averageRating ?? 5.0,
-           reviews: tenant?.totalReviews ?? 1,
-           rank: tenant?.rank
-         },
-         propertyMatch: {
-           id: offer.property?.id,
-           name: offer.property?.name || 'Your Property',
-           address: offer.property?.address || 'Address not specified',
-           rent: offer.property?.monthlyRent ? `${offer.property.monthlyRent.toLocaleString('pl-PL')} zł` : 'Rent not specified',
-           available: offer.property?.availableFrom ? new Date(offer.property.availableFrom).toISOString() : 'Date not specified',
-           propertyType: offer.property?.propertyType || 'Apartment'
-         },
-         status: 'accepted'
-       };
-     });
+    const normalizePending = poolRequests.requests.map((match) => {
+      // Get the primary tenant from the tenant group
+      const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
+      const tenant = primaryMember?.user;
 
-     // 4) Declined (by this landlord)
-     const declinedMatches = await prisma.landlordRequestMatch.findMany({
-       where: {
-         organizationId: { in: _orgIds },
-         status: 'DECLINED'
-       },
-       include: {
-         rentalRequest: {
-           include: {
-             tenantGroup: {
-               include: {
-                 members: {
-                   include: {
-                     user: {
-                       select: {
-                         id: true,
-                         name: true,
-                         email: true,
-                         firstName: true,
-                         lastName: true,
-                         profileImage: true,
-                         phoneNumber: true,
-                         profession: true,
-                         dateOfBirth: true,
-                         averageRating: true,
-                         totalReviews: true,
-                         rank: true
-                       }
-                     }
-                   }
-                 }
-               }
-             }
-           }
-         },
-         property: {
-           select: { id: true, name: true, address: true, city: true, monthlyRent: true, propertyType: true, bedrooms: true, furnished: true, parking: true, petsAllowed: true, availableFrom: true }
-         }
-       },
-       orderBy: [{ updatedAt: 'desc' }],
-       take: parseInt(limit)
-     });
+      return {
+        ...match.rentalRequest,
+        matchScore: match.matchScore,
+        matchReason: match.matchReason,
+        budgetRange:
+          match.rentalRequest.budgetFrom && match.rentalRequest.budgetTo
+            ? `${match.rentalRequest.budgetFrom} - ${match.rentalRequest.budgetTo} PLN`
+            : match.rentalRequest.budget
+              ? `${match.rentalRequest.budget} PLN`
+              : 'Budget not specified',
+        tenant: {
+          id: tenant?.id,
+          name: tenant?.name,
+          email: tenant?.email,
+          firstName: tenant?.firstName,
+          lastName: tenant?.lastName,
+          profileImage: tenant?.profileImage,
+          phoneNumber: tenant?.phoneNumber,
+          occupation: tenant?.profession, // Map profession to occupation for frontend
+          dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
+          age: tenant?.dateOfBirth
+            ? Math.max(
+                18,
+                Math.floor(
+                  (Date.now() - new Date(tenant.dateOfBirth).getTime()) /
+                    (1000 * 60 * 60 * 24 * 365)
+                )
+              )
+            : null,
+          rating: tenant?.averageRating ?? 5.0,
+          reviews: tenant?.totalReviews ?? 1,
+          rank: tenant?.rank,
+        },
+        landlord: null, // RentalRequest doesn't have landlord field
+        propertyMatch: mapBestProperty(match),
+        status: 'pending',
+      };
+    });
 
-     const normalizeDeclined = declinedMatches.map((match) => {
-       // Get the primary tenant from the tenant group
-       const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
-       const tenant = primaryMember?.user;
-       
-       return {
-         ...match.rentalRequest,
-         matchScore: match.matchScore,
-         matchReason: match.matchReason,
-         budgetRange: match.rentalRequest.budgetFrom && match.rentalRequest.budgetTo 
-           ? `${match.rentalRequest.budgetFrom} - ${match.rentalRequest.budgetTo} PLN`
-           : match.rentalRequest.budget 
-           ? `${match.rentalRequest.budget} PLN`
-           : 'Budget not specified',
-         tenant: {
-           id: tenant?.id,
-           name: tenant?.name,
-           email: tenant?.email,
-           firstName: tenant?.firstName,
-           lastName: tenant?.lastName,
-           profileImage: tenant?.profileImage,
-           phoneNumber: tenant?.phoneNumber,
-           occupation: tenant?.profession, // Map profession to occupation for frontend
-           dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
-           age: tenant?.dateOfBirth
-             ? Math.max(18, Math.floor((Date.now() - new Date(tenant.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365)))
-             : null,
-           rating: tenant?.averageRating ?? 5.0,
-           reviews: tenant?.totalReviews ?? 1,
-           rank: tenant?.rank
-         },
-         propertyMatch: mapBestProperty(match),
-         status: 'declined'
-       };
-     });
- 
-     return res.json({
-       pending: normalizePending,
-       offered: normalizeOffered,
-       accepted: normalizeAccepted,
-       declined: normalizeDeclined,
-       pagination: poolRequests.pagination
-     });
-   } catch (error) {
-     console.error('Get all active requests error:', error);
-     res.status(500).json({
-       error: 'Internal server error.'
-     });
-   }
- };
+    // 2) Offered (responded=true and an offer from this landlord exists)
+    const offeredMatchesRaw = await prisma.landlordRequestMatch.findMany({
+      where: {
+        organizationId: { in: _orgIds },
+        isResponded: true,
+        status: 'ACTIVE',
+        rentalRequest: { poolStatus: 'ACTIVE', expiresAt: { gt: new Date() } },
+      },
+      include: {
+        rentalRequest: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        firstName: true,
+                        lastName: true,
+                        profileImage: true,
+                        phoneNumber: true,
+                        profession: true,
+                        dateOfBirth: true,
+                        averageRating: true,
+                        totalReviews: true,
+                        rank: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            offers: {
+              where: { organizationId: { in: _orgIds } },
+              select: {
+                id: true,
+                organization: {
+                  select: {
+                    id: true,
+                    name: true,
+                    isPersonal: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            monthlyRent: true,
+            propertyType: true,
+            bedrooms: true,
+            furnished: true,
+            parking: true,
+            petsAllowed: true,
+            availableFrom: true,
+          },
+        },
+      },
+      orderBy: [{ matchScore: 'desc' }, { createdAt: 'desc' }],
+      take: parseInt(limit),
+    });
+
+    const offeredMatches = offeredMatchesRaw.filter(
+      (m) => (m.rentalRequest.offers || []).length > 0
+    );
+    const normalizeOffered = offeredMatches.map((match) => {
+      // Get the primary tenant from the tenant group
+      const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
+      const tenant = primaryMember?.user;
+
+      return {
+        ...match.rentalRequest,
+        matchScore: match.matchScore,
+        matchReason: match.matchReason,
+        budgetRange:
+          match.rentalRequest.budgetFrom && match.rentalRequest.budgetTo
+            ? `${match.rentalRequest.budgetFrom} - ${match.rentalRequest.budgetTo} PLN`
+            : match.rentalRequest.budget
+              ? `${match.rentalRequest.budget} PLN`
+              : 'Budget not specified',
+        tenant: {
+          id: tenant?.id,
+          name: tenant?.name,
+          email: tenant?.email,
+          firstName: tenant?.firstName,
+          lastName: tenant?.lastName,
+          profileImage: tenant?.profileImage,
+          phoneNumber: tenant?.phoneNumber,
+          occupation: tenant?.profession, // Map profession to occupation for frontend
+          dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
+          age: tenant?.dateOfBirth
+            ? Math.max(
+                18,
+                Math.floor(
+                  (Date.now() - new Date(tenant.dateOfBirth).getTime()) /
+                    (1000 * 60 * 60 * 24 * 365)
+                )
+              )
+            : null,
+          rating: tenant?.averageRating ?? 5.0,
+          reviews: tenant?.totalReviews ?? 1,
+          rank: tenant?.rank,
+        },
+        propertyMatch: mapBestProperty(match),
+        status: 'offered',
+      };
+    });
+
+    // 3) Accepted (property rented - request accepted)
+    // Find rental requests where this landlord has a PAID offer and the property is RENTED
+    const acceptedOffers = await prisma.offer.findMany({
+      where: {
+        organizationId: { in: _orgIds },
+        status: 'PAID', // Offer has been paid for
+      },
+      include: {
+        rentalRequest: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        firstName: true,
+                        lastName: true,
+                        profileImage: true,
+                        phoneNumber: true,
+                        profession: true,
+                        dateOfBirth: true,
+                        averageRating: true,
+                        totalReviews: true,
+                        rank: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            isPersonal: true,
+          },
+        },
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            monthlyRent: true,
+            propertyType: true,
+            bedrooms: true,
+            furnished: true,
+            parking: true,
+            petsAllowed: true,
+            availableFrom: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: [{ updatedAt: 'desc' }],
+      take: parseInt(limit),
+    });
+
+    // Filter to only include offers where the property status is RENTED
+    const acceptedOffersFiltered = acceptedOffers.filter(
+      (offer) => offer.property && offer.property.status === 'RENTED'
+    );
+
+    const normalizeAccepted = acceptedOffersFiltered.map((offer) => {
+      // Get the primary tenant from the tenant group
+      const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
+      const tenant = primaryMember?.user;
+
+      return {
+        ...offer.rentalRequest,
+        matchScore: 0, // Offers don't have matchScore
+        matchReason: 'Property rented - request accepted',
+        budgetRange:
+          offer.rentalRequest.budgetFrom && offer.rentalRequest.budgetTo
+            ? `${offer.rentalRequest.budgetFrom} - ${offer.rentalRequest.budgetTo} PLN`
+            : offer.rentalRequest.budget
+              ? `${offer.rentalRequest.budget} PLN`
+              : 'Budget not specified',
+        tenant: {
+          id: tenant?.id,
+          name: tenant?.name,
+          email: tenant?.email,
+          firstName: tenant?.firstName,
+          lastName: tenant?.lastName,
+          profileImage: tenant?.profileImage,
+          phoneNumber: tenant?.phoneNumber,
+          occupation: tenant?.profession, // Map profession to occupation for frontend
+          dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
+          age: tenant?.dateOfBirth
+            ? Math.max(
+                18,
+                Math.floor(
+                  (Date.now() - new Date(tenant.dateOfBirth).getTime()) /
+                    (1000 * 60 * 60 * 24 * 365)
+                )
+              )
+            : null,
+          rating: tenant?.averageRating ?? 5.0,
+          reviews: tenant?.totalReviews ?? 1,
+          rank: tenant?.rank,
+        },
+        propertyMatch: {
+          id: offer.property?.id,
+          name: offer.property?.name || 'Your Property',
+          address: offer.property?.address || 'Address not specified',
+          rent: offer.property?.monthlyRent
+            ? `${offer.property.monthlyRent.toLocaleString('pl-PL')} zł`
+            : 'Rent not specified',
+          available: offer.property?.availableFrom
+            ? new Date(offer.property.availableFrom).toISOString()
+            : 'Date not specified',
+          propertyType: offer.property?.propertyType || 'Apartment',
+        },
+        status: 'accepted',
+      };
+    });
+
+    // 4) Declined (by this landlord)
+    const declinedMatches = await prisma.landlordRequestMatch.findMany({
+      where: {
+        organizationId: { in: _orgIds },
+        status: 'DECLINED',
+      },
+      include: {
+        rentalRequest: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        firstName: true,
+                        lastName: true,
+                        profileImage: true,
+                        phoneNumber: true,
+                        profession: true,
+                        dateOfBirth: true,
+                        averageRating: true,
+                        totalReviews: true,
+                        rank: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            monthlyRent: true,
+            propertyType: true,
+            bedrooms: true,
+            furnished: true,
+            parking: true,
+            petsAllowed: true,
+            availableFrom: true,
+          },
+        },
+      },
+      orderBy: [{ updatedAt: 'desc' }],
+      take: parseInt(limit),
+    });
+
+    const normalizeDeclined = declinedMatches.map((match) => {
+      // Get the primary tenant from the tenant group
+      const primaryMember = match.rentalRequest.tenantGroup?.members?.[0];
+      const tenant = primaryMember?.user;
+
+      return {
+        ...match.rentalRequest,
+        matchScore: match.matchScore,
+        matchReason: match.matchReason,
+        budgetRange:
+          match.rentalRequest.budgetFrom && match.rentalRequest.budgetTo
+            ? `${match.rentalRequest.budgetFrom} - ${match.rentalRequest.budgetTo} PLN`
+            : match.rentalRequest.budget
+              ? `${match.rentalRequest.budget} PLN`
+              : 'Budget not specified',
+        tenant: {
+          id: tenant?.id,
+          name: tenant?.name,
+          email: tenant?.email,
+          firstName: tenant?.firstName,
+          lastName: tenant?.lastName,
+          profileImage: tenant?.profileImage,
+          phoneNumber: tenant?.phoneNumber,
+          occupation: tenant?.profession, // Map profession to occupation for frontend
+          dateOfBirth: tenant?.dateOfBirth, // Send dateOfBirth for age calculation
+          age: tenant?.dateOfBirth
+            ? Math.max(
+                18,
+                Math.floor(
+                  (Date.now() - new Date(tenant.dateOfBirth).getTime()) /
+                    (1000 * 60 * 60 * 24 * 365)
+                )
+              )
+            : null,
+          rating: tenant?.averageRating ?? 5.0,
+          reviews: tenant?.totalReviews ?? 1,
+          rank: tenant?.rank,
+        },
+        propertyMatch: mapBestProperty(match),
+        status: 'declined',
+      };
+    });
+
+    return res.json({
+      pending: normalizePending,
+      offered: normalizeOffered,
+      accepted: normalizeAccepted,
+      declined: normalizeDeclined,
+      pagination: poolRequests.pagination,
+    });
+  } catch (error) {
+    console.error('Get all active requests error:', error);
+    res.status(500).json({
+      error: 'Internal server error.',
+    });
+  }
+};
 
 // 🚀 SCALABILITY: Mark request as viewed
 const markRequestAsViewed = async (req, res) => {
   try {
     const { requestId } = req.params;
-    
+
     // Find the match to get the organizationId (server derives it, doesn't trust client)
     const match = await prisma.landlordRequestMatch.findFirst({
       where: {
         rentalRequestId: parseInt(requestId),
         organization: {
           members: {
-            some: { userId: req.user.id }
-          }
-        }
+            some: { userId: req.user.id },
+          },
+        },
       },
-      select: { organizationId: true }
+      select: { organizationId: true },
     });
-    
+
     if (!match) {
       return res.status(404).json({
-        error: 'Match not found or you do not have access to this request.'
+        error: 'Match not found or you do not have access to this request.',
       });
     }
-    
-    await requestPoolService.markAsViewedForOrg(match.organizationId, parseInt(requestId));
-    
+
+    await requestPoolService.markAsViewedForOrg(
+      match.organizationId,
+      parseInt(requestId)
+    );
+
     res.json({
-      message: 'Request marked as viewed successfully.'
+      message: 'Request marked as viewed successfully.',
     });
   } catch (error) {
     console.error('Mark request as viewed error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
@@ -661,35 +778,41 @@ const createOffer = async (req, res) => {
       propertyAmenities,
       propertyDescription,
       rulesText,
-      rulesPdf
+      rulesPdf,
     } = req.body;
 
     // Debug: log incoming identifiers and types
-    console.log('createOffer params:', { requestIdRaw: requestId, requestIdType: typeof requestId, propertyIdRaw: propertyId, propertyIdType: typeof propertyId });
+    console.log('createOffer params:', {
+      requestIdRaw: requestId,
+      requestIdType: typeof requestId,
+      propertyIdRaw: propertyId,
+      propertyIdType: typeof propertyId,
+    });
 
     // Validate required fields
     if (!propertyId || !rentAmount || !leaseDuration || !availableFrom) {
       return res.status(400).json({
-        error: 'Property ID, rent amount, lease duration, and available from date are required.'
+        error:
+          'Property ID, rent amount, lease duration, and available from date are required.',
       });
     }
 
     // 🚀 SCALABILITY: Check landlord availability and property status before creating offer
     console.log('🔍 Checking landlord availability for user:', req.user.id);
-    
+
     // Get the user's organization IDs
     const userOrgs = await prisma.organizationMember.findMany({
       where: { userId: req.user.id },
-      select: { organizationId: true }
+      select: { organizationId: true },
     });
-    const orgIds = userOrgs.map(o => o.organizationId);
-    
+    const orgIds = userOrgs.map((o) => o.organizationId);
+
     if (orgIds.length === 0) {
       return res.status(400).json({
-        error: 'You must be a member of an organization to create offers.'
+        error: 'You must be a member of an organization to create offers.',
       });
     }
-    
+
     // First, validate that the property exists and belongs to this landlord
     // NOTE: Property IDs are strings (cuid). Do NOT parseInt here.
     const property = await prisma.property.findFirst({
@@ -697,11 +820,11 @@ const createOffer = async (req, res) => {
         id: propertyId,
         organization: {
           members: {
-            some: { userId: req.user.id }
-          }
+            some: { userId: req.user.id },
+          },
         },
         status: 'AVAILABLE',
-        availability: true
+        availability: true,
       },
       select: {
         id: true,
@@ -710,13 +833,13 @@ const createOffer = async (req, res) => {
         status: true,
         availability: true,
         monthlyRent: true,
-        propertyType: true
-      }
+        propertyType: true,
+      },
     });
 
     if (!property) {
       return res.status(400).json({
-        error: 'Property not found, not available, or does not belong to you.'
+        error: 'Property not found, not available, or does not belong to you.',
       });
     }
 
@@ -727,16 +850,16 @@ const createOffer = async (req, res) => {
       where: {
         organization: {
           members: {
-            some: { userId: req.user.id }
-          }
+            some: { userId: req.user.id },
+          },
         },
-        rentalRequestId: parseInt(requestId)
-      }
+        rentalRequestId: parseInt(requestId),
+      },
     });
 
     if (existingOffer) {
       return res.status(400).json({
-        error: 'You have already sent an offer for this rental request.'
+        error: 'You have already sent an offer for this rental request.',
       });
     }
 
@@ -748,25 +871,28 @@ const createOffer = async (req, res) => {
         status: true,
         poolStatus: true,
         expiresAt: true,
-        tenantGroupId: true
-      }
+        tenantGroupId: true,
+      },
     });
 
     if (!rentalRequest) {
       return res.status(404).json({
-        error: 'Rental request not found.'
+        error: 'Rental request not found.',
       });
     }
 
-    if (rentalRequest.status !== 'ACTIVE' || rentalRequest.poolStatus !== 'ACTIVE') {
+    if (
+      rentalRequest.status !== 'ACTIVE' ||
+      rentalRequest.poolStatus !== 'ACTIVE'
+    ) {
       return res.status(400).json({
-        error: 'This rental request is no longer active.'
+        error: 'This rental request is no longer active.',
       });
     }
 
     if (rentalRequest.expiresAt && new Date() > rentalRequest.expiresAt) {
       return res.status(400).json({
-        error: 'This rental request has expired.'
+        error: 'This rental request has expired.',
       });
     }
 
@@ -774,13 +900,13 @@ const createOffer = async (req, res) => {
     const acceptedOffer = await prisma.offer.findFirst({
       where: {
         rentalRequestId: parseInt(requestId),
-        status: { in: ['ACCEPTED', 'PAID'] }
-      }
+        status: { in: ['ACCEPTED', 'PAID'] },
+      },
     });
 
     if (acceptedOffer) {
       return res.status(400).json({
-        error: 'This rental request has already been accepted by the tenant.'
+        error: 'This rental request has already been accepted by the tenant.',
       });
     }
 
@@ -798,17 +924,21 @@ const createOffer = async (req, res) => {
         utilitiesIncluded: Boolean(utilitiesIncluded),
         availableFrom: new Date(availableFrom),
         propertyAddress: propertyAddress || null,
-        propertyImages: Array.isArray(propertyImages) ? JSON.stringify(propertyImages) : (propertyImages || null),
+        propertyImages: Array.isArray(propertyImages)
+          ? JSON.stringify(propertyImages)
+          : propertyImages || null,
         propertyVideo: propertyVideo || null,
         propertyType: propertyType || null,
         propertySize: propertySize || null,
-        propertyAmenities: Array.isArray(propertyAmenities) ? JSON.stringify(propertyAmenities) : (propertyAmenities || null),
+        propertyAmenities: Array.isArray(propertyAmenities)
+          ? JSON.stringify(propertyAmenities)
+          : propertyAmenities || null,
         propertyDescription: propertyDescription || null,
         rulesText: rulesText || null,
         rulesPdf: rulesPdf || null,
         // Prisma strict relations: connect tenant group by ID
-        tenantGroup: { connect: { id: rentalRequest.tenantGroupId } }
-      }
+        tenantGroup: { connect: { id: rentalRequest.tenantGroupId } },
+      },
     });
 
     // 🚀 SCALABILITY: Update the match status to show landlord has responded
@@ -816,15 +946,15 @@ const createOffer = async (req, res) => {
       where: {
         organization: {
           members: {
-            some: { userId: req.user.id }
-          }
+            some: { userId: req.user.id },
+          },
         },
-        rentalRequestId: parseInt(requestId)
+        rentalRequestId: parseInt(requestId),
       },
       data: {
         isResponded: true,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     // 🚀 NOTIFICATION: Create notification for the tenant group members about the new offer
@@ -834,9 +964,9 @@ const createOffer = async (req, res) => {
         where: { tenantGroupId: rentalRequest.tenantGroupId },
         include: {
           user: {
-            select: { name: true, email: true }
-          }
-        }
+            select: { name: true, email: true },
+          },
+        },
       });
 
       if (tenantGroupMembers.length > 0) {
@@ -864,12 +994,19 @@ const createOffer = async (req, res) => {
         }
       }
     } catch (notificationError) {
-      console.error('Warning: Failed to send offer notification:', notificationError);
+      console.error(
+        'Warning: Failed to send offer notification:',
+        notificationError
+      );
       // Don't fail the offer creation if notification fails
     }
 
-    console.log(`✅ Offer created successfully for request ${requestId} by landlord ${req.user.id}`);
-    console.log(`🏆 Competition: This request now has multiple offers from different landlords`);
+    console.log(
+      `✅ Offer created successfully for request ${requestId} by landlord ${req.user.id}`
+    );
+    console.log(
+      `🏆 Competition: This request now has multiple offers from different landlords`
+    );
     console.log(`🔔 Tenant notification sent for offer ${offer.id}`);
 
     res.json({
@@ -882,24 +1019,24 @@ const createOffer = async (req, res) => {
         depositAmount: offer.depositAmount,
         leaseDuration: offer.leaseDuration,
         status: offer.status,
-        createdAt: offer.createdAt
+        createdAt: offer.createdAt,
       },
       property: {
         id: property.id,
         name: property.name,
         address: property.address,
-        propertyType: property.propertyType
+        propertyType: property.propertyType,
       },
       competition: {
-        message: 'Multiple landlords are competing for this request. First to get accepted and paid wins!',
-        tip: 'Consider making your offer more attractive to increase chances of acceptance.'
-      }
+        message:
+          'Multiple landlords are competing for this request. First to get accepted and paid wins!',
+        tip: 'Consider making your offer more attractive to increase chances of acceptance.',
+      },
     });
-
   } catch (error) {
     console.error('Create offer error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
@@ -914,14 +1051,14 @@ const updateOfferStatus = async (req, res) => {
     const validStatuses = ['ACCEPTED', 'REJECTED'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
-        error: 'Status must be either ACCEPTED or REJECTED.'
+        error: 'Status must be either ACCEPTED or REJECTED.',
       });
     }
 
     // Validate payment gateway if accepting offer
     if (status === 'ACCEPTED' && !preferredPaymentGateway) {
       return res.status(400).json({
-        error: 'Payment gateway is required when accepting an offer.'
+        error: 'Payment gateway is required when accepting an offer.',
       });
     }
 
@@ -929,7 +1066,8 @@ const updateOfferStatus = async (req, res) => {
       const validGateways = ['STRIPE', 'PAYU', 'P24', 'TPAY'];
       if (!validGateways.includes(preferredPaymentGateway)) {
         return res.status(400).json({
-          error: 'Invalid payment gateway. Must be one of: STRIPE, PAYU, P24, TPAY.'
+          error:
+            'Invalid payment gateway. Must be one of: STRIPE, PAYU, P24, TPAY.',
         });
       }
     }
@@ -940,32 +1078,35 @@ const updateOfferStatus = async (req, res) => {
       include: {
         rentalRequest: {
           include: {
-            tenantGroup: true
-          }
+            tenantGroup: true,
+          },
         },
         landlord: {
           select: {
             id: true,
             name: true,
-            email: true
-          }
-        }
-      }
+            email: true,
+          },
+        },
+      },
     });
 
     if (!offer) {
       return res.status(404).json({
-        error: 'Offer not found.'
+        error: 'Offer not found.',
       });
     }
 
     // Verify tenant owns the request
     const isMember = await prisma.tenantGroupMember.findFirst({
-      where: { tenantGroupId: offer.rentalRequest.tenantGroupId, userId: req.user.id }
+      where: {
+        tenantGroupId: offer.rentalRequest.tenantGroupId,
+        userId: req.user.id,
+      },
     });
     if (!isMember) {
       return res.status(403).json({
-        error: 'You can only update offers for your own rental requests.'
+        error: 'You can only update offers for your own rental requests.',
       });
     }
 
@@ -975,7 +1116,8 @@ const updateOfferStatus = async (req, res) => {
         where: { id },
         data: {
           status: status,
-          preferredPaymentGateway: status === 'ACCEPTED' ? preferredPaymentGateway : null
+          preferredPaymentGateway:
+            status === 'ACCEPTED' ? preferredPaymentGateway : null,
         },
         include: {
           rentalRequest: {
@@ -984,24 +1126,27 @@ const updateOfferStatus = async (req, res) => {
                 select: {
                   id: true,
                   name: true,
-                  email: true
-                }
-              }
-            }
+                  email: true,
+                },
+              },
+            },
           },
           landlord: {
             select: {
               id: true,
               name: true,
-              email: true
-            }
-          }
-        }
+              email: true,
+            },
+          },
+        },
       });
 
       // If accepted, remove request from pool
       if (status === 'ACCEPTED') {
-        await requestPoolService.removeFromPool(offer.rentalRequestId, 'MATCHED');
+        await requestPoolService.removeFromPool(
+          offer.rentalRequestId,
+          'MATCHED'
+        );
       }
 
       return updatedOffer;
@@ -1009,12 +1154,12 @@ const updateOfferStatus = async (req, res) => {
 
     res.json({
       message: `Offer ${status.toLowerCase()} successfully.`,
-      offer: result
+      offer: result,
     });
   } catch (error) {
     console.error('Update offer status error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
@@ -1036,7 +1181,7 @@ const getPoolStats = async (req, res) => {
   } catch (error) {
     console.error('Get pool stats error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
@@ -1046,12 +1191,12 @@ const cleanupExpiredRequests = async (req, res) => {
   try {
     await requestPoolService.cleanupExpiredRequests();
     res.json({
-      message: 'Expired requests cleaned up successfully.'
+      message: 'Expired requests cleaned up successfully.',
     });
   } catch (error) {
     console.error('Cleanup expired requests error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
@@ -1067,8 +1212,8 @@ const getMyRequests = async (req, res) => {
     const rentalRequestsRaw = await prisma.rentalRequest.findMany({
       where: {
         tenantGroup: {
-          members: { some: { userId: tenantId } }
-        }
+          members: { some: { userId: tenantId } },
+        },
       },
       include: {
         offers: {
@@ -1078,27 +1223,37 @@ const getMyRequests = async (req, res) => {
             moveInVerificationStatus: true,
             payments: {
               where: { status: { in: ['SUCCEEDED', 'CANCELLED'] } },
-              select: { id: true, amount: true, status: true, gateway: true, paidAt: true, errorMessage: true, purpose: true }
+              select: {
+                id: true,
+                amount: true,
+                status: true,
+                gateway: true,
+                paidAt: true,
+                errorMessage: true,
+                purpose: true,
+              },
             },
-            organizationId: true
-          }
+            organizationId: true,
+          },
         },
         tenantGroup: {
           select: {
             id: true,
-            _count: { select: { members: true } }
-          }
-        }
+            _count: { select: { members: true } },
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
     });
 
     // Build maps for refund aggregation
-    const rrIds = rentalRequestsRaw.map(r => r.id);
+    const rrIds = rentalRequestsRaw.map((r) => r.id);
     const offerIdToRrId = new Map();
-    rentalRequestsRaw.forEach(r => (r.offers || []).forEach(o => offerIdToRrId.set(o.id, r.id)));
+    rentalRequestsRaw.forEach((r) =>
+      (r.offers || []).forEach((o) => offerIdToRrId.set(o.id, r.id))
+    );
 
     // Fetch cancelled payments for these requests/offers
     const cancelledPayments = await prisma.payment.findMany({
@@ -1106,17 +1261,27 @@ const getMyRequests = async (req, res) => {
         status: 'CANCELLED',
         OR: [
           { rentalRequestId: { in: rrIds } },
-          { offerId: { in: Array.from(offerIdToRrId.keys()) } }
-        ]
+          { offerId: { in: Array.from(offerIdToRrId.keys()) } },
+        ],
       },
-      select: { id: true, amount: true, gateway: true, rentalRequestId: true, offerId: true }
+      select: {
+        id: true,
+        amount: true,
+        gateway: true,
+        rentalRequestId: true,
+        offerId: true,
+      },
     });
 
     const rrIdToRefundSummary = new Map();
-    cancelledPayments.forEach(p => {
+    cancelledPayments.forEach((p) => {
       const rrId = p.rentalRequestId || offerIdToRrId.get(p.offerId);
       if (!rrId) return;
-      const cur = rrIdToRefundSummary.get(rrId) || { totalRefunded: 0, count: 0, gateways: new Set() };
+      const cur = rrIdToRefundSummary.get(rrId) || {
+        totalRefunded: 0,
+        count: 0,
+        gateways: new Set(),
+      };
       cur.totalRefunded += p.amount || 0;
       cur.count += 1;
       cur.gateways.add(p.gateway || 'UNKNOWN');
@@ -1124,22 +1289,33 @@ const getMyRequests = async (req, res) => {
     });
 
     // Derive status and attach refund summary
-    const rentalRequests = rentalRequestsRaw.map(rr => {
-      const hasCancelledOffer = (rr.offers || []).some(o => o.moveInVerificationStatus === 'CANCELLED');
-      const base = hasCancelledOffer && rr.status !== 'CANCELLED' ? { ...rr, status: 'CANCELLED' } : rr;
+    const rentalRequests = rentalRequestsRaw.map((rr) => {
+      const hasCancelledOffer = (rr.offers || []).some(
+        (o) => o.moveInVerificationStatus === 'CANCELLED'
+      );
+      const base =
+        hasCancelledOffer && rr.status !== 'CANCELLED'
+          ? { ...rr, status: 'CANCELLED' }
+          : rr;
       const aggr = rrIdToRefundSummary.get(rr.id);
-      const summary = aggr ? { totalRefunded: aggr.totalRefunded, count: aggr.count, gateways: Array.from(aggr.gateways) } : undefined;
+      const summary = aggr
+        ? {
+            totalRefunded: aggr.totalRefunded,
+            count: aggr.count,
+            gateways: Array.from(aggr.gateways),
+          }
+        : undefined;
       return summary ? { ...base, _refundSummary: summary } : base;
     });
 
     res.json({
       message: 'Rental requests retrieved successfully.',
-      rentalRequests: rentalRequests
+      rentalRequests: rentalRequests,
     });
   } catch (error) {
     console.error('Get my requests error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
@@ -1148,18 +1324,18 @@ const getMyRequests = async (req, res) => {
 const autoUpdateRequestStatus = async (tenantId) => {
   try {
     const now = new Date();
-    
+
     // Update requests where move-in date is in the past
     await prisma.rentalRequest.updateMany({
       where: {
         tenantGroup: { members: { some: { userId: tenantId } } },
         moveInDate: { lt: now },
-        status: { not: 'CANCELLED' }
+        status: { not: 'CANCELLED' },
       },
       data: {
         status: 'CANCELLED',
-        poolStatus: 'EXPIRED'
-      }
+        poolStatus: 'EXPIRED',
+      },
     });
 
     // Update requests where tenant has accepted or paid for an offer
@@ -1167,12 +1343,12 @@ const autoUpdateRequestStatus = async (tenantId) => {
       where: {
         tenantGroup: { members: { some: { userId: tenantId } } },
         offers: { some: { status: { in: ['ACCEPTED', 'PAID'] } } },
-        status: { notIn: ['LOCKED', 'CANCELLED'] }
+        status: { notIn: ['LOCKED', 'CANCELLED'] },
       },
       data: {
         status: 'LOCKED',
-        poolStatus: 'MATCHED'
-      }
+        poolStatus: 'MATCHED',
+      },
     });
 
     console.log('✅ Auto-updated request statuses for tenant:', tenantId);
@@ -1196,20 +1372,22 @@ const updateRentalRequest = async (req, res) => {
     const existingRequest = await prisma.rentalRequest.findFirst({
       where: {
         id: parseInt(id),
-        tenantGroup: { members: { some: { userId: tenantId } } }
-      }
+        tenantGroup: { members: { some: { userId: tenantId } } },
+      },
     });
 
     if (!existingRequest) {
       return res.status(404).json({
-        error: 'Rental request not found or you do not have permission to edit it.'
+        error:
+          'Rental request not found or you do not have permission to edit it.',
       });
     }
 
     // Check if request is locked (has accepted or paid offers)
     if (existingRequest.status === 'LOCKED') {
       return res.status(400).json({
-        error: 'Cannot edit a rental request that has been accepted or paid for.'
+        error:
+          'Cannot edit a rental request that has been accepted or paid for.',
       });
     }
 
@@ -1217,13 +1395,14 @@ const updateRentalRequest = async (req, res) => {
     const hasAcceptedOrPaidOffer = await prisma.offer.findFirst({
       where: {
         rentalRequestId: parseInt(id),
-        status: { in: ['ACCEPTED', 'PAID'] }
-      }
+        status: { in: ['ACCEPTED', 'PAID'] },
+      },
     });
-    
+
     if (hasAcceptedOrPaidOffer) {
       return res.status(400).json({
-        error: 'Cannot edit a rental request that has been accepted or paid for.'
+        error:
+          'Cannot edit a rental request that has been accepted or paid for.',
       });
     }
 
@@ -1232,7 +1411,7 @@ const updateRentalRequest = async (req, res) => {
       const moveInDateObj = new Date(updateData.moveInDate);
       if (moveInDateObj <= new Date()) {
         return res.status(400).json({
-          error: 'Move-in date must be in the future.'
+          error: 'Move-in date must be in the future.',
         });
       }
       updateData.moveInDate = moveInDateObj;
@@ -1241,36 +1420,69 @@ const updateRentalRequest = async (req, res) => {
     // Validate budget is positive if provided
     if (updateData.budget && updateData.budget <= 0) {
       return res.status(400).json({
-        error: 'Budget must be a positive number.'
+        error: 'Budget must be a positive number.',
       });
     }
 
     // Validate property type and set bedrooms automatically
-    const validPropertyTypes = ['Room', 'Shared Room', 'Studio', 'Apartment', 'House'];
-    if (updateData.propertyType && !validPropertyTypes.includes(updateData.propertyType)) {
+    const validPropertyTypes = [
+      'Room',
+      'Shared Room',
+      'Studio',
+      'Apartment',
+      'House',
+    ];
+    if (
+      updateData.propertyType &&
+      !validPropertyTypes.includes(updateData.propertyType)
+    ) {
       return res.status(400).json({
-        error: 'Invalid property type. Must be one of: Room, Shared Room, Studio, Apartment, House.'
+        error:
+          'Invalid property type. Must be one of: Room, Shared Room, Studio, Apartment, House.',
       });
     }
 
     // Auto-set bedrooms for single-room property types
     const singleRoomTypes = ['Room', 'Shared Room', 'Studio'];
-    if (updateData.propertyType && singleRoomTypes.includes(updateData.propertyType)) {
+    if (
+      updateData.propertyType &&
+      singleRoomTypes.includes(updateData.propertyType)
+    ) {
       updateData.bedrooms = 1;
     }
 
     // Filter out fields that don't exist in the database schema
     const allowedFields = [
-      'title', 'description', 'location', 'budget', 'budgetFrom', 'budgetTo', 'moveInDate', 
-      'propertyType', 'district', 'bedrooms', 'additionalRequirements',
-      'bathrooms', 'furnished', 'parking', 'petsAllowed', 'status', 
-      'isLocked', 'preferredNeighborhood', 'maxCommuteTime', 'mustHaveFeatures',
-      'flexibleOnMoveInDate', 'poolStatus', 'matchScore', 'viewCount', 
-      'responseCount', 'expiresAt'
+      'title',
+      'description',
+      'location',
+      'budget',
+      'budgetFrom',
+      'budgetTo',
+      'moveInDate',
+      'propertyType',
+      'district',
+      'bedrooms',
+      'additionalRequirements',
+      'bathrooms',
+      'furnished',
+      'parking',
+      'petsAllowed',
+      'status',
+      'isLocked',
+      'preferredNeighborhood',
+      'maxCommuteTime',
+      'mustHaveFeatures',
+      'flexibleOnMoveInDate',
+      'poolStatus',
+      'matchScore',
+      'viewCount',
+      'responseCount',
+      'expiresAt',
     ];
 
     const filteredUpdateData = {};
-    Object.keys(updateData).forEach(key => {
+    Object.keys(updateData).forEach((key) => {
       if (allowedFields.includes(key)) {
         filteredUpdateData[key] = updateData[key];
       }
@@ -1280,7 +1492,7 @@ const updateRentalRequest = async (req, res) => {
 
     const updatedRequest = await prisma.rentalRequest.update({
       where: {
-        id: parseInt(id)
+        id: parseInt(id),
       },
       data: filteredUpdateData,
       include: {
@@ -1290,22 +1502,22 @@ const updateRentalRequest = async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                email: true
-              }
-            }
-          }
-        }
-      }
+                email: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     res.json({
       message: 'Rental request updated successfully.',
-      rentalRequest: updatedRequest
+      rentalRequest: updatedRequest,
     });
   } catch (error) {
     console.error('Update rental request error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
@@ -1320,13 +1532,14 @@ const deleteRentalRequest = async (req, res) => {
     const existingRequest = await prisma.rentalRequest.findFirst({
       where: {
         id: parseInt(id),
-        tenantGroup: { members: { some: { userId: tenantId } } }
-      }
+        tenantGroup: { members: { some: { userId: tenantId } } },
+      },
     });
 
     if (!existingRequest) {
       return res.status(404).json({
-        error: 'Rental request not found or you do not have permission to delete it.'
+        error:
+          'Rental request not found or you do not have permission to delete it.',
       });
     }
 
@@ -1334,20 +1547,20 @@ const deleteRentalRequest = async (req, res) => {
     const hasAcceptedOrPaidOffer = await prisma.offer.findFirst({
       where: {
         rentalRequestId: parseInt(id),
-        status: { in: ['ACCEPTED', 'PAID'] }
-      }
+        status: { in: ['ACCEPTED', 'PAID'] },
+      },
     });
-    
+
     if (hasAcceptedOrPaidOffer) {
       return res.status(400).json({
-        error: 'Cannot delete a request that has been accepted or paid for.'
+        error: 'Cannot delete a request that has been accepted or paid for.',
       });
     }
 
     // Check if request is locked
     if (existingRequest.status === 'LOCKED') {
       return res.status(400).json({
-        error: 'Cannot delete a locked rental request.'
+        error: 'Cannot delete a locked rental request.',
       });
     }
 
@@ -1358,17 +1571,17 @@ const deleteRentalRequest = async (req, res) => {
 
     await prisma.rentalRequest.delete({
       where: {
-        id: parseInt(id)
-      }
+        id: parseInt(id),
+      },
     });
 
     res.json({
-      message: 'Rental request deleted successfully.'
+      message: 'Rental request deleted successfully.',
     });
   } catch (error) {
     console.error('Delete rental request error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
@@ -1381,12 +1594,12 @@ const getMyOffers = async (req, res) => {
     const offers = await prisma.offer.findMany({
       where: {
         rentalRequest: {
-          tenantGroup: { members: { some: { userId: tenantId } } }
+          tenantGroup: { members: { some: { userId: tenantId } } },
         },
         // Hide offers whose rental request has been cancelled via unwind
         NOT: {
-          moveInVerificationStatus: 'CANCELLED'
-        }
+          moveInVerificationStatus: 'CANCELLED',
+        },
       },
       include: {
         rentalRequest: {
@@ -1399,8 +1612,8 @@ const getMyOffers = async (req, res) => {
             budgetTo: true,
             bedrooms: true,
             moveInDate: true,
-            status: true
-          }
+            status: true,
+          },
         },
         organization: {
           select: {
@@ -1408,8 +1621,8 @@ const getMyOffers = async (req, res) => {
             name: true,
             taxId: true,
             address: true,
-            signatureBase64: true
-          }
+            signatureBase64: true,
+          },
         },
         property: {
           select: {
@@ -1428,22 +1641,25 @@ const getMyOffers = async (req, res) => {
             petsAllowed: true,
             description: true,
             images: true,
-            videos: true
-          }
-        }
+            videos: true,
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
     });
 
     // Transform offers to include actual property data from the offer or linked property
-    const transformedOffers = offers.map(offer => {
+    const transformedOffers = offers.map((offer) => {
       // 🏠 Priority 1: Use linked property data if available
       if (offer.property) {
         return {
           ...offer,
-          propertyTitle: offer.property.name || offer.property.description || 'Property Offer',
+          propertyTitle:
+            offer.property.name ||
+            offer.property.description ||
+            'Property Offer',
           // For paid offers, show full address; for others, show masked address
           propertyAddress: (() => {
             if (offer.status === 'PAID') {
@@ -1452,13 +1668,16 @@ const getMyOffers = async (req, res) => {
               if (offer.property.district) {
                 completeAddress += ', ' + offer.property.district;
               }
-              completeAddress += ', ' + offer.property.zipCode + ', ' + offer.property.city;
+              completeAddress +=
+                ', ' + offer.property.zipCode + ', ' + offer.property.city;
               return completeAddress;
             } else {
               // Show masked address for unpaid offers
               const addressParts = offer.property.address.split(' ');
               // Remove the last part if it contains numbers (house/apartment number)
-              const streetParts = addressParts.filter(part => !/\d/.test(part));
+              const streetParts = addressParts.filter(
+                (part) => !/\d/.test(part)
+              );
               const streetName = streetParts.join(' ');
               const maskedAddress = `${streetName}, ${offer.property.district || ''}, ${offer.property.city}`;
               return maskedAddress;
@@ -1466,16 +1685,29 @@ const getMyOffers = async (req, res) => {
           })(),
           propertyImages: offer.property.images || offer.propertyImages || null,
           propertyVideo: offer.property.videos || offer.propertyVideo || null,
-          propertyAmenities: offer.propertyAmenities || JSON.stringify([
-            offer.property.furnished ? 'Furnished' : 'Unfurnished',
-            offer.property.parking ? 'Parking' : 'No Parking',
-            offer.property.petsAllowed ? 'Pets Allowed' : 'No Pets',
-            offer.property.bedrooms ? `${offer.property.bedrooms} Bedrooms` : '',
-            offer.property.bathrooms ? `${offer.property.bathrooms} Bathrooms` : '',
-            offer.property.size ? `${offer.property.size} m²` : ''
-          ].filter(Boolean)),
-          propertyType: offer.property.propertyType || offer.propertyType || 'Apartment',
-          propertySize: offer.property.bedrooms?.toString() || offer.property.size?.toString() || offer.propertySize || '1',
+          propertyAmenities:
+            offer.propertyAmenities ||
+            JSON.stringify(
+              [
+                offer.property.furnished ? 'Furnished' : 'Unfurnished',
+                offer.property.parking ? 'Parking' : 'No Parking',
+                offer.property.petsAllowed ? 'Pets Allowed' : 'No Pets',
+                offer.property.bedrooms
+                  ? `${offer.property.bedrooms} Bedrooms`
+                  : '',
+                offer.property.bathrooms
+                  ? `${offer.property.bathrooms} Bathrooms`
+                  : '',
+                offer.property.size ? `${offer.property.size} m²` : '',
+              ].filter(Boolean)
+            ),
+          propertyType:
+            offer.property.propertyType || offer.propertyType || 'Apartment',
+          propertySize:
+            offer.property.bedrooms?.toString() ||
+            offer.property.size?.toString() ||
+            offer.propertySize ||
+            '1',
           // 🏠 Pass property data explicitly
           property: {
             bedrooms: offer.property.bedrooms,
@@ -1484,33 +1716,47 @@ const getMyOffers = async (req, res) => {
             furnished: offer.property.furnished,
             parking: offer.property.parking,
             petsAllowed: offer.property.petsAllowed,
-            smokingAllowed: offer.property.smokingAllowed
+            smokingAllowed: offer.property.smokingAllowed,
           },
-          isPaid: offer.status === 'PAID'
+          isPaid: offer.status === 'PAID',
         };
       }
-      
+
       // Priority 2: Use offer data (fallback)
       return {
         ...offer,
-        propertyTitle: offer.propertyDescription || offer.rentalRequest?.title || 'Property Offer',
-        propertyAddress: offer.propertyAddress || offer.rentalRequest?.location || 'Location not specified',
+        propertyTitle:
+          offer.propertyDescription ||
+          offer.rentalRequest?.title ||
+          'Property Offer',
+        propertyAddress:
+          offer.propertyAddress ||
+          offer.rentalRequest?.location ||
+          'Location not specified',
         propertyImages: offer.propertyImages || null,
         propertyVideo: offer.propertyVideo || null,
-        propertyAmenities: offer.propertyAmenities ? (typeof offer.propertyAmenities === 'string' && offer.propertyAmenities.startsWith('[') ? offer.propertyAmenities : JSON.stringify([offer.propertyAmenities])) : null,
+        propertyAmenities: offer.propertyAmenities
+          ? typeof offer.propertyAmenities === 'string' &&
+            offer.propertyAmenities.startsWith('[')
+            ? offer.propertyAmenities
+            : JSON.stringify([offer.propertyAmenities])
+          : null,
         propertyType: offer.propertyType || 'Apartment',
-        propertySize: offer.propertySize || offer.rentalRequest?.bedrooms?.toString() || '1',
-        isPaid: offer.status === 'PAID'
+        propertySize:
+          offer.propertySize ||
+          offer.rentalRequest?.bedrooms?.toString() ||
+          '1',
+        isPaid: offer.status === 'PAID',
       };
     });
 
     res.json({
-      offers: transformedOffers
+      offers: transformedOffers,
     });
   } catch (error) {
     console.error('Get my offers error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
@@ -1520,17 +1766,17 @@ const getOfferDetails = async (req, res) => {
   try {
     const { offerId } = req.params;
     const { id: tenantId } = req.user;
-    
+
     console.log('🔍 GetOfferDetails called with:', { offerId, tenantId });
 
     // Check if user is a member of any tenant group
     const userMembership = await prisma.tenantGroupMember.findFirst({
-      where: { userId: tenantId }
+      where: { userId: tenantId },
     });
 
     if (!userMembership) {
       return res.status(404).json({
-        error: 'You are not a member of any tenant group.'
+        error: 'You are not a member of any tenant group.',
       });
     }
 
@@ -1538,8 +1784,8 @@ const getOfferDetails = async (req, res) => {
       where: {
         id: offerId,
         rentalRequest: {
-          tenantGroupId: userMembership.tenantGroupId
-        }
+          tenantGroupId: userMembership.tenantGroupId,
+        },
       },
       include: {
         rentalRequest: {
@@ -1564,14 +1810,14 @@ const getOfferDetails = async (req, res) => {
                         city: true,
                         zipCode: true,
                         country: true,
-                        address: true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+                        address: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
         organization: {
           include: {
@@ -1596,12 +1842,12 @@ const getOfferDetails = async (req, res) => {
                     city: true,
                     zipCode: true,
                     country: true,
-                    address: true
-                  }
-                }
-              }
-            }
-          }
+                    address: true,
+                  },
+                },
+              },
+            },
+          },
         },
         property: {
           select: {
@@ -1624,29 +1870,33 @@ const getOfferDetails = async (req, res) => {
             description: true,
             images: true,
             videos: true,
-            houseRules: true
-          }
-        }
-      }
+            houseRules: true,
+          },
+        },
+      },
     });
 
     if (!offer) {
-      console.log('❌ Offer not found for:', { offerId, tenantId, tenantGroupId: userMembership.tenantGroupId });
+      console.log('❌ Offer not found for:', {
+        offerId,
+        tenantId,
+        tenantGroupId: userMembership.tenantGroupId,
+      });
       return res.status(404).json({
-        error: 'Offer not found or you do not have permission to view it.'
+        error: 'Offer not found or you do not have permission to view it.',
       });
     }
-    
+
     // Get landlord info from organization
     const landlordUser = offer.organization?.members?.[0]?.user;
-    
-    console.log('✅ Offer found:', { 
-      offerId: offer.id, 
-      status: offer.status, 
+
+    console.log('✅ Offer found:', {
+      offerId: offer.id,
+      status: offer.status,
       landlordId: offer.organizationId,
       landlordName: landlordUser?.name,
       landlordFirstName: landlordUser?.firstName,
-      landlordLastName: landlordUser?.lastName
+      landlordLastName: landlordUser?.lastName,
     });
 
     // Optional: compute landlord rank info
@@ -1669,7 +1919,9 @@ const getOfferDetails = async (req, res) => {
       leaseDuration: offer.leaseDuration,
       description: offer.description,
       availableFrom: offer.availableFrom,
-      isPaid: offer.status === 'PAID' || (offer.status === 'ACCEPTED' && offer.paymentIntentId),
+      isPaid:
+        offer.status === 'PAID' ||
+        (offer.status === 'ACCEPTED' && offer.paymentIntentId),
       paymentIntentId: offer.paymentIntentId,
       paymentDate: offer.paymentDate,
       leaseStartDate: offer.leaseStartDate,
@@ -1682,11 +1934,16 @@ const getOfferDetails = async (req, res) => {
           if (offer.property.district) {
             completeAddress += ', ' + offer.property.district;
           }
-          completeAddress += ', ' + offer.property.zipCode + ', ' + offer.property.city;
+          completeAddress +=
+            ', ' + offer.property.zipCode + ', ' + offer.property.city;
           return completeAddress;
         } else {
           // Show offer address for unpaid offers
-          return offer.propertyAddress || offer.rentalRequest?.location || 'Location not specified';
+          return (
+            offer.propertyAddress ||
+            offer.rentalRequest?.location ||
+            'Location not specified'
+          );
         }
       })(),
       propertyImages: offer.propertyImages,
@@ -1705,16 +1962,17 @@ const getOfferDetails = async (req, res) => {
       rentalRequestId: offer.rentalRequestId,
       landlordId: offer.organizationId, // Use organizationId instead of landlordId
       propertyId: offer.propertyId,
-      
+
       // Include rental request data
       rentalRequest: offer.rentalRequest,
-      
+
       // Include landlord data
       landlord: {
         id: landlordUser?.id,
-        name: landlordUser?.firstName && landlordUser?.lastName ? 
-          `${landlordUser.firstName} ${landlordUser.lastName}` : 
-          landlordUser?.name || 'Landlord',
+        name:
+          landlordUser?.firstName && landlordUser?.lastName
+            ? `${landlordUser.firstName} ${landlordUser.lastName}`
+            : landlordUser?.name || 'Landlord',
         firstName: landlordUser?.firstName,
         lastName: landlordUser?.lastName,
         email: landlordUser?.email,
@@ -1731,20 +1989,22 @@ const getOfferDetails = async (req, res) => {
         zipCode: landlordUser?.zipCode,
         country: landlordUser?.country,
         address: landlordUser?.address,
-        rankInfo: landlordRankInfo
+        rankInfo: landlordRankInfo,
       },
-      
+
       // Include property data if available
       property: offer.property,
-      
+
       // Include tenant group data
       tenantGroup: {
         id: offer.rentalRequest.tenantGroupId,
-        members: offer.rentalRequest.tenantGroup?.members?.map(member => ({
-          id: member.user.id,
-          name: member.user.firstName && member.user.lastName ? 
-            `${member.user.firstName} ${member.user.lastName}` : 
-            member.user.name || 'Tenant',
+        members:
+          offer.rentalRequest.tenantGroup?.members?.map((member) => ({
+            id: member.user.id,
+            name:
+              member.user.firstName && member.user.lastName
+                ? `${member.user.firstName} ${member.user.lastName}`
+                : member.user.name || 'Tenant',
             email: member.user.email || 'tenant@email.com',
             signatureBase64: member.user.signatureBase64 || null,
             pesel: member.user.pesel || null,
@@ -1756,20 +2016,23 @@ const getOfferDetails = async (req, res) => {
             zipCode: member.user.zipCode || null,
             country: member.user.country || null,
             address: member.user.address || null,
-            isPrimary: member.isPrimary
-        })) || []
+            isPrimary: member.isPrimary,
+          })) || [],
       },
-      
+
       // Include tenant data for backward compatibility (primary member)
       tenant: (() => {
-        const primaryMember = offer.rentalRequest.tenantGroup?.members?.find(m => m.isPrimary);
+        const primaryMember = offer.rentalRequest.tenantGroup?.members?.find(
+          (m) => m.isPrimary
+        );
         if (!primaryMember) return null;
-        
+
         return {
           id: primaryMember.user.id,
-          name: primaryMember.user.firstName && primaryMember.user.lastName ? 
-            `${primaryMember.user.firstName} ${primaryMember.user.lastName}` : 
-            primaryMember.user.name || 'Tenant',
+          name:
+            primaryMember.user.firstName && primaryMember.user.lastName
+              ? `${primaryMember.user.firstName} ${primaryMember.user.lastName}`
+              : primaryMember.user.name || 'Tenant',
           email: primaryMember.user.email || 'tenant@email.com',
           signatureBase64: primaryMember.user.signatureBase64 || null,
           pesel: primaryMember.user.pesel || null,
@@ -1780,27 +2043,39 @@ const getOfferDetails = async (req, res) => {
           city: primaryMember.user.city || null,
           zipCode: primaryMember.user.zipCode || null,
           country: primaryMember.user.country || null,
-          address: primaryMember.user.address || null
+          address: primaryMember.user.address || null,
         };
-      })()
+      })(),
     };
 
     console.log('✅ Transformation completed successfully');
     console.log('🔍 Signature Debug in getOfferDetails:');
-    console.log('Tenant signature present:', !!transformedOffer.tenant.signatureBase64);
-    console.log('Landlord signature present:', !!transformedOffer.landlord.signatureBase64);
-    console.log('Tenant signature length:', transformedOffer.tenant.signatureBase64?.length || 0);
-    console.log('Landlord signature length:', transformedOffer.landlord.signatureBase64?.length || 0);
-    
+    console.log(
+      'Tenant signature present:',
+      !!transformedOffer.tenant.signatureBase64
+    );
+    console.log(
+      'Landlord signature present:',
+      !!transformedOffer.landlord.signatureBase64
+    );
+    console.log(
+      'Tenant signature length:',
+      transformedOffer.tenant.signatureBase64?.length || 0
+    );
+    console.log(
+      'Landlord signature length:',
+      transformedOffer.landlord.signatureBase64?.length || 0
+    );
+
     res.json({
-      offer: transformedOffer
+      offer: transformedOffer,
     });
   } catch (error) {
     console.error('Get offer details error:', error);
     console.error('Error stack:', error.stack);
     res.status(500).json({
       error: 'Internal server error.',
-      details: error.message
+      details: error.message,
     });
   }
 };
@@ -1822,15 +2097,15 @@ const updateTenantOfferStatus = async (req, res) => {
             id: true,
             tenantGroupId: true,
             poolStatus: true,
-            expiresAt: true
-          }
-        }
-      }
+            expiresAt: true,
+          },
+        },
+      },
     });
 
     if (!offer) {
       return res.status(404).json({
-        error: 'Offer not found.'
+        error: 'Offer not found.',
       });
     }
 
@@ -1838,13 +2113,13 @@ const updateTenantOfferStatus = async (req, res) => {
     const userMembership = await prisma.tenantGroupMember.findFirst({
       where: {
         userId: req.user.id,
-        tenantGroupId: offer.rentalRequest.tenantGroupId
-      }
+        tenantGroupId: offer.rentalRequest.tenantGroupId,
+      },
     });
 
     if (!userMembership) {
       return res.status(403).json({
-        error: 'You can only update offers for your own rental requests.'
+        error: 'You can only update offers for your own rental requests.',
       });
     }
 
@@ -1857,8 +2132,8 @@ const updateTenantOfferStatus = async (req, res) => {
           where: { id: offerId },
           data: {
             status: 'ACCEPTED',
-            updatedAt: new Date()
-          }
+            updatedAt: new Date(),
+          },
         });
 
         // 🚀 SCALABILITY: Reject all other offers for the same rental request
@@ -1866,51 +2141,57 @@ const updateTenantOfferStatus = async (req, res) => {
           where: {
             rentalRequestId: offer.rentalRequest.id,
             id: { not: offerId },
-            status: { in: ['PENDING', 'ACCEPTED'] }
+            status: { in: ['PENDING', 'ACCEPTED'] },
           },
           data: {
             status: 'REJECTED',
-            updatedAt: new Date()
-          }
+            updatedAt: new Date(),
+          },
         });
 
-        console.log(`✅ Accepted offer ${offerId}, rejected ${otherOffers.count} other offers`);
+        console.log(
+          `✅ Accepted offer ${offerId}, rejected ${otherOffers.count} other offers`
+        );
         return { updatedOffer, rejectedCount: otherOffers.count };
       });
 
       res.json({
         success: true,
-        message: 'Offer accepted successfully! Other offers for this request have been automatically rejected.',
+        message:
+          'Offer accepted successfully! Other offers for this request have been automatically rejected.',
         offer: result.updatedOffer,
         competition: {
-          message: 'You have exclusive rights to this property. Other tenants can no longer accept offers for this request.',
-          nextStep: 'Complete payment to secure the property and unlock communication with the landlord.'
-        }
+          message:
+            'You have exclusive rights to this property. Other tenants can no longer accept offers for this request.',
+          nextStep:
+            'Complete payment to secure the property and unlock communication with the landlord.',
+        },
       });
-
     } else if (status === 'REJECTED') {
       // 🚀 SCALABILITY: When tenant rejects an offer, it stays rejected but request remains in pool
       const updatedOffer = await prisma.offer.update({
         where: { id: offerId },
         data: {
           status: 'REJECTED',
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
       console.log(`✅ Offer ${offerId} rejected by tenant`);
 
       res.json({
         success: true,
-        message: 'Offer rejected successfully. You can still receive other offers for your request.',
+        message:
+          'Offer rejected successfully. You can still receive other offers for your request.',
         offer: updatedOffer,
-        note: 'Your rental request remains active in the pool for other landlords to consider.'
-        });
+        note: 'Your rental request remains active in the pool for other landlords to consider.',
+      });
     } else if (status === 'PAID') {
       // Block direct PAID status updates unless explicitly allowed for dev/manual flows
       if (process.env.ALLOW_MANUAL_PAID !== 'true') {
         return res.status(400).json({
-          error: 'Direct PAID status update is disabled. Complete payment via /api/payments endpoints.'
+          error:
+            'Direct PAID status update is disabled. Complete payment via /api/payments endpoints.',
         });
       }
       // 🔧 DEV/Mock payment path: mark offer as PAID and perform all side effects
@@ -1923,7 +2204,7 @@ const updateTenantOfferStatus = async (req, res) => {
             status: 'PAID',
             isPaid: true,
             paymentDate: paidAt,
-            updatedAt: paidAt
+            updatedAt: paidAt,
           },
           select: {
             id: true,
@@ -1931,25 +2212,32 @@ const updateTenantOfferStatus = async (req, res) => {
             depositAmount: true,
             rentalRequestId: true,
             propertyId: true,
-            organizationId: true
-          }
+            organizationId: true,
+          },
         });
 
         // Compute prorated first-month amount based on move-in date
         const reqRecord = await tx.rentalRequest.findUnique({
           where: { id: updatedOffer.rentalRequestId },
-          select: { moveInDate: true }
+          select: { moveInDate: true },
         });
 
-        const moveInDate = reqRecord?.moveInDate ? new Date(reqRecord.moveInDate) : null;
+        const moveInDate = reqRecord?.moveInDate
+          ? new Date(reqRecord.moveInDate)
+          : null;
         let proratedFirstMonth = Number(updatedOffer.rentAmount) || 0;
         if (moveInDate && Number.isFinite(proratedFirstMonth)) {
-          const endOfMonth = new Date(moveInDate.getFullYear(), moveInDate.getMonth() + 1, 0);
+          const endOfMonth = new Date(
+            moveInDate.getFullYear(),
+            moveInDate.getMonth() + 1,
+            0
+          );
           const days = Math.ceil((endOfMonth - moveInDate) / 86400000) + 1; // inclusive
           proratedFirstMonth = Math.round((proratedFirstMonth * days) / 30);
         }
 
-        const amountTotal = (updatedOffer.depositAmount || 0) + (proratedFirstMonth || 0);
+        const amountTotal =
+          (updatedOffer.depositAmount || 0) + (proratedFirstMonth || 0);
 
         // Create a successful general payment (deposit + prorated first month) - idempotent
         const existingCombined = await tx.payment.findFirst({
@@ -1957,8 +2245,8 @@ const updateTenantOfferStatus = async (req, res) => {
             userId: req.user.id,
             purpose: 'DEPOSIT_AND_FIRST_MONTH',
             status: 'SUCCEEDED',
-            offerId: updatedOffer.id
-          }
+            offerId: updatedOffer.id,
+          },
         });
         if (!existingCombined) {
           await tx.payment.create({
@@ -1971,8 +2259,8 @@ const updateTenantOfferStatus = async (req, res) => {
               rentalRequestId: updatedOffer.rentalRequestId,
               offerId: updatedOffer.id,
               paymentIntentId: `mock_${Date.now()}_${updatedOffer.id}`,
-              createdAt: paidAt
-            }
+              createdAt: paidAt,
+            },
           });
         }
 
@@ -1987,9 +2275,9 @@ const updateTenantOfferStatus = async (req, res) => {
             where: {
               propertyId: updatedOffer.propertyId,
               id: { not: offerId },
-              status: { in: ['PENDING', 'ACCEPTED'] }
+              status: { in: ['PENDING', 'ACCEPTED'] },
             },
-            data: { status: 'REJECTED', updatedAt: new Date() }
+            data: { status: 'REJECTED', updatedAt: new Date() },
           });
         }
 
@@ -1998,26 +2286,34 @@ const updateTenantOfferStatus = async (req, res) => {
 
       // Remove the rental request from the pool and update its status
       try {
-        console.log(`🔄 Updating rental request ${result.rentalRequestId} status to MATCHED...`);
-        
+        console.log(
+          `🔄 Updating rental request ${result.rentalRequestId} status to MATCHED...`
+        );
+
         // First, update the rental request status to MATCHED
         const updatedRequest = await prisma.rentalRequest.update({
           where: { id: result.rentalRequestId },
           data: {
             status: 'MATCHED',
             poolStatus: 'MATCHED',
-            updatedAt: new Date()
+            updatedAt: new Date(),
+          },
+        });
+
+        console.log(
+          `✅ Rental request ${result.rentalRequestId} status updated:`,
+          {
+            id: updatedRequest.id,
+            status: updatedRequest.status,
+            poolStatus: updatedRequest.poolStatus,
           }
-        });
-        
-        console.log(`✅ Rental request ${result.rentalRequestId} status updated:`, {
-          id: updatedRequest.id,
-          status: updatedRequest.status,
-          poolStatus: updatedRequest.poolStatus
-        });
-        
+        );
+
         // Then remove from request pool
-        await requestPoolService.removeFromPool(result.rentalRequestId, 'MATCHED');
+        await requestPoolService.removeFromPool(
+          result.rentalRequestId,
+          'MATCHED'
+        );
         console.log('✅ Rental request removed from pool');
       } catch (poolError) {
         console.error('❌ Error removing request from pool:', poolError);
@@ -2026,38 +2322,51 @@ const updateTenantOfferStatus = async (req, res) => {
       // Update property availability to RENTED (not OCCUPIED)
       try {
         if (result.propertyId) {
-          console.log(`🔄 Updating property ${result.propertyId} status to RENTED...`);
-          await propertyAvailabilityService.updatePropertyAvailability(result.propertyId, false, 'RENTED');
+          console.log(
+            `🔄 Updating property ${result.propertyId} status to RENTED...`
+          );
+          await propertyAvailabilityService.updatePropertyAvailability(
+            result.propertyId,
+            false,
+            'RENTED'
+          );
           console.log('✅ Property status updated to RENTED');
         }
       } catch (availabilityError) {
-        console.error('❌ Error updating property availability:', availabilityError);
+        console.error(
+          '❌ Error updating property availability:',
+          availabilityError
+        );
       }
 
       // Generate contract (idempotent if already exists)
       try {
-        const { generateContractForRentalRequest } = await import('./contractController.js');
+        const { generateContractForRentalRequest } = await import(
+          './contractController.js'
+        );
         await generateContractForRentalRequest(result.rentalRequestId);
       } catch (contractError) {
-        console.error('❌ Error generating contract after mock payment:', contractError);
+        console.error(
+          '❌ Error generating contract after mock payment:',
+          contractError
+        );
       }
 
       return res.json({
         success: true,
-        message: 'Payment completed. Offer marked as PAID and contract generated.',
-        offer: { id: result.id, status: 'PAID', paymentDate: new Date() }
+        message:
+          'Payment completed. Offer marked as PAID and contract generated.',
+        offer: { id: result.id, status: 'PAID', paymentDate: new Date() },
       });
-
     } else {
       return res.status(400).json({
-        error: 'Invalid status. Only ACCEPTED, REJECTED, or PAID are allowed.'
+        error: 'Invalid status. Only ACCEPTED, REJECTED, or PAID are allowed.',
       });
     }
-
   } catch (error) {
     console.error('Update tenant offer status error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
@@ -2072,8 +2381,8 @@ const getAllRentalRequests = async (req, res) => {
       where: {
         status: 'AVAILABLE', // Only available properties
         organization: {
-          members: { some: { userId: landlordId } }
-        }
+          members: { some: { userId: landlordId } },
+        },
       },
       select: {
         id: true,
@@ -2089,8 +2398,8 @@ const getAllRentalRequests = async (req, res) => {
         furnished: true,
         parking: true,
         petsAllowed: true,
-        availableFrom: true // Include available from date
-      }
+        availableFrom: true, // Include available from date
+      },
     });
 
     // If landlord has no properties, return empty array
@@ -2098,7 +2407,8 @@ const getAllRentalRequests = async (req, res) => {
       return res.json({
         success: true,
         rentalRequests: [],
-        message: 'No properties found. Add properties to see matching rental requests.'
+        message:
+          'No properties found. Add properties to see matching rental requests.',
       });
     }
 
@@ -2108,18 +2418,18 @@ const getAllRentalRequests = async (req, res) => {
         AND: [
           {
             poolStatus: 'ACTIVE',
-            status: 'ACTIVE'
+            status: 'ACTIVE',
           },
           {
-            OR: landlordProperties.map(property => ({
+            OR: landlordProperties.map((property) => ({
               AND: [
                 // Location matching (improved - check both city and full location)
                 {
                   OR: [
                     { location: { contains: property.city } },
                     { location: { contains: property.city.toLowerCase() } },
-                    { location: { contains: property.city.toUpperCase() } }
-                  ]
+                    { location: { contains: property.city.toUpperCase() } },
+                  ],
                 },
                 // Budget matching with fallback to single budget value
                 {
@@ -2127,32 +2437,36 @@ const getAllRentalRequests = async (req, res) => {
                     {
                       AND: [
                         { budgetFrom: { lte: property.monthlyRent * 1.2 } },
-                        { budgetTo: { gte: property.monthlyRent * 0.8 } }
-                      ]
+                        { budgetTo: { gte: property.monthlyRent * 0.8 } },
+                      ],
                     },
                     {
                       AND: [
                         { budget: { gte: property.monthlyRent * 0.8 } },
-                        { budget: { lte: property.monthlyRent * 1.2 } }
-                      ]
-                    }
-                  ]
+                        { budget: { lte: property.monthlyRent * 1.2 } },
+                      ],
+                    },
+                  ],
                 },
                 // Property type matching (optional, case-insensitive). If request has no type, allow match
                 {
                   OR: [
                     { propertyType: null },
                     { propertyType: property.propertyType },
-                    { propertyType: property.propertyType.charAt(0).toUpperCase() + property.propertyType.slice(1) },
-                    { propertyType: property.propertyType.toLowerCase() }
-                  ]
+                    {
+                      propertyType:
+                        property.propertyType.charAt(0).toUpperCase() +
+                        property.propertyType.slice(1),
+                    },
+                    { propertyType: property.propertyType.toLowerCase() },
+                  ],
                 },
                 // Date matching
-                { moveInDate: { gte: property.availableFrom || new Date() } }
-              ]
-            }))
-          }
-        ]
+                { moveInDate: { gte: property.availableFrom || new Date() } },
+              ],
+            })),
+          },
+        ],
       },
       include: {
         tenantGroup: {
@@ -2170,16 +2484,16 @@ const getAllRentalRequests = async (req, res) => {
                     profession: true,
                     dateOfBirth: true,
                     phoneNumber: true,
-                    pesel: true
-                  }
-                }
-              }
-            }
-          }
+                    pesel: true,
+                  },
+                },
+              },
+            },
+          },
         },
         offers: {
           where: {
-            organization: { members: { some: { userId: landlordId } } }
+            organization: { members: { some: { userId: landlordId } } },
           },
           select: {
             id: true,
@@ -2189,33 +2503,41 @@ const getAllRentalRequests = async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                isPersonal: true
-              }
-            }
-          }
-        }
+                isPersonal: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
     });
 
     // For each rental request, find the best matching property and map tenant data
-    const requestsWithMatchedProperties = requests.map(request => {
+    const requestsWithMatchedProperties = requests.map((request) => {
       // Find the best matching property for this request
-      const matchedProperty = landlordProperties.find(property => {
-        const locationMatch = (request.location || '').toLowerCase().includes((property.city || '').toLowerCase());
+      const matchedProperty = landlordProperties.find((property) => {
+        const locationMatch = (request.location || '')
+          .toLowerCase()
+          .includes((property.city || '').toLowerCase());
         const budgetRangeMatch =
-          (request.budgetFrom != null && request.budgetTo != null &&
-            request.budgetFrom <= property.monthlyRent * 1.2 &&
-            request.budgetTo >= property.monthlyRent * 0.8);
+          request.budgetFrom != null &&
+          request.budgetTo != null &&
+          request.budgetFrom <= property.monthlyRent * 1.2 &&
+          request.budgetTo >= property.monthlyRent * 0.8;
         const singleBudgetMatch =
-          (request.budget != null &&
-            request.budget >= property.monthlyRent * 0.8 &&
-            request.budget <= property.monthlyRent * 1.2);
+          request.budget != null &&
+          request.budget >= property.monthlyRent * 0.8 &&
+          request.budget <= property.monthlyRent * 1.2;
         const budgetMatch = budgetRangeMatch || singleBudgetMatch;
-        const typeMatch = !request.propertyType || request.propertyType.toLowerCase() === (property.propertyType || '').toLowerCase();
-        const dateMatch = new Date(request.moveInDate) >= (property.availableFrom || new Date());
+        const typeMatch =
+          !request.propertyType ||
+          request.propertyType.toLowerCase() ===
+            (property.propertyType || '').toLowerCase();
+        const dateMatch =
+          new Date(request.moveInDate) >=
+          (property.availableFrom || new Date());
 
         // Require location and budget; type/date act as soft signals
         return locationMatch && budgetMatch;
@@ -2231,20 +2553,20 @@ const getAllRentalRequests = async (req, res) => {
       return {
         ...request,
         tenant, // Map the primary tenant group member's user as the tenant
-        matchedProperty: finalMatchedProperty
+        matchedProperty: finalMatchedProperty,
       };
     });
 
     res.json({
       success: true,
       rentalRequests: requestsWithMatchedProperties,
-      totalProperties: landlordProperties.length
+      totalProperties: landlordProperties.length,
     });
   } catch (error) {
     console.error('Error fetching rental requests:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch rental requests'
+      error: 'Failed to fetch rental requests',
     });
   }
 };
@@ -2259,7 +2581,7 @@ const getLandlordAcceptedRequests = async (req, res) => {
       where: {
         organization: { members: { some: { userId: landlordId } } },
         status: 'PAID',
-        moveInVerificationStatus: { not: 'CANCELLED' }
+        moveInVerificationStatus: { not: 'CANCELLED' },
       },
       include: {
         rentalRequest: {
@@ -2278,21 +2600,21 @@ const getLandlordAcceptedRequests = async (req, res) => {
                         profession: true,
                         dateOfBirth: true,
                         phoneNumber: true,
-                        pesel: true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+                        pesel: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
         organization: {
           select: {
             id: true,
             name: true,
-            isPersonal: true
-          }
+            isPersonal: true,
+          },
         },
         property: {
           select: {
@@ -2304,17 +2626,17 @@ const getLandlordAcceptedRequests = async (req, res) => {
             monthlyRent: true,
             propertyType: true,
             bedrooms: true,
-            bathrooms: true
-          }
-        }
+            bathrooms: true,
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
     });
 
     // Transform accepted offers to match the expected format
-    const acceptedRequests = acceptedOffers.map(offer => {
+    const acceptedRequests = acceptedOffers.map((offer) => {
       // Get the primary tenant from the tenant group
       const primaryMember = offer.rentalRequest.tenantGroup?.members?.[0];
       const tenant = primaryMember?.user;
@@ -2340,25 +2662,27 @@ const getLandlordAcceptedRequests = async (req, res) => {
           id: offer.property.id,
           name: offer.property.name || 'Your Property',
           address: offer.property.address || 'Address not specified',
-          rent: offer.property.monthlyRent ? `${offer.property.monthlyRent} zł` : 'Rent not specified',
+          rent: offer.property.monthlyRent
+            ? `${offer.property.monthlyRent} zł`
+            : 'Rent not specified',
           available: offer.property.availableFrom || 'Date not specified',
-          propertyType: offer.property.propertyType || 'Apartment'
+          propertyType: offer.property.propertyType || 'Apartment',
         },
         createdAt: offer.rentalRequest.createdAt,
-        updatedAt: offer.rentalRequest.updatedAt
+        updatedAt: offer.rentalRequest.updatedAt,
       };
     });
 
     res.json({
       success: true,
       acceptedRequests: acceptedRequests,
-      totalAccepted: acceptedRequests.length
+      totalAccepted: acceptedRequests.length,
     });
   } catch (error) {
     console.error('Error fetching accepted requests:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch accepted requests'
+      error: 'Failed to fetch accepted requests',
     });
   }
 };
@@ -2370,7 +2694,10 @@ const declineRentalRequest = async (req, res) => {
     const { reason } = req.body;
 
     // Debug: log incoming requestId and its type
-    console.log('declineRentalRequest params:', { requestIdRaw: requestId, requestIdType: typeof requestId });
+    console.log('declineRentalRequest params:', {
+      requestIdRaw: requestId,
+      requestIdType: typeof requestId,
+    });
 
     console.log(`🚫 Landlord ${req.user.id} declining request ${requestId}`);
 
@@ -2379,26 +2706,26 @@ const declineRentalRequest = async (req, res) => {
       where: { id: parseInt(requestId) },
       include: {
         landlordRequestMatches: {
-          where: { 
+          where: {
             organization: {
               members: {
-                some: { userId: req.user.id }
-              }
-            }
-          }
-        }
-      }
+                some: { userId: req.user.id },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!rentalRequest) {
       return res.status(404).json({
-        error: 'Rental request not found.'
+        error: 'Rental request not found.',
       });
     }
 
     if (rentalRequest.poolStatus !== 'ACTIVE') {
       return res.status(400).json({
-        error: 'This rental request is no longer active.'
+        error: 'This rental request is no longer active.',
       });
     }
 
@@ -2406,7 +2733,7 @@ const declineRentalRequest = async (req, res) => {
     const match = rentalRequest.landlordRequestMatches[0];
     if (!match) {
       return res.status(400).json({
-        error: 'You are not matched with this rental request.'
+        error: 'You are not matched with this rental request.',
       });
     }
 
@@ -2416,8 +2743,8 @@ const declineRentalRequest = async (req, res) => {
       data: {
         status: 'DECLINED',
         isResponded: true,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     // 🚀 SCALABILITY: Update request analytics
@@ -2425,10 +2752,10 @@ const declineRentalRequest = async (req, res) => {
       where: { id: parseInt(requestId) },
       data: {
         responseCount: {
-          increment: 1
+          increment: 1,
         },
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     console.log(`✅ Request ${requestId} declined by landlord ${req.user.id}`);
@@ -2436,21 +2763,25 @@ const declineRentalRequest = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Request declined successfully. The request remains active for other landlords.',
+      message:
+        'Request declined successfully. The request remains active for other landlords.',
       note: 'This rental request will continue searching for other matching properties until expiration.',
       requestStatus: {
         id: rentalRequest.id,
         poolStatus: rentalRequest.poolStatus,
         expiresAt: rentalRequest.expiresAt,
-        remainingTime: rentalRequest.expiresAt ? 
-          Math.ceil((new Date(rentalRequest.expiresAt) - new Date()) / (1000 * 60 * 60 * 24)) : null
-      }
+        remainingTime: rentalRequest.expiresAt
+          ? Math.ceil(
+              (new Date(rentalRequest.expiresAt) - new Date()) /
+                (1000 * 60 * 60 * 24)
+            )
+          : null,
+      },
     });
-
   } catch (error) {
     console.error('Decline rental request error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
@@ -2473,5 +2804,5 @@ export {
   getAllRentalRequests,
   declineRentalRequest,
   getOfferDetails,
-  getLandlordAcceptedRequests
-}; 
+  getLandlordAcceptedRequests,
+};

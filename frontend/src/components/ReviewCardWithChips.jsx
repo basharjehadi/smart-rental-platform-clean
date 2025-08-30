@@ -4,21 +4,24 @@ import { useTranslation } from 'react-i18next';
 import ReviewStatusChip from './ReviewStatusChip';
 import CountdownTimer from './CountdownTimer';
 
-const ReviewCardWithChips = ({ 
-  review, 
-  isLandlord, 
-  currentUserId, 
+const ReviewCardWithChips = ({
+  review,
+  isLandlord,
+  currentUserId,
   onWriteReview,
-  showWriteReviewButton = false 
+  showWriteReviewButton = false,
 }) => {
   const { t } = useTranslation();
-  
+
   // Determine if this review is from the current user
   const isMyReview = review.reviewerId === currentUserId;
-  
+
   // Determine if this is a double-blind review (submitted but not yet published)
-  const isDoubleBlind = review.status === 'SUBMITTED' && review.publishAfter && new Date(review.publishAfter) > new Date();
-  
+  const isDoubleBlind =
+    review.status === 'SUBMITTED' &&
+    review.publishAfter &&
+    new Date(review.publishAfter) > new Date();
+
   // Determine if content should be hidden from the counterpart
   // Content is hidden when:
   // 1. It's NOT my review (I'm the counterpart)
@@ -32,19 +35,19 @@ const ReviewCardWithChips = ({
       return {
         name: review.tenant?.name || 'Tenant',
         role: 'Tenant',
-        avatar: review.tenant?.profileImage || null
+        avatar: review.tenant?.profileImage || null,
       };
     } else {
       return {
         name: review.landlord?.name || 'Landlord',
         role: 'Landlord',
-        avatar: review.landlord?.profileImage || null
+        avatar: review.landlord?.profileImage || null,
       };
     }
   };
 
   // Get stage information
-  const getStageInfo = (stage) => {
+  const getStageInfo = stage => {
     switch (stage) {
       case 'MOVE_IN':
         return {
@@ -52,7 +55,7 @@ const ReviewCardWithChips = ({
           description: 'Review after moving in',
           color: 'blue',
           label: t('review.flow.moveInLabel'),
-          affectsScore: false
+          affectsScore: false,
         };
       case 'END_OF_LEASE':
         return {
@@ -60,7 +63,7 @@ const ReviewCardWithChips = ({
           description: 'Final review after lease ends',
           color: 'purple',
           label: t('review.flow.leaseEndLabel'),
-          affectsScore: true
+          affectsScore: true,
         };
       default:
         return {
@@ -68,7 +71,7 @@ const ReviewCardWithChips = ({
           description: 'General review',
           color: 'gray',
           label: t('review.flow.initialLabel'),
-          affectsScore: false
+          affectsScore: false,
         };
     }
   };
@@ -77,81 +80,93 @@ const ReviewCardWithChips = ({
   const stageInfo = getStageInfo(review.reviewStage);
 
   return (
-    <div className="border border-gray-200 bg-white rounded-lg p-4 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between">
-        <div className="flex items-start space-x-3 flex-1">
+    <div className='border border-gray-200 bg-white rounded-lg p-4 hover:shadow-md transition-shadow'>
+      <div className='flex items-start justify-between'>
+        <div className='flex items-start space-x-3 flex-1'>
           {/* Avatar */}
-          <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+          <div className='w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0'>
             {targetInfo.avatar ? (
-              <img 
-                src={targetInfo.avatar} 
+              <img
+                src={targetInfo.avatar}
                 alt={targetInfo.name}
-                className="w-10 h-10 rounded-full object-cover"
+                className='w-10 h-10 rounded-full object-cover'
               />
             ) : (
-              <span className="text-sm font-medium text-gray-600">
-                {targetInfo.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+              <span className='text-sm font-medium text-gray-600'>
+                {targetInfo.name
+                  .split(' ')
+                  .map(n => n[0])
+                  .join('')
+                  .toUpperCase()}
               </span>
             )}
           </div>
 
           {/* Review Content */}
-          <div className="flex-1 min-w-0">
+          <div className='flex-1 min-w-0'>
             {/* Header */}
-            <div className="flex items-center space-x-2 mb-2">
-              <span className="font-medium text-gray-900">{targetInfo.name}</span>
-              <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded">
+            <div className='flex items-center space-x-2 mb-2'>
+              <span className='font-medium text-gray-900'>
+                {targetInfo.name}
+              </span>
+              <span className='inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded'>
                 {targetInfo.role}
               </span>
             </div>
 
             {/* Property and Stage */}
-            <p className="text-sm text-gray-600 mb-2">
-              {review.property?.name || review.property?.address || 'Property'} • {stageInfo.description}
+            <p className='text-sm text-gray-600 mb-2'>
+              {review.property?.name || review.property?.address || 'Property'}{' '}
+              • {stageInfo.description}
             </p>
 
             {/* Status Chip with Double-Blind Indicator */}
-            <div className="mb-2">
-              <ReviewStatusChip 
-                status={review.status} 
+            <div className='mb-2'>
+              <ReviewStatusChip
+                status={review.status}
                 publishAfter={review.publishAfter}
                 isBlind={isDoubleBlind}
               />
-              
+
               {/* Double-Blind Countdown Chip */}
               {isDoubleBlind && (
-                <div className="mt-1">
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
-                    <Eye className="w-3 h-3 mr-1" />
-                    Publishes in <CountdownTimer targetDate={review.publishAfter} />
+                <div className='mt-1'>
+                  <span className='inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200'>
+                    <Eye className='w-3 h-3 mr-1' />
+                    Publishes in{' '}
+                    <CountdownTimer targetDate={review.publishAfter} />
                   </span>
                 </div>
               )}
             </div>
 
             {/* Stage Label */}
-            <div className="mb-3">
-              <span className={`inline-block text-xs px-2 py-1 rounded-full ${
-                stageInfo.affectsScore 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-blue-100 text-blue-800'
-              }`}>
+            <div className='mb-3'>
+              <span
+                className={`inline-block text-xs px-2 py-1 rounded-full ${
+                  stageInfo.affectsScore
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-blue-100 text-blue-800'
+                }`}
+              >
                 {stageInfo.label}
               </span>
             </div>
 
             {/* Rating - Hidden from counterpart if double-blind */}
             {!shouldHideContent && review.rating && (
-              <div className="flex items-center space-x-1 mb-2">
+              <div className='flex items-center space-x-1 mb-2'>
                 {Array.from({ length: 5 }, (_, i) => (
-                  <Star 
-                    key={i} 
+                  <Star
+                    key={i}
                     className={`w-4 h-4 ${
-                      i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
-                    }`} 
+                      i < review.rating
+                        ? 'text-yellow-400 fill-current'
+                        : 'text-gray-300'
+                    }`}
                   />
                 ))}
-                <span className="text-sm font-medium text-gray-900 ml-1">
+                <span className='text-sm font-medium text-gray-900 ml-1'>
                   {review.rating}
                 </span>
               </div>
@@ -159,36 +174,41 @@ const ReviewCardWithChips = ({
 
             {/* Comment - Hidden from counterpart if double-blind */}
             {!shouldHideContent && review.comment && (
-              <p className="text-sm text-gray-700 mb-2">
-                {review.comment}
-              </p>
+              <p className='text-sm text-gray-700 mb-2'>{review.comment}</p>
             )}
 
             {/* Hidden Content Message for Double-Blind Reviews */}
             {shouldHideContent && (
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-2">
-                <div className="flex items-center space-x-2">
-                  <Eye className="w-4 h-4 text-orange-600" />
-                  <span className="text-sm text-orange-800 font-medium">
+              <div className='bg-orange-50 border border-orange-200 rounded-lg p-3 mb-2'>
+                <div className='flex items-center space-x-2'>
+                  <Eye className='w-4 h-4 text-orange-600' />
+                  <span className='text-sm text-orange-800 font-medium'>
                     {t('review.flow.blindNotice')}
                   </span>
                 </div>
-                <p className="text-xs text-orange-700 mt-1">
-                  {t('review.flow.blindCountdown')} <CountdownTimer targetDate={review.publishAfter} />
+                <p className='text-xs text-orange-700 mt-1'>
+                  {t('review.flow.blindCountdown')}{' '}
+                  <CountdownTimer targetDate={review.publishAfter} />
                 </p>
               </div>
             )}
 
             {/* Timestamps */}
-            <div className="text-xs text-gray-500 space-y-1">
+            <div className='text-xs text-gray-500 space-y-1'>
               {review.createdAt && (
-                <p>Created: {new Date(review.createdAt).toLocaleDateString()}</p>
+                <p>
+                  Created: {new Date(review.createdAt).toLocaleDateString()}
+                </p>
               )}
               {review.submittedAt && (
-                <p>Submitted: {new Date(review.submittedAt).toLocaleDateString()}</p>
+                <p>
+                  Submitted: {new Date(review.submittedAt).toLocaleDateString()}
+                </p>
               )}
               {review.publishedAt && (
-                <p>Published: {new Date(review.publishedAt).toLocaleDateString()}</p>
+                <p>
+                  Published: {new Date(review.publishedAt).toLocaleDateString()}
+                </p>
               )}
             </div>
           </div>
@@ -196,12 +216,12 @@ const ReviewCardWithChips = ({
 
         {/* Action Button */}
         {showWriteReviewButton && review.status === 'PENDING' && (
-          <div className="flex-shrink-0 ml-4">
-            <button 
+          <div className='flex-shrink-0 ml-4'>
+            <button
               onClick={() => onWriteReview(review)}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+              className='px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2'
             >
-              <MessageSquare className="w-4 h-4" />
+              <MessageSquare className='w-4 h-4' />
               <span>{t('review.actions.writeReview')}</span>
             </button>
           </div>

@@ -46,8 +46,8 @@ export const BADGES = {
       type: 'PERCENTAGE',
       value: 100,
       metric: 'on_time_payments',
-      timeframe: '12M'
-    }
+      timeframe: '12M',
+    },
   },
   HOST_ACCURATE_95: {
     id: 'HOST_ACCURATE_95',
@@ -60,8 +60,8 @@ export const BADGES = {
       type: 'PERCENTAGE',
       value: 95,
       metric: 'move_in_accuracy',
-      timeframe: 'ALL_TIME'
-    }
+      timeframe: 'ALL_TIME',
+    },
   },
   HOST_RESPONSIVE_24H: {
     id: 'HOST_RESPONSIVE_24H',
@@ -74,9 +74,9 @@ export const BADGES = {
       type: 'THRESHOLD',
       value: 24,
       metric: 'avg_response_time_hours',
-      timeframe: 'ALL_TIME'
-    }
-  }
+      timeframe: 'ALL_TIME',
+    },
+  },
 };
 
 /**
@@ -91,7 +91,7 @@ export async function calculateUserBadges(userId) {
       badgesEarned: [],
       badgesLost: [],
       totalBadges: 0,
-      calculations: {}
+      calculations: {},
     };
 
     // Calculate each badge type
@@ -102,7 +102,7 @@ export async function calculateUserBadges(userId) {
     results.calculations = {
       tenantOnTime,
       hostAccurate,
-      hostResponsive
+      hostResponsive,
     };
 
     // Check for new badges earned
@@ -133,24 +133,24 @@ async function calculateTenantOnTimeBadge(userId) {
 
     const payments = await prisma.rentPayment.findMany({
       where: {
-        tenantId: userId,
+        userId: userId,
         dueDate: {
-          gte: twelveMonthsAgo
+          gte: twelveMonthsAgo,
         },
         status: {
-          in: ['PAID', 'LATE', 'OVERDUE']
-        }
+          in: ['PAID', 'LATE', 'OVERDUE'],
+        },
       },
       select: {
         id: true,
         dueDate: true,
         paidAt: true,
         status: true,
-        amount: true
+        amount: true,
       },
       orderBy: {
-        dueDate: 'asc'
-      }
+        dueDate: 'asc',
+      },
     });
 
     if (payments.length === 0) {
@@ -159,12 +159,12 @@ async function calculateTenantOnTimeBadge(userId) {
         percentage: 0,
         totalPayments: 0,
         onTimePayments: 0,
-        reason: 'No payments in last 12 months'
+        reason: 'No payments in last 12 months',
       };
     }
 
     // Calculate on-time percentage
-    const onTimePayments = payments.filter(payment => {
+    const onTimePayments = payments.filter((payment) => {
       if (payment.status === 'PAID') {
         // Check if paid on or before due date
         return payment.paidAt && payment.paidAt <= payment.dueDate;
@@ -180,7 +180,9 @@ async function calculateTenantOnTimeBadge(userId) {
       percentage: Math.round(percentage * 100) / 100,
       totalPayments: payments.length,
       onTimePayments,
-      reason: eligible ? 'Eligible for badge' : `Only ${percentage.toFixed(1)}% on-time payments`
+      reason: eligible
+        ? 'Eligible for badge'
+        : `Only ${percentage.toFixed(1)}% on-time payments`,
     };
   } catch (error) {
     console.error('Error calculating tenant on-time badge:', error);
@@ -189,7 +191,7 @@ async function calculateTenantOnTimeBadge(userId) {
       percentage: 0,
       totalPayments: 0,
       onTimePayments: 0,
-      reason: 'Error calculating badge eligibility'
+      reason: 'Error calculating badge eligibility',
     };
   }
 }
@@ -205,10 +207,10 @@ async function calculateHostAccurateBadge(userId) {
     const moveInReviews = await prisma.review.findMany({
       where: {
         lease: {
-          landlordId: userId
+          landlordId: userId,
         },
         reviewStage: 'MOVE_IN',
-        status: 'PUBLISHED'
+        status: 'PUBLISHED',
       },
       select: {
         id: true,
@@ -219,12 +221,12 @@ async function calculateHostAccurateBadge(userId) {
           select: {
             property: {
               select: {
-                description: true
-              }
-            }
-          }
-        }
-      }
+                description: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (moveInReviews.length === 0) {
@@ -233,13 +235,15 @@ async function calculateHostAccurateBadge(userId) {
         percentage: 0,
         totalReviews: 0,
         accurateReviews: 0,
-        reason: 'No move-in reviews found'
+        reason: 'No move-in reviews found',
       };
     }
 
     // Count reviews that indicate "as described" (high ratings)
     // Consider 4-5 star reviews as "as described"
-    const accurateReviews = moveInReviews.filter(review => review.rating >= 4).length;
+    const accurateReviews = moveInReviews.filter(
+      (review) => review.rating >= 4
+    ).length;
     const percentage = (accurateReviews / moveInReviews.length) * 100;
     const eligible = percentage >= 95;
 
@@ -248,7 +252,9 @@ async function calculateHostAccurateBadge(userId) {
       percentage: Math.round(percentage * 100) / 100,
       totalReviews: moveInReviews.length,
       accurateReviews,
-      reason: eligible ? 'Eligible for badge' : `Only ${percentage.toFixed(1)}% accuracy`
+      reason: eligible
+        ? 'Eligible for badge'
+        : `Only ${percentage.toFixed(1)}% accuracy`,
     };
   } catch (error) {
     console.error('Error calculating host accurate badge:', error);
@@ -257,7 +263,7 @@ async function calculateHostAccurateBadge(userId) {
       percentage: 0,
       totalReviews: 0,
       accurateReviews: 0,
-      reason: 'Error calculating badge eligibility'
+      reason: 'Error calculating badge eligibility',
     };
   }
 }
@@ -275,17 +281,17 @@ async function calculateHostResponsiveBadge(userId) {
         recipientId: userId,
         // Only count messages from tenants (not other landlords)
         sender: {
-          role: 'TENANT'
-        }
+          role: 'TENANT',
+        },
       },
       select: {
         id: true,
         createdAt: true,
-        conversationId: true
+        conversationId: true,
       },
       orderBy: {
-        createdAt: 'asc'
-      }
+        createdAt: 'asc',
+      },
     });
 
     if (messages.length === 0) {
@@ -294,13 +300,13 @@ async function calculateHostResponsiveBadge(userId) {
         avgResponseTime: 0,
         totalMessages: 0,
         respondedMessages: 0,
-        reason: 'No messages from tenants found'
+        reason: 'No messages from tenants found',
       };
     }
 
     // Group messages by conversation to find first responses
     const conversationMap = new Map();
-    messages.forEach(message => {
+    messages.forEach((message) => {
       if (!conversationMap.has(message.conversationId)) {
         conversationMap.set(message.conversationId, []);
       }
@@ -316,13 +322,16 @@ async function calculateHostResponsiveBadge(userId) {
 
       // Find the first response from the landlord
       const firstTenantMessage = conversationMessages[0];
-      const firstLandlordResponse = conversationMessages.find(msg => 
-        msg.id !== firstTenantMessage.id && 
-        msg.createdAt > firstTenantMessage.createdAt
+      const firstLandlordResponse = conversationMessages.find(
+        (msg) =>
+          msg.id !== firstTenantMessage.id &&
+          msg.createdAt > firstTenantMessage.createdAt
       );
 
       if (firstLandlordResponse) {
-        const responseTimeMs = firstLandlordResponse.createdAt.getTime() - firstTenantMessage.createdAt.getTime();
+        const responseTimeMs =
+          firstLandlordResponse.createdAt.getTime() -
+          firstTenantMessage.createdAt.getTime();
         const responseTimeHours = responseTimeMs / (1000 * 60 * 60);
         totalResponseTime += responseTimeHours;
         respondedConversations++;
@@ -335,7 +344,7 @@ async function calculateHostResponsiveBadge(userId) {
         avgResponseTime: 0,
         totalMessages: 0,
         respondedMessages: 0,
-        reason: 'No responses to tenant messages found'
+        reason: 'No responses to tenant messages found',
       };
     }
 
@@ -347,7 +356,9 @@ async function calculateHostResponsiveBadge(userId) {
       avgResponseTime: Math.round(avgResponseTime * 100) / 100,
       totalMessages: messages.length,
       respondedMessages: respondedConversations,
-      reason: eligible ? 'Eligible for badge' : `Average response time: ${avgResponseTime.toFixed(1)} hours`
+      reason: eligible
+        ? 'Eligible for badge'
+        : `Average response time: ${avgResponseTime.toFixed(1)} hours`,
     };
   } catch (error) {
     console.error('Error calculating host responsive badge:', error);
@@ -356,7 +367,7 @@ async function calculateHostResponsiveBadge(userId) {
       avgResponseTime: 0,
       totalMessages: 0,
       respondedMessages: 0,
-      reason: 'Error calculating badge eligibility'
+      reason: 'Error calculating badge eligibility',
     };
   }
 }
@@ -373,23 +384,34 @@ async function checkAndAwardBadges(userId, calculations) {
   try {
     // Check each badge type
     if (calculations.tenantOnTime.eligible) {
-      const badge = await awardBadge(userId, 'TENANT_ON_TIME_12M', calculations.tenantOnTime);
+      const badge = await awardBadge(
+        userId,
+        'TENANT_ON_TIME_12M',
+        calculations.tenantOnTime
+      );
       if (badge) newBadges.push(badge);
     }
 
     if (calculations.hostAccurate.eligible) {
-      const badge = await awardBadge(userId, 'HOST_ACCURATE_95', calculations.hostAccurate);
+      const badge = await awardBadge(
+        userId,
+        'HOST_ACCURATE_95',
+        calculations.hostAccurate
+      );
       if (badge) newBadges.push(badge);
     }
 
     if (calculations.hostResponsive.eligible) {
-      const badge = await awardBadge(userId, 'HOST_RESPONSIVE_24H', calculations.hostResponsive);
+      const badge = await awardBadge(
+        userId,
+        'HOST_RESPONSIVE_24H',
+        calculations.hostResponsive
+      );
       if (badge) newBadges.push(badge);
     }
 
     // Update user profile with badge count
     await updateUserBadgeCount(userId);
-
   } catch (error) {
     console.error('Error awarding badges:', error);
   }
@@ -411,8 +433,8 @@ async function awardBadge(userId, badgeId, metadata) {
       where: {
         userId,
         badgeId,
-        isActive: true
-      }
+        isActive: true,
+      },
     });
 
     if (existingBadge) {
@@ -426,8 +448,8 @@ async function awardBadge(userId, badgeId, metadata) {
         badgeId,
         earnedAt: new Date(),
         metadata: JSON.stringify(metadata),
-        isActive: true
-      }
+        isActive: true,
+      },
     });
 
     console.log(`Badge awarded: ${badgeId} to user ${userId}`);
@@ -435,9 +457,8 @@ async function awardBadge(userId, badgeId, metadata) {
       id: newBadge.id,
       badgeId,
       earnedAt: newBadge.earnedAt,
-      metadata
+      metadata,
     };
-
   } catch (error) {
     console.error(`Error awarding badge ${badgeId}:`, error);
     return null;
@@ -454,8 +475,8 @@ async function getUserActiveBadgeCount(userId) {
     const count = await prisma.userBadge.count({
       where: {
         userId,
-        isActive: true
-      }
+        isActive: true,
+      },
     });
     return count;
   } catch (error) {
@@ -471,14 +492,13 @@ async function getUserActiveBadgeCount(userId) {
 async function updateUserBadgeCount(userId) {
   try {
     const badgeCount = await getUserActiveBadgeCount(userId);
-    
+
     await prisma.user.update({
       where: { id: userId },
       data: {
-        badgeCount: badgeCount
-      }
+        badgeCount: badgeCount,
+      },
     });
-
   } catch (error) {
     console.error('Error updating user badge count:', error);
   }
@@ -494,17 +514,17 @@ export async function getUserBadges(userId) {
     const userBadges = await prisma.userBadge.findMany({
       where: {
         userId,
-        isActive: true
+        isActive: true,
       },
       include: {
-        badge: true
+        badge: true,
       },
       orderBy: {
-        earnedAt: 'desc'
-      }
+        earnedAt: 'desc',
+      },
     });
 
-    return userBadges.map(userBadge => ({
+    return userBadges.map((userBadge) => ({
       id: userBadge.id,
       badgeId: userBadge.badgeId,
       name: BADGES[userBadge.badgeId]?.name || userBadge.badgeId,
@@ -512,9 +532,8 @@ export async function getUserBadges(userId) {
       icon: BADGES[userBadge.badgeId]?.icon || '🏆',
       color: BADGES[userBadge.badgeId]?.color || 'default',
       earnedAt: userBadge.earnedAt,
-      metadata: userBadge.metadata ? JSON.parse(userBadge.metadata) : {}
+      metadata: userBadge.metadata ? JSON.parse(userBadge.metadata) : {},
     }));
-
   } catch (error) {
     console.error('Error getting user badges:', error);
     return [];
@@ -530,7 +549,7 @@ export async function getUserBadgeStats(userId) {
   try {
     const totalBadges = await getUserActiveBadgeCount(userId);
     const badges = await getUserBadges(userId);
-    
+
     // Group badges by category
     const badgesByCategory = badges.reduce((acc, badge) => {
       const category = BADGES[badge.badgeId]?.category || 'OTHER';
@@ -543,16 +562,15 @@ export async function getUserBadgeStats(userId) {
       totalBadges,
       badgesByCategory,
       recentBadges: badges.slice(0, 5), // Last 5 badges earned
-      categories: Object.keys(badgesByCategory)
+      categories: Object.keys(badgesByCategory),
     };
-
   } catch (error) {
     console.error('Error getting user badge stats:', error);
     return {
       totalBadges: 0,
       badgesByCategory: {},
       recentBadges: [],
-      categories: []
+      categories: [],
     };
   }
 }
@@ -574,7 +592,7 @@ export async function calculateBadgesForUsers(userIds) {
         error: error.message,
         badgesEarned: [],
         badgesLost: [],
-        totalBadges: 0
+        totalBadges: 0,
       };
     }
   }
@@ -595,5 +613,5 @@ export default {
   getUserBadges,
   getUserBadgeStats,
   calculateBadgesForUsers,
-  getAllBadges
+  getAllBadges,
 };

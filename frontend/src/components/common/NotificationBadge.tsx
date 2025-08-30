@@ -5,7 +5,10 @@ interface NotificationBadgeProps {
   className?: string;
 }
 
-const NotificationBadge: React.FC<NotificationBadgeProps> = ({ count, className = '' }) => {
+const NotificationBadge: React.FC<NotificationBadgeProps> = ({
+  count,
+  className = '',
+}) => {
   if (count === 0) return null;
 
   return (

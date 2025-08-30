@@ -9,11 +9,11 @@ export const uploadPropertyImages = async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
-        error: 'No images uploaded'
+        error: 'No images uploaded',
       });
     }
 
-    const imageUrls = req.files.map(file => {
+    const imageUrls = req.files.map((file) => {
       // Return the relative path for storage in database
       return `/uploads/property_images/${file.filename}`;
     });
@@ -21,13 +21,12 @@ export const uploadPropertyImages = async (req, res) => {
     res.json({
       message: 'Images uploaded successfully',
       imageUrls,
-      count: imageUrls.length
+      count: imageUrls.length,
     });
-
   } catch (error) {
     console.error('Upload property images error:', error);
     res.status(500).json({
-      error: 'Failed to upload images'
+      error: 'Failed to upload images',
     });
   }
 };
@@ -37,7 +36,7 @@ export const uploadPropertyVideo = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
-        error: 'No video uploaded'
+        error: 'No video uploaded',
       });
     }
 
@@ -45,13 +44,12 @@ export const uploadPropertyVideo = async (req, res) => {
 
     res.json({
       message: 'Video uploaded successfully',
-      videoUrl
+      videoUrl,
     });
-
   } catch (error) {
     console.error('Upload property video error:', error);
     res.status(500).json({
-      error: 'Failed to upload video'
+      error: 'Failed to upload video',
     });
   }
 };
@@ -63,7 +61,7 @@ export const deletePropertyFile = async (req, res) => {
 
     if (!fileUrl) {
       return res.status(400).json({
-        error: 'File URL is required'
+        error: 'File URL is required',
       });
     }
 
@@ -77,13 +75,12 @@ export const deletePropertyFile = async (req, res) => {
     }
 
     res.json({
-      message: 'File deleted successfully'
+      message: 'File deleted successfully',
     });
-
   } catch (error) {
     console.error('Delete property file error:', error);
     res.status(500).json({
-      error: 'Failed to delete file'
+      error: 'Failed to delete file',
     });
   }
 };
@@ -95,7 +92,7 @@ export const getFileInfo = async (req, res) => {
 
     if (!fileUrl) {
       return res.status(400).json({
-        error: 'File URL is required'
+        error: 'File URL is required',
       });
     }
 
@@ -106,7 +103,7 @@ export const getFileInfo = async (req, res) => {
     // Check if file exists
     if (!fs.existsSync(fullPath)) {
       return res.status(404).json({
-        error: 'File not found'
+        error: 'File not found',
       });
     }
 
@@ -118,13 +115,12 @@ export const getFileInfo = async (req, res) => {
       size: stats.size,
       extension: ext,
       isImage: ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext),
-      isVideo: ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm'].includes(ext)
+      isVideo: ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm'].includes(ext),
     });
-
   } catch (error) {
     console.error('Get file info error:', error);
     res.status(500).json({
-      error: 'Failed to get file info'
+      error: 'Failed to get file info',
     });
   }
-}; 
+};

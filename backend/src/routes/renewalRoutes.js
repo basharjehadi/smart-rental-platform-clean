@@ -5,7 +5,7 @@ import {
   counterRenewalRequest,
   acceptRenewalRequest,
   declineRenewalRequest,
-  listRenewalsForLease
+  listRenewalsForLease,
 } from '../controllers/renewalController.js';
 
 const router = Router();
@@ -24,5 +24,3 @@ router.post('/renewals/:id/decline', verifyToken, declineRenewalRequest);
 router.get('/leases/:id/renewals', verifyToken, listRenewalsForLease);
 
 export default router;
-
-

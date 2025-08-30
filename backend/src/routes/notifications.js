@@ -15,23 +15,23 @@ router.get('/unread-counts', verifyToken, async (req, res) => {
         where: {
           userId,
           type: 'NEW_RENTAL_REQUEST',
-          isRead: false
-        }
+          isRead: false,
+        },
       }),
       prisma.notification.count({
         where: {
           userId,
           type: 'NEW_OFFER',
-          isRead: false
-        }
+          isRead: false,
+        },
       }),
       // Total unread (all types) to power the bell badge for system notifications too
       prisma.notification.count({
         where: {
           userId,
-          isRead: false
-        }
-      })
+          isRead: false,
+        },
+      }),
     ]);
 
     // Total is ALL unread notifications (business + system)
@@ -41,13 +41,13 @@ router.get('/unread-counts', verifyToken, async (req, res) => {
       success: true,
       rentalRequests,
       offers,
-      total
+      total,
     });
   } catch (error) {
     console.error('Error fetching unread counts:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch unread counts'
+      error: 'Failed to fetch unread counts',
     });
   }
 });
@@ -61,23 +61,23 @@ router.get('/', verifyToken, async (req, res) => {
 
     const notifications = await prisma.notification.findMany({
       where: {
-        userId
+        userId,
       },
       orderBy: {
-        createdAt: 'desc'
+        createdAt: 'desc',
       },
-      take: limit
+      take: limit,
     });
 
     res.json({
       success: true,
-      notifications
+      notifications,
     });
   } catch (error) {
     console.error('Error fetching notifications:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch notifications'
+      error: 'Failed to fetch notifications',
     });
   }
 });
@@ -92,22 +92,22 @@ router.put('/:id/read', verifyToken, async (req, res) => {
     const notification = await prisma.notification.update({
       where: {
         id,
-        userId // Ensure user can only mark their own notifications as read
+        userId, // Ensure user can only mark their own notifications as read
       },
       data: {
-        isRead: true
-      }
+        isRead: true,
+      },
     });
 
     res.json({
       success: true,
-      notification
+      notification,
     });
   } catch (error) {
     console.error('Error marking notification as read:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to mark notification as read'
+      error: 'Failed to mark notification as read',
     });
   }
 });
@@ -121,22 +121,22 @@ router.put('/read-all', verifyToken, async (req, res) => {
     await prisma.notification.updateMany({
       where: {
         userId,
-        isRead: false
+        isRead: false,
       },
       data: {
-        isRead: true
-      }
+        isRead: true,
+      },
     });
 
     res.json({
       success: true,
-      message: 'All notifications marked as read'
+      message: 'All notifications marked as read',
     });
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to mark all notifications as read'
+      error: 'Failed to mark all notifications as read',
     });
   }
 });
@@ -150,15 +150,23 @@ router.put('/read-by-type/:type', verifyToken, async (req, res) => {
 
     // Validate notification type
     const validTypes = [
-      'NEW_RENTAL_REQUEST', 'NEW_OFFER', 'PAYMENT_CONFIRMED', 'PAYMENT_FAILED',
-      'CONTRACT_UPDATED', 'CONTRACT_SIGNED', 'KYC_APPROVED', 'KYC_REJECTED',
-      'PROPERTY_STATUS_CHANGED', 'SYSTEM_ANNOUNCEMENT', 'ACCOUNT_UPDATED'
+      'NEW_RENTAL_REQUEST',
+      'NEW_OFFER',
+      'PAYMENT_CONFIRMED',
+      'PAYMENT_FAILED',
+      'CONTRACT_UPDATED',
+      'CONTRACT_SIGNED',
+      'KYC_APPROVED',
+      'KYC_REJECTED',
+      'PROPERTY_STATUS_CHANGED',
+      'SYSTEM_ANNOUNCEMENT',
+      'ACCOUNT_UPDATED',
     ];
-    
+
     if (!validTypes.includes(type)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid notification type'
+        error: 'Invalid notification type',
       });
     }
 
@@ -166,22 +174,22 @@ router.put('/read-by-type/:type', verifyToken, async (req, res) => {
       where: {
         userId,
         type,
-        isRead: false
+        isRead: false,
       },
       data: {
-        isRead: true
-      }
+        isRead: true,
+      },
     });
 
     res.json({
       success: true,
-      message: `All ${type} notifications marked as read`
+      message: `All ${type} notifications marked as read`,
     });
   } catch (error) {
     console.error('Error marking notifications by type as read:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to mark notifications as read'
+      error: 'Failed to mark notifications as read',
     });
   }
 });

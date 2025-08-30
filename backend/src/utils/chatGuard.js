@@ -9,7 +9,7 @@ import { prisma } from './prisma.js';
 export const checkPropertyPayment = async (propertyId, userId) => {
   try {
     // debug: checking property payment
-    
+
     // Method 1: Check payments through offer -> property (direct offer payments)
     const paymentThroughOffer = await prisma.payment.findFirst({
       where: {
@@ -17,9 +17,9 @@ export const checkPropertyPayment = async (propertyId, userId) => {
         status: 'SUCCEEDED',
         purpose: { in: ['DEPOSIT', 'RENT', 'DEPOSIT_AND_FIRST_MONTH'] },
         offer: {
-          propertyId: propertyId
-        }
-      }
+          propertyId: propertyId,
+        },
+      },
     });
 
     if (paymentThroughOffer) {
@@ -37,11 +37,11 @@ export const checkPropertyPayment = async (propertyId, userId) => {
           offers: {
             some: {
               propertyId: propertyId,
-              status: 'PAID'
-            }
-          }
-        }
-      }
+              status: 'PAID',
+            },
+          },
+        },
+      },
     });
 
     if (paymentThroughRequest) {
@@ -55,11 +55,11 @@ export const checkPropertyPayment = async (propertyId, userId) => {
         propertyId: propertyId,
         rentalRequest: {
           tenantGroup: {
-            members: { some: { userId: userId } }
-          }
+            members: { some: { userId: userId } },
+          },
         },
-        status: 'PAID'
-      }
+        status: 'PAID',
+      },
     });
 
     if (paidOffer) {
@@ -72,24 +72,24 @@ export const checkPropertyPayment = async (propertyId, userId) => {
       where: {
         userId: userId,
         status: 'SUCCEEDED',
-        purpose: { in: ['DEPOSIT', 'RENT', 'DEPOSIT_AND_FIRST_MONTH'] }
+        purpose: { in: ['DEPOSIT', 'RENT', 'DEPOSIT_AND_FIRST_MONTH'] },
       },
       include: {
         rentalRequest: {
           include: {
             offers: {
               where: {
-                propertyId: propertyId
-              }
-            }
-          }
+                propertyId: propertyId,
+              },
+            },
+          },
         },
         offer: {
           where: {
-            propertyId: propertyId
-          }
-        }
-      }
+            propertyId: propertyId,
+          },
+        },
+      },
     });
 
     if (anyPayment) {
@@ -120,23 +120,23 @@ export const canChat = async (conversationId, userId) => {
         offer: {
           select: {
             id: true,
-            status: true
-          }
+            status: true,
+          },
         },
         property: {
           select: {
             id: true,
-            organizationId: true
-          }
-        }
-      }
+            organizationId: true,
+          },
+        },
+      },
     });
 
     if (!conversation) {
       return {
         ok: false,
         error: 'Conversation not found',
-        errorCode: 'NOT_FOUND'
+        errorCode: 'NOT_FOUND',
       };
     }
 
@@ -144,15 +144,15 @@ export const canChat = async (conversationId, userId) => {
     const participant = await prisma.conversationParticipant.findFirst({
       where: {
         conversationId,
-        userId
-      }
+        userId,
+      },
     });
 
     if (!participant) {
       return {
         ok: false,
         error: 'Not a participant in this conversation',
-        errorCode: 'NOT_MEMBER'
+        errorCode: 'NOT_MEMBER',
       };
     }
 
@@ -161,7 +161,7 @@ export const canChat = async (conversationId, userId) => {
       return {
         ok: false,
         error: 'Conversation is not active',
-        errorCode: 'CONVERSATION_NOT_ACTIVE'
+        errorCode: 'CONVERSATION_NOT_ACTIVE',
       };
     }
 
@@ -172,10 +172,10 @@ export const canChat = async (conversationId, userId) => {
         where: {
           organizationId: conversation.property.organizationId,
           userId: userId,
-          role: 'OWNER'
-        }
+          role: 'OWNER',
+        },
       });
-      
+
       if (isLandlord) {
         return { ok: true };
       }
@@ -190,7 +190,7 @@ export const canChat = async (conversationId, userId) => {
         return {
           ok: false,
           error: 'Payment required to access chat',
-          errorCode: 'PAYMENT_REQUIRED'
+          errorCode: 'PAYMENT_REQUIRED',
         };
       }
 
@@ -199,24 +199,27 @@ export const canChat = async (conversationId, userId) => {
         return {
           ok: false,
           error: 'Payment required to access chat',
-          errorCode: 'PAYMENT_REQUIRED'
+          errorCode: 'PAYMENT_REQUIRED',
         };
       }
-      
+
       // debug: offer paid
     } else if (conversation.propertyId) {
       // Property-based check - verify user has paid for this property
       // debug: property-based check
-      const hasPaid = await checkPropertyPayment(conversation.propertyId, userId);
+      const hasPaid = await checkPropertyPayment(
+        conversation.propertyId,
+        userId
+      );
       if (!hasPaid) {
         // debug: user not paid for property
         return {
           ok: false,
           error: 'Payment required to access chat',
-          errorCode: 'PAYMENT_REQUIRED'
+          errorCode: 'PAYMENT_REQUIRED',
         };
       }
-      
+
       // debug: user paid for property
     } else {
       // No property or offer linked
@@ -224,7 +227,7 @@ export const canChat = async (conversationId, userId) => {
       return {
         ok: false,
         error: 'Invalid conversation',
-        errorCode: 'INVALID_CONVERSATION'
+        errorCode: 'INVALID_CONVERSATION',
       };
     }
 
@@ -235,7 +238,7 @@ export const canChat = async (conversationId, userId) => {
     return {
       ok: false,
       error: 'Internal server error',
-      errorCode: 'INTERNAL_ERROR'
+      errorCode: 'INTERNAL_ERROR',
     };
   }
 };
@@ -249,20 +252,23 @@ export const activateConversationAfterPayment = async (offerId) => {
   try {
     // Find all conversations linked to this offer
     const conversations = await prisma.conversation.findMany({
-      where: { offerId }
+      where: { offerId },
     });
 
     // Update all conversations to ACTIVE status
     for (const conversation of conversations) {
       await prisma.conversation.update({
         where: { id: conversation.id },
-        data: { status: 'ACTIVE' }
+        data: { status: 'ACTIVE' },
       });
     }
 
     // debug: conversations activated for offer
   } catch (error) {
-    console.error('Error activating conversations after payment:', error.message);
+    console.error(
+      'Error activating conversations after payment:',
+      error.message
+    );
     throw error;
   }
 };

@@ -1,5 +1,6 @@
 // LibreTranslate API configuration
-const getLibreTranslateUrl = () => process.env.LIBRETRANSLATE_URL || 'http://127.0.0.1:5002';
+const getLibreTranslateUrl = () =>
+  process.env.LIBRETRANSLATE_URL || 'http://127.0.0.1:5002';
 
 // Fallback translations for common rental terms
 const fallbackTranslations = {
@@ -13,11 +14,11 @@ const fallbackTranslations = {
   'internet not included': 'internet nie wliczony',
   'parking included': 'parking wliczony',
   'parking not included': 'parking nie wliczony',
-  'furnished': 'umeblowane',
-  'unfurnished': 'nieumeblowane',
+  furnished: 'umeblowane',
+  unfurnished: 'nieumeblowane',
   'partially furnished': 'częściowo umeblowane',
   'washing machine': 'pralka',
-  'dishwasher': 'zmywarka',
+  dishwasher: 'zmywarka',
   'air conditioning': 'klimatyzacja',
   'heating included': 'ogrzewanie wliczone',
   'electricity included': 'prąd wliczony',
@@ -36,8 +37,8 @@ const fallbackTranslations = {
   'damage deposit': 'kaucja za szkody',
   'cleaning fee': 'opłata za sprzątanie',
   'late payment fee': 'opłata za zwłokę',
-  'maintenance': 'konserwacja',
-  'repairs': 'naprawy',
+  maintenance: 'konserwacja',
+  repairs: 'naprawy',
   'emergency contact': 'kontakt awaryjny',
   'landlord access': 'dostęp wynajmującego',
   'tenant responsibilities': 'obowiązki najemcy',
@@ -46,8 +47,8 @@ const fallbackTranslations = {
   'additional charges': 'dodatkowe opłaty',
   'rent increase': 'podwyżka czynszu',
   'lease renewal': 'odnowienie umowy',
-  'subletting': 'podnajem',
-  'guests': 'goście',
+  subletting: 'podnajem',
+  guests: 'goście',
   'overnight guests': 'goście nocujący',
   'key deposit': 'kaucja za klucze',
   'move in inspection': 'inspekcja przy wprowadzeniu',
@@ -55,7 +56,7 @@ const fallbackTranslations = {
   'normal wear and tear': 'normalne zużycie',
   'property condition': 'stan nieruchomości',
   'tenant insurance': 'ubezpieczenie najemcy',
-  'landlord insurance': 'ubezpieczenie wynajmującego'
+  'landlord insurance': 'ubezpieczenie wynajmującego',
 };
 
 // Reverse translations for Polish to English
@@ -76,10 +77,12 @@ const detectLanguage = (text) => {
 
   // Polish characters and common words
   const polishChars = /[ąćęłńóśźż]/gi;
-  const polishWords = /\b(dozwolone|zakaz|wliczone|umeblowane|kaucja|czynsz|media|internet|parking|ogrzewanie|prąd|woda|gaz|godziny|ciszy|imprez|muzyki|miesięczny|okres|najmu|wprowadzenia|wyprowadzenia|wypowiedzenia|rozwiązanie|szkody|sprzątanie|zwłokę|konserwacja|naprawy|kontakt|dostęp|wynajmującego|obowiązki|najemcy|zasady|nieruchomości|domu|dodatkowe|opłaty|podwyżka|odnowienie|umowy|podnajem|goście|nocujący|klucze|inspekcja|zużycie|stan|ubezpieczenie)\b/gi;
-  
+  const polishWords =
+    /\b(dozwolone|zakaz|wliczone|umeblowane|kaucja|czynsz|media|internet|parking|ogrzewanie|prąd|woda|gaz|godziny|ciszy|imprez|muzyki|miesięczny|okres|najmu|wprowadzenia|wyprowadzenia|wypowiedzenia|rozwiązanie|szkody|sprzątanie|zwłokę|konserwacja|naprawy|kontakt|dostęp|wynajmującego|obowiązki|najemcy|zasady|nieruchomości|domu|dodatkowe|opłaty|podwyżka|odnowienie|umowy|podnajem|goście|nocujący|klucze|inspekcja|zużycie|stan|ubezpieczenie)\b/gi;
+
   // English characters and common words
-  const englishWords = /\b(allowed|pets|no|smoking|utilities|included|internet|parking|furnished|heating|electricity|water|gas|quiet|hours|parties|music|monthly|rent|security|deposit|lease|term|move|date|notice|period|early|termination|damage|cleaning|fee|late|payment|maintenance|repairs|emergency|contact|landlord|access|tenant|responsibilities|property|rules|house|additional|charges|increase|renewal|subletting|guests|overnight|keys|inspection|wear|tear|condition|insurance)\b/gi;
+  const englishWords =
+    /\b(allowed|pets|no|smoking|utilities|included|internet|parking|furnished|heating|electricity|water|gas|quiet|hours|parties|music|monthly|rent|security|deposit|lease|term|move|date|notice|period|early|termination|damage|cleaning|fee|late|payment|maintenance|repairs|emergency|contact|landlord|access|tenant|responsibilities|property|rules|house|additional|charges|increase|renewal|subletting|guests|overnight|keys|inspection|wear|tear|condition|insurance)\b/gi;
 
   const polishCharCount = (text.match(polishChars) || []).length;
   const polishWordCount = (text.match(polishWords) || []).length;
@@ -105,7 +108,7 @@ const fallbackTranslate = (text, targetLang = 'pl') => {
   }
 
   let translatedText = text.toLowerCase();
-  
+
   if (targetLang === 'pl') {
     // English to Polish
     Object.entries(fallbackTranslations).forEach(([english, polish]) => {
@@ -121,9 +124,12 @@ const fallbackTranslate = (text, targetLang = 'pl') => {
   }
 
   // Capitalize first letter of each sentence
-  translatedText = translatedText.replace(/(^|\.\s+)([a-z])/g, (match, p1, p2) => {
-    return p1 + p2.toUpperCase();
-  });
+  translatedText = translatedText.replace(
+    /(^|\.\s+)([a-z])/g,
+    (match, p1, p2) => {
+      return p1 + p2.toUpperCase();
+    }
+  );
 
   return translatedText;
 };
@@ -137,19 +143,22 @@ const fallbackTranslate = (text, targetLang = 'pl') => {
  */
 const translateWithLibreTranslate = async (text, sourceLang, targetLang) => {
   const LIBRETRANSLATE_URL = getLibreTranslateUrl();
-  console.log(`🔄 Translating with LibreTranslate (${sourceLang} → ${targetLang}):`, text.substring(0, 50) + '...');
+  console.log(
+    `🔄 Translating with LibreTranslate (${sourceLang} → ${targetLang}):`,
+    text.substring(0, 50) + '...'
+  );
   console.log('URL:', `${LIBRETRANSLATE_URL}/translate`);
-  
+
   const response = await fetch(`${LIBRETRANSLATE_URL}/translate`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       q: text,
       source: sourceLang,
-      target: targetLang
-    })
+      target: targetLang,
+    }),
   });
 
   console.log('Response status:', response.status);
@@ -185,7 +194,9 @@ export const translateWithAutoDetection = async (text) => {
     try {
       englishText = await translateWithLibreTranslate(text, 'pl', 'en');
     } catch (error) {
-      console.log('⚠️ LibreTranslate not available, using fallback translation');
+      console.log(
+        '⚠️ LibreTranslate not available, using fallback translation'
+      );
       englishText = fallbackTranslate(text, 'en');
     }
   } else {
@@ -194,7 +205,9 @@ export const translateWithAutoDetection = async (text) => {
     try {
       polishText = await translateWithLibreTranslate(text, 'en', 'pl');
     } catch (error) {
-      console.log('⚠️ LibreTranslate not available, using fallback translation');
+      console.log(
+        '⚠️ LibreTranslate not available, using fallback translation'
+      );
       polishText = fallbackTranslate(text, 'pl');
     }
   }
@@ -202,7 +215,7 @@ export const translateWithAutoDetection = async (text) => {
   return {
     english: englishText,
     polish: polishText,
-    detectedLang
+    detectedLang,
   };
 };
 

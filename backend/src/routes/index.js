@@ -98,4 +98,4 @@ router.use('/leases', leaseRoutes);
 // Renewal routes
 router.use('/', renewalRoutes);
 
-export default router; 
+export default router;

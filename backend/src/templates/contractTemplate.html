@@ -1,869 +1,985 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Rental Agreement - {{contractNumber}}</title>
     <style>
-        @page {
-            size: A4;
-            margin: 20mm;
-        }
-        
-        body {
-            font-family: 'Times New Roman', serif;
-            font-size: 11pt;
-            line-height: 1.4;
-            color: #333;
-            margin: 0;
-            padding: 0;
-            background: white;
-            /* Optimize for PDF generation */
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }
-        
-        .page {
-            width: 210mm;
-            min-height: 297mm;
-            padding: 20mm;
-            margin: 0 auto;
-            background: white;
-            box-sizing: border-box;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 30pt;
-            border-bottom: 2pt solid #333;
-            padding-bottom: 15pt;
-        }
-        
-        .main-title {
-            font-size: 18pt;
-            font-weight: bold;
-            margin-bottom: 5pt;
-            text-transform: uppercase;
-        }
-        
-        .sub-title {
-            font-size: 14pt;
-            font-weight: bold;
-            margin-bottom: 5pt;
-        }
-        
-        .contract-number {
-            font-size: 12pt;
-            font-weight: bold;
-            margin-bottom: 5pt;
-        }
-        
-        .contract-date {
-            font-size: 11pt;
-            margin-bottom: 10pt;
-        }
-        
-        .section {
-            margin-bottom: 15pt;
-            page-break-inside: avoid;
-        }
-        
-        .section-title {
-            font-size: 12pt;
-            font-weight: bold;
-            margin-bottom: 10pt;
-            text-transform: uppercase;
-            border-bottom: 1pt solid #333;
-            padding-bottom: 3pt;
-        }
-        
-        .bilingual-content {
-            display: table;
-            width: 100%;
-            margin-bottom: 12pt;
-        }
-        
-        .english-content {
-            display: table-cell;
-            width: 50%;
-            text-align: left;
-            padding-right: 8pt;
-            vertical-align: top;
-        }
-        
-        .polish-content {
-            display: table-cell;
-            width: 50%;
-            text-align: left;
-            padding-left: 8pt;
-            vertical-align: top;
-            border-left: 1pt solid #ccc;
-        }
-        
-        .content {
-            margin-bottom: 10pt;
-            text-align: justify;
-        }
-        
-        .parties-section {
-            margin-bottom: 25pt;
-        }
-        
-        .party-info {
-            margin-bottom: 15pt;
-        }
-        
-        .party-title {
-            font-weight: bold;
-            margin-bottom: 8pt;
-            font-size: 12pt;
-        }
-        
-        .party-details {
-            margin-left: 10pt;
-        }
-        
-        .party-detail {
-            margin-bottom: 5pt;
-        }
-        
-        .party-detail-separator {
-            margin: 8pt 0;
-            text-align: center;
-            color: #666;
-            font-size: 9pt;
-            border-top: 1pt solid #ddd;
-            padding-top: 5pt;
-        }
-        
-        /* Occupants section styles */
-        .occupants-list {
-            margin-top: 10pt;
-        }
-        
-        .occupant-item {
-            margin-bottom: 8pt;
-            padding: 8pt;
-            background-color: #f9f9f9;
-            border-left: 3pt solid #007bff;
-            border-radius: 3pt;
-        }
-        
-        .occupant-separator {
-            height: 1pt;
-            background-color: #ddd;
-            margin: 8pt 0;
-        }
-        
-        /* Group signatures styles */
-        .group-signatures-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15pt;
-            margin-top: 15pt;
-            justify-content: center;
-        }
-        
-        .group-signature-box {
-            width: 180pt;
-            text-align: center;
-            padding: 10pt;
-            border: 1pt solid #ccc;
-            border-radius: 5pt;
-            background-color: #f9f9f9;
-            margin-bottom: 10pt;
-        }
-        
-        .primary-badge {
-            background-color: #007bff;
-            color: white;
-            padding: 2pt 6pt;
-            border-radius: 10pt;
-            font-size: 8pt;
-            font-weight: bold;
-            margin-left: 5pt;
-        }
-        
+      @page {
+        size: A4;
+        margin: 20mm;
+      }
 
-        
-        .payment-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10pt 0;
-        }
-        
-        .payment-table th,
-        .payment-table td {
-            border: 1pt solid #333;
-            padding: 5pt;
-            text-align: center;
-            font-size: 10pt;
-        }
-        
-        .payment-table th {
-            background-color: #f5f5f5;
-            font-weight: bold;
-        }
-        
-        .payment-table .amount {
-            font-weight: bold;
-        }
-        
-        .signatures-section {
-            margin-top: 20pt;
-            page-break-inside: avoid;
-        }
-        
-        .signature-container {
-            display: table;
-            width: 100%;
-            margin-top: 20pt;
-        }
-        
-        .signature-box {
-            display: table-cell;
-            width: 50%;
-            text-align: center;
-            padding: 10pt;
-        }
-        
-        .signature-image {
-            max-width: 160pt;
-            max-height: 80pt;
-            margin: 0 auto 10pt auto;
-            border: 1pt solid #ccc;
-            display: block;
-            /* Perfect centering */
-            position: relative;
-            left: 50%;
-            transform: translateX(-50%);
-            /* Optimize image rendering */
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-        }
-        
-        .signature-line {
-            width: 150pt;
-            height: 1pt;
-            background-color: #333;
-            margin: 10pt auto;
-        }
-        
-        .signature-name {
-            font-weight: bold;
-            margin-bottom: 5pt;
-        }
-        
-        .signature-title {
-            font-style: italic;
-            margin-bottom: 5pt;
-        }
-        
-        .signature-date {
-            font-size: 10pt;
-        }
-        
-        .footer {
-            margin-top: 15pt;
-            text-align: center;
-            font-size: 9pt;
-            color: #666;
-            border-top: 1pt solid #ccc;
-            padding-top: 8pt;
-        }
-        
-        .page-number {
-            position: absolute;
-            bottom: 10mm;
-            right: 20mm;
-            font-size: 10pt;
-        }
+      body {
+        font-family: 'Times New Roman', serif;
+        font-size: 11pt;
+        line-height: 1.4;
+        color: #333;
+        margin: 0;
+        padding: 0;
+        background: white;
+        /* Optimize for PDF generation */
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .page {
+        width: 210mm;
+        min-height: 297mm;
+        padding: 20mm;
+        margin: 0 auto;
+        background: white;
+        box-sizing: border-box;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 30pt;
+        border-bottom: 2pt solid #333;
+        padding-bottom: 15pt;
+      }
+
+      .main-title {
+        font-size: 18pt;
+        font-weight: bold;
+        margin-bottom: 5pt;
+        text-transform: uppercase;
+      }
+
+      .sub-title {
+        font-size: 14pt;
+        font-weight: bold;
+        margin-bottom: 5pt;
+      }
+
+      .contract-number {
+        font-size: 12pt;
+        font-weight: bold;
+        margin-bottom: 5pt;
+      }
+
+      .contract-date {
+        font-size: 11pt;
+        margin-bottom: 10pt;
+      }
+
+      .section {
+        margin-bottom: 15pt;
+        page-break-inside: avoid;
+      }
+
+      .section-title {
+        font-size: 12pt;
+        font-weight: bold;
+        margin-bottom: 10pt;
+        text-transform: uppercase;
+        border-bottom: 1pt solid #333;
+        padding-bottom: 3pt;
+      }
+
+      .bilingual-content {
+        display: table;
+        width: 100%;
+        margin-bottom: 12pt;
+      }
+
+      .english-content {
+        display: table-cell;
+        width: 50%;
+        text-align: left;
+        padding-right: 8pt;
+        vertical-align: top;
+      }
+
+      .polish-content {
+        display: table-cell;
+        width: 50%;
+        text-align: left;
+        padding-left: 8pt;
+        vertical-align: top;
+        border-left: 1pt solid #ccc;
+      }
+
+      .content {
+        margin-bottom: 10pt;
+        text-align: justify;
+      }
+
+      .parties-section {
+        margin-bottom: 25pt;
+      }
+
+      .party-info {
+        margin-bottom: 15pt;
+      }
+
+      .party-title {
+        font-weight: bold;
+        margin-bottom: 8pt;
+        font-size: 12pt;
+      }
+
+      .party-details {
+        margin-left: 10pt;
+      }
+
+      .party-detail {
+        margin-bottom: 5pt;
+      }
+
+      .party-detail-separator {
+        margin: 8pt 0;
+        text-align: center;
+        color: #666;
+        font-size: 9pt;
+        border-top: 1pt solid #ddd;
+        padding-top: 5pt;
+      }
+
+      /* Occupants section styles */
+      .occupants-list {
+        margin-top: 10pt;
+      }
+
+      .occupant-item {
+        margin-bottom: 8pt;
+        padding: 8pt;
+        background-color: #f9f9f9;
+        border-left: 3pt solid #007bff;
+        border-radius: 3pt;
+      }
+
+      .occupant-separator {
+        height: 1pt;
+        background-color: #ddd;
+        margin: 8pt 0;
+      }
+
+      /* Group signatures styles */
+      .group-signatures-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15pt;
+        margin-top: 15pt;
+        justify-content: center;
+      }
+
+      .group-signature-box {
+        width: 180pt;
+        text-align: center;
+        padding: 10pt;
+        border: 1pt solid #ccc;
+        border-radius: 5pt;
+        background-color: #f9f9f9;
+        margin-bottom: 10pt;
+      }
+
+      .primary-badge {
+        background-color: #007bff;
+        color: white;
+        padding: 2pt 6pt;
+        border-radius: 10pt;
+        font-size: 8pt;
+        font-weight: bold;
+        margin-left: 5pt;
+      }
+
+      .payment-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10pt 0;
+      }
+
+      .payment-table th,
+      .payment-table td {
+        border: 1pt solid #333;
+        padding: 5pt;
+        text-align: center;
+        font-size: 10pt;
+      }
+
+      .payment-table th {
+        background-color: #f5f5f5;
+        font-weight: bold;
+      }
+
+      .payment-table .amount {
+        font-weight: bold;
+      }
+
+      .signatures-section {
+        margin-top: 20pt;
+        page-break-inside: avoid;
+      }
+
+      .signature-container {
+        display: table;
+        width: 100%;
+        margin-top: 20pt;
+      }
+
+      .signature-box {
+        display: table-cell;
+        width: 50%;
+        text-align: center;
+        padding: 10pt;
+      }
+
+      .signature-image {
+        max-width: 160pt;
+        max-height: 80pt;
+        margin: 0 auto 10pt auto;
+        border: 1pt solid #ccc;
+        display: block;
+        /* Perfect centering */
+        position: relative;
+        left: 50%;
+        transform: translateX(-50%);
+        /* Optimize image rendering */
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+      }
+
+      .signature-line {
+        width: 150pt;
+        height: 1pt;
+        background-color: #333;
+        margin: 10pt auto;
+      }
+
+      .signature-name {
+        font-weight: bold;
+        margin-bottom: 5pt;
+      }
+
+      .signature-title {
+        font-style: italic;
+        margin-bottom: 5pt;
+      }
+
+      .signature-date {
+        font-size: 10pt;
+      }
+
+      .footer {
+        margin-top: 15pt;
+        text-align: center;
+        font-size: 9pt;
+        color: #666;
+        border-top: 1pt solid #ccc;
+        padding-top: 8pt;
+      }
+
+      .page-number {
+        position: absolute;
+        bottom: 10mm;
+        right: 20mm;
+        font-size: 10pt;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="page">
-        <div class="header">
-            <div class="main-title">Rental Agreement</div>
-            <div class="sub-title">Umowa Najmu</div>
-            <div class="contract-number">Contract No.: {{contractNumber}}</div>
-            <div class="contract-date">Date: {{contractDate}}</div>
+      <div class="header">
+        <div class="main-title">Rental Agreement</div>
+        <div class="sub-title">Umowa Najmu</div>
+        <div class="contract-number">Contract No.: {{contractNumber}}</div>
+        <div class="contract-date">Date: {{contractDate}}</div>
+      </div>
+
+      <div class="parties-section">
+        <div class="section-title">§1. Parties / Strony</div>
+
+        <!-- LANDLORD SECTION -->
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="party-info">
+              <div class="party-title">LANDLORD:</div>
+              <div class="party-details">
+                {{#if isLandlordBusiness}}
+                <!-- Business Landlord -->
+                <div class="party-detail">Company Name: {{landlordName}}</div>
+                <div class="party-detail">Tax ID: {{landlordTaxId}}</div>
+                <div class="party-detail">
+                  Registration Number: {{landlordRegNumber}}
+                </div>
+                <div class="party-detail">Address: {{landlordAddress}}</div>
+                {{#if landlordFirstName}}
+                <div class="party-detail">
+                  Contact Person: {{landlordFirstName}} {{landlordLastName}}
+                </div>
+                <div class="party-detail">Phone: {{landlordPhone}}</div>
+                <div class="party-detail">Email: {{landlordEmail}}</div>
+                {{/if}} {{else}}
+                <!-- Individual Landlord -->
+                <div class="party-detail">
+                  First Name: {{landlordFirstName}}
+                </div>
+                <div class="party-detail">Last Name: {{landlordLastName}}</div>
+                <div class="party-detail">Address: {{landlordAddress}}</div>
+                <div class="party-detail">PESEL: {{landlordPESEL}}</div>
+                <div class="party-detail">
+                  ID Card Number: {{landlordIdNumber}}
+                </div>
+                <div class="party-detail">
+                  Citizenship: {{landlordCitizenship}}
+                </div>
+                <div class="party-detail">
+                  Date of Birth: {{landlordDateOfBirth}}
+                </div>
+                <div class="party-detail">Phone: {{landlordPhone}}</div>
+                <div class="party-detail">Email: {{landlordEmail}}</div>
+                {{/if}}
+              </div>
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="party-info">
+              <div class="party-title">WYNAJMUJĄCY:</div>
+              <div class="party-details">
+                {{#if isLandlordBusiness}}
+                <!-- Business Landlord -->
+                <div class="party-detail">Nazwa firmy: {{landlordName}}</div>
+                <div class="party-detail">NIP: {{landlordTaxId}}</div>
+                <div class="party-detail">
+                  Numer rejestrowy: {{landlordRegNumber}}
+                </div>
+                <div class="party-detail">Adres: {{landlordAddress}}</div>
+                {{#if landlordFirstName}}
+                <div class="party-detail">
+                  Osoba kontaktowa: {{landlordFirstName}} {{landlordLastName}}
+                </div>
+                <div class="party-detail">Telefon: {{landlordPhone}}</div>
+                <div class="party-detail">Email: {{landlordEmail}}</div>
+                {{/if}} {{else}}
+                <!-- Individual Landlord -->
+                <div class="party-detail">Imię: {{landlordFirstName}}</div>
+                <div class="party-detail">Nazwisko: {{landlordLastName}}</div>
+                <div class="party-detail">Adres: {{landlordAddress}}</div>
+                <div class="party-detail">PESEL: {{landlordPESEL}}</div>
+                <div class="party-detail">
+                  Numer dowodu osobistego: {{landlordIdNumber}}
+                </div>
+                <div class="party-detail">
+                  Obywatelstwo: {{landlordCitizenship}}
+                </div>
+                <div class="party-detail">
+                  Data urodzenia: {{landlordDateOfBirth}}
+                </div>
+                <div class="party-detail">Telefon: {{landlordPhone}}</div>
+                <div class="party-detail">Email: {{landlordEmail}}</div>
+                {{/if}}
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="parties-section">
-            <div class="section-title">§1. Parties / Strony</div>
-            
-            <!-- LANDLORD SECTION -->
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="party-info">
-                        <div class="party-title">LANDLORD:</div>
-                        <div class="party-details">
-                            {{#if isLandlordBusiness}}
-                                <!-- Business Landlord -->
-                                <div class="party-detail">Company Name: {{landlordName}}</div>
-                                <div class="party-detail">Tax ID: {{landlordTaxId}}</div>
-                                <div class="party-detail">Registration Number: {{landlordRegNumber}}</div>
-                                <div class="party-detail">Address: {{landlordAddress}}</div>
-                                {{#if landlordFirstName}}
-                                <div class="party-detail">Contact Person: {{landlordFirstName}} {{landlordLastName}}</div>
-                                <div class="party-detail">Phone: {{landlordPhone}}</div>
-                                <div class="party-detail">Email: {{landlordEmail}}</div>
-                                {{/if}}
-                            {{else}}
-                                <!-- Individual Landlord -->
-                                <div class="party-detail">First Name: {{landlordFirstName}}</div>
-                                <div class="party-detail">Last Name: {{landlordLastName}}</div>
-                                <div class="party-detail">Address: {{landlordAddress}}</div>
-                                <div class="party-detail">PESEL: {{landlordPESEL}}</div>
-                                <div class="party-detail">ID Card Number: {{landlordIdNumber}}</div>
-                                <div class="party-detail">Citizenship: {{landlordCitizenship}}</div>
-                                <div class="party-detail">Date of Birth: {{landlordDateOfBirth}}</div>
-                                <div class="party-detail">Phone: {{landlordPhone}}</div>
-                                <div class="party-detail">Email: {{landlordEmail}}</div>
-                            {{/if}}
-                        </div>
-                    </div>
+        <!-- TENANT SECTION -->
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="party-info">
+              <div class="party-title">TENANT:</div>
+              <div class="party-details">
+                {{#if isTenantBusiness}}
+                <!-- Business Tenant -->
+                <div class="party-detail">Company Name: {{tenantName}}</div>
+                <div class="party-detail">Tax ID: {{tenantTaxId}}</div>
+                <div class="party-detail">
+                  Registration Number: {{tenantRegNumber}}
                 </div>
-                <div class="polish-content">
-                    <div class="party-info">
-                        <div class="party-title">WYNAJMUJĄCY:</div>
-                        <div class="party-details">
-                            {{#if isLandlordBusiness}}
-                                <!-- Business Landlord -->
-                                <div class="party-detail">Nazwa firmy: {{landlordName}}</div>
-                                <div class="party-detail">NIP: {{landlordTaxId}}</div>
-                                <div class="party-detail">Numer rejestrowy: {{landlordRegNumber}}</div>
-                                <div class="party-detail">Adres: {{landlordAddress}}</div>
-                                {{#if landlordFirstName}}
-                                <div class="party-detail">Osoba kontaktowa: {{landlordFirstName}} {{landlordLastName}}</div>
-                                <div class="party-detail">Telefon: {{landlordPhone}}</div>
-                                <div class="party-detail">Email: {{landlordEmail}}</div>
-                                {{/if}}
-                            {{else}}
-                                <!-- Individual Landlord -->
-                                <div class="party-detail">Imię: {{landlordFirstName}}</div>
-                                <div class="party-detail">Nazwisko: {{landlordLastName}}</div>
-                                <div class="party-detail">Adres: {{landlordAddress}}</div>
-                                <div class="party-detail">PESEL: {{landlordPESEL}}</div>
-                                <div class="party-detail">Numer dowodu osobistego: {{landlordIdNumber}}</div>
-                                <div class="party-detail">Obywatelstwo: {{landlordCitizenship}}</div>
-                                <div class="party-detail">Data urodzenia: {{landlordDateOfBirth}}</div>
-                                <div class="party-detail">Telefon: {{landlordPhone}}</div>
-                                <div class="party-detail">Email: {{landlordEmail}}</div>
-                            {{/if}}
-                        </div>
-                    </div>
+                <div class="party-detail">Address: {{tenantAddress}}</div>
+                {{#if tenantFirstName}}
+                <div class="party-detail">
+                  Contact Person: {{tenantFirstName}} {{tenantLastName}}
                 </div>
+                <div class="party-detail">Phone: {{tenantPhone}}</div>
+                <div class="party-detail">Email: {{tenantEmail}}</div>
+                {{/if}} {{else if isTenantGroup}}
+                <!-- Group Tenant -->
+                <div class="party-detail">Group Name: {{tenantGroupName}}</div>
+                <div class="party-detail">
+                  Primary Member: {{tenantFirstName}} {{tenantLastName}}
+                </div>
+                <div class="party-detail">Address: {{tenantAddress}}</div>
+                <div class="party-detail">Phone: {{tenantPhone}}</div>
+                <div class="party-detail">Email: {{tenantEmail}}</div>
+                {{else}}
+                <!-- Individual Tenant -->
+                <div class="party-detail">First Name: {{tenantFirstName}}</div>
+                <div class="party-detail">Last Name: {{tenantLastName}}</div>
+                <div class="party-detail">Address: {{tenantAddress}}</div>
+                <div class="party-detail">PESEL: {{tenantPESEL}}</div>
+                <div class="party-detail">
+                  Passport Number: {{tenantPassportNumber}}
+                </div>
+                <div class="party-detail">
+                  Citizenship: {{tenantCitizenship}}
+                </div>
+                <div class="party-detail">
+                  Date of Birth: {{tenantDateOfBirth}}
+                </div>
+                <div class="party-detail">Profession: {{tenantProfession}}</div>
+                <div class="party-detail">Phone: {{tenantPhone}}</div>
+                <div class="party-detail">Email: {{tenantEmail}}</div>
+                {{/if}}
+              </div>
             </div>
-            
-            <!-- TENANT SECTION -->
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="party-info">
-                        <div class="party-title">TENANT:</div>
-                        <div class="party-details">
-                            {{#if isTenantBusiness}}
-                                <!-- Business Tenant -->
-                                <div class="party-detail">Company Name: {{tenantName}}</div>
-                                <div class="party-detail">Tax ID: {{tenantTaxId}}</div>
-                                <div class="party-detail">Registration Number: {{tenantRegNumber}}</div>
-                                <div class="party-detail">Address: {{tenantAddress}}</div>
-                                {{#if tenantFirstName}}
-                                <div class="party-detail">Contact Person: {{tenantFirstName}} {{tenantLastName}}</div>
-                                <div class="party-detail">Phone: {{tenantPhone}}</div>
-                                <div class="party-detail">Email: {{tenantEmail}}</div>
-                                {{/if}}
-                            {{else if isTenantGroup}}
-                                <!-- Group Tenant -->
-                                <div class="party-detail">Group Name: {{tenantGroupName}}</div>
-                                <div class="party-detail">Primary Member: {{tenantFirstName}} {{tenantLastName}}</div>
-                                <div class="party-detail">Address: {{tenantAddress}}</div>
-                                <div class="party-detail">Phone: {{tenantPhone}}</div>
-                                <div class="party-detail">Email: {{tenantEmail}}</div>
-                            {{else}}
-                                <!-- Individual Tenant -->
-                                <div class="party-detail">First Name: {{tenantFirstName}}</div>
-                                <div class="party-detail">Last Name: {{tenantLastName}}</div>
-                                <div class="party-detail">Address: {{tenantAddress}}</div>
-                                <div class="party-detail">PESEL: {{tenantPESEL}}</div>
-                                <div class="party-detail">Passport Number: {{tenantPassportNumber}}</div>
-                                <div class="party-detail">Citizenship: {{tenantCitizenship}}</div>
-                                <div class="party-detail">Date of Birth: {{tenantDateOfBirth}}</div>
-                                <div class="party-detail">Profession: {{tenantProfession}}</div>
-                                <div class="party-detail">Phone: {{tenantPhone}}</div>
-                                <div class="party-detail">Email: {{tenantEmail}}</div>
-                            {{/if}}
-                        </div>
-                    </div>
+          </div>
+          <div class="polish-content">
+            <div class="party-info">
+              <div class="party-title">NAJEMCA:</div>
+              <div class="party-details">
+                {{#if isTenantBusiness}}
+                <!-- Business Tenant -->
+                <div class="party-detail">Nazwa firmy: {{tenantName}}</div>
+                <div class="party-detail">NIP: {{tenantTaxId}}</div>
+                <div class="party-detail">
+                  Numer rejestrowy: {{tenantRegNumber}}
                 </div>
-                <div class="polish-content">
-                    <div class="party-info">
-                        <div class="party-title">NAJEMCA:</div>
-                        <div class="party-details">
-                            {{#if isTenantBusiness}}
-                                <!-- Business Tenant -->
-                                <div class="party-detail">Nazwa firmy: {{tenantName}}</div>
-                                <div class="party-detail">NIP: {{tenantTaxId}}</div>
-                                <div class="party-detail">Numer rejestrowy: {{tenantRegNumber}}</div>
-                                <div class="party-detail">Adres: {{tenantAddress}}</div>
-                                {{#if tenantFirstName}}
-                                <div class="party-detail">Osoba kontaktowa: {{tenantFirstName}} {{tenantLastName}}</div>
-                                <div class="party-detail">Telefon: {{tenantPhone}}</div>
-                                <div class="party-detail">Email: {{tenantEmail}}</div>
-                                {{/if}}
-                            {{else if isTenantGroup}}
-                                <!-- Group Tenant -->
-                                <div class="party-detail">Nazwa grupy: {{tenantGroupName}}</div>
-                                <div class="party-detail">Członek główny: {{tenantFirstName}} {{tenantLastName}}</div>
-                                <div class="party-detail">Adres: {{tenantAddress}}</div>
-                                <div class="party-detail">Telefon: {{tenantPhone}}</div>
-                                <div class="party-detail">Email: {{tenantEmail}}</div>
-                            {{else}}
-                                <!-- Individual Tenant -->
-                                <div class="party-detail">Imię: {{tenantFirstName}}</div>
-                                <div class="party-detail">Nazwisko: {{tenantLastName}}</div>
-                                <div class="party-detail">Adres: {{tenantAddress}}</div>
-                                <div class="party-detail">PESEL: {{tenantPESEL}}</div>
-                                <div class="party-detail">Numer paszportu: {{tenantPassportNumber}}</div>
-                                <div class="party-detail">Obywatelstwo: {{tenantCitizenship}}</div>
-                                <div class="party-detail">Data urodzenia: {{tenantDateOfBirth}}</div>
-                                <div class="party-detail">Zawód: {{tenantProfession}}</div>
-                                <div class="party-detail">Telefon: {{tenantPhone}}</div>
-                                <div class="party-detail">Email: {{tenantEmail}}</div>
-                            {{/if}}
-                        </div>
-                    </div>
+                <div class="party-detail">Adres: {{tenantAddress}}</div>
+                {{#if tenantFirstName}}
+                <div class="party-detail">
+                  Osoba kontaktowa: {{tenantFirstName}} {{tenantLastName}}
                 </div>
+                <div class="party-detail">Telefon: {{tenantPhone}}</div>
+                <div class="party-detail">Email: {{tenantEmail}}</div>
+                {{/if}} {{else if isTenantGroup}}
+                <!-- Group Tenant -->
+                <div class="party-detail">Nazwa grupy: {{tenantGroupName}}</div>
+                <div class="party-detail">
+                  Członek główny: {{tenantFirstName}} {{tenantLastName}}
+                </div>
+                <div class="party-detail">Adres: {{tenantAddress}}</div>
+                <div class="party-detail">Telefon: {{tenantPhone}}</div>
+                <div class="party-detail">Email: {{tenantEmail}}</div>
+                {{else}}
+                <!-- Individual Tenant -->
+                <div class="party-detail">Imię: {{tenantFirstName}}</div>
+                <div class="party-detail">Nazwisko: {{tenantLastName}}</div>
+                <div class="party-detail">Adres: {{tenantAddress}}</div>
+                <div class="party-detail">PESEL: {{tenantPESEL}}</div>
+                <div class="party-detail">
+                  Numer paszportu: {{tenantPassportNumber}}
+                </div>
+                <div class="party-detail">
+                  Obywatelstwo: {{tenantCitizenship}}
+                </div>
+                <div class="party-detail">
+                  Data urodzenia: {{tenantDateOfBirth}}
+                </div>
+                <div class="party-detail">Zawód: {{tenantProfession}}</div>
+                <div class="party-detail">Telefon: {{tenantPhone}}</div>
+                <div class="party-detail">Email: {{tenantEmail}}</div>
+                {{/if}}
+              </div>
             </div>
-            
-            <!-- OCCUPANTS SECTION (for business tenants) -->
-            {{#if occupants.length}}
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="party-info">
-                        <div class="party-title">OCCUPANTS:</div>
-                        <div class="party-details">
-                            {{#each occupants}}
-                            <div class="party-detail">Name: {{name}}</div>
-                            {{#if role}}<div class="party-detail">Role: {{role}}</div>{{/if}}
-                            {{#if email}}<div class="party-detail">Email: {{email}}</div>{{/if}}
-                            {{#if phone}}<div class="party-detail">Phone: {{phone}}</div>{{/if}}
-                            {{#unless @last}}<div class="party-detail-separator">---</div>{{/unless}}
-                            {{/each}}
-                        </div>
-                    </div>
-                </div>
-                <div class="polish-content">
-                    <div class="party-info">
-                        <div class="party-title">OSOBY ZAMIESZKUJĄCE:</div>
-                        <div class="party-details">
-                            {{#each occupants}}
-                            <div class="party-detail">Imię i nazwisko: {{name}}</div>
-                            {{#if role}}<div class="party-detail">Rola: {{role}}</div>{{/if}}
-                            {{#if email}}<div class="party-detail">Email: {{email}}</div>{{/if}}
-                            {{#if phone}}<div class="party-detail">Telefon: {{phone}}</div>{{/if}}
-                            {{#unless @last}}<div class="party-detail-separator">---</div>{{/unless}}
-                            {{/each}}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {{/if}}
-            
-            <!-- GROUP MEMBERS SECTION (for tenant groups) -->
-            {{#if tenantGroupMembers.length}}
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="party-info">
-                        <div class="party-title">GROUP MEMBERS:</div>
-                        <div class="party-details">
-                            {{#each tenantGroupMembers}}
-                            <div class="party-detail">{{#if isPrimary}}[PRIMARY] {{/if}}{{name}}</div>
-                            <div class="party-detail">Email: {{email}}</div>
-                            {{#if phone}}<div class="party-detail">Phone: {{phone}}</div>{{/if}}
-                            {{#unless @last}}<div class="party-detail-separator">---</div>{{/unless}}
-                            {{/each}}
-                        </div>
-                    </div>
-                </div>
-                <div class="polish-content">
-                    <div class="party-info">
-                        <div class="party-title">CZŁONKOWIE GRUPY:</div>
-                        <div class="party-details">
-                            {{#each tenantGroupMembers}}
-                            <div class="party-detail">{{#if isPrimary}}[GŁÓWNY] {{/if}}{{name}}</div>
-                            <div class="party-detail">Email: {{email}}</div>
-                            {{#if phone}}<div class="party-detail">Telefon: {{phone}}</div>{{/if}}
-                            {{#unless @last}}<div class="party-detail-separator">---</div>{{/unless}}
-                            {{/each}}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {{/if}}
+          </div>
         </div>
 
-        <div class="section">
-            <div class="section-title">§2. Subject of Agreement / Przedmiot Umowy</div>
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="content">
-                        The Landlord declares that he/she is the owner of the real estate property located at: {{propertyAddress}}.
-                        The Landlord hereby rents to the Tenant, and the Tenant hereby rents from the Landlord, the above-mentioned property for residential purposes.
-                    </div>
-                </div>
-                <div class="polish-content">
-                    <div class="content">
-                        Wynajmujący oświadcza, że jest właścicielem nieruchomości położonej pod adresem: {{propertyAddress}}.
-                        Wynajmujący niniejszym wynajmuje Najemcy, a Najemca niniejszym wynajmuje od Wynajmującego ww. nieruchomość na cele mieszkalne.
-                    </div>
-                </div>
+        <!-- OCCUPANTS SECTION (for business tenants) -->
+        {{#if occupants.length}}
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="party-info">
+              <div class="party-title">OCCUPANTS:</div>
+              <div class="party-details">
+                {{#each occupants}}
+                <div class="party-detail">Name: {{name}}</div>
+                {{#if role}}
+                <div class="party-detail">Role: {{role}}</div>
+                {{/if}} {{#if email}}
+                <div class="party-detail">Email: {{email}}</div>
+                {{/if}} {{#if phone}}
+                <div class="party-detail">Phone: {{phone}}</div>
+                {{/if}} {{#unless @last}}
+                <div class="party-detail-separator">---</div>
+                {{/unless}} {{/each}}
+              </div>
             </div>
-        </div>
-
-        <div class="section">
-            <div class="section-title">§3. Lease Term / Okres Najmu</div>
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="content">
-                        The lease term is {{leaseMonths}} months, starting from {{leaseStartDate}} and ending on {{leaseEndDate}}.
-                    </div>
-                </div>
-                <div class="polish-content">
-                    <div class="content">
-                        Okres najmu wynosi {{leaseMonths}} miesięcy, rozpoczynając się od {{leaseStartDate}} i kończąc się {{leaseEndDate}}.
-                    </div>
-                </div>
+          </div>
+          <div class="polish-content">
+            <div class="party-info">
+              <div class="party-title">OSOBY ZAMIESZKUJĄCE:</div>
+              <div class="party-details">
+                {{#each occupants}}
+                <div class="party-detail">Imię i nazwisko: {{name}}</div>
+                {{#if role}}
+                <div class="party-detail">Rola: {{role}}</div>
+                {{/if}} {{#if email}}
+                <div class="party-detail">Email: {{email}}</div>
+                {{/if}} {{#if phone}}
+                <div class="party-detail">Telefon: {{phone}}</div>
+                {{/if}} {{#unless @last}}
+                <div class="party-detail-separator">---</div>
+                {{/unless}} {{/each}}
+              </div>
             </div>
-        </div>
-
-        <div class="section">
-            <div class="section-title">§4. Rent and Deposit / Czynsz i Kaucja</div>
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="content">
-                        a) The monthly rent is {{monthlyRent}} PLN, payable in advance by the 10th of each month.<br>
-                        b) The security deposit is {{securityDeposit}} PLN, has been paid before signing this agreement.<br>
-                        c) Utilities are included in the rent amount.<br>
-                        d) Deposit Purpose: cover damage, unpaid bills.
-                    </div>
-                </div>
-                <div class="polish-content">
-                    <div class="content">
-                        a) Miesięczny czynsz wynosi {{monthlyRent}} PLN, płatny z góry do 10. dnia każdego miesiąca.<br>
-                        b) Kaucja wynosi {{securityDeposit}} PLN, została opłacona przed podpisaniem niniejszej umowy.<br>
-                        c) Media są wliczone w kwotę czynszu.<br>
-                        d) Cel kaucji: pokrycie szkód, nieopłacone rachunki.
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="section">
-            <div class="section-title">§5. Payment Schedule / Harmonogram Płatności</div>
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <table class="payment-table">
-                        <thead>
-                            <tr>
-                                <th>Payment No.</th>
-                                <th>Due Date</th>
-                                <th>Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {{#each paymentSchedule}}
-                            <tr>
-                                <td>{{number}}</td>
-                                <td>{{dueDate}}</td>
-                                <td class="amount">{{amount}} PLN</td>
-                            </tr>
-                            {{/each}}
-                        </tbody>
-                    </table>
-                </div>
-                <div class="polish-content">
-                    <table class="payment-table">
-                        <thead>
-                            <tr>
-                                <th>Nr płatności</th>
-                                <th>Termin płatności</th>
-                                <th>Kwota</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {{#each paymentSchedule}}
-                            <tr>
-                                <td>{{number}}</td>
-                                <td>{{dueDate}}</td>
-                                <td class="amount">{{amount}} PLN</td>
-                            </tr>
-                            {{/each}}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div class="section">
-            <div class="section-title">§6. Tenant Protection / Ochrona Najemcy</div>
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="content">
-                        a) Tenant may terminate within 24 hours after check-in if the property does not match the offer (amenities, appearance).<br>
-                        b) Full refund procedure.
-                    </div>
-                </div>
-                <div class="polish-content">
-                    <div class="content">
-                        a) Najemca może rozwiązać umowę w ciągu 24 godzin po zameldowaniu, jeśli nieruchomość nie odpowiada ofercie (udogodnienia, wygląd).<br>
-                        b) Procedura pełnego zwrotu.
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="section">
-            <div class="section-title">§7. Rights and Obligations of the Tenant / Prawa i Obowiązki Najemcy</div>
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="content">
-                        a) Keep property in good condition.<br>
-                        b) Notify landlord of necessary repairs.<br>
-                        c) No structural changes without consent.<br>
-                        d) Follow house regulations.<br>
-                        e) Respect quiet hours.
-                    </div>
-                </div>
-                <div class="polish-content">
-                    <div class="content">
-                        a) Utrzymywać nieruchomość w dobrym stanie.<br>
-                        b) Powiadamiać wynajmującego o koniecznych naprawach.<br>
-                        c) Brak zmian strukturalnych bez zgody.<br>
-                        d) Przestrzegać regulaminu domu.<br>
-                        e) Respektować godziny ciszy.
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="section">
-            <div class="section-title">§8. Rights and Obligations of the Landlord / Prawa i Obowiązki Wynajmującego</div>
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="content">
-                        a) Provide property in usable condition.<br>
-                        b) Ensure access to agreed amenities.<br>
-                        c) Carry out necessary repairs not caused by tenant.
-                    </div>
-                </div>
-                <div class="polish-content">
-                    <div class="content">
-                        a) Zapewnić nieruchomość w stanie nadającym się do użytku.<br>
-                        b) Zapewnić dostęp do uzgodnionych udogodnień.<br>
-                        c) Przeprowadzać niezbędne naprawy nie spowodowane przez najemcę.
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="section">
-            <div class="section-title">§9. Maintenance and Repairs / Naprawy i Konserwacja</div>
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="content">
-                        a) Tenant handles minor maintenance (e.g., replacing lightbulbs).<br>
-                        b) Landlord responsible for major repairs (e.g., heating system).<br>
-                        c) Timeline for handling repair requests.
-                    </div>
-                </div>
-                <div class="polish-content">
-                    <div class="content">
-                        a) Najemca zajmuje się drobnymi naprawami (np. wymiana żarówek).<br>
-                        b) Wynajmujący odpowiedzialny za poważne naprawy (np. system ogrzewania).<br>
-                        c) Harmonogram obsługi wniosków o naprawy.
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="section">
-            <div class="section-title">§10. Inspection Rights / Prawo Kontroli</div>
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="content">
-                        a) Landlord may inspect property with prior notice (commonly 24–48 hours).<br>
-                        b) Emergencies allow immediate access.
-                    </div>
-                </div>
-                <div class="polish-content">
-                    <div class="content">
-                        a) Wynajmujący może kontrolować nieruchomość z uprzednim powiadomieniem (zazwyczaj 24-48 godzin).<br>
-                        b) Sytuacje awaryjne pozwalają na natychmiastowy dostęp.
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="section">
-            <div class="section-title">§11. Termination of Agreement / Rozwiązanie Umowy</div>
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="content">
-                        a) Notice period (commonly 1–3 months).<br>
-                        b) Conditions for early termination (breach of contract, damage, non-payment).<br>
-                        c) Immediate termination clauses.
-                    </div>
-                </div>
-                <div class="polish-content">
-                    <div class="content">
-                        a) Okres wypowiedzenia (zazwyczaj 1-3 miesiące).<br>
-                        b) Warunki wcześniejszego rozwiązania (naruszenie umowy, szkody, brak płatności).<br>
-                        c) Klauzule natychmiastowego rozwiązania.
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {{#if additionalTerms}}
-        <div class="section">
-            <div class="section-title">§12. Additional Terms & Conditions / Dodatkowe Warunki i Postanowienia</div>
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="content">
-                        {{additionalTerms}}
-                    </div>
-                </div>
-                <div class="polish-content">
-                    <div class="content">
-                        {{additionalTermsPolish}}
-                    </div>
-                </div>
-            </div>
+          </div>
         </div>
         {{/if}}
 
-        <!-- AUTHORIZED OCCUPANTS SECTION (for business tenants only) -->
-        {{#if isTenantBusiness}}
-        <div class="section">
-            <div class="section-title">§13. Authorized Occupants / Autoryzowani Mieszkańcy</div>
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="content">
-                        The following individuals are authorized to occupy the property under this agreement:
-                        <div class="occupants-list">
-                            {{#each occupants}}
-                            <div class="occupant-item">
-                                <strong>{{name}}</strong>{{#if role}} - {{role}}{{/if}}
-                                {{#if email}}<br>Email: {{email}}{{/if}}
-                                {{#if phone}}<br>Phone: {{phone}}{{/if}}
-                            </div>
-                            {{#unless @last}}<div class="occupant-separator"></div>{{/unless}}
-                            {{/each}}
-                        </div>
-                    </div>
-                </div>
-                <div class="polish-content">
-                    <div class="content">
-                        Następujące osoby są upoważnione do zamieszkiwania w nieruchomości na podstawie niniejszej umowy:
-                        <div class="occupants-list">
-                            {{#each occupants}}
-                            <div class="occupant-item">
-                                <strong>{{name}}</strong>{{#if role}} - {{role}}{{/if}}
-                                {{#if email}}<br>Email: {{email}}{{/if}}
-                                {{#if phone}}<br>Telefon: {{phone}}{{/if}}
-                            </div>
-                            {{#unless @last}}<div class="occupant-separator"></div>{{/unless}}
-                            {{/each}}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {{/if}}
-
-        <!-- GROUP MEMBER SIGNATURES SECTION (for tenant groups only) -->
-        {{#if isTenantGroup}}
-        <div class="section">
-            <div class="section-title">§{{#if isTenantBusiness}}14{{else}}13{{/if}}. Group Member Signatures / Podpisy Członków Grupy</div>
-            <div class="bilingual-content">
-                <div class="english-content">
-                    <div class="content">
-                        All group members acknowledge and agree to the terms of this lease agreement:
-                    </div>
-                </div>
-                <div class="polish-content">
-                    <div class="content">
-                        Wszyscy członkowie grupy potwierdzają i zgadzają się z warunkami niniejszej umowy najmu:
-                    </div>
-                </div>
-            </div>
-            
-            <div class="group-signatures-container">
+        <!-- GROUP MEMBERS SECTION (for tenant groups) -->
+        {{#if tenantGroupMembers.length}}
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="party-info">
+              <div class="party-title">GROUP MEMBERS:</div>
+              <div class="party-details">
                 {{#each tenantGroupMembers}}
-                <div class="group-signature-box">
-                    <div class="signature-name">{{name}}{{#if isPrimary}} <span class="primary-badge">[PRIMARY]</span>{{/if}}</div>
-                    <div class="signature-title">Group Member / Członek Grupy</div>
-                    {{#if signature}}
-                    <img src="{{signature}}" class="signature-image" alt="Group Member Signature" 
-                         width="160" height="80">
-                    {{else}}
-                    <div class="signature-line"></div>
-                    {{/if}}
-                    <div class="signature-date">Date: {{../contractDate}}</div>
+                <div class="party-detail">
+                  {{#if isPrimary}}[PRIMARY] {{/if}}{{name}}
                 </div>
-                {{/each}}
+                <div class="party-detail">Email: {{email}}</div>
+                {{#if phone}}
+                <div class="party-detail">Phone: {{phone}}</div>
+                {{/if}} {{#unless @last}}
+                <div class="party-detail-separator">---</div>
+                {{/unless}} {{/each}}
+              </div>
             </div>
+          </div>
+          <div class="polish-content">
+            <div class="party-info">
+              <div class="party-title">CZŁONKOWIE GRUPY:</div>
+              <div class="party-details">
+                {{#each tenantGroupMembers}}
+                <div class="party-detail">
+                  {{#if isPrimary}}[GŁÓWNY] {{/if}}{{name}}
+                </div>
+                <div class="party-detail">Email: {{email}}</div>
+                {{#if phone}}
+                <div class="party-detail">Telefon: {{phone}}</div>
+                {{/if}} {{#unless @last}}
+                <div class="party-detail-separator">---</div>
+                {{/unless}} {{/each}}
+              </div>
+            </div>
+          </div>
         </div>
         {{/if}}
+      </div>
 
-        <div class="signatures-section">
-            <div class="section-title">§{{#if isTenantBusiness}}{{#if isTenantGroup}}15{{else}}14{{/if}}{{else}}{{#if isTenantGroup}}14{{else}}13{{/if}}{{/if}}. Main Contract Signatures / Główne Podpisy Umowy</div>
-            <div class="signature-container">
-                <div class="signature-box">
-                    <div class="signature-name">{{landlordName}}</div>
-                    <div class="signature-title">
-                        {{#if isLandlordBusiness}}
-                        Business Landlord / Wynajmujący Biznesowy
-                        {{else}}
-                        Landlord / Wynajmujący
-                        {{/if}}
-                    </div>
-                    {{#if landlordSignature}}
-                    <img src="{{landlordSignature}}" class="signature-image" alt="Landlord Signature" 
-                         width="{{landlordSignatureWidth}}" height="{{landlordSignatureHeight}}">
-                    {{else}}
-                    <div class="signature-line"></div>
-                    {{/if}}
-                    <div class="signature-date">Date: {{contractDate}}</div>
-                </div>
-                <div class="signature-box">
-                    <div class="signature-name">{{tenantName}}</div>
-                    <div class="signature-title">
-                        {{#if isTenantBusiness}}
-                        Business Tenant / Najemca Biznesowy
-                        {{else if isTenantGroup}}
-                        Primary Group Member / Główny Członek Grupy
-                        {{else}}
-                        Tenant / Najemca
-                        {{/if}}
-                    </div>
-                    {{#if tenantSignature}}
-                    <img src="{{tenantSignature}}" class="signature-image" alt="Tenant Signature" 
-                         width="{{tenantSignatureWidth}}" height="{{tenantSignatureHeight}}">
-                    {{else}}
-                    <div class="signature-line"></div>
-                    {{/if}}
-                    <div class="signature-date">Date: {{contractDate}}</div>
-                </div>
+      <div class="section">
+        <div class="section-title">
+          §2. Subject of Agreement / Przedmiot Umowy
+        </div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              The Landlord declares that he/she is the owner of the real estate
+              property located at: {{propertyAddress}}. The Landlord hereby
+              rents to the Tenant, and the Tenant hereby rents from the
+              Landlord, the above-mentioned property for residential purposes.
             </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              Wynajmujący oświadcza, że jest właścicielem nieruchomości
+              położonej pod adresem: {{propertyAddress}}. Wynajmujący niniejszym
+              wynajmuje Najemcy, a Najemca niniejszym wynajmuje od Wynajmującego
+              ww. nieruchomość na cele mieszkalne.
+            </div>
+          </div>
         </div>
-        
-        <div class="footer">
-            This document was generated by Smart Rental System on {{contractDate}}. Legally binding.
+      </div>
+
+      <div class="section">
+        <div class="section-title">§3. Lease Term / Okres Najmu</div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              The lease term is {{leaseMonths}} months, starting from
+              {{leaseStartDate}} and ending on {{leaseEndDate}}.
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              Okres najmu wynosi {{leaseMonths}} miesięcy, rozpoczynając się od
+              {{leaseStartDate}} i kończąc się {{leaseEndDate}}.
+            </div>
+          </div>
         </div>
-        
-        <div class="page-number">1</div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">§4. Rent and Deposit / Czynsz i Kaucja</div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              a) The monthly rent is {{monthlyRent}} PLN, payable in advance by
+              the 10th of each month.<br />
+              b) The security deposit is {{securityDeposit}} PLN, has been paid
+              before signing this agreement.<br />
+              c) Utilities are included in the rent amount.<br />
+              d) Deposit Purpose: cover damage, unpaid bills.
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              a) Miesięczny czynsz wynosi {{monthlyRent}} PLN, płatny z góry do
+              10. dnia każdego miesiąca.<br />
+              b) Kaucja wynosi {{securityDeposit}} PLN, została opłacona przed
+              podpisaniem niniejszej umowy.<br />
+              c) Media są wliczone w kwotę czynszu.<br />
+              d) Cel kaucji: pokrycie szkód, nieopłacone rachunki.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          §5. Payment Schedule / Harmonogram Płatności
+        </div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <table class="payment-table">
+              <thead>
+                <tr>
+                  <th>Payment No.</th>
+                  <th>Due Date</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{#each paymentSchedule}}
+                <tr>
+                  <td>{{number}}</td>
+                  <td>{{dueDate}}</td>
+                  <td class="amount">{{amount}} PLN</td>
+                </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          </div>
+          <div class="polish-content">
+            <table class="payment-table">
+              <thead>
+                <tr>
+                  <th>Nr płatności</th>
+                  <th>Termin płatności</th>
+                  <th>Kwota</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{#each paymentSchedule}}
+                <tr>
+                  <td>{{number}}</td>
+                  <td>{{dueDate}}</td>
+                  <td class="amount">{{amount}} PLN</td>
+                </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">§6. Tenant Protection / Ochrona Najemcy</div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              a) Tenant may terminate within 24 hours after check-in if the
+              property does not match the offer (amenities, appearance).<br />
+              b) Full refund procedure.
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              a) Najemca może rozwiązać umowę w ciągu 24 godzin po zameldowaniu,
+              jeśli nieruchomość nie odpowiada ofercie (udogodnienia,
+              wygląd).<br />
+              b) Procedura pełnego zwrotu.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          §7. Rights and Obligations of the Tenant / Prawa i Obowiązki Najemcy
+        </div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              a) Keep property in good condition.<br />
+              b) Notify landlord of necessary repairs.<br />
+              c) No structural changes without consent.<br />
+              d) Follow house regulations.<br />
+              e) Respect quiet hours.
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              a) Utrzymywać nieruchomość w dobrym stanie.<br />
+              b) Powiadamiać wynajmującego o koniecznych naprawach.<br />
+              c) Brak zmian strukturalnych bez zgody.<br />
+              d) Przestrzegać regulaminu domu.<br />
+              e) Respektować godziny ciszy.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          §8. Rights and Obligations of the Landlord / Prawa i Obowiązki
+          Wynajmującego
+        </div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              a) Provide property in usable condition.<br />
+              b) Ensure access to agreed amenities.<br />
+              c) Carry out necessary repairs not caused by tenant.
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              a) Zapewnić nieruchomość w stanie nadającym się do użytku.<br />
+              b) Zapewnić dostęp do uzgodnionych udogodnień.<br />
+              c) Przeprowadzać niezbędne naprawy nie spowodowane przez najemcę.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          §9. Maintenance and Repairs / Naprawy i Konserwacja
+        </div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              a) Tenant handles minor maintenance (e.g., replacing
+              lightbulbs).<br />
+              b) Landlord responsible for major repairs (e.g., heating
+              system).<br />
+              c) Timeline for handling repair requests.
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              a) Najemca zajmuje się drobnymi naprawami (np. wymiana
+              żarówek).<br />
+              b) Wynajmujący odpowiedzialny za poważne naprawy (np. system
+              ogrzewania).<br />
+              c) Harmonogram obsługi wniosków o naprawy.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">§10. Inspection Rights / Prawo Kontroli</div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              a) Landlord may inspect property with prior notice (commonly 24–48
+              hours).<br />
+              b) Emergencies allow immediate access.
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              a) Wynajmujący może kontrolować nieruchomość z uprzednim
+              powiadomieniem (zazwyczaj 24-48 godzin).<br />
+              b) Sytuacje awaryjne pozwalają na natychmiastowy dostęp.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          §11. Termination of Agreement / Rozwiązanie Umowy
+        </div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              a) Notice period (commonly 1–3 months).<br />
+              b) Conditions for early termination (breach of contract, damage,
+              non-payment).<br />
+              c) Immediate termination clauses.
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              a) Okres wypowiedzenia (zazwyczaj 1-3 miesiące).<br />
+              b) Warunki wcześniejszego rozwiązania (naruszenie umowy, szkody,
+              brak płatności).<br />
+              c) Klauzule natychmiastowego rozwiązania.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {{#if additionalTerms}}
+      <div class="section">
+        <div class="section-title">
+          §12. Additional Terms & Conditions / Dodatkowe Warunki i Postanowienia
+        </div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">{{additionalTerms}}</div>
+          </div>
+          <div class="polish-content">
+            <div class="content">{{additionalTermsPolish}}</div>
+          </div>
+        </div>
+      </div>
+      {{/if}}
+
+      <!-- AUTHORIZED OCCUPANTS SECTION (for business tenants only) -->
+      {{#if isTenantBusiness}}
+      <div class="section">
+        <div class="section-title">
+          §13. Authorized Occupants / Autoryzowani Mieszkańcy
+        </div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              The following individuals are authorized to occupy the property
+              under this agreement:
+              <div class="occupants-list">
+                {{#each occupants}}
+                <div class="occupant-item">
+                  <strong>{{name}}</strong>{{#if role}} - {{role}}{{/if}} {{#if
+                  email}}<br />Email: {{email}}{{/if}} {{#if phone}}<br />Phone:
+                  {{phone}}{{/if}}
+                </div>
+                {{#unless @last}}
+                <div class="occupant-separator"></div>
+                {{/unless}} {{/each}}
+              </div>
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              Następujące osoby są upoważnione do zamieszkiwania w nieruchomości
+              na podstawie niniejszej umowy:
+              <div class="occupants-list">
+                {{#each occupants}}
+                <div class="occupant-item">
+                  <strong>{{name}}</strong>{{#if role}} - {{role}}{{/if}} {{#if
+                  email}}<br />Email: {{email}}{{/if}} {{#if phone}}<br />Telefon:
+                  {{phone}}{{/if}}
+                </div>
+                {{#unless @last}}
+                <div class="occupant-separator"></div>
+                {{/unless}} {{/each}}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {{/if}}
+
+      <!-- GROUP MEMBER SIGNATURES SECTION (for tenant groups only) -->
+      {{#if isTenantGroup}}
+      <div class="section">
+        <div class="section-title">
+          §{{#if isTenantBusiness}}14{{else}}13{{/if}}. Group Member Signatures
+          / Podpisy Członków Grupy
+        </div>
+        <div class="bilingual-content">
+          <div class="english-content">
+            <div class="content">
+              All group members acknowledge and agree to the terms of this lease
+              agreement:
+            </div>
+          </div>
+          <div class="polish-content">
+            <div class="content">
+              Wszyscy członkowie grupy potwierdzają i zgadzają się z warunkami
+              niniejszej umowy najmu:
+            </div>
+          </div>
+        </div>
+
+        <div class="group-signatures-container">
+          {{#each tenantGroupMembers}}
+          <div class="group-signature-box">
+            <div class="signature-name">
+              {{name}}{{#if isPrimary}}
+              <span class="primary-badge">[PRIMARY]</span>{{/if}}
+            </div>
+            <div class="signature-title">Group Member / Członek Grupy</div>
+            {{#if signature}}
+            <img
+              src="{{signature}}"
+              class="signature-image"
+              alt="Group Member Signature"
+              width="160"
+              height="80"
+            />
+            {{else}}
+            <div class="signature-line"></div>
+            {{/if}}
+            <div class="signature-date">Date: {{../contractDate}}</div>
+          </div>
+          {{/each}}
+        </div>
+      </div>
+      {{/if}}
+
+      <div class="signatures-section">
+        <div class="section-title">
+          §{{#if isTenantBusiness}}{{#if
+          isTenantGroup}}15{{else}}14{{/if}}{{else}}{{#if
+          isTenantGroup}}14{{else}}13{{/if}}{{/if}}. Main Contract Signatures /
+          Główne Podpisy Umowy
+        </div>
+        <div class="signature-container">
+          <div class="signature-box">
+            <div class="signature-name">{{landlordName}}</div>
+            <div class="signature-title">
+              {{#if isLandlordBusiness}} Business Landlord / Wynajmujący
+              Biznesowy {{else}} Landlord / Wynajmujący {{/if}}
+            </div>
+            {{#if landlordSignature}}
+            <img
+              src="{{landlordSignature}}"
+              class="signature-image"
+              alt="Landlord Signature"
+              width="{{landlordSignatureWidth}}"
+              height="{{landlordSignatureHeight}}"
+            />
+            {{else}}
+            <div class="signature-line"></div>
+            {{/if}}
+            <div class="signature-date">Date: {{contractDate}}</div>
+          </div>
+          <div class="signature-box">
+            <div class="signature-name">{{tenantName}}</div>
+            <div class="signature-title">
+              {{#if isTenantBusiness}} Business Tenant / Najemca Biznesowy
+              {{else if isTenantGroup}} Primary Group Member / Główny Członek
+              Grupy {{else}} Tenant / Najemca {{/if}}
+            </div>
+            {{#if tenantSignature}}
+            <img
+              src="{{tenantSignature}}"
+              class="signature-image"
+              alt="Tenant Signature"
+              width="{{tenantSignatureWidth}}"
+              height="{{tenantSignatureHeight}}"
+            />
+            {{else}}
+            <div class="signature-line"></div>
+            {{/if}}
+            <div class="signature-date">Date: {{contractDate}}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        This document was generated by Smart Rental System on {{contractDate}}.
+        Legally binding.
+      </div>
+
+      <div class="page-number">1</div>
     </div>
-</body>
+  </body>
 </html>

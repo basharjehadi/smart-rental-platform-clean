@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { 
-  getSystemStatus, 
-  getSystemConfig, 
-  testSystemFunctionality 
+import {
+  getSystemStatus,
+  getSystemConfig,
+  testSystemFunctionality,
 } from '../controllers/systemController.js';
 
 const router = Router();

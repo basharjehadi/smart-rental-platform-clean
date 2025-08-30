@@ -12,9 +12,9 @@ export const getLandlordProperties = async (req, res) => {
         // Properties owned by an organization where the current user is a member
         organization: {
           members: {
-            some: { userId: landlordId }
-          }
-        }
+            some: { userId: landlordId },
+          },
+        },
       },
       include: {
         offers: {
@@ -25,43 +25,49 @@ export const getLandlordProperties = async (req, res) => {
             moveInVerificationStatus: true,
             moveInVerificationDeadline: true,
             moveInVerificationDate: true,
-            rentalRequest: { select: { moveInDate: true } }
-          }
-        }
+            rentalRequest: { select: { moveInDate: true } },
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
     });
 
     // Shape with inline move-in status for quick UI
-    const shaped = properties.map(p => {
+    const shaped = properties.map((p) => {
       const latest = (p.offers && p.offers[0]) || null;
-      const deadline = latest?.moveInVerificationDeadline || (latest?.rentalRequest?.moveInDate
-        ? new Date(new Date(latest.rentalRequest.moveInDate).getTime() + 24 * 60 * 60 * 1000)
-        : null);
+      const deadline =
+        latest?.moveInVerificationDeadline ||
+        (latest?.rentalRequest?.moveInDate
+          ? new Date(
+              new Date(latest.rentalRequest.moveInDate).getTime() +
+                24 * 60 * 60 * 1000
+            )
+          : null);
       const { offers, ...rest } = p;
       return {
         ...rest,
-        _moveIn: latest ? {
-          offerId: latest.id,
-          status: latest.moveInVerificationStatus,
-          deadline,
-          verifiedAt: latest.moveInVerificationDate
-        } : null
+        _moveIn: latest
+          ? {
+              offerId: latest.id,
+              status: latest.moveInVerificationStatus,
+              deadline,
+              verifiedAt: latest.moveInVerificationDate,
+            }
+          : null,
       };
     });
 
     res.json({
       success: true,
-      properties: shaped
+      properties: shaped,
     });
-
   } catch (error) {
     console.error('Get landlord properties error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch properties'
+      error: 'Failed to fetch properties',
     });
   }
 };
@@ -79,17 +85,17 @@ export const getPropertyById = async (req, res) => {
         id: id,
         organization: {
           members: {
-            some: { userId: landlordId }
-          }
-        }
-      }
+            some: { userId: landlordId },
+          },
+        },
+      },
     });
 
     if (!property) {
       console.log('❌ Property not found');
       return res.status(404).json({
         success: false,
-        error: 'Property not found'
+        error: 'Property not found',
       });
     }
 
@@ -98,19 +104,18 @@ export const getPropertyById = async (req, res) => {
       name: property.name,
       houseRules: property.houseRules,
       images: property.images,
-      videos: property.videos
+      videos: property.videos,
     });
 
     res.json({
       success: true,
-      property: property
+      property: property,
     });
-
   } catch (error) {
     console.error('❌ Get property by ID error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch property'
+      error: 'Failed to fetch property',
     });
   }
 };
@@ -122,7 +127,7 @@ export const createProperty = async (req, res) => {
     console.log('📋 Request body:', req.body);
     console.log('📁 Request files:', req.files);
     console.log('👤 User ID:', req.user.id);
-    
+
     const landlordId = req.user.id;
     const {
       name,
@@ -147,14 +152,23 @@ export const createProperty = async (req, res) => {
       petsAllowed = false,
       smokingAllowed = false,
       description,
-      houseRules
+      houseRules,
     } = req.body;
 
     // Validate required fields
-    if (!name || !address || !city || !zipCode || !propertyType || !monthlyRent || !availableFrom) {
+    if (
+      !name ||
+      !address ||
+      !city ||
+      !zipCode ||
+      !propertyType ||
+      !monthlyRent ||
+      !availableFrom
+    ) {
       return res.status(400).json({
         success: false,
-        error: 'Name, address, city, zip code, property type, monthly rent, and available from date are required'
+        error:
+          'Name, address, city, zip code, property type, monthly rent, and available from date are required',
       });
     }
 
@@ -162,14 +176,14 @@ export const createProperty = async (req, res) => {
     if (!req.files || !req.files.propertyVideo) {
       return res.status(400).json({
         success: false,
-        error: 'Virtual tour video is required'
+        error: 'Virtual tour video is required',
       });
     }
 
     if (!req.files.propertyImages || req.files.propertyImages.length === 0) {
       return res.status(400).json({
         success: false,
-        error: 'At least one property photo is required'
+        error: 'At least one property photo is required',
       });
     }
 
@@ -184,17 +198,17 @@ export const createProperty = async (req, res) => {
       // Handle property images
       if (req.files.propertyImages) {
         console.log('📸 Processing property images:', req.files.propertyImages);
-        imageUrls = req.files.propertyImages.map(file => {
+        imageUrls = req.files.propertyImages.map((file) => {
           const url = `/uploads/property_images/${file.filename}`;
           console.log('📸 Image URL:', url);
           return url;
         });
       }
-      
+
       // Handle property videos
       if (req.files.propertyVideo) {
         console.log('🎥 Processing property videos:', req.files.propertyVideo);
-        videoUrls = req.files.propertyVideo.map(file => {
+        videoUrls = req.files.propertyVideo.map((file) => {
           const url = `/uploads/property_videos/${file.filename}`;
           console.log('🎥 Video URL:', url);
           return url;
@@ -222,7 +236,8 @@ export const createProperty = async (req, res) => {
       totalFloors: totalFloors ? parseInt(totalFloors) : null,
       monthlyRent: parseFloat(monthlyRent),
       depositAmount: depositAmount ? parseFloat(depositAmount) : null,
-      utilitiesIncluded: utilitiesIncluded === 'true' || utilitiesIncluded === true,
+      utilitiesIncluded:
+        utilitiesIncluded === 'true' || utilitiesIncluded === true,
       availableFrom: availableFrom ? new Date(availableFrom) : null,
       availableUntil: availableUntil ? new Date(availableUntil) : null,
       furnished: furnished === 'true' || furnished === true,
@@ -233,7 +248,7 @@ export const createProperty = async (req, res) => {
       description,
       houseRules,
       images: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
-      videos: videoUrls.length > 0 ? JSON.stringify(videoUrls) : null
+      videos: videoUrls.length > 0 ? JSON.stringify(videoUrls) : null,
     });
 
     console.log('🏠 Amenities/houseRules being saved:', houseRules);
@@ -242,27 +257,30 @@ export const createProperty = async (req, res) => {
     // Resolve the organization for this user; if none, auto-provision a personal org
     let orgMember = await prisma.organizationMember.findFirst({
       where: { userId: landlordId },
-      include: { organization: true }
+      include: { organization: true },
     });
 
     if (!orgMember) {
       const user = await prisma.user.findUnique({
         where: { id: landlordId },
-        select: { id: true, name: true, email: true }
+        select: { id: true, name: true, email: true },
       });
 
-      const orgName = user?.name ? `${user.name}` : `Personal Organization (${user?.email || landlordId})`;
-      
+      const orgName = user?.name
+        ? `${user.name}`
+        : `Personal Organization (${user?.email || landlordId})`;
+
       // Get landlord's address for organization
       const landlordProfile = await prisma.user.findUnique({
         where: { id: landlordId },
-        select: { street: true, city: true, zipCode: true, country: true }
+        select: { street: true, city: true, zipCode: true, country: true },
       });
-      
-      const orgAddress = landlordProfile?.street && landlordProfile?.city 
-        ? `${landlordProfile.street}, ${landlordProfile.city}, ${landlordProfile.zipCode || ''}, ${landlordProfile.country || ''}`.trim()
-        : 'Address not provided';
-      
+
+      const orgAddress =
+        landlordProfile?.street && landlordProfile?.city
+          ? `${landlordProfile.street}, ${landlordProfile.city}, ${landlordProfile.zipCode || ''}, ${landlordProfile.country || ''}`.trim()
+          : 'Address not provided';
+
       const organization = await prisma.organization.create({
         data: {
           name: orgName,
@@ -270,17 +288,17 @@ export const createProperty = async (req, res) => {
           regNumber: null,
           address: orgAddress,
           signatureBase64: null,
-          isPersonal: true
-        }
+          isPersonal: true,
+        },
       });
 
       orgMember = await prisma.organizationMember.create({
         data: {
           userId: landlordId,
           organizationId: organization.id,
-          role: 'OWNER'
+          role: 'OWNER',
         },
-        include: { organization: true }
+        include: { organization: true },
       });
     }
 
@@ -301,7 +319,8 @@ export const createProperty = async (req, res) => {
         totalFloors: totalFloors ? parseInt(totalFloors) : null,
         monthlyRent: parseFloat(monthlyRent),
         depositAmount: depositAmount ? parseFloat(depositAmount) : null,
-        utilitiesIncluded: utilitiesIncluded === 'true' || utilitiesIncluded === true,
+        utilitiesIncluded:
+          utilitiesIncluded === 'true' || utilitiesIncluded === true,
         availableFrom: availableFrom ? new Date(availableFrom) : null,
         availableUntil: availableUntil ? new Date(availableUntil) : null,
         furnished: furnished === 'true' || furnished === true,
@@ -312,8 +331,8 @@ export const createProperty = async (req, res) => {
         description,
         houseRules,
         images: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
-        videos: videoUrls.length > 0 ? JSON.stringify(videoUrls) : null
-      }
+        videos: videoUrls.length > 0 ? JSON.stringify(videoUrls) : null,
+      },
     });
 
     console.log('✅ Property created successfully:', property.id);
@@ -325,31 +344,33 @@ export const createProperty = async (req, res) => {
     try {
       await RequestPoolService.matchRequestsForNewProperty(property.id);
     } catch (reverseMatchError) {
-      console.error('❌ Reverse matching failed for new property:', reverseMatchError);
+      console.error(
+        '❌ Reverse matching failed for new property:',
+        reverseMatchError
+      );
       // Don't fail the main operation if reverse matching fails
     }
 
     res.status(201).json({
       success: true,
       property: property,
-      message: 'Property created successfully'
+      message: 'Property created successfully',
     });
-
   } catch (error) {
     console.error('Create property error:', error);
     console.error('Error details:', {
       message: error.message,
       stack: error.stack,
       code: error.code,
-      name: error.name
+      name: error.name,
     });
-    
+
     // Send more detailed error information
     res.status(500).json({
       success: false,
       error: 'Failed to create property',
       details: error.message,
-      code: error.code
+      code: error.code,
     });
   }
 };
@@ -361,7 +382,7 @@ export const updateProperty = async (req, res) => {
     console.log('📋 Request body:', req.body);
     console.log('📁 Request files:', req.files);
     console.log('👤 User ID:', req.user.id);
-    
+
     const { id } = req.params;
     const landlordId = req.user.id;
     const updateData = { ...req.body };
@@ -372,16 +393,16 @@ export const updateProperty = async (req, res) => {
         id: id,
         organization: {
           members: {
-            some: { userId: landlordId }
-          }
-        }
-      }
+            some: { userId: landlordId },
+          },
+        },
+      },
     });
 
     if (!existingProperty) {
       return res.status(404).json({
         success: false,
-        error: 'Property not found'
+        error: 'Property not found',
       });
     }
 
@@ -410,17 +431,23 @@ export const updateProperty = async (req, res) => {
     // 2. Add newly uploaded files (multer field names: propertyVideo, propertyImages)
     if (req.files) {
       // Some multer configs provide single file as req.file, ensure arrays exist
-      req.files.propertyVideo = req.files.propertyVideo || (req.files['propertyVideo'] || []);
-      req.files.propertyImages = req.files.propertyImages || (req.files['propertyImages'] || []);
-      
+      req.files.propertyVideo =
+        req.files.propertyVideo || req.files['propertyVideo'] || [];
+      req.files.propertyImages =
+        req.files.propertyImages || req.files['propertyImages'] || [];
+
       if (req.files.propertyVideo && req.files.propertyVideo.length > 0) {
         // If a new video is uploaded, it replaces any retained/old video
-        finalVideos = [`/uploads/property_videos/${req.files.propertyVideo[0].filename}`];
+        finalVideos = [
+          `/uploads/property_videos/${req.files.propertyVideo[0].filename}`,
+        ];
         console.log('🎥 New video uploaded:', finalVideos);
       }
-      
+
       if (req.files.propertyImages && req.files.propertyImages.length > 0) {
-        const newImageFilenames = req.files.propertyImages.map(file => `/uploads/property_images/${file.filename}`);
+        const newImageFilenames = req.files.propertyImages.map(
+          (file) => `/uploads/property_images/${file.filename}`
+        );
         finalImages = [...finalImages, ...newImageFilenames]; // Append new images
         console.log('📸 New images uploaded:', newImageFilenames);
       }
@@ -429,39 +456,58 @@ export const updateProperty = async (req, res) => {
     // Update the images and videos fields in updateData
     // Preserve existing arrays if nothing retained or uploaded
     if (finalImages.length === 0 && existingProperty.images) {
-      try { finalImages = JSON.parse(existingProperty.images) || []; } catch {}
+      try {
+        finalImages = JSON.parse(existingProperty.images) || [];
+      } catch {}
     }
     if (finalVideos.length === 0 && existingProperty.videos) {
-      try { finalVideos = JSON.parse(existingProperty.videos) || []; } catch {}
+      try {
+        finalVideos = JSON.parse(existingProperty.videos) || [];
+      } catch {}
     }
 
-    updateData.images = finalImages.length > 0 ? JSON.stringify(finalImages) : null;
-    updateData.videos = finalVideos.length > 0 ? JSON.stringify(finalVideos) : null;
+    updateData.images =
+      finalImages.length > 0 ? JSON.stringify(finalImages) : null;
+    updateData.videos =
+      finalVideos.length > 0 ? JSON.stringify(finalVideos) : null;
     console.log('📸 Final images:', finalImages);
     console.log('🎥 Final videos:', finalVideos);
     // --- End Media Handling ---
 
     // Parse numeric fields
-    if (updateData.bedrooms) updateData.bedrooms = parseInt(updateData.bedrooms);
-    if (updateData.bathrooms) updateData.bathrooms = parseInt(updateData.bathrooms);
+    if (updateData.bedrooms)
+      updateData.bedrooms = parseInt(updateData.bedrooms);
+    if (updateData.bathrooms)
+      updateData.bathrooms = parseInt(updateData.bathrooms);
     if (updateData.size) updateData.size = parseFloat(updateData.size);
     if (updateData.floor) updateData.floor = parseInt(updateData.floor);
-    if (updateData.totalFloors) updateData.totalFloors = parseInt(updateData.totalFloors);
-    if (updateData.monthlyRent) updateData.monthlyRent = parseFloat(updateData.monthlyRent);
-    if (updateData.depositAmount) updateData.depositAmount = parseFloat(updateData.depositAmount);
+    if (updateData.totalFloors)
+      updateData.totalFloors = parseInt(updateData.totalFloors);
+    if (updateData.monthlyRent)
+      updateData.monthlyRent = parseFloat(updateData.monthlyRent);
+    if (updateData.depositAmount)
+      updateData.depositAmount = parseFloat(updateData.depositAmount);
 
     // Parse boolean fields
-    if (updateData.furnished !== undefined) updateData.furnished = updateData.furnished === 'true';
-    if (updateData.parking !== undefined) updateData.parking = updateData.parking === 'true';
-    if (updateData.petsAllowed !== undefined) updateData.petsAllowed = updateData.petsAllowed === 'true';
-    if (updateData.smokingAllowed !== undefined) updateData.smokingAllowed = updateData.smokingAllowed === 'true';
-    if (updateData.utilitiesIncluded !== undefined) updateData.utilitiesIncluded = updateData.utilitiesIncluded === 'true';
+    if (updateData.furnished !== undefined)
+      updateData.furnished = updateData.furnished === 'true';
+    if (updateData.parking !== undefined)
+      updateData.parking = updateData.parking === 'true';
+    if (updateData.petsAllowed !== undefined)
+      updateData.petsAllowed = updateData.petsAllowed === 'true';
+    if (updateData.smokingAllowed !== undefined)
+      updateData.smokingAllowed = updateData.smokingAllowed === 'true';
+    if (updateData.utilitiesIncluded !== undefined)
+      updateData.utilitiesIncluded = updateData.utilitiesIncluded === 'true';
 
     // Handle amenities (houseRules)
     if (updateData.houseRules) {
       // Frontend sends it as JSON string, so no need to stringify if it's already a string
       // But if it's an empty string, it means no amenities, so set to '[]'
-      if (typeof updateData.houseRules === 'string' && updateData.houseRules.length === 0) {
+      if (
+        typeof updateData.houseRules === 'string' &&
+        updateData.houseRules.length === 0
+      ) {
         updateData.houseRules = '[]';
       }
     } else {
@@ -469,17 +515,22 @@ export const updateProperty = async (req, res) => {
     }
 
     // Parse date fields
-    if (updateData.availableFrom) updateData.availableFrom = new Date(updateData.availableFrom);
-    if (updateData.availableUntil) updateData.availableUntil = new Date(updateData.availableUntil);
+    if (updateData.availableFrom)
+      updateData.availableFrom = new Date(updateData.availableFrom);
+    if (updateData.availableUntil)
+      updateData.availableUntil = new Date(updateData.availableUntil);
 
     console.log('📝 Final update data:', updateData);
-    console.log('🏠 Amenities/houseRules being updated:', updateData.houseRules);
+    console.log(
+      '🏠 Amenities/houseRules being updated:',
+      updateData.houseRules
+    );
 
     const property = await prisma.property.update({
       where: {
-        id: id
+        id: id,
       },
-      data: updateData
+      data: updateData,
     });
 
     console.log('✅ Property updated successfully:', property.id);
@@ -490,23 +541,22 @@ export const updateProperty = async (req, res) => {
     res.json({
       success: true,
       property: property,
-      message: 'Property updated successfully'
+      message: 'Property updated successfully',
     });
-
   } catch (error) {
     console.error('❌ Update property error:', error);
     console.error('Error details:', {
       message: error.message,
       stack: error.stack,
       code: error.code,
-      name: error.name
+      name: error.name,
     });
-    
+
     res.status(500).json({
       success: false,
       error: 'Failed to update property',
       details: error.message,
-      code: error.code
+      code: error.code,
     });
   }
 };
@@ -523,35 +573,34 @@ export const deleteProperty = async (req, res) => {
         id: id,
         organization: {
           members: {
-            some: { userId: landlordId }
-          }
-        }
-      }
+            some: { userId: landlordId },
+          },
+        },
+      },
     });
 
     if (!existingProperty) {
       return res.status(404).json({
         success: false,
-        error: 'Property not found'
+        error: 'Property not found',
       });
     }
 
     await prisma.property.delete({
       where: {
-        id: id
-      }
+        id: id,
+      },
     });
 
     res.json({
       success: true,
-      message: 'Property deleted successfully'
+      message: 'Property deleted successfully',
     });
-
   } catch (error) {
     console.error('Delete property error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to delete property'
+      error: 'Failed to delete property',
     });
   }
 };
@@ -568,7 +617,7 @@ export const updatePropertyStatus = async (req, res) => {
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid status. Must be one of: AVAILABLE, RENTED'
+        error: 'Invalid status. Must be one of: AVAILABLE, RENTED',
       });
     }
 
@@ -578,32 +627,36 @@ export const updatePropertyStatus = async (req, res) => {
         id: id,
         organization: {
           members: {
-            some: { userId: landlordId }
-          }
-        }
-      }
+            some: { userId: landlordId },
+          },
+        },
+      },
     });
 
     if (!existingProperty) {
       return res.status(404).json({
         success: false,
-        error: 'Property not found'
+        error: 'Property not found',
       });
     }
 
     // Update property status and availability
-    const property = await propertyAvailabilityService.updatePropertyAvailability(
-      id, 
-      status === 'AVAILABLE', // availability is true only if status is AVAILABLE
-      status
-    );
+    const property =
+      await propertyAvailabilityService.updatePropertyAvailability(
+        id,
+        status === 'AVAILABLE', // availability is true only if status is AVAILABLE
+        status
+      );
 
     // 🚀 REVERSE MATCHING: If property becomes available, find matching rental requests
     if (status === 'AVAILABLE') {
       try {
         await RequestPoolService.matchRequestsForNewProperty(id);
       } catch (reverseMatchError) {
-        console.error('❌ Reverse matching failed for property status update:', reverseMatchError);
+        console.error(
+          '❌ Reverse matching failed for property status update:',
+          reverseMatchError
+        );
         // Don't fail the main operation if reverse matching fails
       }
     }
@@ -611,14 +664,13 @@ export const updatePropertyStatus = async (req, res) => {
     res.json({
       success: true,
       property: property,
-      message: 'Property status updated successfully'
+      message: 'Property status updated successfully',
     });
-
   } catch (error) {
     console.error('Update property status error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to update property status'
+      error: 'Failed to update property status',
     });
   }
 };
@@ -634,7 +686,7 @@ export const updatePropertyAvailability = async (req, res) => {
     if (typeof availability !== 'boolean') {
       return res.status(400).json({
         success: false,
-        error: 'Availability must be a boolean value'
+        error: 'Availability must be a boolean value',
       });
     }
 
@@ -644,28 +696,35 @@ export const updatePropertyAvailability = async (req, res) => {
         id: id,
         organization: {
           members: {
-            some: { userId: landlordId }
-          }
-        }
-      }
+            some: { userId: landlordId },
+          },
+        },
+      },
     });
 
     if (!existingProperty) {
       return res.status(404).json({
         success: false,
-        error: 'Property not found'
+        error: 'Property not found',
       });
     }
 
     // Update property availability
-    const property = await propertyAvailabilityService.updatePropertyAvailability(id, availability);
+    const property =
+      await propertyAvailabilityService.updatePropertyAvailability(
+        id,
+        availability
+      );
 
     // 🚀 REVERSE MATCHING: If property becomes available, find matching rental requests
     if (availability === true) {
       try {
         await RequestPoolService.matchRequestsForNewProperty(id);
       } catch (reverseMatchError) {
-        console.error('❌ Reverse matching failed for property availability update:', reverseMatchError);
+        console.error(
+          '❌ Reverse matching failed for property availability update:',
+          reverseMatchError
+        );
         // Don't fail the main operation if reverse matching fails
       }
     }
@@ -673,14 +732,13 @@ export const updatePropertyAvailability = async (req, res) => {
     res.json({
       success: true,
       property: property,
-      message: 'Property availability updated successfully'
+      message: 'Property availability updated successfully',
     });
-
   } catch (error) {
     console.error('Update property availability error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to update property availability'
+      error: 'Failed to update property availability',
     });
   }
 };
@@ -690,22 +748,26 @@ export const getPropertyAvailabilitySummary = async (req, res) => {
   try {
     const landlordId = req.user.id;
 
-    const summary = await propertyAvailabilityService.getPropertyAvailabilitySummary(landlordId);
-    const availableProperties = await propertyAvailabilityService.getAvailableProperties(landlordId);
-    const canAcceptRequests = await propertyAvailabilityService.canLandlordAcceptRequests(landlordId);
+    const summary =
+      await propertyAvailabilityService.getPropertyAvailabilitySummary(
+        landlordId
+      );
+    const availableProperties =
+      await propertyAvailabilityService.getAvailableProperties(landlordId);
+    const canAcceptRequests =
+      await propertyAvailabilityService.canLandlordAcceptRequests(landlordId);
 
     res.json({
       success: true,
       summary,
       availableProperties,
-      canAcceptRequests
+      canAcceptRequests,
     });
-
   } catch (error) {
     console.error('Get property availability summary error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to get property availability summary'
+      error: 'Failed to get property availability summary',
     });
   }
 };

@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from 'react';
 import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext';
 import api from '../utils/api';
@@ -11,7 +17,18 @@ interface NotificationCounts {
 
 interface Notification {
   id: string;
-  type: 'NEW_RENTAL_REQUEST' | 'NEW_OFFER' | 'PAYMENT_CONFIRMED' | 'PAYMENT_FAILED' | 'CONTRACT_UPDATED' | 'CONTRACT_SIGNED' | 'KYC_APPROVED' | 'KYC_REJECTED' | 'PROPERTY_STATUS_CHANGED' | 'SYSTEM_ANNOUNCEMENT' | 'ACCOUNT_UPDATED';
+  type:
+    | 'NEW_RENTAL_REQUEST'
+    | 'NEW_OFFER'
+    | 'PAYMENT_CONFIRMED'
+    | 'PAYMENT_FAILED'
+    | 'CONTRACT_UPDATED'
+    | 'CONTRACT_SIGNED'
+    | 'KYC_APPROVED'
+    | 'KYC_REJECTED'
+    | 'PROPERTY_STATUS_CHANGED'
+    | 'SYSTEM_ANNOUNCEMENT'
+    | 'ACCOUNT_UPDATED';
   entityId: string;
   title: string;
   body: string;
@@ -24,16 +41,33 @@ interface NotificationContextType {
   notifications: Notification[];
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
-  markByTypeAsRead: (type: 'NEW_RENTAL_REQUEST' | 'NEW_OFFER' | 'PAYMENT_CONFIRMED' | 'PAYMENT_FAILED' | 'CONTRACT_UPDATED' | 'CONTRACT_SIGNED' | 'KYC_APPROVED' | 'KYC_REJECTED' | 'PROPERTY_STATUS_CHANGED' | 'SYSTEM_ANNOUNCEMENT' | 'ACCOUNT_UPDATED') => Promise<void>;
+  markByTypeAsRead: (
+    type:
+      | 'NEW_RENTAL_REQUEST'
+      | 'NEW_OFFER'
+      | 'PAYMENT_CONFIRMED'
+      | 'PAYMENT_FAILED'
+      | 'CONTRACT_UPDATED'
+      | 'CONTRACT_SIGNED'
+      | 'KYC_APPROVED'
+      | 'KYC_REJECTED'
+      | 'PROPERTY_STATUS_CHANGED'
+      | 'SYSTEM_ANNOUNCEMENT'
+      | 'ACCOUNT_UPDATED'
+  ) => Promise<void>;
   refreshCounts: () => Promise<void>;
 }
 
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+const NotificationContext = createContext<NotificationContextType | undefined>(
+  undefined
+);
 
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
   if (!context) {
-    throw new Error('useNotifications must be used within a NotificationProvider');
+    throw new Error(
+      'useNotifications must be used within a NotificationProvider'
+    );
   }
   return context;
 };
@@ -42,27 +76,29 @@ interface NotificationProviderProps {
   children: ReactNode;
 }
 
-export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
+export const NotificationProvider: React.FC<NotificationProviderProps> = ({
+  children,
+}) => {
   const { user } = useAuth();
   const { socket } = useSocket();
   const [counts, setCounts] = useState<NotificationCounts>({
     rentalRequests: 0,
     offers: 0,
-    total: 0
+    total: 0,
   });
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // Fetch initial notification counts (all unread)
   const fetchCounts = async () => {
     if (!user) return;
-    
+
     try {
       const response = await api.get('/notifications/unread-counts');
       if (response.data.success) {
         setCounts({
           rentalRequests: response.data.rentalRequests,
           offers: response.data.offers,
-          total: response.data.total
+          total: response.data.total,
         });
       }
     } catch (error) {
@@ -73,7 +109,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   // Fetch notifications
   const fetchNotifications = async () => {
     if (!user) return;
-    
+
     try {
       const response = await api.get('/notifications?limit=20');
       if (response.data.success) {
@@ -89,8 +125,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     try {
       await api.put(`/notifications/${id}/read`);
       // Update local state
-      setNotifications(prev => 
-        prev.map(notif => 
+      setNotifications(prev =>
+        prev.map(notif =>
           notif.id === id ? { ...notif, isRead: true } : notif
         )
       );
@@ -106,9 +142,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     try {
       await api.put('/notifications/read-all');
       // Update local state
-      setNotifications(prev => 
-        prev.map(notif => ({ ...notif, isRead: true }))
-      );
+      setNotifications(prev => prev.map(notif => ({ ...notif, isRead: true })));
       // Reset counts
       setCounts({ rentalRequests: 0, offers: 0, total: 0 });
     } catch (error) {
@@ -117,12 +151,25 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   };
 
   // Mark notifications by type as read
-  const markByTypeAsRead = async (type: 'NEW_RENTAL_REQUEST' | 'NEW_OFFER' | 'PAYMENT_CONFIRMED' | 'PAYMENT_FAILED' | 'CONTRACT_UPDATED' | 'CONTRACT_SIGNED' | 'KYC_APPROVED' | 'KYC_REJECTED' | 'PROPERTY_STATUS_CHANGED' | 'SYSTEM_ANNOUNCEMENT' | 'ACCOUNT_UPDATED') => {
+  const markByTypeAsRead = async (
+    type:
+      | 'NEW_RENTAL_REQUEST'
+      | 'NEW_OFFER'
+      | 'PAYMENT_CONFIRMED'
+      | 'PAYMENT_FAILED'
+      | 'CONTRACT_UPDATED'
+      | 'CONTRACT_SIGNED'
+      | 'KYC_APPROVED'
+      | 'KYC_REJECTED'
+      | 'PROPERTY_STATUS_CHANGED'
+      | 'SYSTEM_ANNOUNCEMENT'
+      | 'ACCOUNT_UPDATED'
+  ) => {
     try {
       await api.put(`/notifications/read-by-type/${type}`);
       // Update local state
-      setNotifications(prev => 
-        prev.map(notif => 
+      setNotifications(prev =>
+        prev.map(notif =>
           notif.type === type ? { ...notif, isRead: true } : notif
         )
       );
@@ -185,7 +232,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     markAsRead,
     markAllAsRead,
     markByTypeAsRead,
-    refreshCounts
+    refreshCounts,
   };
 
   return (

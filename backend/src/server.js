@@ -2,7 +2,10 @@ import dotenv from 'dotenv';
 import { createServer } from 'http';
 import app from './app.js';
 import { prisma } from './utils/prisma.js';
-import { startContractMonitoring, stopContractMonitoring } from './controllers/contractController.js';
+import {
+  startContractMonitoring,
+  stopContractMonitoring,
+} from './controllers/contractController.js';
 import { logger } from './utils/logger.js';
 import { initializeSocket } from './socket/socketServer.js';
 
@@ -16,7 +19,7 @@ logger.info('Environment variables loaded:', {
   JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'NOT SET',
   PORT: process.env.PORT,
   NODE_ENV: process.env.NODE_ENV,
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET'
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET',
 });
 
 // Start server
@@ -30,15 +33,21 @@ const startServer = async () => {
     startContractMonitoring();
 
     // Start move-in verification scheduler
-    const { startMoveInVerificationScheduler } = await import('./services/moveInVerificationService.js');
+    const { startMoveInVerificationScheduler } = await import(
+      './services/moveInVerificationService.js'
+    );
     startMoveInVerificationScheduler();
 
     // Start lease lifecycle scheduler (termination execution)
-    const { startLeaseLifecycleScheduler } = await import('./services/leaseLifecycleService.js');
+    const { startLeaseLifecycleScheduler } = await import(
+      './services/leaseLifecycleService.js'
+    );
     startLeaseLifecycleScheduler();
 
     // Start review cron jobs
-    const { initializeReviewCronJobs } = await import('./services/reviewCronService.js');
+    const { initializeReviewCronJobs } = await import(
+      './services/reviewCronService.js'
+    );
     initializeReviewCronJobs();
     logger.info('⏰ Review cron jobs initialized');
 
@@ -61,7 +70,9 @@ const startServer = async () => {
     // Start server
     server.listen(PORT, () => {
       logger.info(`🚀 Server running on port ${PORT}`);
-      logger.info(`📱 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+      logger.info(
+        `📱 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`
+      );
       logger.info(`🔐 Social Auth URLs:`);
       logger.info(`   Google: http://localhost:${PORT}/api/auth/google`);
       logger.info(`   Facebook: http://localhost:${PORT}/api/auth/facebook`);
@@ -76,7 +87,7 @@ const startServer = async () => {
 // Handle graceful shutdown
 const gracefulShutdown = async (signal) => {
   logger.info(`\n🛑 Received ${signal}. Shutting down server...`);
-  
+
   try {
     stopContractMonitoring();
     await prisma.$disconnect();
@@ -103,4 +114,4 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-startServer(); 
+startServer();

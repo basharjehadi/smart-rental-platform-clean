@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
-const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false, requestData = null, rentalType = 'solo' }) => {
+const CreateRentalRequestModal = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  editMode = false,
+  requestData = null,
+  rentalType = 'solo',
+}) => {
   const [originalRequestId, setOriginalRequestId] = useState(null);
   const [formData, setFormData] = useState({
     city: '',
@@ -14,7 +21,7 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
     requirements: '',
     furnished: false,
     parking: false,
-    petsAllowed: false
+    petsAllowed: false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -23,143 +30,530 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
 
   // Polish cities with their districts
   const cityDistricts = {
-    'Warsaw': [
-      'Mokotów', 'Praga-Południe', 'Wola', 'Śródmieście', 'Bielany', 'Targówek', 
-      'Bemowo', 'Ochota', 'Praga-Północ', 'Żoliborz', 'Włochy', 'Ursus', 
-      'Wilanów', 'Wesoła', 'Wawer', 'Rembertów', 'Ursynów', 'Saska Kępa'
+    Warsaw: [
+      'Mokotów',
+      'Praga-Południe',
+      'Wola',
+      'Śródmieście',
+      'Bielany',
+      'Targówek',
+      'Bemowo',
+      'Ochota',
+      'Praga-Północ',
+      'Żoliborz',
+      'Włochy',
+      'Ursus',
+      'Wilanów',
+      'Wesoła',
+      'Wawer',
+      'Rembertów',
+      'Ursynów',
+      'Saska Kępa',
     ],
-    'Krakow': [
-      'Stare Miasto', 'Grzegórzki', 'Prądnik Czerwony', 'Prądnik Biały', 'Krowodrza', 
-      'Bronowice', 'Zwierzyniec', 'Dębniki', 'Łagiewniki-Borek Fałęcki', 'Swoszowice', 
-      'Podgórze Duchackie', 'Bieżanów-Prokocim', 'Podgórze', 'Czyżyny', 'Mistrzejowice', 
-      'Bieńczyce', 'Wzgórza Krzesławickie', 'Nowa Huta'
+    Krakow: [
+      'Stare Miasto',
+      'Grzegórzki',
+      'Prądnik Czerwony',
+      'Prądnik Biały',
+      'Krowodrza',
+      'Bronowice',
+      'Zwierzyniec',
+      'Dębniki',
+      'Łagiewniki-Borek Fałęcki',
+      'Swoszowice',
+      'Podgórze Duchackie',
+      'Bieżanów-Prokocim',
+      'Podgórze',
+      'Czyżyny',
+      'Mistrzejowice',
+      'Bieńczyce',
+      'Wzgórza Krzesławickie',
+      'Nowa Huta',
     ],
-    'Poznan': [
-      'Stare Miasto', 'Wilda', 'Piątkowo', 'Nowe Miasto', 'Jeżyce', 'Grunwald', 
-      'Łazarz', 'Górczyn', 'Juniakowo', 'Chartowo', 'Winogrady', 
-      'Naramowice', 'Umultowo', 'Morasko', 'Radojewo', 'Kiekrz'
+    Poznan: [
+      'Stare Miasto',
+      'Wilda',
+      'Piątkowo',
+      'Nowe Miasto',
+      'Jeżyce',
+      'Grunwald',
+      'Łazarz',
+      'Górczyn',
+      'Juniakowo',
+      'Chartowo',
+      'Winogrady',
+      'Naramowice',
+      'Umultowo',
+      'Morasko',
+      'Radojewo',
+      'Kiekrz',
     ],
-    'Gdansk': [
-      'Śródmieście', 'Chełm', 'Brzeźno', 'Nowy Port', 'Wrzeszcz Dolny', 'Wrzeszcz Górny', 
-      'Oliwa', 'Przymorze Wielkie', 'Przymorze Małe', 'Żabianka-Wejhera-Jelitkowo-Tysiąclecia', 
-      'Kokoszki', 'Kiełpino Górne', 'VII Dwór', 'Matarnia', 'Ujeścisko-Łostowice', 
-      'Piecki-Migowo', 'Rudniki', 'Suchanino', 'Siedlce', 'Aniołki', 'Młyniska', 
-      'Letnica', 'Krakowiec-Górki Zachodnie', 'Osowa', 'Jasień', 'Orunia-Św.Wojciech-Lipce'
+    Gdansk: [
+      'Śródmieście',
+      'Chełm',
+      'Brzeźno',
+      'Nowy Port',
+      'Wrzeszcz Dolny',
+      'Wrzeszcz Górny',
+      'Oliwa',
+      'Przymorze Wielkie',
+      'Przymorze Małe',
+      'Żabianka-Wejhera-Jelitkowo-Tysiąclecia',
+      'Kokoszki',
+      'Kiełpino Górne',
+      'VII Dwór',
+      'Matarnia',
+      'Ujeścisko-Łostowice',
+      'Piecki-Migowo',
+      'Rudniki',
+      'Suchanino',
+      'Siedlce',
+      'Aniołki',
+      'Młyniska',
+      'Letnica',
+      'Krakowiec-Górki Zachodnie',
+      'Osowa',
+      'Jasień',
+      'Orunia-Św.Wojciech-Lipce',
     ],
-    'Wroclaw': [
-      'Stare Miasto', 'Śródmieście', 'Krzyki', 'Fabryczna', 'Psie Pole', 'Karłowice', 
-      'Kleczków', 'Kowale', 'Leśnica', 'Muchobór Mały', 'Muchobór Wielki', 'Ołbin', 
-      'Ołtaszyn', 'Pilczyce', 'Pracze Odrzańskie', 'Różanka', 'Sępolno', 'Sołtysowice', 
-      'Stabłowice', 'Strachocin-Swojczyce-Wojnów', 'Świniary', 'Tarnogaj', 'Widawa', 'Wojszyce', 'Zalesie', 'Żerniki'
+    Wroclaw: [
+      'Stare Miasto',
+      'Śródmieście',
+      'Krzyki',
+      'Fabryczna',
+      'Psie Pole',
+      'Karłowice',
+      'Kleczków',
+      'Kowale',
+      'Leśnica',
+      'Muchobór Mały',
+      'Muchobór Wielki',
+      'Ołbin',
+      'Ołtaszyn',
+      'Pilczyce',
+      'Pracze Odrzańskie',
+      'Różanka',
+      'Sępolno',
+      'Sołtysowice',
+      'Stabłowice',
+      'Strachocin-Swojczyce-Wojnów',
+      'Świniary',
+      'Tarnogaj',
+      'Widawa',
+      'Wojszyce',
+      'Zalesie',
+      'Żerniki',
     ],
-    'Lodz': [
-      'Bałuty', 'Górna', 'Polesie', 'Śródmieście', 'Widzew', 'Andrzejów', 'Chojny', 
-      'Dąbrowa', 'Doły', 'Fabryczna', 'Górniak', 'Karolew', 'Koziny', 'Kurczaki', 
-      'Lublinek', 'Łagiewniki', 'Mileszki', 'Mokra', 'Nowosolna', 'Olechów', 'Olechów-Janów', 
-      'Park Reymonta', 'Radogoszcz', 'Retkinia', 'Ruda', 'Sikawa', 'Smulsko', 'Stare Polesie', 
-      'Stary Widzew', 'Teofilów', 'Wiskitno', 'Wzniesień Łódzkich', 'Zagórnik', 'Zielona Góra'
+    Lodz: [
+      'Bałuty',
+      'Górna',
+      'Polesie',
+      'Śródmieście',
+      'Widzew',
+      'Andrzejów',
+      'Chojny',
+      'Dąbrowa',
+      'Doły',
+      'Fabryczna',
+      'Górniak',
+      'Karolew',
+      'Koziny',
+      'Kurczaki',
+      'Lublinek',
+      'Łagiewniki',
+      'Mileszki',
+      'Mokra',
+      'Nowosolna',
+      'Olechów',
+      'Olechów-Janów',
+      'Park Reymonta',
+      'Radogoszcz',
+      'Retkinia',
+      'Ruda',
+      'Sikawa',
+      'Smulsko',
+      'Stare Polesie',
+      'Stary Widzew',
+      'Teofilów',
+      'Wiskitno',
+      'Wzniesień Łódzkich',
+      'Zagórnik',
+      'Zielona Góra',
     ],
-    'Szczecin': [
-      'Śródmieście', 'Pomorzany', 'Niebużany', 'Świerczewo', 'Warszewo', 'Arkońskie-Niemierzyn', 
-      'Głębokie-Pilchowo', 'Gumieńce', 'Krzekowo-Bezrzecze', 'Osów', 'Płonia-Śmierdnica-Jezierzyce', 
-      'Podjuchy', 'Wielgowo-Sławociesze', 'Załom-Kasztanowe', 'Bukowo', 'Centrum', 'Dąbie', 
-      'Kijewo', 'Międzyodrze-Wyspa Pucka', 'Niebuszewo', 'Nowe Miasto', 'Pogodno', 'Stołczyn', 'Turzyn', 'Zdroje'
+    Szczecin: [
+      'Śródmieście',
+      'Pomorzany',
+      'Niebużany',
+      'Świerczewo',
+      'Warszewo',
+      'Arkońskie-Niemierzyn',
+      'Głębokie-Pilchowo',
+      'Gumieńce',
+      'Krzekowo-Bezrzecze',
+      'Osów',
+      'Płonia-Śmierdnica-Jezierzyce',
+      'Podjuchy',
+      'Wielgowo-Sławociesze',
+      'Załom-Kasztanowe',
+      'Bukowo',
+      'Centrum',
+      'Dąbie',
+      'Kijewo',
+      'Międzyodrze-Wyspa Pucka',
+      'Niebuszewo',
+      'Nowe Miasto',
+      'Pogodno',
+      'Stołczyn',
+      'Turzyn',
+      'Zdroje',
     ],
-    'Bydgoszcz': [
-      'Szwederowo', 'Błonie', 'Okole', 'Śródmieście', 'Fordon', 'Brdyujście', 'Bartodzieje', 
-      'Bielawy', 'Bocianowo', 'Czyżkówko', 'Glinki', 'Jary', 'Kapuściska', 
-      'Łęgnowo', 'Miedzyń', 'Osowa Góra', 'Piaski', 'Prądy', 'Siernieczek', 'Skrzetusko', 
-      'Smukała', 'Stary Fordon', 'Wzgórze Wolności', 'Wyżyny', 'Zimne Wody'
+    Bydgoszcz: [
+      'Szwederowo',
+      'Błonie',
+      'Okole',
+      'Śródmieście',
+      'Fordon',
+      'Brdyujście',
+      'Bartodzieje',
+      'Bielawy',
+      'Bocianowo',
+      'Czyżkówko',
+      'Glinki',
+      'Jary',
+      'Kapuściska',
+      'Łęgnowo',
+      'Miedzyń',
+      'Osowa Góra',
+      'Piaski',
+      'Prądy',
+      'Siernieczek',
+      'Skrzetusko',
+      'Smukała',
+      'Stary Fordon',
+      'Wzgórze Wolności',
+      'Wyżyny',
+      'Zimne Wody',
     ],
-    'Lublin': [
-      'Śródmieście', 'Wieniawa', 'Zabłocie', 'Rury', 'Sławin', 'Sławinek', 'Wrotków', 
-      'Bronowice', 'Tatary', 'Kalinowszczyzna', 'Hajdów-Zadębie', 'Konstantynów', 'Lubelskiej Spółdzielni Mieszkaniowej', 
-      'Kościelniak', 'Szerokie', 'Zemborzyce', 'Dziesiąta', 'Głusk', 'Węglin', 'Felicity'
+    Lublin: [
+      'Śródmieście',
+      'Wieniawa',
+      'Zabłocie',
+      'Rury',
+      'Sławin',
+      'Sławinek',
+      'Wrotków',
+      'Bronowice',
+      'Tatary',
+      'Kalinowszczyzna',
+      'Hajdów-Zadębie',
+      'Konstantynów',
+      'Lubelskiej Spółdzielni Mieszkaniowej',
+      'Kościelniak',
+      'Szerokie',
+      'Zemborzyce',
+      'Dziesiąta',
+      'Głusk',
+      'Węglin',
+      'Felicity',
     ],
-    'Katowice': [
-      'Śródmieście', 'Koszutka', 'Bogucice', 'Osiedle Paderewskiego-Muchowiec', 'Dąb', 
-      'Wełnowiec-Józefowiec', 'Załęże', 'Osiedle Witosa', 'Piotrowice-Ochojec', 'Ligota-Panewniki', 
-      'Brynowiec-Osiedle Zgrzebnioka', 'Giszowiec', 'Murcki', 'Kostuchna', 'Podlesie', 'Szopienice-Burowiec', 
-      'Janów-Nikiszowiec', 'Dąbrówka Mała', 'Roździeń', 'Załęska Hałda-Brynów część zachodnia'
+    Katowice: [
+      'Śródmieście',
+      'Koszutka',
+      'Bogucice',
+      'Osiedle Paderewskiego-Muchowiec',
+      'Dąb',
+      'Wełnowiec-Józefowiec',
+      'Załęże',
+      'Osiedle Witosa',
+      'Piotrowice-Ochojec',
+      'Ligota-Panewniki',
+      'Brynowiec-Osiedle Zgrzebnioka',
+      'Giszowiec',
+      'Murcki',
+      'Kostuchna',
+      'Podlesie',
+      'Szopienice-Burowiec',
+      'Janów-Nikiszowiec',
+      'Dąbrówka Mała',
+      'Roździeń',
+      'Załęska Hałda-Brynów część zachodnia',
     ],
-    'Bialystok': [
-      'Centrum', 'Białostoczek', 'Sienkiewicza', 'Bojary', 'Piaski', 'Przydworcowe', 
-      'Młynarskie', 'Piasta I', 'Piasta II', 'Skorupy', 'Mickiewicza', 'Dojlidy Górne', 
-      'Dojlidy', 'Wygoda', 'Wysoki Stoczek', 'Dziesięciny I', 'Dziesięciny II', 
-      'Antoniuk', 'Jaroszówka', 'Krynicka', 'Nowe Miasto', 'Osiedle Leśne', 'Piasta', 'Starosielce', 'Słoneczny Stok', 'Zielone Wzgórza'
+    Bialystok: [
+      'Centrum',
+      'Białostoczek',
+      'Sienkiewicza',
+      'Bojary',
+      'Piaski',
+      'Przydworcowe',
+      'Młynarskie',
+      'Piasta I',
+      'Piasta II',
+      'Skorupy',
+      'Mickiewicza',
+      'Dojlidy Górne',
+      'Dojlidy',
+      'Wygoda',
+      'Wysoki Stoczek',
+      'Dziesięciny I',
+      'Dziesięciny II',
+      'Antoniuk',
+      'Jaroszówka',
+      'Krynicka',
+      'Nowe Miasto',
+      'Osiedle Leśne',
+      'Piasta',
+      'Starosielce',
+      'Słoneczny Stok',
+      'Zielone Wzgórza',
     ],
-    'Gdynia': [
-      'Śródmieście', 'Kamienna Góra', 'Grabówek', 'Oksywie', 'Obłuże', 'Pogórze', 
-      'Działki Leśne', 'Leszczynki', 'Chwarzno-Wiczlino', 'Mały Kack', 'Wielki Kack', 
-      'Karwiny', 'Dąbrowa', 'Chylonia', 'Pustki Cisowskie-Demptowo', 'Cisowa'
+    Gdynia: [
+      'Śródmieście',
+      'Kamienna Góra',
+      'Grabówek',
+      'Oksywie',
+      'Obłuże',
+      'Pogórze',
+      'Działki Leśne',
+      'Leszczynki',
+      'Chwarzno-Wiczlino',
+      'Mały Kack',
+      'Wielki Kack',
+      'Karwiny',
+      'Dąbrowa',
+      'Chylonia',
+      'Pustki Cisowskie-Demptowo',
+      'Cisowa',
     ],
-    'Czestochowa': [
-      'Śródmieście', 'Stare Miasto', 'Ostatni Grosz', 'Trzech Wieszczów', 'Tysiąclecie', 
-      'Północ', 'Raków', 'Błeszno', 'Częstochówka-Parkitka', 'Gnaszyn-Kawodrza', 'Grabówka', 
-      'Kiedrzyn', 'Lisiniec', 'Mirów', 'Podjasnogórska', 'Stradom', 'Wrzosowiak', 'Wyczerpy-Aniołów', 'Zawodzie-Dąbie'
+    Czestochowa: [
+      'Śródmieście',
+      'Stare Miasto',
+      'Ostatni Grosz',
+      'Trzech Wieszczów',
+      'Tysiąclecie',
+      'Północ',
+      'Raków',
+      'Błeszno',
+      'Częstochówka-Parkitka',
+      'Gnaszyn-Kawodrza',
+      'Grabówka',
+      'Kiedrzyn',
+      'Lisiniec',
+      'Mirów',
+      'Podjasnogórska',
+      'Stradom',
+      'Wrzosowiak',
+      'Wyczerpy-Aniołów',
+      'Zawodzie-Dąbie',
     ],
-    'Radom': [
-      'Śródmieście', 'Ustronie', 'Gołębiów I', 'Gołębiów II', 'Kozia Góra', 'Klimontów', 
-      'Michałów', 'Obozisko', 'Planty', 'Potkanów', 'Prędocice', 'Sadków', 
-      'Wacyn', 'Wośniki', 'Zakrzew', 'Żakowice'
+    Radom: [
+      'Śródmieście',
+      'Ustronie',
+      'Gołębiów I',
+      'Gołębiów II',
+      'Kozia Góra',
+      'Klimontów',
+      'Michałów',
+      'Obozisko',
+      'Planty',
+      'Potkanów',
+      'Prędocice',
+      'Sadków',
+      'Wacyn',
+      'Wośniki',
+      'Zakrzew',
+      'Żakowice',
     ],
-    'Sosnowiec': [
-      'Śródmieście', 'Pogoń', 'Radocha', 'Rudna I', 'Rudna II', 'Rudna III', 'Rudna IV', 
-      'Rudna V', 'Rudna VI', 'Rudna VII', 'Rudna VIII', 'Rudna IX', 'Rudna X', 'Rudna XI', 
-      'Rudna XII', 'Rudna XIII', 'Rudna XIV', 'Rudna XV', 'Rudna XVI', 'Rudna XVII', 'Rudna XVIII', 'Rudna XIX', 'Rudna XX'
+    Sosnowiec: [
+      'Śródmieście',
+      'Pogoń',
+      'Radocha',
+      'Rudna I',
+      'Rudna II',
+      'Rudna III',
+      'Rudna IV',
+      'Rudna V',
+      'Rudna VI',
+      'Rudna VII',
+      'Rudna VIII',
+      'Rudna IX',
+      'Rudna X',
+      'Rudna XI',
+      'Rudna XII',
+      'Rudna XIII',
+      'Rudna XIV',
+      'Rudna XV',
+      'Rudna XVI',
+      'Rudna XVII',
+      'Rudna XVIII',
+      'Rudna XIX',
+      'Rudna XX',
     ],
-    'Torun': [
-      'Stare Miasto', 'Nowe Miasto', 'Rubinkowo', 'Bielany', 'Bydgoskie Przedmieście', 
-      'Chełmińskie Przedmieście', 'Jakubskie Przedmieście', 'Katarzynka', 'Koniuchy', 
-      'Mokre', 'Na Skarpie', 'Podgórz', 'Rynek Nowomiejski', 'Stawki', 'Wrzosy', 'Zieleniec'
+    Torun: [
+      'Stare Miasto',
+      'Nowe Miasto',
+      'Rubinkowo',
+      'Bielany',
+      'Bydgoskie Przedmieście',
+      'Chełmińskie Przedmieście',
+      'Jakubskie Przedmieście',
+      'Katarzynka',
+      'Koniuchy',
+      'Mokre',
+      'Na Skarpie',
+      'Podgórz',
+      'Rynek Nowomiejski',
+      'Stawki',
+      'Wrzosy',
+      'Zieleniec',
     ],
-    'Kielce': [
-      'Śródmieście', 'Barwinek', 'Białogon', 'Bocianek', 'Bukówka', 'Cedzyna', 'Ciekoty', 
-      'Dąbrowa', 'Dobromyśl', 'Domaszowice', 'Drozdów', 'Górno', 'Grabówka', 'Herby', 
-      'Jagiellońskie', 'Kadzielnia', 'Karczówka', 'Książnica', 'Laskówka', 'Leśnica', 
-      'Lipówka', 'Łazy', 'Maleszowa', 'Miedziana Góra', 'Niewachlów', 'Nowy Folwark', 
-      'Ostra Górka', 'Pakosz', 'Piekoszów', 'Piaski', 'Podkarczówka', 'Podklonówka', 
-      'Podłęże', 'Podmiejska', 'Podszkodzie', 'Podzamcze', 'Pogorzałe', 'Polanka', 
-      'Przypki', 'Reków', 'Słowik', 'Słowik Stary', 'Stadion', 'Stare Miasto', 
-      'Szydłówek', 'Ślichowice', 'Świętokrzyskie', 'Targi', 'Tomaszówka', 'Uroczysko', 
-      'Warszawskie', 'Wietrznia', 'Wzgórze Świętej Katarzyny', 'Zagórze', 'Zalesie', 'Zielona'
+    Kielce: [
+      'Śródmieście',
+      'Barwinek',
+      'Białogon',
+      'Bocianek',
+      'Bukówka',
+      'Cedzyna',
+      'Ciekoty',
+      'Dąbrowa',
+      'Dobromyśl',
+      'Domaszowice',
+      'Drozdów',
+      'Górno',
+      'Grabówka',
+      'Herby',
+      'Jagiellońskie',
+      'Kadzielnia',
+      'Karczówka',
+      'Książnica',
+      'Laskówka',
+      'Leśnica',
+      'Lipówka',
+      'Łazy',
+      'Maleszowa',
+      'Miedziana Góra',
+      'Niewachlów',
+      'Nowy Folwark',
+      'Ostra Górka',
+      'Pakosz',
+      'Piekoszów',
+      'Piaski',
+      'Podkarczówka',
+      'Podklonówka',
+      'Podłęże',
+      'Podmiejska',
+      'Podszkodzie',
+      'Podzamcze',
+      'Pogorzałe',
+      'Polanka',
+      'Przypki',
+      'Reków',
+      'Słowik',
+      'Słowik Stary',
+      'Stadion',
+      'Stare Miasto',
+      'Szydłówek',
+      'Ślichowice',
+      'Świętokrzyskie',
+      'Targi',
+      'Tomaszówka',
+      'Uroczysko',
+      'Warszawskie',
+      'Wietrznia',
+      'Wzgórze Świętej Katarzyny',
+      'Zagórze',
+      'Zalesie',
+      'Zielona',
     ],
-    'Rzeszow': [
-      'Śródmieście', 'Nowe Miasto', 'Pobitno', 'Drabinianka', 'Zalesie', 'Słocina', 
-      'Przybyszówka', 'Zwięczyca', 'Budziwój', 'Ruska Wieś', 'Załęże', 'Biała', 'Tyczyn', 
-      'Krasne', 'Boguchwała', 'Łańcut', 'Leżajsk', 'Przeworsk', 'Jarosław', 'Przemyśl'
+    Rzeszow: [
+      'Śródmieście',
+      'Nowe Miasto',
+      'Pobitno',
+      'Drabinianka',
+      'Zalesie',
+      'Słocina',
+      'Przybyszówka',
+      'Zwięczyca',
+      'Budziwój',
+      'Ruska Wieś',
+      'Załęże',
+      'Biała',
+      'Tyczyn',
+      'Krasne',
+      'Boguchwała',
+      'Łańcut',
+      'Leżajsk',
+      'Przeworsk',
+      'Jarosław',
+      'Przemyśl',
     ],
-    'Gliwice': [
-      'Śródmieście', 'Kozłów', 'Huta Andrzej', 'Ruda', 'Wirek', 'Bojków', 'Gaj', 'Kleszczów', 
-      'Kobiór', 'Krywałd', 'Łabędy', 'Mikołów', 'Ornontowice', 'Orzesze', 'Paniówki', 
-      'Pawłowice', 'Pielgrzymowice', 'Pilchowice', 'Pogrzebień', 'Pruchna', 'Pszczyna', 
-      'Pszów', 'Radlin', 'Radostowice', 'Rudy', 'Rybnik', 'Rydułtowy', 'Sośnicowice', 
-      'Suszec', 'Świerklany', 'Tychy', 'Wodzisław Śląski', 'Żory', 'Żywiec'
+    Gliwice: [
+      'Śródmieście',
+      'Kozłów',
+      'Huta Andrzej',
+      'Ruda',
+      'Wirek',
+      'Bojków',
+      'Gaj',
+      'Kleszczów',
+      'Kobiór',
+      'Krywałd',
+      'Łabędy',
+      'Mikołów',
+      'Ornontowice',
+      'Orzesze',
+      'Paniówki',
+      'Pawłowice',
+      'Pielgrzymowice',
+      'Pilchowice',
+      'Pogrzebień',
+      'Pruchna',
+      'Pszczyna',
+      'Pszów',
+      'Radlin',
+      'Radostowice',
+      'Rudy',
+      'Rybnik',
+      'Rydułtowy',
+      'Sośnicowice',
+      'Suszec',
+      'Świerklany',
+      'Tychy',
+      'Wodzisław Śląski',
+      'Żory',
+      'Żywiec',
     ],
-    'Zabrze': [
-      'Centrum Południe', 'Centrum Północ', 'Biskupice', 'Borsigwerk', 'Dorota', 'Grzegorz', 
-      'Helenka', 'Kończyce', 'Maczki', 'Mikulczyce', 'Osiedle Janek', 'Osiedle Tadeusza', 
-      'Pawłów', 'Rokitnica', 'Zaborze Południe', 'Zaborze Północ', 'Zandka'
-    ]
+    Zabrze: [
+      'Centrum Południe',
+      'Centrum Północ',
+      'Biskupice',
+      'Borsigwerk',
+      'Dorota',
+      'Grzegorz',
+      'Helenka',
+      'Kończyce',
+      'Maczki',
+      'Mikulczyce',
+      'Osiedle Janek',
+      'Osiedle Tadeusza',
+      'Pawłów',
+      'Rokitnica',
+      'Zaborze Południe',
+      'Zaborze Północ',
+      'Zandka',
+    ],
   };
 
   // Polish cities for dropdown
   const polishCities = Object.keys(cityDistricts);
 
   // Property types
-  const propertyTypes = [
-    'Room',
-    'Shared Room',
-    'Studio',
-    'Apartment',
-    'House'
-  ];
+  const propertyTypes = ['Room', 'Shared Room', 'Studio', 'Apartment', 'House'];
 
   // Number of rooms options
   const roomOptions = ['1', '2', '3', '4', '5', '6'];
 
   // Get districts for selected city
-  const getDistrictsForCity = (city) => {
+  const getDistrictsForCity = city => {
     const districts = cityDistricts[city] || [];
     const uniqueDistricts = Array.from(new Set(districts));
     return ['All', ...uniqueDistricts]; // Add "All" option at the beginning
@@ -171,19 +565,27 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
       const { city, district } = parseLocation(requestData.location);
       // Handle district - if it's null or empty, set to "All"
       const districtValue = requestData.district || district || 'All';
-      
+
       setFormData({
         city: city || '',
         district: districtValue,
-        budgetFrom: requestData.budgetFrom?.toString() || requestData.budget?.toString() || '',
-        budgetTo: requestData.budgetTo?.toString() || requestData.budget?.toString() || '',
+        budgetFrom:
+          requestData.budgetFrom?.toString() ||
+          requestData.budget?.toString() ||
+          '',
+        budgetTo:
+          requestData.budgetTo?.toString() ||
+          requestData.budget?.toString() ||
+          '',
         propertyType: requestData.propertyType || '',
         numberOfRooms: requestData.bedrooms?.toString() || '',
-        moveInDate: requestData.moveInDate ? requestData.moveInDate.split('T')[0] : '',
+        moveInDate: requestData.moveInDate
+          ? requestData.moveInDate.split('T')[0]
+          : '',
         requirements: requestData.description || '',
         furnished: requestData.furnished || false,
         parking: requestData.parking || false,
-        petsAllowed: requestData.petsAllowed || false
+        petsAllowed: requestData.petsAllowed || false,
       });
       // Store the original request ID for editing
       setOriginalRequestId(requestData.id);
@@ -191,7 +593,7 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
   }, [editMode, requestData]);
 
   // Parse location to extract city and district
-  const parseLocation = (location) => {
+  const parseLocation = location => {
     if (!location) return { city: '', district: '' };
     const parts = location.split(',').map(part => part.trim());
     if (parts.length >= 2) {
@@ -203,18 +605,18 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
-    
+
     // Reset district when city changes
     if (field === 'city') {
       setFormData(prev => ({
         ...prev,
         [field]: value,
-        district: ''
+        district: '',
       }));
     }
-    
+
     // Auto-set number of rooms to 1 for Room, Shared Room, and Studio
     if (field === 'propertyType') {
       const singleRoomTypes = ['Room', 'Shared Room', 'Studio'];
@@ -222,23 +624,24 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
         setFormData(prev => ({
           ...prev,
           [field]: value,
-          numberOfRooms: '1'
+          numberOfRooms: '1',
         }));
       }
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
       // Handle "All" district option
-      const locationText = formData.district === 'All' 
-        ? formData.city 
-        : `${formData.district}, ${formData.city}`;
-      
+      const locationText =
+        formData.district === 'All'
+          ? formData.city
+          : `${formData.district}, ${formData.city}`;
+
       const requestData = {
         title: `Looking for ${formData.propertyType} in ${formData.city}`,
         description: formData.requirements,
@@ -255,13 +658,16 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
         furnished: formData.furnished,
         parking: formData.parking,
         petsAllowed: formData.petsAllowed,
-        rentalType
+        rentalType,
       };
 
       let response;
       if (editMode) {
         // Update existing request
-        response = await api.put(`/rental-request/${originalRequestId}`, requestData);
+        response = await api.put(
+          `/rental-request/${originalRequestId}`,
+          requestData
+        );
       } else {
         // Create new request
         response = await api.post('/rental-request', requestData);
@@ -280,9 +686,9 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
           requirements: '',
           furnished: false,
           parking: false,
-          petsAllowed: false
+          petsAllowed: false,
         });
-        
+
         setOriginalRequestId(null);
         onSuccess && onSuccess();
         onClose();
@@ -292,7 +698,9 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
       if (error.response?.data?.error) {
         setError(error.response.data.error);
       } else {
-        setError(`Failed to ${editMode ? 'update' : 'create'} rental request. Please try again.`);
+        setError(
+          `Failed to ${editMode ? 'update' : 'create'} rental request. Please try again.`
+        );
       }
     } finally {
       setLoading(false);
@@ -311,7 +719,7 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
       requirements: '',
       furnished: false,
       parking: false,
-      petsAllowed: false
+      petsAllowed: false,
     });
     setError('');
     setOriginalRequestId(null);
@@ -321,65 +729,81 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
+      <div className='bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto'>
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
+        <div className='flex items-center justify-between p-6 border-b border-gray-200'>
+          <h2 className='text-xl font-semibold text-gray-900'>
             {editMode ? 'Edit Rental Request' : 'Create New Rental Request'}
           </h2>
           <button
             onClick={handleCancel}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className='text-gray-400 hover:text-gray-600 transition-colors'
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className='w-6 h-6'
+              fill='none'
+              stroke='currentColor'
+              viewBox='0 0 24 24'
+            >
+              <path
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth={2}
+                d='M6 18L18 6M6 6l12 12'
+              />
             </svg>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className='p-6 space-y-6'>
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            <div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded'>
               {error}
             </div>
           )}
 
           {/* City and District */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className='block text-sm font-medium text-gray-700 mb-2'>
                 City *
               </label>
               <select
                 value={formData.city}
-                onChange={(e) => handleInputChange('city', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={e => handleInputChange('city', e.target.value)}
+                className='w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                 required
               >
-                <option value="">Select a city</option>
+                <option value=''>Select a city</option>
                 {polishCities.map(city => (
-                  <option key={city} value={city}>{city}</option>
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className='block text-sm font-medium text-gray-700 mb-2'>
                 District *
               </label>
               <select
                 value={formData.district}
-                onChange={(e) => handleInputChange('district', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                onChange={e => handleInputChange('district', e.target.value)}
+                className='w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed'
                 required
                 disabled={!formData.city}
               >
-                <option value="">
-                  {formData.city ? 'Select a district' : 'Please select a city first'}
+                <option value=''>
+                  {formData.city
+                    ? 'Select a district'
+                    : 'Please select a city first'}
                 </option>
                 {getDistrictsForCity(formData.city).map(district => (
-                  <option key={district} value={district}>{district}</option>
+                  <option key={district} value={district}>
+                    {district}
+                  </option>
                 ))}
               </select>
             </div>
@@ -387,31 +811,33 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
 
           {/* Budget Range */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className='block text-sm font-medium text-gray-700 mb-2'>
               Budget Range (PLN) *
             </label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className='grid grid-cols-2 gap-4'>
               <div>
                 <input
-                  type="number"
+                  type='number'
                   value={formData.budgetFrom}
-                  onChange={(e) => handleInputChange('budgetFrom', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="From"
-                  min="0"
-                  step="100"
+                  onChange={e =>
+                    handleInputChange('budgetFrom', e.target.value)
+                  }
+                  className='w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                  placeholder='From'
+                  min='0'
+                  step='100'
                   required
                 />
               </div>
               <div>
                 <input
-                  type="number"
+                  type='number'
                   value={formData.budgetTo}
-                  onChange={(e) => handleInputChange('budgetTo', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="To"
-                  min="0"
-                  step="100"
+                  onChange={e => handleInputChange('budgetTo', e.target.value)}
+                  className='w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                  placeholder='To'
+                  min='0'
+                  step='100'
                   required
                 />
               </div>
@@ -419,115 +845,142 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
           </div>
 
           {/* Property Type and Number of Rooms */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className='block text-sm font-medium text-gray-700 mb-2'>
                 Property Type *
               </label>
               <select
                 value={formData.propertyType}
-                onChange={(e) => handleInputChange('propertyType', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={e =>
+                  handleInputChange('propertyType', e.target.value)
+                }
+                className='w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                 required
               >
-                <option value="">Select property type</option>
+                <option value=''>Select property type</option>
                 {propertyTypes.map(type => (
-                  <option key={type} value={type}>{type}</option>
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className='block text-sm font-medium text-gray-700 mb-2'>
                 Number of Rooms *
               </label>
               <select
                 value={formData.numberOfRooms}
-                onChange={(e) => handleInputChange('numberOfRooms', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                onChange={e =>
+                  handleInputChange('numberOfRooms', e.target.value)
+                }
+                className='w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed'
                 required
-                disabled={['Room', 'Shared Room', 'Studio'].includes(formData.propertyType)}
+                disabled={['Room', 'Shared Room', 'Studio'].includes(
+                  formData.propertyType
+                )}
               >
-                <option value="">Select number of rooms</option>
+                <option value=''>Select number of rooms</option>
                 {roomOptions.map(rooms => (
-                  <option key={rooms} value={rooms}>{rooms}</option>
+                  <option key={rooms} value={rooms}>
+                    {rooms}
+                  </option>
                 ))}
               </select>
-              {['Room', 'Shared Room', 'Studio'].includes(formData.propertyType) && (
-                <p className="text-xs text-gray-500 mt-1">Automatically set to 1 room for this property type</p>
+              {['Room', 'Shared Room', 'Studio'].includes(
+                formData.propertyType
+              ) && (
+                <p className='text-xs text-gray-500 mt-1'>
+                  Automatically set to 1 room for this property type
+                </p>
               )}
             </div>
           </div>
 
           {/* Move-in Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className='block text-sm font-medium text-gray-700 mb-2'>
               Move-in Date *
             </label>
             <input
-              type="date"
+              type='date'
               value={formData.moveInDate}
-              onChange={(e) => handleInputChange('moveInDate', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={e => handleInputChange('moveInDate', e.target.value)}
+              className='w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
               required
             />
           </div>
 
           {/* Requirements Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className='block text-sm font-medium text-gray-700 mb-2'>
               Requirements Description *
             </label>
-                         <textarea
-               value={formData.requirements}
-               onChange={(e) => handleInputChange('requirements', e.target.value)}
-               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-32 resize-none"
-               placeholder="Describe your specific requirements, lifestyle preferences, or any other important details (e.g., quiet neighborhood, close to public transport, specific amenities, etc.)"
-               required
-             />
+            <textarea
+              value={formData.requirements}
+              onChange={e => handleInputChange('requirements', e.target.value)}
+              className='w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-32 resize-none'
+              placeholder='Describe your specific requirements, lifestyle preferences, or any other important details (e.g., quiet neighborhood, close to public transport, specific amenities, etc.)'
+              required
+            />
           </div>
 
           {/* Property Preferences */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
+            <label className='block text-sm font-medium text-gray-700 mb-3'>
               Property Preferences
             </label>
-            <div className="space-y-3">
-              <div className="flex items-center">
+            <div className='space-y-3'>
+              <div className='flex items-center'>
                 <input
-                  type="checkbox"
-                  id="furnished"
+                  type='checkbox'
+                  id='furnished'
                   checked={formData.furnished}
-                  onChange={(e) => handleInputChange('furnished', e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  onChange={e =>
+                    handleInputChange('furnished', e.target.checked)
+                  }
+                  className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
                 />
-                <label htmlFor="furnished" className="ml-2 block text-sm text-gray-900">
+                <label
+                  htmlFor='furnished'
+                  className='ml-2 block text-sm text-gray-900'
+                >
                   Furnished accommodation
                 </label>
               </div>
-              
-              <div className="flex items-center">
+
+              <div className='flex items-center'>
                 <input
-                  type="checkbox"
-                  id="parking"
+                  type='checkbox'
+                  id='parking'
                   checked={formData.parking}
-                  onChange={(e) => handleInputChange('parking', e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  onChange={e => handleInputChange('parking', e.target.checked)}
+                  className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
                 />
-                <label htmlFor="parking" className="ml-2 block text-sm text-gray-900">
+                <label
+                  htmlFor='parking'
+                  className='ml-2 block text-sm text-gray-900'
+                >
                   Parking available
                 </label>
               </div>
-              
-              <div className="flex items-center">
+
+              <div className='flex items-center'>
                 <input
-                  type="checkbox"
-                  id="petsAllowed"
+                  type='checkbox'
+                  id='petsAllowed'
                   checked={formData.petsAllowed}
-                  onChange={(e) => handleInputChange('petsAllowed', e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  onChange={e =>
+                    handleInputChange('petsAllowed', e.target.checked)
+                  }
+                  className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
                 />
-                <label htmlFor="petsAllowed" className="ml-2 block text-sm text-gray-900">
+                <label
+                  htmlFor='petsAllowed'
+                  className='ml-2 block text-sm text-gray-900'
+                >
                   Pets allowed
                 </label>
               </div>
@@ -535,29 +988,47 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
           </div>
 
           {/* Action Buttons */}
-          <div className="flex space-x-3 pt-4 border-t border-gray-200">
+          <div className='flex space-x-3 pt-4 border-t border-gray-200'>
             <button
-              type="button"
+              type='button'
               onClick={handleCancel}
-              className="flex-1 px-4 py-3 text-gray-700 bg-gray-100 font-medium rounded-lg hover:bg-gray-200 transition-colors"
+              className='flex-1 px-4 py-3 text-gray-700 bg-gray-100 font-medium rounded-lg hover:bg-gray-200 transition-colors'
             >
               Cancel
             </button>
             <button
-              type="submit"
+              type='submit'
               disabled={loading}
-              className="flex-1 px-4 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              className='flex-1 px-4 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center'
             >
               {loading ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <svg
+                    className='animate-spin -ml-1 mr-3 h-5 w-5 text-white'
+                    xmlns='http://www.w3.org/2000/svg'
+                    fill='none'
+                    viewBox='0 0 24 24'
+                  >
+                    <circle
+                      className='opacity-25'
+                      cx='12'
+                      cy='12'
+                      r='10'
+                      stroke='currentColor'
+                      strokeWidth='4'
+                    ></circle>
+                    <path
+                      className='opacity-75'
+                      fill='currentColor'
+                      d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                    ></path>
                   </svg>
                   {editMode ? 'Updating...' : 'Publishing...'}
                 </>
+              ) : editMode ? (
+                'Update Request'
               ) : (
-                editMode ? 'Update Request' : 'Publish Request'
+                'Publish Request'
               )}
             </button>
           </div>
@@ -567,4 +1038,4 @@ const CreateRentalRequestModal = ({ isOpen, onClose, onSuccess, editMode = false
   );
 };
 
-export default CreateRentalRequestModal; 
+export default CreateRentalRequestModal;

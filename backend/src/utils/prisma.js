@@ -7,7 +7,10 @@ const __dirname = dirname(__filename);
 
 // Create a single PrismaClient instance that can be shared throughout your app
 const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error']
+  log:
+    process.env.NODE_ENV === 'development'
+      ? ['query', 'error', 'warn']
+      : ['error'],
 });
 
 // Handle connection events
@@ -28,5 +31,5 @@ process.on('beforeExit', async () => {
   await prisma.$disconnect();
 });
 
-export { prisma }; 
-export default prisma; 
+export { prisma };
+export default prisma;

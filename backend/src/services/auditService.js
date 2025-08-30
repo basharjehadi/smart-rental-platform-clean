@@ -24,7 +24,7 @@ export class AuditService {
     resourceId,
     details = {},
     ipAddress = null,
-    userAgent = null
+    userAgent = null,
   }) {
     try {
       const auditLog = await prisma.auditLog.create({
@@ -36,11 +36,13 @@ export class AuditService {
           details: JSON.stringify(details),
           ipAddress,
           userAgent,
-          timestamp: new Date()
-        }
+          timestamp: new Date(),
+        },
       });
 
-      console.log(`Audit log created: ${action} on ${resourceType} ${resourceId} by admin ${adminId}`);
+      console.log(
+        `Audit log created: ${action} on ${resourceType} ${resourceId} by admin ${adminId}`
+      );
       return auditLog;
     } catch (error) {
       console.error('Failed to create audit log:', error);
@@ -56,15 +58,20 @@ export class AuditService {
    * @param {number} limit - Maximum number of logs to return
    * @param {number} offset - Number of logs to skip
    */
-  static async getResourceAuditLogs(resourceType, resourceId, limit = 50, offset = 0) {
+  static async getResourceAuditLogs(
+    resourceType,
+    resourceId,
+    limit = 50,
+    offset = 0
+  ) {
     try {
       const logs = await prisma.auditLog.findMany({
         where: {
           resourceType,
-          resourceId
+          resourceId,
         },
         orderBy: {
-          timestamp: 'desc'
+          timestamp: 'desc',
         },
         take: limit,
         skip: offset,
@@ -73,10 +80,10 @@ export class AuditService {
             select: {
               id: true,
               name: true,
-              email: true
-            }
-          }
-        }
+              email: true,
+            },
+          },
+        },
       });
 
       return logs;
@@ -96,13 +103,13 @@ export class AuditService {
     try {
       const logs = await prisma.auditLog.findMany({
         where: {
-          adminId
+          adminId,
         },
         orderBy: {
-          timestamp: 'desc'
+          timestamp: 'desc',
         },
         take: limit,
-        skip: offset
+        skip: offset,
       });
 
       return logs;

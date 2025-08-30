@@ -7,7 +7,13 @@ import { useAuth } from '../contexts/AuthContext';
 // Initialize Stripe with environment variable
 // const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
-const PaymentFormContent = ({ amount, rentalRequestId, purpose, onSuccess, onError }) => {
+const PaymentFormContent = ({
+  amount,
+  rentalRequestId,
+  purpose,
+  onSuccess,
+  onError,
+}) => {
   // const [clientSecret, setClientSecret] = useState('');
   // const [loading, setLoading] = useState(true);
   // const [processing, setProcessing] = useState(false);
@@ -18,7 +24,7 @@ const PaymentFormContent = ({ amount, rentalRequestId, purpose, onSuccess, onErr
   // const elements = useElements();
   // const { api } = useAuth();
 
-    // useEffect(() => {
+  // useEffect(() => {
   //   createPaymentIntent();
   // }, [amount, rentalRequestId, purpose]);
 
@@ -42,7 +48,7 @@ const PaymentFormContent = ({ amount, rentalRequestId, purpose, onSuccess, onErr
   //   }
   // };
 
-    // const handleSubmit = async (event) => {
+  // const handleSubmit = async (event) => {
   //   event.preventDefault();
 
   //   if (!stripe || !elements || !clientSecret) {
@@ -182,25 +188,33 @@ const PaymentFormContent = ({ amount, rentalRequestId, purpose, onSuccess, onErr
   // );
 
   return (
-    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-      <h3 className="text-lg font-medium text-yellow-900 mb-2">
+    <div className='bg-yellow-50 border border-yellow-200 rounded-md p-4'>
+      <h3 className='text-lg font-medium text-yellow-900 mb-2'>
         Payment Form Content (Temporarily Disabled)
       </h3>
-      <p className="text-yellow-700">
-        Payment form content is temporarily disabled. Stripe integration has been commented out.
+      <p className='text-yellow-700'>
+        Payment form content is temporarily disabled. Stripe integration has
+        been commented out.
       </p>
     </div>
   );
 };
 
-const PaymentForm = ({ amount, rentalRequestId, purpose, onSuccess, onError }) => {
+const PaymentForm = ({
+  amount,
+  rentalRequestId,
+  purpose,
+  onSuccess,
+  onError,
+}) => {
   return (
-    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-      <h3 className="text-lg font-medium text-yellow-900 mb-2">
+    <div className='bg-yellow-50 border border-yellow-200 rounded-md p-4'>
+      <h3 className='text-lg font-medium text-yellow-900 mb-2'>
         Payment Form (Temporarily Disabled)
       </h3>
-      <p className="text-yellow-700">
-        Payment form is temporarily disabled. Stripe integration has been commented out.
+      <p className='text-yellow-700'>
+        Payment form is temporarily disabled. Stripe integration has been
+        commented out.
       </p>
     </div>
     // <Elements stripe={stripePromise}>
@@ -215,4 +229,4 @@ const PaymentForm = ({ amount, rentalRequestId, purpose, onSuccess, onError }) =
   );
 };
 
-export default PaymentForm; 
+export default PaymentForm;

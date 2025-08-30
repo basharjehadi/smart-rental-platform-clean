@@ -29,7 +29,9 @@ const prisma = new PrismaClient();
  */
 export async function anonymizeDeletedUser(userId) {
   const startTime = new Date();
-  console.log(`🔄 Starting anonymization for user ${userId} at ${startTime.toISOString()}`);
+  console.log(
+    `🔄 Starting anonymization for user ${userId} at ${startTime.toISOString()}`
+  );
 
   try {
     // Verify user exists and is marked as deleted
@@ -41,8 +43,8 @@ export async function anonymizeDeletedUser(userId) {
         name: true,
         profileImage: true,
         isDeleted: true,
-        deletedAt: true
-      }
+        deletedAt: true,
+      },
     });
 
     if (!user) {
@@ -62,7 +64,7 @@ export async function anonymizeDeletedUser(userId) {
       repliesAnonymized: 0,
       reportsAnonymized: 0,
       signalsAnonymized: 0,
-      aggregatesRecomputed: 0
+      aggregatesRecomputed: 0,
     };
 
     // 1. Anonymize user profile
@@ -71,8 +73,8 @@ export async function anonymizeDeletedUser(userId) {
       data: {
         name: 'Former user',
         profileImage: null,
-        anonymizedAt: new Date()
-      }
+        anonymizedAt: new Date(),
+      },
     });
 
     if (profileUpdate.name === 'Former user') {
@@ -118,17 +120,16 @@ export async function anonymizeDeletedUser(userId) {
       success: true,
       message: `Successfully anonymized user ${userId}`,
       changes,
-      anonymizedAt: endTime
+      anonymizedAt: endTime,
     };
 
     console.log(`✅ Anonymization completed successfully in ${duration}ms`);
     console.log(`📊 Changes made:`, changes);
 
     return result;
-
   } catch (error) {
     console.error(`❌ Error anonymizing user ${userId}:`, error);
-    
+
     const result = {
       userId,
       success: false,
@@ -140,9 +141,9 @@ export async function anonymizeDeletedUser(userId) {
         repliesAnonymized: 0,
         reportsAnonymized: 0,
         signalsAnonymized: 0,
-        aggregatesRecomputed: 0
+        aggregatesRecomputed: 0,
       },
-      anonymizedAt: new Date()
+      anonymizedAt: new Date(),
     };
 
     return result;
@@ -158,15 +159,12 @@ async function anonymizeUserReviews(userId) {
   try {
     const result = await prisma.review.updateMany({
       where: {
-        OR: [
-          { reviewerId: userId },
-          { revieweeId: userId }
-        ]
+        OR: [{ reviewerId: userId }, { revieweeId: userId }],
       },
       data: {
         reviewerDisplayName: 'Former user',
-        revieweeDisplayName: 'Former user'
-      }
+        revieweeDisplayName: 'Former user',
+      },
     });
 
     console.log(`✅ Anonymized ${result.count} reviews`);
@@ -187,8 +185,8 @@ async function anonymizeUserReplies(userId) {
     const result = await prisma.reviewReply.updateMany({
       where: { revieweeId: userId },
       data: {
-        userDisplayName: 'Former user'
-      }
+        userDisplayName: 'Former user',
+      },
     });
 
     console.log(`✅ Anonymized ${result.count} review replies`);
@@ -209,8 +207,8 @@ async function anonymizeUserReports(userId) {
     const result = await prisma.reviewReport.updateMany({
       where: { reporterId: userId },
       data: {
-        reporterDisplayName: 'Former user'
-      }
+        reporterDisplayName: 'Former user',
+      },
     });
 
     console.log(`✅ Anonymized ${result.count} review reports`);
@@ -229,17 +227,17 @@ async function anonymizeUserReports(userId) {
 async function anonymizeUserSignals(userId) {
   try {
     const result = await prisma.reviewSignal.updateMany({
-      where: { 
+      where: {
         lease: {
           OR: [
             { tenantGroup: { members: { some: { userId } } } },
-            { property: { landlordId: userId } }
-          ]
-        }
+            { property: { landlordId: userId } },
+          ],
+        },
       },
       data: {
-        userDisplayName: 'Former user'
-      }
+        userDisplayName: 'Former user',
+      },
     });
 
     console.log(`✅ Anonymized ${result.count} review signals`);
@@ -260,19 +258,21 @@ async function anonymizeUserMessages(userId) {
     const senderResult = await prisma.message.updateMany({
       where: { senderId: userId },
       data: {
-        senderDisplayName: 'Former user'
-      }
+        senderDisplayName: 'Former user',
+      },
     });
 
     // Anonymize messages where user is recipient
     const recipientResult = await prisma.message.updateMany({
       where: { recipientId: userId },
       data: {
-        recipientDisplayName: 'Former user'
-      }
+        recipientDisplayName: 'Former user',
+      },
     });
 
-    console.log(`✅ Anonymized ${senderResult.count} sent messages and ${recipientResult.count} received messages`);
+    console.log(
+      `✅ Anonymized ${senderResult.count} sent messages and ${recipientResult.count} received messages`
+    );
   } catch (error) {
     console.error('Error anonymizing messages:', error);
   }
@@ -287,8 +287,8 @@ async function anonymizeUserAuditLogs(userId) {
     const result = await prisma.auditLog.updateMany({
       where: { userId },
       data: {
-        userDisplayName: 'Former user'
-      }
+        userDisplayName: 'Former user',
+      },
     });
 
     console.log(`✅ Anonymized ${result.count} audit log entries`);
@@ -304,7 +304,9 @@ async function anonymizeUserAuditLogs(userId) {
  */
 async function recomputeAffectedAggregates(userId) {
   try {
-    console.log(`🔄 Re-computing aggregates for users affected by anonymization of ${userId}`);
+    console.log(
+      `🔄 Re-computing aggregates for users affected by anonymization of ${userId}`
+    );
 
     // Get all unique users who need aggregate recomputation
     const affectedUsers = new Set();
@@ -312,26 +314,26 @@ async function recomputeAffectedAggregates(userId) {
     // 1. Users who reviewed the anonymized user
     const reviewsReceived = await prisma.review.findMany({
       where: { revieweeId: userId },
-      select: { reviewerId: true }
+      select: { reviewerId: true },
     });
-    reviewsReceived.forEach(review => affectedUsers.add(review.reviewerId));
+    reviewsReceived.forEach((review) => affectedUsers.add(review.reviewerId));
 
     // 2. Users who were reviewed by the anonymized user
     const reviewsGiven = await prisma.review.findMany({
       where: { reviewerId: userId },
-      select: { revieweeId: true }
+      select: { revieweeId: true },
     });
-    reviewsGiven.forEach(review => affectedUsers.add(review.revieweeId));
+    reviewsGiven.forEach((review) => affectedUsers.add(review.revieweeId));
 
     // 3. Users in tenant groups that had reviews from/to the anonymized user
     const tenantGroupIds = new Set();
-    
+
     // Get tenant groups from reviews received
     const tenantGroupsFromReviews = await prisma.review.findMany({
       where: { revieweeId: userId },
-      select: { targetTenantGroupId: true }
+      select: { targetTenantGroupId: true },
     });
-    tenantGroupsFromReviews.forEach(review => {
+    tenantGroupsFromReviews.forEach((review) => {
       if (review.targetTenantGroupId) {
         tenantGroupIds.add(review.targetTenantGroupId);
       }
@@ -340,9 +342,9 @@ async function recomputeAffectedAggregates(userId) {
     // Get tenant groups from reviews given
     const tenantGroupsToReviews = await prisma.review.findMany({
       where: { reviewerId: userId },
-      select: { targetTenantGroupId: true }
+      select: { targetTenantGroupId: true },
     });
-    tenantGroupsToReviews.forEach(review => {
+    tenantGroupsToReviews.forEach((review) => {
       if (review.targetTenantGroupId) {
         tenantGroupIds.add(review.targetTenantGroupId);
       }
@@ -352,20 +354,26 @@ async function recomputeAffectedAggregates(userId) {
     for (const tenantGroupId of tenantGroupIds) {
       const tenantGroup = await prisma.tenantGroup.findUnique({
         where: { id: tenantGroupId },
-        select: { members: { select: { userId: true } } }
+        select: { members: { select: { userId: true } } },
       });
       if (tenantGroup) {
-        tenantGroup.members.forEach(member => affectedUsers.add(member.userId));
+        tenantGroup.members.forEach((member) =>
+          affectedUsers.add(member.userId)
+        );
       }
     }
 
     // Remove the anonymized user from the set
     affectedUsers.delete(userId);
 
-    console.log(`📊 Found ${affectedUsers.size} affected users for aggregate recomputation`);
+    console.log(
+      `📊 Found ${affectedUsers.size} affected users for aggregate recomputation`
+    );
 
     // Import aggregate computation functions
-    const { computeUserAggregate, computeTenantGroupAggregate } = await import('../services/reviews/aggregates.js');
+    const { computeUserAggregate, computeTenantGroupAggregate } = await import(
+      '../services/reviews/aggregates.js'
+    );
 
     let recomputedCount = 0;
 
@@ -376,7 +384,10 @@ async function recomputeAffectedAggregates(userId) {
         recomputedCount++;
         console.log(`✅ Recomputed aggregate for user: ${affectedUserId}`);
       } catch (error) {
-        console.error(`❌ Failed to recompute aggregate for user ${affectedUserId}:`, error);
+        console.error(
+          `❌ Failed to recompute aggregate for user ${affectedUserId}:`,
+          error
+        );
       }
     }
 
@@ -385,15 +396,19 @@ async function recomputeAffectedAggregates(userId) {
       try {
         await computeTenantGroupAggregate(tenantGroupId);
         recomputedCount++;
-        console.log(`✅ Recomputed aggregate for tenant group: ${tenantGroupId}`);
+        console.log(
+          `✅ Recomputed aggregate for tenant group: ${tenantGroupId}`
+        );
       } catch (error) {
-        console.error(`❌ Failed to recompute aggregate for tenant group ${tenantGroupId}:`, error);
+        console.error(
+          `❌ Failed to recompute aggregate for tenant group ${tenantGroupId}:`,
+          error
+        );
       }
     }
 
     console.log(`✅ Successfully recomputed ${recomputedCount} aggregates`);
     return { count: recomputedCount };
-
   } catch (error) {
     console.error('Error recomputing affected aggregates:', error);
     return { count: 0 };
@@ -427,15 +442,17 @@ export async function anonymizeDeletedUsers(userIds) {
           repliesAnonymized: 0,
           reportsAnonymized: 0,
           signalsAnonymized: 0,
-          aggregatesRecomputed: 0
+          aggregatesRecomputed: 0,
         },
-        anonymizedAt: new Date()
+        anonymizedAt: new Date(),
       });
     }
   }
 
-  const successCount = results.filter(r => r.success).length;
-  console.log(`✅ Batch anonymization completed: ${successCount}/${userIds.length} users successfully anonymized`);
+  const successCount = results.filter((r) => r.success).length;
+  console.log(
+    `✅ Batch anonymization completed: ${successCount}/${userIds.length} users successfully anonymized`
+  );
 
   return results;
 }
@@ -452,18 +469,20 @@ export async function getAnonymizationStats() {
       totalAnonymizedReplies,
       totalAnonymizedReports,
       totalAnonymizedSignals,
-      lastAnonymizedUser
+      lastAnonymizedUser,
     ] = await Promise.all([
       prisma.user.count({ where: { anonymizedAt: { not: null } } }),
       prisma.review.count({ where: { reviewerDisplayName: 'Former user' } }),
       prisma.reviewReply.count({ where: { userDisplayName: 'Former user' } }),
-      prisma.reviewReport.count({ where: { reporterDisplayName: 'Former user' } }),
+      prisma.reviewReport.count({
+        where: { reporterDisplayName: 'Former user' },
+      }),
       prisma.reviewSignal.count({ where: { userDisplayName: 'Former user' } }),
       prisma.user.findFirst({
         where: { anonymizedAt: { not: null } },
         orderBy: { anonymizedAt: 'desc' },
-        select: { anonymizedAt: true }
-      })
+        select: { anonymizedAt: true },
+      }),
     ]);
 
     return {
@@ -472,7 +491,7 @@ export async function getAnonymizationStats() {
       totalAnonymizedReplies,
       totalAnonymizedReports,
       totalAnonymizedSignals,
-      lastAnonymization: lastAnonymizedUser?.anonymizedAt || null
+      lastAnonymization: lastAnonymizedUser?.anonymizedAt || null,
     };
   } catch (error) {
     console.error('Error getting anonymization stats:', error);
@@ -482,7 +501,7 @@ export async function getAnonymizationStats() {
       totalAnonymizedReplies: 0,
       totalAnonymizedReports: 0,
       totalAnonymizedSignals: 0,
-      lastAnonymization: null
+      lastAnonymization: null,
     };
   }
 }
@@ -503,5 +522,5 @@ export default {
   anonymizeDeletedUser,
   anonymizeDeletedUsers,
   getAnonymizationStats,
-  cleanup
+  cleanup,
 };

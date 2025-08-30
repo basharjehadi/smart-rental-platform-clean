@@ -33,14 +33,20 @@ router.get('/my-invitations', tenantGroupController.getMyInvitations);
  * @desc    Accept invitation by token
  * @access  Private (authenticated users)
  */
-router.post('/accept-invitation', tenantGroupController.acceptInvitationByToken);
+router.post(
+  '/accept-invitation',
+  tenantGroupController.acceptInvitationByToken
+);
 
 /**
  * @route   POST /api/tenant-groups/decline-invitation
  * @desc    Decline invitation by token
  * @access  Private (authenticated users)
  */
-router.post('/decline-invitation', tenantGroupController.declineInvitationByToken);
+router.post(
+  '/decline-invitation',
+  tenantGroupController.declineInvitationByToken
+);
 
 /**
  * @route   POST /api/tenant-groups/:tenantGroupId/invite
@@ -54,7 +60,10 @@ router.post('/:tenantGroupId/invite', tenantGroupController.inviteUserToGroup);
  * @desc    Accept invitation to join tenant group (legacy by group id)
  * @access  Private (authenticated users)
  */
-router.post('/:tenantGroupId/accept', tenantGroupController.acceptGroupInvitation);
+router.post(
+  '/:tenantGroupId/accept',
+  tenantGroupController.acceptGroupInvitation
+);
 
 /**
  * @route   GET /api/tenant-groups/:tenantGroupId/members
@@ -82,6 +91,9 @@ router.delete('/:tenantGroupId/leave', tenantGroupController.leaveTenantGroup);
  * @desc    Transfer primary membership to another member
  * @access  Private (primary members only)
  */
-router.post('/:tenantGroupId/transfer-ownership', tenantGroupController.transferPrimaryMembership);
+router.post(
+  '/:tenantGroupId/transfer-ownership',
+  tenantGroupController.transferPrimaryMembership
+);
 
 export default router;

@@ -1,17 +1,23 @@
 import { prisma } from '../utils/prisma.js';
-import { getUnifiedPaymentData, getUpcomingPayments } from '../services/paymentService.js';
+import {
+  getUnifiedPaymentData,
+  getUpcomingPayments,
+} from '../services/paymentService.js';
 
 // Helper function to get tenant payment data - Now using unified service
 const getTenantPaymentsData = async (tenantId) => {
   try {
     console.log('🔍 getTenantPaymentsData called with tenantId:', tenantId);
-    
+
     // Use unified payment service
     const paymentData = await getUnifiedPaymentData(tenantId);
-    
-    console.log('✅ getTenantPaymentsData returning payments:', paymentData.payments.length);
+
+    console.log(
+      '✅ getTenantPaymentsData returning payments:',
+      paymentData.payments.length
+    );
     console.log('✅ Total paid amount:', paymentData.totalPaid);
-    
+
     return paymentData.payments;
   } catch (error) {
     console.error('Error fetching tenant payments:', error);
@@ -28,7 +34,7 @@ export const getTenantDashboardData = async (req, res) => {
     // Always return the tenant's own rental requests for the My Requests list
     const rentalRequests = await prisma.rentalRequest.findMany({
       where: {
-        tenantGroup: { members: { some: { userId: tenantId } } }
+        tenantGroup: { members: { some: { userId: tenantId } } },
       },
       include: {
         offers: {
@@ -38,33 +44,37 @@ export const getTenantDashboardData = async (req, res) => {
             moveInVerificationStatus: true,
             payments: {
               where: { status: { in: ['SUCCEEDED', 'CANCELLED'] } },
-              select: { id: true, amount: true, status: true, gateway: true, paidAt: true, purpose: true }
+              select: {
+                id: true,
+                amount: true,
+                status: true,
+                gateway: true,
+                paidAt: true,
+                purpose: true,
+              },
             },
-            organizationId: true
-          }
+            organizationId: true,
+          },
         },
         tenantGroup: {
           select: {
             id: true,
-            _count: { select: { members: true } }
-          }
-        }
+            _count: { select: { members: true } },
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     // Get tenant's active leases (paid offers that were NOT cancelled)
     const activeLeases = await prisma.offer.findMany({
       where: {
         rentalRequest: {
-          tenantGroup: { members: { some: { userId: tenantId } } }
+          tenantGroup: { members: { some: { userId: tenantId } } },
+          NOT: { status: 'CANCELLED' },
         },
         status: 'PAID',
         moveInVerificationStatus: { not: 'CANCELLED' },
-        rentalRequest: {
-          tenantGroup: { members: { some: { userId: tenantId } } },
-          NOT: { status: 'CANCELLED' }
-        }
       },
       include: {
         rentalRequest: true,
@@ -74,8 +84,8 @@ export const getTenantDashboardData = async (req, res) => {
             name: true,
             taxId: true,
             address: true,
-            signatureBase64: true
-          }
+            signatureBase64: true,
+          },
         },
         property: {
           select: {
@@ -89,17 +99,17 @@ export const getTenantDashboardData = async (req, res) => {
             bedrooms: true,
             bathrooms: true,
             size: true,
-            houseRules: true
-          }
-        }
+            houseRules: true,
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     console.log('🔍 Active leases found:', activeLeases.length);
     const activeLease = activeLeases[0] || null;
     console.log('🔍 Primary active lease ID:', activeLease?.id);
-    
+
     // If no active lease, return appropriate empty state data
     if (!activeLease) {
       console.log('❌ No active lease found for tenant:', tenantId);
@@ -116,13 +126,13 @@ export const getTenantDashboardData = async (req, res) => {
         accountStatus: {
           paymentHistory: 'No Data',
           leaseCompliance: 'No Data',
-          communication: 'No Data'
+          communication: 'No Data',
         },
         upcomingActions: [
           'Create your first rental request',
           'Complete your profile information',
-          'Upload identity verification documents'
-        ]
+          'Upload identity verification documents',
+        ],
       });
     }
 
@@ -131,17 +141,27 @@ export const getTenantDashboardData = async (req, res) => {
       const propertyAddress = (() => {
         if (offer.property && offer.property.address) {
           let completeAddress = offer.property.address;
-          if (offer.property.district) completeAddress += `, ${offer.property.district}`;
+          if (offer.property.district)
+            completeAddress += `, ${offer.property.district}`;
           completeAddress += `, ${offer.property.zipCode}, ${offer.property.city}`;
           return completeAddress;
         }
         return offer.rentalRequest.location || 'Address not specified';
       })();
 
-      const areaString = offer.property?.size ? `${offer.property.size} m²` : (offer.propertySize || '');
+      const areaString = offer.property?.size
+        ? `${offer.property.size} m²`
+        : offer.propertySize || '';
 
       const leaseStartDate = offer.rentalRequest.moveInDate;
-      const leaseEndDate = offer.leaseEndDate || (() => { const start = new Date(leaseStartDate); const end = new Date(start); end.setMonth(end.getMonth() + (offer.leaseDuration || 12)); return end; })();
+      const leaseEndDate =
+        offer.leaseEndDate ||
+        (() => {
+          const start = new Date(leaseStartDate);
+          const end = new Date(start);
+          end.setMonth(end.getMonth() + (offer.leaseDuration || 12));
+          return end;
+        })();
 
       return {
         offerId: offer.id,
@@ -149,34 +169,49 @@ export const getTenantDashboardData = async (req, res) => {
         property: {
           id: offer.property?.id,
           address: propertyAddress,
-          propertyType: offer.property?.propertyType || offer.propertyType || offer.rentalRequest.propertyType || 'Apartment',
+          propertyType:
+            offer.property?.propertyType ||
+            offer.propertyType ||
+            offer.rentalRequest.propertyType ||
+            'Apartment',
           rooms: offer.property?.bedrooms || offer.rentalRequest.bedrooms || 2,
-          bathrooms: offer.property?.bathrooms || offer.rentalRequest.bathrooms || 1,
+          bathrooms:
+            offer.property?.bathrooms || offer.rentalRequest.bathrooms || 1,
           area: areaString,
           leaseTerm: offer.leaseDuration || 12,
           amenities: (() => {
             if (offer.property?.houseRules) {
-              try { const parsed = JSON.parse(offer.property.houseRules); if (Array.isArray(parsed) && parsed.length > 0) return parsed; } catch {}
+              try {
+                const parsed = JSON.parse(offer.property.houseRules);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+              } catch {}
             }
             if (offer.propertyAmenities) {
-              try { return typeof offer.propertyAmenities === 'string' ? JSON.parse(offer.propertyAmenities) : offer.propertyAmenities; } catch { return ['No amenities listed']; }
+              try {
+                return typeof offer.propertyAmenities === 'string'
+                  ? JSON.parse(offer.propertyAmenities)
+                  : offer.propertyAmenities;
+              } catch {
+                return ['No amenities listed'];
+              }
             }
             return ['No amenities listed'];
-          })()
+          })(),
         },
         landlord: {
           name: offer.organization?.name || 'Organization',
           email: null,
           phone: null,
           address: offer.organization?.address || 'Not provided',
-          profileImage: null
+          profileImage: null,
         },
         lease: {
           startDate: leaseStartDate,
           endDate: leaseEndDate,
           monthlyRent: offer.rentAmount || offer.rentalRequest.budget || 0,
-          securityDeposit: offer.depositAmount || offer.rentalRequest.budget || 0
-        }
+          securityDeposit:
+            offer.depositAmount || offer.rentalRequest.budget || 0,
+        },
       };
     });
 
@@ -193,39 +228,70 @@ export const getTenantDashboardData = async (req, res) => {
             if (activeLease.property.district) {
               completeAddress += ', ' + activeLease.property.district;
             }
-            completeAddress += ', ' + activeLease.property.zipCode + ', ' + activeLease.property.city;
+            completeAddress +=
+              ', ' +
+              activeLease.property.zipCode +
+              ', ' +
+              activeLease.property.city;
             return completeAddress;
           }
           return activeLease.rentalRequest.location || 'Address not specified';
         })(),
-        propertyType: activeLease.property?.propertyType || activeLease.propertyType || activeLease.rentalRequest.propertyType || 'Apartment',
-        rooms: activeLease.property?.bedrooms || activeLease.rentalRequest.bedrooms || 2,
-        bathrooms: activeLease.property?.bathrooms || activeLease.rentalRequest.bathrooms || 1,
-        area: activeLease.property?.size ? `${activeLease.property.size} m²` : (activeLease.propertySize || ''),
+        propertyType:
+          activeLease.property?.propertyType ||
+          activeLease.propertyType ||
+          activeLease.rentalRequest.propertyType ||
+          'Apartment',
+        rooms:
+          activeLease.property?.bedrooms ||
+          activeLease.rentalRequest.bedrooms ||
+          2,
+        bathrooms:
+          activeLease.property?.bathrooms ||
+          activeLease.rentalRequest.bathrooms ||
+          1,
+        area: activeLease.property?.size
+          ? `${activeLease.property.size} m²`
+          : activeLease.propertySize || '',
         leaseTerm: activeLease.leaseDuration || 12,
         amenities: (() => {
           // Use the actual property houseRules (amenities) if available
           if (activeLease.property && activeLease.property.houseRules) {
             try {
-              const propertyAmenities = JSON.parse(activeLease.property.houseRules);
-              if (Array.isArray(propertyAmenities) && propertyAmenities.length > 0) {
+              const propertyAmenities = JSON.parse(
+                activeLease.property.houseRules
+              );
+              if (
+                Array.isArray(propertyAmenities) &&
+                propertyAmenities.length > 0
+              ) {
                 return propertyAmenities;
               }
             } catch (error) {
-              console.warn('Failed to parse property houseRules:', activeLease.property.houseRules, error);
+              console.warn(
+                'Failed to parse property houseRules:',
+                activeLease.property.houseRules,
+                error
+              );
             }
           }
-          
+
           // Fallback to offer amenities if property houseRules not available
           if (activeLease.propertyAmenities) {
             try {
-              return typeof activeLease.propertyAmenities === 'string' ? JSON.parse(activeLease.propertyAmenities) : activeLease.propertyAmenities;
+              return typeof activeLease.propertyAmenities === 'string'
+                ? JSON.parse(activeLease.propertyAmenities)
+                : activeLease.propertyAmenities;
             } catch (error) {
-              console.warn('Failed to parse offer propertyAmenities:', activeLease.propertyAmenities, error);
+              console.warn(
+                'Failed to parse offer propertyAmenities:',
+                activeLease.propertyAmenities,
+                error
+              );
               return ['No amenities listed'];
             }
           }
-          
+
           return ['No amenities listed'];
         })(),
       },
@@ -235,13 +301,21 @@ export const getTenantDashboardData = async (req, res) => {
         email: null,
         phone: null,
         address: activeLease.organization?.address || 'Not provided',
-        profileImage: null
+        profileImage: null,
       },
       lease: {
         startDate: activeLease.rentalRequest.moveInDate,
-        endDate: (() => { if (activeLease.leaseEndDate) return activeLease.leaseEndDate; const start = new Date(activeLease.rentalRequest.moveInDate); const end = new Date(start); end.setMonth(end.getMonth() + (activeLease.leaseDuration || 12)); return end; })(),
-        monthlyRent: activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
-        securityDeposit: activeLease.depositAmount || activeLease.rentalRequest.budget || 0
+        endDate: (() => {
+          if (activeLease.leaseEndDate) return activeLease.leaseEndDate;
+          const start = new Date(activeLease.rentalRequest.moveInDate);
+          const end = new Date(start);
+          end.setMonth(end.getMonth() + (activeLease.leaseDuration || 12));
+          return end;
+        })(),
+        monthlyRent:
+          activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
+        securityDeposit:
+          activeLease.depositAmount || activeLease.rentalRequest.budget || 0,
       },
       leases,
       rentalRequests,
@@ -249,28 +323,30 @@ export const getTenantDashboardData = async (req, res) => {
       accountStatus: {
         paymentHistory: 'No Data',
         leaseCompliance: 'Good',
-        communication: 'Responsive'
+        communication: 'Responsive',
       },
       upcomingActions: [
         'Lease renewal decision due in 30 days',
         'Annual inspection scheduled for next month',
-        'Update emergency contact information'
-      ]
+        'Update emergency contact information',
+      ],
     };
 
     console.log('✅ Dashboard data prepared successfully');
     console.log('🔍 Offer ID in response:', responseData.offerId);
     console.log('🔍 Payments data in response:', responseData.payments);
     console.log('🔍 Payments count:', responseData.payments?.length || 0);
-    console.log('🔍 Full response data:', JSON.stringify(responseData, null, 2));
+    console.log(
+      '🔍 Full response data:',
+      JSON.stringify(responseData, null, 2)
+    );
     res.json(responseData);
-
   } catch (error) {
     console.error('Error fetching tenant dashboard data:', error);
     console.error('Error stack:', error.stack);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to fetch dashboard data',
-      details: error.message
+      details: error.message,
     });
   }
 };
@@ -284,9 +360,8 @@ export const getTenantPayments = async (req, res) => {
     const payments = await getTenantPaymentsData(tenantId);
 
     res.json({
-      payments: payments
+      payments: payments,
     });
-
   } catch (error) {
     console.error('Error fetching tenant payments:', error);
     res.status(500).json({ error: 'Failed to fetch payment history' });
@@ -301,20 +376,20 @@ export const getTenantActiveLease = async (req, res) => {
     const activeLease = await prisma.offer.findFirst({
       where: {
         rentalRequest: {
-          tenantGroup: { members: { some: { userId: tenantId } } }
+          tenantGroup: { members: { some: { userId: tenantId } } },
         },
         status: 'PAID',
         moveInVerificationStatus: { not: 'CANCELLED' },
         rentalRequest: {
           tenantGroup: { members: { some: { userId: tenantId } } },
-          NOT: { status: 'CANCELLED' }
-        }
+          NOT: { status: 'CANCELLED' },
+        },
       },
       include: {
         rentalRequest: true,
         organization: true,
-        property: true
-      }
+        property: true,
+      },
     });
 
     if (!activeLease) {
@@ -322,7 +397,7 @@ export const getTenantActiveLease = async (req, res) => {
         property: null,
         landlord: null,
         lease: null,
-        leaseMeta: null
+        leaseMeta: null,
       });
     }
 
@@ -335,40 +410,67 @@ export const getTenantActiveLease = async (req, res) => {
           if (activeLease.property.district) {
             completeAddress += ', ' + activeLease.property.district;
           }
-          completeAddress += ', ' + activeLease.property.zipCode + ', ' + activeLease.property.city;
+          completeAddress +=
+            ', ' +
+            activeLease.property.zipCode +
+            ', ' +
+            activeLease.property.city;
           return completeAddress;
         }
         return activeLease.rentalRequest.location || 'Address not specified';
       })(),
-      rooms: activeLease.property?.bedrooms || activeLease.rentalRequest.bedrooms || 2,
-      bathrooms: activeLease.property?.bathrooms || activeLease.rentalRequest.bathrooms || 1,
-      area: activeLease.property?.size ? `${activeLease.property.size} m²` : activeLease.propertySize || '65 m²',
+      rooms:
+        activeLease.property?.bedrooms ||
+        activeLease.rentalRequest.bedrooms ||
+        2,
+      bathrooms:
+        activeLease.property?.bathrooms ||
+        activeLease.rentalRequest.bathrooms ||
+        1,
+      area: activeLease.property?.size
+        ? `${activeLease.property.size} m²`
+        : activeLease.propertySize || '65 m²',
       leaseTerm: activeLease.leaseDuration || 12,
-              amenities: (() => {
-                // Use the actual property houseRules (amenities) if available
-                if (activeLease.property && activeLease.property.houseRules) {
-                  try {
-                    const propertyAmenities = JSON.parse(activeLease.property.houseRules);
-                    if (Array.isArray(propertyAmenities) && propertyAmenities.length > 0) {
-                      return propertyAmenities;
-                    }
-                  } catch (error) {
-                    console.warn('Failed to parse property houseRules:', activeLease.property.houseRules, error);
-                  }
-                }
-                
-                // Fallback to offer amenities if property houseRules not available
-                if (activeLease.propertyAmenities) {
-                  try {
-                    return typeof activeLease.propertyAmenities === 'string' ? JSON.parse(activeLease.propertyAmenities) : activeLease.propertyAmenities;
-                  } catch (error) {
-                    console.warn('Failed to parse offer propertyAmenities:', activeLease.propertyAmenities, error);
-                    return ['No amenities listed'];
-                  }
-                }
-                
-                return ['No amenities listed'];
-              })(),
+      amenities: (() => {
+        // Use the actual property houseRules (amenities) if available
+        if (activeLease.property && activeLease.property.houseRules) {
+          try {
+            const propertyAmenities = JSON.parse(
+              activeLease.property.houseRules
+            );
+            if (
+              Array.isArray(propertyAmenities) &&
+              propertyAmenities.length > 0
+            ) {
+              return propertyAmenities;
+            }
+          } catch (error) {
+            console.warn(
+              'Failed to parse property houseRules:',
+              activeLease.property.houseRules,
+              error
+            );
+          }
+        }
+
+        // Fallback to offer amenities if property houseRules not available
+        if (activeLease.propertyAmenities) {
+          try {
+            return typeof activeLease.propertyAmenities === 'string'
+              ? JSON.parse(activeLease.propertyAmenities)
+              : activeLease.propertyAmenities;
+          } catch (error) {
+            console.warn(
+              'Failed to parse offer propertyAmenities:',
+              activeLease.propertyAmenities,
+              error
+            );
+            return ['No amenities listed'];
+          }
+        }
+
+        return ['No amenities listed'];
+      })(),
     };
 
     const landlordInfo = {
@@ -376,16 +478,20 @@ export const getTenantActiveLease = async (req, res) => {
       company: 'Business Landlord',
       email: null,
       phone: null,
-      address: activeLease.organization?.address || 'Not provided'
+      address: activeLease.organization?.address || 'Not provided',
     };
 
     const leaseInfo = {
       startDate: activeLease.rentalRequest.moveInDate,
-      endDate: activeLease.leaseEndDate || new Date(activeLease.rentalRequest.moveInDate).setFullYear(
-        new Date(activeLease.rentalRequest.moveInDate).getFullYear() + 1
-      ),
-      monthlyRent: activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
-      securityDeposit: activeLease.depositAmount || activeLease.rentalRequest.budget || 0
+      endDate:
+        activeLease.leaseEndDate ||
+        new Date(activeLease.rentalRequest.moveInDate).setFullYear(
+          new Date(activeLease.rentalRequest.moveInDate).getFullYear() + 1
+        ),
+      monthlyRent:
+        activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
+      securityDeposit:
+        activeLease.depositAmount || activeLease.rentalRequest.budget || 0,
     };
 
     // Try to load Lease meta (termination/renewal)
@@ -393,8 +499,14 @@ export const getTenantActiveLease = async (req, res) => {
     try {
       const leaseRow = await prisma.lease.findFirst({
         where: {
-          tenantId,
-          rentalRequestId: activeLease.rentalRequest.id
+          tenantGroup: {
+            members: {
+              some: {
+                userId: tenantId,
+              },
+            },
+          },
+          rentalRequestId: activeLease.rentalRequest.id,
         },
         select: {
           id: true,
@@ -403,14 +515,17 @@ export const getTenantActiveLease = async (req, res) => {
           terminationEffectiveDate: true,
           terminationReason: true,
           renewalStatus: true,
-          renewalDeclinedAt: true
-        }
+          renewalDeclinedAt: true,
+        },
       });
       if (leaseRow) {
         leaseMeta = leaseRow;
       }
     } catch (e) {
-      console.warn('getTenantActiveLease: leaseMeta lookup failed:', e?.message);
+      console.warn(
+        'getTenantActiveLease: leaseMeta lookup failed:',
+        e?.message
+      );
     }
 
     res.json({
@@ -419,14 +534,13 @@ export const getTenantActiveLease = async (req, res) => {
       lease: leaseInfo,
       leaseMeta,
       rentalRequestId: activeLease.rentalRequest.id,
-      offerId: activeLease.id
+      offerId: activeLease.id,
     });
-
   } catch (error) {
     console.error('Error fetching tenant active lease:', error);
     res.status(500).json({ error: 'Failed to fetch active lease' });
   }
-}; 
+};
 
 // Get tenant's payment history with upcoming payments
 export const getTenantPaymentHistory = async (req, res) => {
@@ -440,37 +554,42 @@ export const getTenantPaymentHistory = async (req, res) => {
     const activeLease = await prisma.offer.findFirst({
       where: {
         rentalRequest: {
-          tenantGroup: { members: { some: { userId: tenantId } } }
+          tenantGroup: { members: { some: { userId: tenantId } } },
         },
-        status: 'PAID'
+        status: 'PAID',
       },
       include: {
-        rentalRequest: true
-      }
+        rentalRequest: true,
+      },
     });
 
     let upcomingPayments = [];
     if (activeLease) {
-        upcomingPayments = await getUpcomingPayments(tenantId);
+      upcomingPayments = await getUpcomingPayments(tenantId);
     }
 
     res.json({
       payments: pastPayments,
       upcomingPayments: upcomingPayments,
-      lease: activeLease ? {
-        startDate: activeLease.rentalRequest.moveInDate,
-        endDate: (() => {
-          if (activeLease.leaseEndDate) return activeLease.leaseEndDate;
-          const start = new Date(activeLease.rentalRequest.moveInDate);
-          const end = new Date(start);
-          end.setMonth(end.getMonth() + (activeLease.leaseDuration || 12));
-          return end;
-        })(),
-        monthlyRent: activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
-        securityDeposit: activeLease.depositAmount || activeLease.rentalRequest.budget || 0
-      } : null
+      lease: activeLease
+        ? {
+            startDate: activeLease.rentalRequest.moveInDate,
+            endDate: (() => {
+              if (activeLease.leaseEndDate) return activeLease.leaseEndDate;
+              const start = new Date(activeLease.rentalRequest.moveInDate);
+              const end = new Date(start);
+              end.setMonth(end.getMonth() + (activeLease.leaseDuration || 12));
+              return end;
+            })(),
+            monthlyRent:
+              activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
+            securityDeposit:
+              activeLease.depositAmount ||
+              activeLease.rentalRequest.budget ||
+              0,
+          }
+        : null,
     });
-
   } catch (error) {
     console.error('Error fetching tenant payment history:', error);
     res.status(500).json({ error: 'Failed to fetch payment history' });
@@ -487,9 +606,9 @@ export const getCurrentRental = async (req, res) => {
     const activeLease = await prisma.offer.findFirst({
       where: {
         rentalRequest: {
-          tenantGroup: { members: { some: { userId: tenantId } } }
+          tenantGroup: { members: { some: { userId: tenantId } } },
         },
-        status: 'PAID'
+        status: 'PAID',
       },
       include: {
         rentalRequest: true,
@@ -507,8 +626,8 @@ export const getCurrentRental = async (req, res) => {
             size: true,
             description: true,
             images: true,
-            houseRules: true
-          }
+            houseRules: true,
+          },
         },
         organization: {
           include: {
@@ -523,33 +642,36 @@ export const getCurrentRental = async (req, res) => {
                     lastName: true,
                     email: true,
                     phoneNumber: true,
-                    profileImage: true
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                    profileImage: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!activeLease) {
-      return res.status(404).json({ 
-        error: 'No active lease found. Please ensure you have an accepted and paid offer.' 
+      return res.status(404).json({
+        error:
+          'No active lease found. Please ensure you have an accepted and paid offer.',
       });
     }
 
     // Build complete address string
     const buildCompleteAddress = (property) => {
       if (!property) return 'Address not available';
-      
+
       let addressParts = [];
       if (property.address) addressParts.push(property.address);
       if (property.district) addressParts.push(property.district);
       if (property.zipCode) addressParts.push(property.zipCode);
       if (property.city) addressParts.push(property.city);
-      
-      return addressParts.length > 0 ? addressParts.join(', ') : 'Address not available';
+
+      return addressParts.length > 0
+        ? addressParts.join(', ')
+        : 'Address not available';
     };
 
     // Parse property images from JSON string
@@ -559,7 +681,11 @@ export const getCurrentRental = async (req, res) => {
         const parsed = JSON.parse(propertyImagesString);
         return Array.isArray(parsed) ? parsed : [];
       } catch (error) {
-        console.warn('Failed to parse property images:', propertyImagesString, error);
+        console.warn(
+          'Failed to parse property images:',
+          propertyImagesString,
+          error
+        );
         return [];
       }
     };
@@ -574,35 +700,48 @@ export const getCurrentRental = async (req, res) => {
         propertyType: activeLease.rentalRequest.propertyType,
         bedrooms: activeLease.rentalRequest.bedrooms,
         bathrooms: activeLease.rentalRequest.bathrooms,
-        budget: activeLease.rentalRequest.budget
+        budget: activeLease.rentalRequest.budget,
       },
       lease: {
         startDate: activeLease.rentalRequest.moveInDate,
-        endDate: activeLease.leaseEndDate || (() => {
-          const start = new Date(activeLease.rentalRequest.moveInDate);
-          const end = new Date(start);
-          end.setMonth(end.getMonth() + (activeLease.leaseDuration || 12));
-          return end;
-        })(),
+        endDate:
+          activeLease.leaseEndDate ||
+          (() => {
+            const start = new Date(activeLease.rentalRequest.moveInDate);
+            const end = new Date(start);
+            end.setMonth(end.getMonth() + (activeLease.leaseDuration || 12));
+            return end;
+          })(),
         monthlyRent: activeLease.rentAmount,
         securityDeposit: activeLease.depositAmount,
-        leaseDuration: activeLease.leaseDuration
+        leaseDuration: activeLease.leaseDuration,
       },
-      property: activeLease.property ? {
-        id: activeLease.property.id,
-        title: activeLease.property.name || activeLease.property.propertyType || 'Property',
-        type: activeLease.property.propertyType || 'Apartment',
-        rooms: activeLease.property.bedrooms || activeLease.rentalRequest.bedrooms || 2,
-        address: buildCompleteAddress(activeLease.property),
-        district: activeLease.property.district,
-        city: activeLease.property.city,
-        zipCode: activeLease.property.zipCode,
-        images: parsePropertyImages(activeLease.property.images),
-        size: activeLease.property.size,
-        description: activeLease.property.description
-      } : null,
+      property: activeLease.property
+        ? {
+            id: activeLease.property.id,
+            title:
+              activeLease.property.name ||
+              activeLease.property.propertyType ||
+              'Property',
+            type: activeLease.property.propertyType || 'Apartment',
+            rooms:
+              activeLease.property.bedrooms ||
+              activeLease.rentalRequest.bedrooms ||
+              2,
+            address: buildCompleteAddress(activeLease.property),
+            district: activeLease.property.district,
+            city: activeLease.property.city,
+            zipCode: activeLease.property.zipCode,
+            images: parsePropertyImages(activeLease.property.images),
+            size: activeLease.property.size,
+            description: activeLease.property.description,
+          }
+        : null,
       landlord: {
-        id: activeLease.organization?.members?.[0]?.user?.id || activeLease.organization?.id || '',
+        id:
+          activeLease.organization?.members?.[0]?.user?.id ||
+          activeLease.organization?.id ||
+          '',
         name: (() => {
           const user = activeLease.organization?.members?.[0]?.user;
           if (user?.firstName && user?.lastName) {
@@ -619,16 +758,19 @@ export const getCurrentRental = async (req, res) => {
           return orgName;
         })(),
         email: activeLease.organization?.members?.[0]?.user?.email || null,
-        phone: activeLease.organization?.members?.[0]?.user?.phoneNumber || null,
-        profileImage: activeLease.organization?.members?.[0]?.user?.profileImage || null
-      }
+        phone:
+          activeLease.organization?.members?.[0]?.user?.phoneNumber || null,
+        profileImage:
+          activeLease.organization?.members?.[0]?.user?.profileImage || null,
+      },
     };
 
     console.log('🔍 Returning current rental data:', rentalData);
     res.json(rentalData);
-
   } catch (error) {
     console.error('Error fetching current rental:', error);
-    res.status(500).json({ error: 'Failed to fetch current rental information' });
+    res
+      .status(500)
+      .json({ error: 'Failed to fetch current rental information' });
   }
-}; 
+};

@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext';
 
@@ -9,59 +15,75 @@ interface ChatBadgeContextType {
   refreshAll: () => Promise<void>;
 }
 
-const ChatBadgeContext = createContext<ChatBadgeContextType | undefined>(undefined);
+const ChatBadgeContext = createContext<ChatBadgeContextType | undefined>(
+  undefined
+);
 
 export const useChatBadge = (): ChatBadgeContextType => {
   const ctx = useContext(ChatBadgeContext);
-  if (!ctx) throw new Error('useChatBadge must be used within ChatBadgeProvider');
+  if (!ctx)
+    throw new Error('useChatBadge must be used within ChatBadgeProvider');
   return ctx;
 };
 
-export const ChatBadgeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ChatBadgeProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { token } = useAuth();
   const { socket, isConnected } = useSocket();
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [offersUnread, setOffersUnread] = useState<number>(0);
   const [rentalRequestsUnread, setRentalRequestsUnread] = useState<number>(0);
 
-  const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
+  const API_BASE =
+    (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
 
-  const refreshUnread = useMemo(() => async () => {
-    if (!token) return;
-    try {
-      const res = await fetch(`${API_BASE}/messaging/conversations/unread-count`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      setUnreadCount(data.unreadCount ?? data.totalUnread ?? 0);
-    } catch {
-      // ignore
-    }
-  }, [token]);
+  const refreshUnread = useMemo(
+    () => async () => {
+      if (!token) return;
+      try {
+        const res = await fetch(
+          `${API_BASE}/messaging/conversations/unread-count`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        setUnreadCount(data.unreadCount ?? data.totalUnread ?? 0);
+      } catch {
+        // ignore
+      }
+    },
+    [token]
+  );
 
   // Offers and rental requests counts via existing notifications API
-  const refreshOfferAndRequestCounts = useMemo(() => async () => {
-    if (!token) return;
-    try {
-      const res = await fetch(`${API_BASE}/notifications/unread-counts`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      // NotificationContext returns { rentalRequests, offers, total }
-      if (typeof data.offers === 'number') setOffersUnread(data.offers);
-      if (typeof data.rentalRequests === 'number') setRentalRequestsUnread(data.rentalRequests);
-    } catch {
-      // ignore
-    }
-  }, [token]);
+  const refreshOfferAndRequestCounts = useMemo(
+    () => async () => {
+      if (!token) return;
+      try {
+        const res = await fetch(`${API_BASE}/notifications/unread-counts`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        // NotificationContext returns { rentalRequests, offers, total }
+        if (typeof data.offers === 'number') setOffersUnread(data.offers);
+        if (typeof data.rentalRequests === 'number')
+          setRentalRequestsUnread(data.rentalRequests);
+      } catch {
+        // ignore
+      }
+    },
+    [token]
+  );
 
   // Initial fetch and when token changes
   useEffect(() => {
@@ -96,7 +118,9 @@ export const ChatBadgeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     socket.on('conversations-loaded', handleConversationsLoaded);
 
     // Fallback: listen for manual refresh triggers from other parts of the app
-    const handleWindowRefresh = () => { refreshUnread(); };
+    const handleWindowRefresh = () => {
+      refreshUnread();
+    };
     window.addEventListener('chat-unread-refresh', handleWindowRefresh as any);
     window.addEventListener('notif-unread-refresh', handleWindowRefresh as any);
 
@@ -104,8 +128,14 @@ export const ChatBadgeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       socket.off('new-message', handleNewMessage);
       socket.off('message-read', handleMessageRead);
       socket.off('conversations-loaded', handleConversationsLoaded);
-      window.removeEventListener('chat-unread-refresh', handleWindowRefresh as any);
-      window.removeEventListener('notif-unread-refresh', handleWindowRefresh as any);
+      window.removeEventListener(
+        'chat-unread-refresh',
+        handleWindowRefresh as any
+      );
+      window.removeEventListener(
+        'notif-unread-refresh',
+        handleWindowRefresh as any
+      );
     };
   }, [socket, token, isConnected, refreshUnread, refreshOfferAndRequestCounts]);
 
@@ -113,7 +143,10 @@ export const ChatBadgeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     unreadCount,
     offersUnread,
     rentalRequestsUnread,
-    refreshAll: async () => { await refreshUnread(); await refreshOfferAndRequestCounts(); }
+    refreshAll: async () => {
+      await refreshUnread();
+      await refreshOfferAndRequestCounts();
+    },
   };
 
   return (
@@ -122,5 +155,3 @@ export const ChatBadgeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     </ChatBadgeContext.Provider>
   );
 };
-
-

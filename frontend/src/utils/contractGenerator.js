@@ -1,47 +1,57 @@
 // Contract Generator Utility
 export const generateRentalContract = (offer, user = null) => {
   // Get tenant signature from offer data - handle nested structure from backend
-  let tenantSignature = offer.tenant?.signatureBase64 || offer.rentalRequest?.tenant?.signatureBase64 || null;
-  
+  let tenantSignature =
+    offer.tenant?.signatureBase64 ||
+    offer.rentalRequest?.tenant?.signatureBase64 ||
+    null;
+
   // Get landlord signature from offer data
   let landlordSignature = offer.landlord?.signatureBase64 || null;
-  
+
   // Clean up signature data - remove data URL prefix if present
   if (tenantSignature && tenantSignature.startsWith('data:image/')) {
     tenantSignature = tenantSignature.split(',')[1];
   }
-  
+
   if (landlordSignature && landlordSignature.startsWith('data:image/')) {
     landlordSignature = landlordSignature.split(',')[1];
   }
 
   // Get payment date from offer - this should be the original payment date when contract was first generated
-  const paymentDate = offer.paymentDate ? new Date(offer.paymentDate) : new Date();
-  
+  const paymentDate = offer.paymentDate
+    ? new Date(offer.paymentDate)
+    : new Date();
+
   // Use the original payment date for contract date to maintain legal validity
   const contractDate = paymentDate.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
-  });
-  
-  console.log('🔍 Contract Generator - Using original payment date for contract:', {
-    originalPaymentDate: offer.paymentDate,
-    parsedDate: paymentDate,
-    contractDate: contractDate
+    day: 'numeric',
   });
 
+  console.log(
+    '🔍 Contract Generator - Using original payment date for contract:',
+    {
+      originalPaymentDate: offer.paymentDate,
+      parsedDate: paymentDate,
+      contractDate: contractDate,
+    }
+  );
+
   // Calculate lease dates
-  const leaseStartDate = offer.availableFrom ? new Date(offer.availableFrom) : new Date();
+  const leaseStartDate = offer.availableFrom
+    ? new Date(offer.availableFrom)
+    : new Date();
   const leaseEndDate = new Date(leaseStartDate);
   leaseEndDate.setMonth(leaseEndDate.getMonth() + offer.leaseDuration);
-  
+
   // Generate landlord-friendly payment schedule
   const generatePaymentSchedule = () => {
     if (!offer.availableFrom || !offer.rentAmount) {
       return [];
     }
-    
+
     const schedule = [];
     const startDate = new Date(offer.availableFrom);
     const endDate = leaseEndDate;
@@ -56,7 +66,9 @@ export const generateRentalContract = (offer, user = null) => {
       const dueDate = new Date(currentDate);
       dueDate.setDate(10);
 
-      const isLastMonth = currentDate.getMonth() === endDate.getMonth() && currentDate.getFullYear() === endDate.getFullYear();
+      const isLastMonth =
+        currentDate.getMonth() === endDate.getMonth() &&
+        currentDate.getFullYear() === endDate.getFullYear();
       let amount = monthlyRent;
       let description = 'Monthly Rent';
 
@@ -68,16 +80,16 @@ export const generateRentalContract = (offer, user = null) => {
 
       schedule.push({
         number: schedule.length + 1,
-        dueDate: dueDate.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
+        dueDate: dueDate.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
         }),
         amount: amount,
         description: description,
-        isLastMonth: isLastMonth
+        isLastMonth: isLastMonth,
       });
-      
+
       currentDate.setMonth(currentDate.getMonth() + 1);
     }
     return schedule;
@@ -91,7 +103,7 @@ export const generateRentalContract = (offer, user = null) => {
     rentalRequest: offer.rentalRequest,
     tenant: offer.tenant,
     rentalRequestTenant: offer.rentalRequest?.tenant,
-    landlord: offer.landlord
+    landlord: offer.landlord,
   });
 
   // Ensure tenant data is properly available
@@ -100,19 +112,25 @@ export const generateRentalContract = (offer, user = null) => {
     rentalRequestTenant: offer.rentalRequest?.tenant,
     offerTenant: offer.tenant,
     userData: user,
-    finalTenantData: tenantData
+    finalTenantData: tenantData,
   });
 
   const contractData = {
-    contractNumber: offer.originalContractNumber || `SR-${paymentDate.getFullYear()}${String(paymentDate.getMonth() + 1).padStart(2, '0')}-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`,
+    contractNumber:
+      offer.originalContractNumber ||
+      `SR-${paymentDate.getFullYear()}${String(paymentDate.getMonth() + 1).padStart(2, '0')}-${Math.floor(
+        Math.random() * 9999
+      )
+        .toString()
+        .padStart(4, '0')}`,
     date: contractDate,
     time: paymentDate.toLocaleTimeString('pl-PL', {
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
     }),
     paymentTimestamp: paymentDate.toISOString(),
-    
+
     // Tenant information - using properly extracted tenant data
     tenantName: tenantData?.name || 'Tenant',
     tenantEmail: tenantData?.email || 'tenant@email.com',
@@ -124,7 +142,7 @@ export const generateRentalContract = (offer, user = null) => {
     tenantPESEL: tenantData?.pesel || 'N/A',
     tenantPassport: tenantData?.passportNumber || null,
     tenantResidenceCard: tenantData?.kartaPobytuNumber || null,
-    
+
     // Landlord information
     landlordName: offer.landlord?.name || 'Landlord',
     landlordEmail: offer.landlord?.email || 'landlord@email.com',
@@ -134,32 +152,32 @@ export const generateRentalContract = (offer, user = null) => {
     landlordZipCode: offer.landlord?.zipCode || 'N/A',
     landlordCountry: offer.landlord?.country || 'Poland',
     landlordPESEL: offer.landlord?.pesel || 'N/A',
-    
+
     // Property information
     propertyAddress: offer.propertyAddress || offer.property?.address || 'N/A',
     propertyType: offer.propertyType || offer.property?.propertyType || 'N/A',
-    
+
     // Lease information
     leaseDuration: offer.leaseDuration || 12,
     leaseStartDate: leaseStartDate.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
     }),
     leaseEndDate: leaseEndDate.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
     }),
-    
+
     // Payment information
     rentAmount: offer.rentAmount || 0,
     depositAmount: offer.depositAmount || 0,
     paymentSchedule: paymentSchedule,
-    
+
     // Signature data
     tenantSignature: tenantSignature,
-    landlordSignature: landlordSignature
+    landlordSignature: landlordSignature,
   };
 
   // Create a professional bilingual HTML contract template
@@ -491,13 +509,17 @@ export const generateRentalContract = (offer, user = null) => {
                   </tr>
                 </thead>
                 <tbody>
-                  ${contractData.paymentSchedule.map(payment => `
+                  ${contractData.paymentSchedule
+                    .map(
+                      payment => `
                     <tr>
                       <td>${payment.number}</td>
                       <td>${payment.dueDate}</td>
                       <td class="amount">${payment.amount} PLN</td>
                     </tr>
-                  `).join('')}
+                  `
+                    )
+                    .join('')}
                 </tbody>
               </table>
             </div>
@@ -511,13 +533,17 @@ export const generateRentalContract = (offer, user = null) => {
                   </tr>
                 </thead>
                 <tbody>
-                  ${contractData.paymentSchedule.map(payment => `
+                  ${contractData.paymentSchedule
+                    .map(
+                      payment => `
                     <tr>
                       <td>${payment.number}</td>
                       <td>${payment.dueDate}</td>
                       <td class="amount">${payment.amount} PLN</td>
                     </tr>
-                  `).join('')}
+                  `
+                    )
+                    .join('')}
                 </tbody>
               </table>
             </div>
@@ -583,12 +609,12 @@ export const viewContract = async (offer, user = null) => {
   try {
     // Generate the contract HTML directly
     const contractHTML = generateRentalContract(offer, user);
-    
+
     // Open the contract in a new window
     const newWindow = window.open('', '_blank');
     newWindow.document.write(contractHTML);
     newWindow.document.close();
-    
+
     console.log('✅ Contract opened in new window successfully');
     return true;
   } catch (error) {
@@ -601,12 +627,12 @@ export const downloadContract = async (offer, user = null) => {
   try {
     // Generate the contract HTML directly
     const contractHTML = generateRentalContract(offer, user);
-    
+
     // Convert HTML to PDF using jsPDF and html2canvas
     try {
       const { jsPDF } = await import('jspdf');
       const html2canvas = await import('html2canvas');
-      
+
       // Create a temporary div to render the HTML
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = contractHTML;
@@ -626,7 +652,7 @@ export const downloadContract = async (offer, user = null) => {
         width: 794, // A4 width in pixels at 96 DPI
         height: tempDiv.scrollHeight,
         scrollX: 0,
-        scrollY: 0
+        scrollY: 0,
       });
 
       // Remove temporary div
@@ -637,10 +663,10 @@ export const downloadContract = async (offer, user = null) => {
       const imgData = canvas.toDataURL('image/png', 1.0);
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
+
       // Check if content fits on one page
       const pageHeight = pdf.internal.pageSize.getHeight();
-      
+
       if (pdfHeight <= pageHeight) {
         // Single page
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
@@ -649,37 +675,49 @@ export const downloadContract = async (offer, user = null) => {
         let heightLeft = pdfHeight;
         let position = 0;
         let page = 1;
-        
+
         while (heightLeft >= pageHeight) {
           pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
           heightLeft -= pageHeight;
           position -= pageHeight;
-          
+
           if (heightLeft >= pageHeight) {
             pdf.addPage();
             page++;
           }
         }
-        
+
         // Add remaining content
         if (heightLeft > 0) {
           pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
         }
       }
-      
+
       // Generate filename with contract number if available
-      const contractNumber = offer.originalContractNumber || `SR-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`;
+      const contractNumber =
+        offer.originalContractNumber ||
+        `SR-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(
+          Math.random() * 9999
+        )
+          .toString()
+          .padStart(4, '0')}`;
       const filename = `Lease_Agreement_${contractNumber}.pdf`;
-      
+
       // Download the PDF
       pdf.save(filename);
-      
+
       console.log('✅ Contract PDF downloaded successfully:', filename);
       return true;
     } catch (error) {
       console.error('❌ Error generating PDF:', error);
       // Fallback: download as HTML file
-      const contractNumber = offer.originalContractNumber || `SR-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`;
+      const contractNumber =
+        offer.originalContractNumber ||
+        `SR-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(
+          Math.random() * 9999
+        )
+          .toString()
+          .padStart(4, '0')}`;
       const blob = new Blob([contractHTML], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -689,7 +727,7 @@ export const downloadContract = async (offer, user = null) => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
+
       console.log('✅ Contract HTML downloaded as fallback');
       return true;
     }

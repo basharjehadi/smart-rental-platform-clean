@@ -7,23 +7,21 @@ import pl from '../locales/pl.json';
 
 const resources = {
   en: {
-    translation: en
+    translation: en,
   },
   pl: {
-    translation: pl
-  }
+    translation: pl,
+  },
 };
 
-i18n
-  .use(initReactI18next)
-  .init({
-    resources,
-    lng: 'en', // default language
-    fallbackLng: 'en',
-    interpolation: {
-      escapeValue: false // React already escapes values
-    },
-    debug: process.env.NODE_ENV === 'development'
-  });
+i18n.use(initReactI18next).init({
+  resources,
+  lng: 'en', // default language
+  fallbackLng: 'en',
+  interpolation: {
+    escapeValue: false, // React already escapes values
+  },
+  debug: process.env.NODE_ENV === 'development',
+});
 
-export default i18n; 
+export default i18n;

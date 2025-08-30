@@ -12,10 +12,10 @@ const createUploadDirs = () => {
     path.join(baseDir, 'uploads', 'identity_documents'),
     path.join(baseDir, 'uploads', 'rules'),
     path.join(baseDir, 'uploads', 'chat_attachments'),
-    path.join(baseDir, 'uploads', 'move_in_evidence')
+    path.join(baseDir, 'uploads', 'move_in_evidence'),
   ];
-  
-  dirs.forEach(dir => {
+
+  dirs.forEach((dir) => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -28,7 +28,7 @@ createUploadDirs();
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let uploadPath = path.join(process.cwd(), 'uploads');
-    
+
     if (file.fieldname === 'profileImage') {
       uploadPath = path.join(uploadPath, 'profile_images');
     } else if (file.fieldname === 'propertyImages') {
@@ -44,15 +44,15 @@ const storage = multer.diskStorage({
     } else if (file.fieldname === 'moveInEvidence') {
       uploadPath = path.join(uploadPath, 'move_in_evidence');
     }
-    
+
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
     // Generate unique filename with timestamp
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname);
     cb(null, file.fieldname + '-' + uniqueSuffix + ext);
-  }
+  },
 });
 
 // File filter function
@@ -81,8 +81,8 @@ const upload = multer({
   fileFilter: fileFilter,
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB limit for general files
-    files: 10 // Maximum 10 files
-  }
+    files: 10, // Maximum 10 files
+  },
 });
 
 // Configure multer for rules files with 10MB limit
@@ -90,9 +90,11 @@ const uploadRulesConfig = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
     // Only allow PDF, JPG, PNG for rules
-    if (file.mimetype === 'application/pdf' || 
-        file.mimetype === 'image/jpeg' || 
-        file.mimetype === 'image/png') {
+    if (
+      file.mimetype === 'application/pdf' ||
+      file.mimetype === 'image/jpeg' ||
+      file.mimetype === 'image/png'
+    ) {
       cb(null, true);
     } else {
       cb(new Error('Rules file must be PDF, JPG, or PNG!'), false);
@@ -100,8 +102,8 @@ const uploadRulesConfig = multer({
   },
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit for rules files
-    files: 1 // Maximum 1 rules file
-  }
+    files: 1, // Maximum 1 rules file
+  },
 });
 
 // Specific upload configurations
@@ -117,7 +119,7 @@ export const uploadRulesPdf = uploadRulesConfig.single('rulesPdf');
 
 export const uploadMultipleFiles = upload.fields([
   { name: 'propertyImages', maxCount: 10 },
-  { name: 'propertyVideo', maxCount: 1 }
+  { name: 'propertyVideo', maxCount: 1 },
 ]);
 
-export default upload; 
+export default upload;

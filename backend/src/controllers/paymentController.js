@@ -11,7 +11,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const getRentalRequestId = async (offerId) => {
   try {
     console.log('🔍 getRentalRequestId called with offerId:', offerId);
-    
+
     if (!offerId) {
       console.log('⚠️ No offerId provided');
       return null;
@@ -20,11 +20,11 @@ const getRentalRequestId = async (offerId) => {
     // First try to find the offer directly
     const offer = await prisma.offer.findUnique({
       where: { id: offerId },
-      select: { rentalRequestId: true }
+      select: { rentalRequestId: true },
     });
 
     console.log('🔍 Found offer:', offer);
-    
+
     if (offer) {
       console.log('✅ Returning rentalRequestId:', offer.rentalRequestId);
       return offer.rentalRequestId;
@@ -32,28 +32,31 @@ const getRentalRequestId = async (offerId) => {
 
     // If offer not found, try to find by payment intent ID (fallback)
     console.log('🔍 Offer not found, trying fallback method...');
-    
+
     const paymentWithOffer = await prisma.payment.findFirst({
       where: {
-        stripePaymentIntentId: offerId // Sometimes offerId might actually be payment intent ID
+        stripePaymentIntentId: offerId, // Sometimes offerId might actually be payment intent ID
       },
       include: {
         rentalRequest: {
           include: {
-            offer: true
-          }
-        }
-      }
+            offer: true,
+          },
+        },
+      },
     });
 
     if (paymentWithOffer?.rentalRequest?.offer) {
-      console.log('✅ Found via fallback method, returning rentalRequestId:', paymentWithOffer.rentalRequestId);
+      console.log(
+        '✅ Found via fallback method, returning rentalRequestId:',
+        paymentWithOffer.rentalRequestId
+      );
       return paymentWithOffer.rentalRequestId;
     }
 
     // If still not found, try to find by user and amount (last resort)
     console.log('🔍 Trying to find by user and amount...');
-    
+
     // This is a more complex fallback - we'll need to implement this differently
     // For now, let's log the issue and return null
     console.log('❌ Offer not found for ID:', offerId);
@@ -70,19 +73,28 @@ const completeMockPayment = async (req, res) => {
     const { paymentId, amount, purpose, offerId, selectedPayments } = req.body;
     const userId = req.user.id;
 
-    console.log('🔍 Completing mock payment:', { paymentId, amount, purpose, offerId, selectedPayments });
+    console.log('🔍 Completing mock payment:', {
+      paymentId,
+      amount,
+      purpose,
+      offerId,
+      selectedPayments,
+    });
     console.log('🔍 User ID:', userId);
 
     if (!paymentId || !amount || !purpose || !offerId) {
       return res.status(400).json({
-        error: 'Missing required payment information'
+        error: 'Missing required payment information',
       });
     }
 
     // For monthly rent payments, selectedPayments is required
-    if (purpose === 'MONTHLY_RENT' && (!selectedPayments || selectedPayments.length === 0)) {
+    if (
+      purpose === 'MONTHLY_RENT' &&
+      (!selectedPayments || selectedPayments.length === 0)
+    ) {
       return res.status(400).json({
-        error: 'Selected payments are required for monthly rent'
+        error: 'Selected payments are required for monthly rent',
       });
     }
 
@@ -96,7 +108,7 @@ const completeMockPayment = async (req, res) => {
         if (offerId) {
           rentOffer = await prisma.offer.findUnique({
             where: { id: offerId },
-            select: { rentalRequestId: true, tenantGroupId: true }
+            select: { rentalRequestId: true, tenantGroupId: true },
           });
           rentRentalRequestId = rentOffer?.rentalRequestId || null;
         }
@@ -111,12 +123,14 @@ const completeMockPayment = async (req, res) => {
           purpose: 'RENT',
           gateway: 'PAYU',
           offer: { connect: { id: offerId } }, // Connect to offer
-          ...(rentRentalRequestId ? { rentalRequest: { connect: { id: rentRentalRequestId } } } : {}),
+          ...(rentRentalRequestId
+            ? { rentalRequest: { connect: { id: rentRentalRequestId } } }
+            : {}),
           tenantGroup: { connect: { id: rentOffer?.tenantGroupId } }, // Connect to tenant group
           user: { connect: { id: userId } }, // Connect to user
           createdAt: new Date(),
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
       console.log('✅ Created general payment record:', generalPayment.id);
@@ -124,7 +138,7 @@ const completeMockPayment = async (req, res) => {
       const rentPayments = [];
 
       console.log('🔍 Processing selected payments:', selectedPayments);
-      
+
       for (const payment of selectedPayments) {
         console.log('🔍 Processing payment:', payment);
         // Create a new rent payment record
@@ -140,8 +154,8 @@ const completeMockPayment = async (req, res) => {
             gracePeriod: 5,
             isOverdue: false,
             userId: userId,
-            paymentId: generalPayment.id // Link to the general payment record
-          }
+            paymentId: generalPayment.id, // Link to the general payment record
+          },
         });
 
         rentPayments.push(rentPayment);
@@ -152,7 +166,7 @@ const completeMockPayment = async (req, res) => {
         success: true,
         message: 'Mock payment completed successfully',
         rentPayments: rentPayments,
-        generalPayment: generalPayment
+        generalPayment: generalPayment,
       });
     }
 
@@ -165,14 +179,20 @@ const completeMockPayment = async (req, res) => {
           userId: userId,
           purpose: 'DEPOSIT_AND_FIRST_MONTH',
           status: 'SUCCEEDED',
-          offerId: offerId || undefined
-        }
+          offerId: offerId || undefined,
+        },
       });
       if (existing) {
-        console.log('ℹ️ Existing DEPOSIT_AND_FIRST_MONTH payment found, returning existing.');
-        return res.json({ success: true, message: 'Payment already recorded', payment: existing });
+        console.log(
+          'ℹ️ Existing DEPOSIT_AND_FIRST_MONTH payment found, returning existing.'
+        );
+        return res.json({
+          success: true,
+          message: 'Payment already recorded',
+          payment: existing,
+        });
       }
-      
+
       // Create the main payment record with offerId for chat system
       // Also link to rentalRequestId so landlord dashboards can filter correctly
       let depositRentalRequestId = null;
@@ -181,12 +201,15 @@ const completeMockPayment = async (req, res) => {
         if (offerId) {
           depOffer = await prisma.offer.findUnique({
             where: { id: offerId },
-            select: { rentalRequestId: true, tenantGroupId: true }
+            select: { rentalRequestId: true, tenantGroupId: true },
           });
           depositRentalRequestId = depOffer?.rentalRequestId || null;
         }
       } catch (lookupErr) {
-        console.error('❌ Error looking up offer for DEPOSIT_AND_FIRST_MONTH:', lookupErr);
+        console.error(
+          '❌ Error looking up offer for DEPOSIT_AND_FIRST_MONTH:',
+          lookupErr
+        );
       }
 
       const depositPayment = await prisma.payment.create({
@@ -196,15 +219,20 @@ const completeMockPayment = async (req, res) => {
           purpose: 'DEPOSIT_AND_FIRST_MONTH',
           gateway: 'PAYU',
           offer: { connect: { id: offerId } }, // Connect to offer
-          ...(depositRentalRequestId ? { rentalRequest: { connect: { id: depositRentalRequestId } } } : {}),
+          ...(depositRentalRequestId
+            ? { rentalRequest: { connect: { id: depositRentalRequestId } } }
+            : {}),
           tenantGroup: { connect: { id: depOffer?.tenantGroupId } }, // Connect to tenant group
           user: { connect: { id: userId } }, // Connect to user
           createdAt: new Date(),
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
 
-      console.log('✅ Created DEPOSIT_AND_FIRST_MONTH payment record:', depositPayment.id);
+      console.log(
+        '✅ Created DEPOSIT_AND_FIRST_MONTH payment record:',
+        depositPayment.id
+      );
       console.log('✅ Payment linked to offerId:', offerId);
 
       // Update offer status to PAID
@@ -212,17 +240,17 @@ const completeMockPayment = async (req, res) => {
         try {
           await prisma.offer.update({
             where: { id: offerId },
-            data: { 
+            data: {
               status: 'PAID',
-              paymentDate: new Date()
-            }
+              paymentDate: new Date(),
+            },
           });
           console.log('✅ Updated offer status to PAID:', offerId);
 
           // Fetch related identifiers for follow-up updates
           const paidOffer = await prisma.offer.findUnique({
             where: { id: offerId },
-            select: { propertyId: true, rentalRequestId: true }
+            select: { propertyId: true, rentalRequestId: true },
           });
 
           // Invalidate other offers for the same property (PENDING/ACCEPTED → REJECTED)
@@ -232,8 +260,8 @@ const completeMockPayment = async (req, res) => {
                 where: {
                   propertyId: paidOffer.propertyId,
                   id: { not: offerId },
-                  status: { in: ['PENDING', 'ACCEPTED'] }
-                }
+                  status: { in: ['PENDING', 'ACCEPTED'] },
+                },
               });
 
               if (otherOffers.length > 0) {
@@ -241,15 +269,20 @@ const completeMockPayment = async (req, res) => {
                   where: {
                     propertyId: paidOffer.propertyId,
                     id: { not: offerId },
-                    status: { in: ['PENDING', 'ACCEPTED'] }
+                    status: { in: ['PENDING', 'ACCEPTED'] },
                   },
-                  data: { status: 'REJECTED', updatedAt: new Date() }
+                  data: { status: 'REJECTED', updatedAt: new Date() },
                 });
-                console.log(`✅ Invalidated ${otherOffers.length} competing offers for property ${paidOffer.propertyId}`);
+                console.log(
+                  `✅ Invalidated ${otherOffers.length} competing offers for property ${paidOffer.propertyId}`
+                );
               }
             }
           } catch (invalidateErr) {
-            console.error('❌ Error invalidating competing offers:', invalidateErr);
+            console.error(
+              '❌ Error invalidating competing offers:',
+              invalidateErr
+            );
           }
 
           // Update property availability to RENTED
@@ -260,7 +293,10 @@ const completeMockPayment = async (req, res) => {
                 false,
                 'RENTED'
               );
-              console.log('✅ Property set to RENTED and unavailable:', paidOffer.propertyId);
+              console.log(
+                '✅ Property set to RENTED and unavailable:',
+                paidOffer.propertyId
+              );
             }
           } catch (propErr) {
             console.error('❌ Error updating property availability:', propErr);
@@ -271,35 +307,58 @@ const completeMockPayment = async (req, res) => {
             if (paidOffer?.rentalRequestId) {
               await prisma.rentalRequest.update({
                 where: { id: paidOffer.rentalRequestId },
-                data: { status: 'MATCHED', updatedAt: new Date() }
+                data: { status: 'MATCHED', updatedAt: new Date() },
               });
-              console.log('✅ Rental request marked as MATCHED:', paidOffer.rentalRequestId);
+              console.log(
+                '✅ Rental request marked as MATCHED:',
+                paidOffer.rentalRequestId
+              );
 
               // Remove from request pool
               try {
-                const requestPoolService = await import('../services/requestPoolService.js');
-                await requestPoolService.default.removeFromPool(paidOffer.rentalRequestId, 'MATCHED');
-                console.log(`✅ Removed request ${paidOffer.rentalRequestId} from pool after payment`);
+                const requestPoolService = await import(
+                  '../services/requestPoolService.js'
+                );
+                await requestPoolService.default.removeFromPool(
+                  paidOffer.rentalRequestId,
+                  'MATCHED'
+                );
+                console.log(
+                  `✅ Removed request ${paidOffer.rentalRequestId} from pool after payment`
+                );
               } catch (poolError) {
-                console.error('❌ Error removing request from pool:', poolError);
+                console.error(
+                  '❌ Error removing request from pool:',
+                  poolError
+                );
               }
             }
           } catch (rrErr) {
-            console.error('❌ Error updating rental request status to MATCHED:', rrErr);
+            console.error(
+              '❌ Error updating rental request status to MATCHED:',
+              rrErr
+            );
           }
 
           // Generate contract after successful mock payment
           try {
             if (paidOffer?.rentalRequestId) {
-              const { generateContractForRentalRequest } = await import('./contractController.js');
-              const contract = await generateContractForRentalRequest(paidOffer.rentalRequestId);
+              const { generateContractForRentalRequest } = await import(
+                './contractController.js'
+              );
+              const contract = await generateContractForRentalRequest(
+                paidOffer.rentalRequestId
+              );
               console.log('✅ Contract generated after mock payment:', {
                 contractId: contract?.id,
-                contractNumber: contract?.contractNumber
+                contractNumber: contract?.contractNumber,
               });
             }
           } catch (contractErr) {
-            console.error('❌ Error generating contract after mock payment:', contractErr);
+            console.error(
+              '❌ Error generating contract after mock payment:',
+              contractErr
+            );
           }
         } catch (offerUpdateError) {
           console.error('❌ Error updating offer status:', offerUpdateError);
@@ -309,18 +368,17 @@ const completeMockPayment = async (req, res) => {
       return res.json({
         success: true,
         message: 'Mock DEPOSIT_AND_FIRST_MONTH payment completed successfully',
-        payment: depositPayment
+        payment: depositPayment,
       });
     }
 
     return res.status(400).json({
-      error: 'Unsupported payment purpose'
+      error: 'Unsupported payment purpose',
     });
-
   } catch (error) {
     console.error('Error completing mock payment:', error);
     res.status(500).json({
-      error: 'Failed to complete mock payment'
+      error: 'Failed to complete mock payment',
     });
   }
 };
@@ -328,18 +386,23 @@ const completeMockPayment = async (req, res) => {
 // Create payment intent
 const createPaymentIntent = async (req, res) => {
   try {
-    const { amount, purpose, offerId, paymentGateway: requestedGateway } = req.body;
-    
+    const {
+      amount,
+      purpose,
+      offerId,
+      paymentGateway: requestedGateway,
+    } = req.body;
+
     // Check if we should use mock payments
     const paymentProvider = process.env.PAYMENT_PROVIDER || 'MOCK';
     const allowMockPayments = process.env.ALLOW_MOCK_PAYMENTS === 'true';
-    
+
     console.log('🔍 Payment provider:', paymentProvider);
     console.log('🔍 Allow mock payments:', allowMockPayments);
 
     if (!amount || amount <= 0) {
       return res.status(400).json({
-        error: 'Invalid amount. Amount must be greater than 0.'
+        error: 'Invalid amount. Amount must be greater than 0.',
       });
     }
 
@@ -354,30 +417,30 @@ const createPaymentIntent = async (req, res) => {
               tenant: {
                 select: {
                   name: true,
-                  email: true
-                }
-              }
-            }
+                  email: true,
+                },
+              },
+            },
           },
           landlord: {
             select: {
               name: true,
-              email: true
-            }
-          }
-        }
+              email: true,
+            },
+          },
+        },
       });
 
       if (!offer) {
         return res.status(404).json({
-          error: 'Offer not found.'
+          error: 'Offer not found.',
         });
       }
 
       // Check if offer is in valid state for payment
       if (!['ACCEPTED', 'PAID'].includes(offer.status)) {
         return res.status(400).json({
-          error: 'Offer is not in a valid state for payment.'
+          error: 'Offer is not in a valid state for payment.',
         });
       }
 
@@ -385,61 +448,112 @@ const createPaymentIntent = async (req, res) => {
       // For monthly rent payments, we'll use the requested gateway instead
       if (purpose !== 'MONTHLY_RENT' && !offer.preferredPaymentGateway) {
         return res.status(400).json({
-          error: 'Payment gateway not selected. Please accept the offer with a payment method first.'
+          error:
+            'Payment gateway not selected. Please accept the offer with a payment method first.',
         });
       }
     }
 
     // Handle different payment gateways
     // For monthly rent payments, prioritize the requested gateway
-    const paymentGateway = purpose === 'MONTHLY_RENT' 
-      ? (requestedGateway || offer?.preferredPaymentGateway || 'STRIPE')
-      : (offer?.preferredPaymentGateway || requestedGateway || 'STRIPE');
-    
+    const paymentGateway =
+      purpose === 'MONTHLY_RENT'
+        ? requestedGateway || offer?.preferredPaymentGateway || 'STRIPE'
+        : offer?.preferredPaymentGateway || requestedGateway || 'STRIPE';
+
     console.log('🔍 Selected payment gateway:', paymentGateway);
-    
+
     // If using mock payments, always use mock gateways regardless of selection
     if (paymentProvider === 'MOCK' && allowMockPayments) {
       console.log('🔍 Using mock payment system');
-      
+
       // Map Stripe to a mock gateway for testing
       if (paymentGateway === 'STRIPE') {
         console.log('🔍 Stripe selected, using mock PayU instead');
-        return await handlePayUPayment(req, res, amount, purpose, offerId, offer);
+        return await handlePayUPayment(
+          req,
+          res,
+          amount,
+          purpose,
+          offerId,
+          offer
+        );
       }
-      
+
       // Use the selected gateway if it's already a mock gateway
       switch (paymentGateway) {
         case 'PAYU':
         case 'P24':
         case 'TPAY':
-          return await handlePayUPayment(req, res, amount, purpose, offerId, offer);
+          return await handlePayUPayment(
+            req,
+            res,
+            amount,
+            purpose,
+            offerId,
+            offer
+          );
         default:
           // Fallback to PayU for any other gateway
-          return await handlePayUPayment(req, res, amount, purpose, offerId, offer);
+          return await handlePayUPayment(
+            req,
+            res,
+            amount,
+            purpose,
+            offerId,
+            offer
+          );
       }
     }
-    
+
     // Real payment processing
     console.log('🔍 Using real payment system');
     switch (paymentGateway) {
       case 'STRIPE':
-        return await handleStripePayment(req, res, amount, purpose, offerId, offer);
+        return await handleStripePayment(
+          req,
+          res,
+          amount,
+          purpose,
+          offerId,
+          offer
+        );
       case 'PAYU':
-        return await handlePayUPayment(req, res, amount, purpose, offerId, offer);
+        return await handlePayUPayment(
+          req,
+          res,
+          amount,
+          purpose,
+          offerId,
+          offer
+        );
       case 'P24':
-        return await handleP24Payment(req, res, amount, purpose, offerId, offer);
+        return await handleP24Payment(
+          req,
+          res,
+          amount,
+          purpose,
+          offerId,
+          offer
+        );
       case 'TPAY':
-        return await handleTPayPayment(req, res, amount, purpose, offerId, offer);
+        return await handleTPayPayment(
+          req,
+          res,
+          amount,
+          purpose,
+          offerId,
+          offer
+        );
       default:
         return res.status(400).json({
-          error: 'Unsupported payment gateway.'
+          error: 'Unsupported payment gateway.',
         });
     }
   } catch (error) {
     console.error('Create payment intent error:', error);
     res.status(500).json({
-      error: 'Failed to create payment intent.'
+      error: 'Failed to create payment intent.',
     });
   }
 };
@@ -476,7 +590,7 @@ const handleWebhook = async (req, res) => {
   } catch (error) {
     console.error('Webhook processing error:', error);
     res.status(500).json({
-      error: 'Webhook processing failed.'
+      error: 'Webhook processing failed.',
     });
   }
 };
@@ -485,20 +599,23 @@ const handleWebhook = async (req, res) => {
 const handlePaymentSucceeded = async (paymentIntent) => {
   try {
     const { id: stripePaymentIntentId, metadata, amount } = paymentIntent;
-    
+
     console.log('💰 Payment succeeded:', {
       paymentIntentId: stripePaymentIntentId,
       amount: amount / 100, // Convert from cents
-      metadata
+      metadata,
     });
 
     // ✅ IDEMPOTENT CHECK: Check if this payment was already processed
     const existingPayment = await prisma.payment.findFirst({
-      where: { stripePaymentIntentId }
+      where: { stripePaymentIntentId },
     });
 
     if (existingPayment) {
-      console.log('ℹ️ Payment already processed, skipping duplicate processing:', stripePaymentIntentId);
+      console.log(
+        'ℹ️ Payment already processed, skipping duplicate processing:',
+        stripePaymentIntentId
+      );
       return; // Exit early - idempotent behavior
     }
 
@@ -511,9 +628,9 @@ const handlePaymentSucceeded = async (paymentIntent) => {
       console.log('🔍 Method 1: Getting rental request ID from offer...');
       const offer = await prisma.offer.findUnique({
         where: { id: offerId },
-        select: { rentalRequestId: true }
+        select: { rentalRequestId: true },
       });
-      
+
       if (offer) {
         rentalRequestId = offer.rentalRequestId;
         console.log('✅ Method 1 successful:', rentalRequestId);
@@ -527,15 +644,15 @@ const handlePaymentSucceeded = async (paymentIntent) => {
       console.log('🔍 Method 2: Trying payment intent ID as offer ID...');
       const paymentWithOffer = await prisma.payment.findFirst({
         where: {
-          stripePaymentIntentId: offerId
+          stripePaymentIntentId: offerId,
         },
         include: {
           rentalRequest: {
             include: {
-              offer: true
-            }
-          }
-        }
+              offer: true,
+            },
+          },
+        },
       });
 
       if (paymentWithOffer?.rentalRequest?.offer) {
@@ -552,26 +669,31 @@ const handlePaymentSucceeded = async (paymentIntent) => {
       const userRentalRequests = await prisma.rentalRequest.findMany({
         where: {
           tenantId: metadata.tenantId,
-          status: 'ACTIVE'
+          status: 'ACTIVE',
         },
         include: {
           offer: {
             where: {
-              status: 'PAID'
-            }
+              status: 'PAID',
+            },
           },
           payments: {
             where: {
-              status: 'SUCCEEDED'
-            }
-          }
-        }
+              status: 'SUCCEEDED',
+            },
+          },
+        },
       });
 
       for (const request of userRentalRequests) {
         if (request.offer) {
-          const expectedAmount = (request.offer.rentAmount || 0) + (request.offer.depositAmount || 0);
-          if (Math.abs(expectedAmount - (amount / 100)) < 1 && request.payments.length === 0) {
+          const expectedAmount =
+            (request.offer.rentAmount || 0) +
+            (request.offer.depositAmount || 0);
+          if (
+            Math.abs(expectedAmount - amount / 100) < 1 &&
+            request.payments.length === 0
+          ) {
             rentalRequestId = request.id;
             console.log('✅ Method 3 successful:', rentalRequestId);
             break;
@@ -595,15 +717,15 @@ const handlePaymentSucceeded = async (paymentIntent) => {
         userId: metadata.tenantId,
         rentalRequestId: rentalRequestId,
         // Persist offerId when available to enable joins by property later
-        ...(offerId ? { offerId } : {})
-      }
+        ...(offerId ? { offerId } : {}),
+      },
     });
 
     console.log('✅ Payment record created:', {
       paymentId: payment.id,
       rentalRequestId: payment.rentalRequestId,
       purpose: payment.purpose,
-      amount: payment.amount
+      amount: payment.amount,
     });
 
     // Update offer status to PAID if we have an offer ID
@@ -612,15 +734,17 @@ const handlePaymentSucceeded = async (paymentIntent) => {
       const paidOffer = await prisma.offer.update({
         where: { id: offerId },
         data: { status: 'PAID' },
-        include: { rentalRequest: true }
+        include: { rentalRequest: true },
       });
       // Compute deadline: moveInDate + 24h if moveInDate exists
       if (!paidOffer.moveInVerificationDeadline) {
         const baseDate = paidOffer.rentalRequest?.moveInDate || new Date();
-        const deadline = new Date(new Date(baseDate).getTime() + 24 * 60 * 60 * 1000);
+        const deadline = new Date(
+          new Date(baseDate).getTime() + 24 * 60 * 60 * 1000
+        );
         await prisma.offer.update({
           where: { id: offerId },
-          data: { moveInVerificationDeadline: deadline }
+          data: { moveInVerificationDeadline: deadline },
         });
       }
 
@@ -631,22 +755,24 @@ const handlePaymentSucceeded = async (paymentIntent) => {
       try {
         const offer = await prisma.offer.findUnique({
           where: { id: offerId },
-          select: { 
+          select: {
             propertyId: true,
-            rentalRequestId: true 
-          }
+            rentalRequestId: true,
+          },
         });
 
         if (offer && offer.propertyId) {
-          console.log(`🏆 First tenant paid for property ${offer.propertyId} - invalidating other offers`);
-          
+          console.log(
+            `🏆 First tenant paid for property ${offer.propertyId} - invalidating other offers`
+          );
+
           // Find and reject all other PENDING or ACCEPTED offers for the same property
           const otherOffers = await prisma.offer.findMany({
             where: {
               propertyId: offer.propertyId,
               id: { not: offerId },
-              status: { in: ['PENDING', 'ACCEPTED'] }
-            }
+              status: { in: ['PENDING', 'ACCEPTED'] },
+            },
           });
 
           if (otherOffers.length > 0) {
@@ -654,16 +780,18 @@ const handlePaymentSucceeded = async (paymentIntent) => {
               where: {
                 propertyId: offer.propertyId,
                 id: { not: offerId },
-                status: { in: ['PENDING', 'ACCEPTED'] }
+                status: { in: ['PENDING', 'ACCEPTED'] },
               },
               data: {
                 status: 'REJECTED',
-                updatedAt: new Date()
-              }
+                updatedAt: new Date(),
+              },
             });
 
-            console.log(`✅ Invalidated ${otherOffers.length} other offers for property ${offer.propertyId}`);
-            
+            console.log(
+              `✅ Invalidated ${otherOffers.length} other offers for property ${offer.propertyId}`
+            );
+
             // Send notifications to other tenants that their offers were rejected
             for (const rejectedOffer of otherOffers) {
               try {
@@ -676,13 +804,13 @@ const handlePaymentSucceeded = async (paymentIntent) => {
                           where: { isPrimary: true },
                           include: {
                             user: {
-                              select: { email: true, name: true }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
+                              select: { email: true, name: true },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
                 });
 
                 // Get the primary tenant from the tenant group
@@ -690,12 +818,17 @@ const handlePaymentSucceeded = async (paymentIntent) => {
                 const tenant = primaryMember?.user;
 
                 if (tenant?.email) {
-                  console.log(`📧 Sending rejection notification to ${tenant.email}`);
+                  console.log(
+                    `📧 Sending rejection notification to ${tenant.email}`
+                  );
                   // You can implement email notification here
                   // await sendOfferRejectedNotification(tenant.email, tenant.name);
                 }
               } catch (notificationError) {
-                console.error(`❌ Error sending rejection notification for offer ${rejectedOffer.id}:`, notificationError);
+                console.error(
+                  `❌ Error sending rejection notification for offer ${rejectedOffer.id}:`,
+                  notificationError
+                );
               }
             }
           }
@@ -703,9 +836,16 @@ const handlePaymentSucceeded = async (paymentIntent) => {
           // 🚀 SCALABILITY: Remove the rental request from the pool since it's now matched
           // Import and use the request pool service
           try {
-            const requestPoolService = await import('../services/requestPoolService.js');
-            await requestPoolService.default.removeFromPool(offer.rentalRequestId, 'MATCHED');
-            console.log(`✅ Removed request ${offer.rentalRequestId} from pool after payment`);
+            const requestPoolService = await import(
+              '../services/requestPoolService.js'
+            );
+            await requestPoolService.default.removeFromPool(
+              offer.rentalRequestId,
+              'MATCHED'
+            );
+            console.log(
+              `✅ Removed request ${offer.rentalRequestId} from pool after payment`
+            );
           } catch (poolError) {
             console.error(`❌ Error removing request from pool:`, poolError);
           }
@@ -719,15 +859,17 @@ const handlePaymentSucceeded = async (paymentIntent) => {
       if (metadata.purpose === 'DEPOSIT_AND_FIRST_MONTH') {
         try {
           console.log('🔧 Auto-generating contract after payment...');
-          
+
           // Check if contract already exists
           const existingContract = await prisma.contract.findUnique({
-            where: { rentalRequestId: rentalRequestId }
+            where: { rentalRequestId: rentalRequestId },
           });
 
           if (!existingContract) {
             // Import contract generation function
-            const { generateContractForRentalRequest } = await import('./contractController.js');
+            const { generateContractForRentalRequest } = await import(
+              './contractController.js'
+            );
             await generateContractForRentalRequest(rentalRequestId);
             console.log('✅ Contract auto-generated successfully');
           } else {
@@ -743,27 +885,33 @@ const handlePaymentSucceeded = async (paymentIntent) => {
       try {
         const offer = await prisma.offer.findUnique({
           where: { id: offerId },
-          select: { propertyId: true }
+          select: { propertyId: true },
         });
 
         if (offer && offer.propertyId) {
           // Use property availability service to update property status and availability
           await propertyAvailabilityService.updatePropertyAvailability(
-            offer.propertyId, 
+            offer.propertyId,
             false, // availability = false when rented
             'RENTED' // status = RENTED (not OCCUPIED)
           );
-          console.log('✅ Property status updated to RENTED:', offer.propertyId);
+          console.log(
+            '✅ Property status updated to RENTED:',
+            offer.propertyId
+          );
         }
       } catch (propertyUpdateError) {
-        console.error('❌ Error updating property status:', propertyUpdateError);
+        console.error(
+          '❌ Error updating property status:',
+          propertyUpdateError
+        );
         // Don't fail the payment if property status update fails
       }
 
       // Note: RentPayment records should only be created for monthly rent payments
       // DEPOSIT_AND_FIRST_MONTH payments are stored only in the Payment table
       // to avoid duplication in payment history
-      // 
+      //
       // Polish rental logic: First month rent is pro-rated based on 30-day calculation
       // Regular months: Full monthly rent regardless of calendar days
     }
@@ -772,15 +920,17 @@ const handlePaymentSucceeded = async (paymentIntent) => {
     if (metadata.purpose === 'DEPOSIT_AND_FIRST_MONTH' && rentalRequestId) {
       try {
         console.log('🔧 Auto-generating contract after payment...');
-        
+
         // Check if contract already exists
         const existingContract = await prisma.contract.findUnique({
-          where: { rentalRequestId: rentalRequestId }
+          where: { rentalRequestId: rentalRequestId },
         });
 
         if (!existingContract) {
           // Import contract generation function
-          const { generateContractForRentalRequest } = await import('./contractController.js');
+          const { generateContractForRentalRequest } = await import(
+            './contractController.js'
+          );
           await generateContractForRentalRequest(rentalRequestId);
           console.log('✅ Contract auto-generated successfully');
         } else {
@@ -803,18 +953,18 @@ const handlePaymentSucceeded = async (paymentIntent) => {
                 tenant: {
                   select: {
                     name: true,
-                    email: true
-                  }
-                }
-              }
+                    email: true,
+                  },
+                },
+              },
             },
             landlord: {
               select: {
                 name: true,
-                email: true
-              }
-            }
-          }
+                email: true,
+              },
+            },
+          },
         });
 
         // Get the primary tenant from the tenant group
@@ -824,9 +974,10 @@ const handlePaymentSucceeded = async (paymentIntent) => {
         // Send payment success notification to landlord
         if (offer?.landlord?.email) {
           console.log('📧 Sending payment success notification to landlord');
-          const paymentDescription = metadata.purpose === 'DEPOSIT_AND_FIRST_MONTH' 
-            ? 'Deposit and First Month Rent' 
-            : 'Rent Payment';
+          const paymentDescription =
+            metadata.purpose === 'DEPOSIT_AND_FIRST_MONTH'
+              ? 'Deposit and First Month Rent'
+              : 'Rent Payment';
           await sendPaymentSuccess(
             offer.landlord.email,
             offer.landlord.name,
@@ -847,19 +998,21 @@ const handlePaymentSucceeded = async (paymentIntent) => {
     if (rentalRequestId && metadata.tenantId) {
       try {
         console.log('🎯 Triggering first review stage for payment completion');
-        
+
         // Find the lease associated with this rental request
         const lease = await prisma.lease.findFirst({
-          where: { 
+          where: {
             rentalRequestId: parseInt(rentalRequestId),
-            tenantId: metadata.tenantId
-          }
+            tenantId: metadata.tenantId,
+          },
         });
 
         if (lease) {
           // Create a review signal instead of triggering a review stage
           try {
-            const reviewSignalService = await import('../services/reviewSignalService.js');
+            const reviewSignalService = await import(
+              '../services/reviewSignalService.js'
+            );
             await reviewSignalService.default.createReviewSignal({
               signalType: 'PAYMENT_CONFIRMED',
               leaseId: lease.id,
@@ -867,12 +1020,18 @@ const handlePaymentSucceeded = async (paymentIntent) => {
               metadata: {
                 amount: paymentIntent.amount / 100,
                 purpose: metadata.purpose,
-                paymentIntentId: stripePaymentIntentId
-              }
+                paymentIntentId: stripePaymentIntentId,
+              },
             });
-            console.log('✅ Payment confirmed review signal created for lease:', lease.id);
+            console.log(
+              '✅ Payment confirmed review signal created for lease:',
+              lease.id
+            );
           } catch (signalError) {
-            console.error('❌ Error creating payment confirmed signal:', signalError);
+            console.error(
+              '❌ Error creating payment confirmed signal:',
+              signalError
+            );
             // Don't fail the payment if signal creation fails
           }
         } else {
@@ -883,7 +1042,6 @@ const handlePaymentSucceeded = async (paymentIntent) => {
         // Don't fail the payment if review trigger fails
       }
     }
-
   } catch (error) {
     console.error('❌ Error handling payment success:', error);
   }
@@ -892,12 +1050,16 @@ const handlePaymentSucceeded = async (paymentIntent) => {
 // Handle failed payment
 const handlePaymentFailed = async (paymentIntent) => {
   try {
-    const { id: stripePaymentIntentId, metadata, last_payment_error } = paymentIntent;
-    
+    const {
+      id: stripePaymentIntentId,
+      metadata,
+      last_payment_error,
+    } = paymentIntent;
+
     console.log('❌ Payment failed:', {
       paymentIntentId: stripePaymentIntentId,
       error: last_payment_error?.message,
-      metadata
+      metadata,
     });
 
     // Create payment record with failed status
@@ -908,8 +1070,8 @@ const handlePaymentFailed = async (paymentIntent) => {
         status: 'FAILED',
         purpose: metadata.purpose || 'RENT',
         userId: metadata.tenantId,
-        paidAt: new Date()
-      }
+        paidAt: new Date(),
+      },
     });
 
     console.log('✅ Failed payment record created');
@@ -923,24 +1085,31 @@ const getMyPayments = async (req, res) => {
   try {
     const payments = await prisma.payment.findMany({
       where: {
-        userId: req.user.id
+        userId: req.user.id,
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: 'desc',
+      },
     });
 
     res.json({ payments });
   } catch (error) {
     console.error('Get my payments error:', error);
     res.status(500).json({
-      error: 'Internal server error.'
+      error: 'Internal server error.',
     });
   }
 };
 
 // Handle Stripe payment
-const handleStripePayment = async (req, res, amount, purpose, offerId, offer) => {
+const handleStripePayment = async (
+  req,
+  res,
+  amount,
+  purpose,
+  offerId,
+  offer
+) => {
   try {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100), // Convert to cents
@@ -949,27 +1118,30 @@ const handleStripePayment = async (req, res, amount, purpose, offerId, offer) =>
         purpose: purpose || 'RENT',
         offerId: offerId || '',
         tenantId: req.user.id,
-        paymentType: purpose === 'DEPOSIT_AND_FIRST_MONTH' ? 'deposit_and_first_month' : 'rent'
-      }
+        paymentType:
+          purpose === 'DEPOSIT_AND_FIRST_MONTH'
+            ? 'deposit_and_first_month'
+            : 'rent',
+      },
     });
 
     // Update offer with paymentIntentId if offerId is provided
     if (offerId) {
       await prisma.offer.update({
         where: { id: offerId },
-        data: { paymentIntentId: paymentIntent.id }
+        data: { paymentIntentId: paymentIntent.id },
       });
     }
 
     res.json({
       client_secret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
-      paymentGateway: 'STRIPE'
+      paymentGateway: 'STRIPE',
     });
   } catch (error) {
     console.error('Stripe payment error:', error);
     res.status(500).json({
-      error: 'Failed to create Stripe payment intent.'
+      error: 'Failed to create Stripe payment intent.',
     });
   }
 };
@@ -984,25 +1156,25 @@ const handlePayUPayment = async (req, res, amount, purpose, offerId, offer) => {
     // For monthly rent payments, pass additional data needed for completion
     if (purpose === 'MONTHLY_RENT') {
       const { selectedPayments } = req.body;
-      
+
       res.json({
         paymentId: mockPaymentId,
         paymentGateway: 'PAYU',
         redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:3002'}/mock-payment?paymentId=${mockPaymentId}&amount=${amount}&gateway=PAYU&offerId=${offerId}&selectedPayments=${encodeURIComponent(JSON.stringify(selectedPayments))}`,
-        message: 'PayU payment integration coming soon'
+        message: 'PayU payment integration coming soon',
       });
     } else {
       res.json({
         paymentId: mockPaymentId,
         paymentGateway: 'PAYU',
         redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:3002'}/mock-payment?paymentId=${mockPaymentId}&amount=${amount}&gateway=PAYU`,
-        message: 'PayU payment integration coming soon'
+        message: 'PayU payment integration coming soon',
       });
     }
   } catch (error) {
     console.error('PayU payment error:', error);
     res.status(500).json({
-      error: 'PayU payment integration not yet implemented.'
+      error: 'PayU payment integration not yet implemented.',
     });
   }
 };
@@ -1017,25 +1189,25 @@ const handleP24Payment = async (req, res, amount, purpose, offerId, offer) => {
     // For monthly rent payments, pass additional data needed for completion
     if (purpose === 'MONTHLY_RENT') {
       const { selectedPayments } = req.body;
-      
+
       res.json({
         paymentId: mockPaymentId,
         paymentGateway: 'P24',
         redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:3002'}/mock-payment?paymentId=${mockPaymentId}&amount=${amount}&gateway=P24&offerId=${offerId}&selectedPayments=${encodeURIComponent(JSON.stringify(selectedPayments))}`,
-        message: 'Przelewy24 payment integration coming soon'
+        message: 'Przelewy24 payment integration coming soon',
       });
     } else {
       res.json({
         paymentId: mockPaymentId,
         paymentGateway: 'P24',
         redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:3002'}/mock-payment?paymentId=${mockPaymentId}&amount=${amount}&gateway=P24`,
-        message: 'Przelewy24 payment integration coming soon'
+        message: 'Przelewy24 payment integration coming soon',
       });
     }
   } catch (error) {
     console.error('P24 payment error:', error);
     res.status(500).json({
-      error: 'Przelewy24 payment integration not yet implemented.'
+      error: 'Przelewy24 payment integration not yet implemented.',
     });
   }
 };
@@ -1050,25 +1222,25 @@ const handleTPayPayment = async (req, res, amount, purpose, offerId, offer) => {
     // For monthly rent payments, pass additional data needed for completion
     if (purpose === 'MONTHLY_RENT') {
       const { selectedPayments } = req.body;
-      
+
       res.json({
         paymentId: mockPaymentId,
         paymentGateway: 'TPAY',
         redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:3002'}/mock-payment?paymentId=${mockPaymentId}&amount=${amount}&gateway=TPAY&offerId=${offerId}&selectedPayments=${encodeURIComponent(JSON.stringify(selectedPayments))}`,
-        message: 'Tpay payment integration coming soon'
+        message: 'Tpay payment integration coming soon',
       });
     } else {
       res.json({
         paymentId: mockPaymentId,
         paymentGateway: 'TPAY',
         redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:3002'}/mock-payment?paymentId=${mockPaymentId}&amount=${amount}&gateway=TPAY`,
-        message: 'Tpay payment integration coming soon'
+        message: 'Tpay payment integration coming soon',
       });
     }
   } catch (error) {
     console.error('Tpay payment error:', error);
     res.status(500).json({
-      error: 'Tpay payment integration not yet implemented.'
+      error: 'Tpay payment integration not yet implemented.',
     });
   }
 };
@@ -1077,8 +1249,8 @@ export {
   createPaymentIntent,
   handleWebhook,
   getMyPayments,
-  completeMockPayment
-}; 
+  completeMockPayment,
+};
 
 // ===== Refunds =====
 /**
@@ -1089,23 +1261,30 @@ export const refundOfferPayments = async (offerId) => {
   // Load identifiers
   const offer = await prisma.offer.findUnique({
     where: { id: offerId },
-    select: { id: true, rentalRequestId: true, organizationId: true }
+    select: { id: true, rentalRequestId: true, organizationId: true },
   });
   if (!offer) return { success: false, message: 'Offer not found' };
 
   const payments = await prisma.payment.findMany({
     where: {
       status: 'SUCCEEDED',
-      OR: [ { offerId }, { rentalRequestId: offer.rentalRequestId } ]
-    }
+      OR: [{ offerId }, { rentalRequestId: offer.rentalRequestId }],
+    },
   });
 
   const results = [];
-  const { getRefundProvider } = await import('../services/refundProviders/index.js');
+  const { getRefundProvider } = await import(
+    '../services/refundProviders/index.js'
+  );
   for (const p of payments) {
     try {
-      if (p.status !== 'SUCCEEDED') { results.push({ id: p.id, skipped: true }); continue; }
-      const provider = getRefundProvider(p.gateway || (p.stripePaymentIntentId ? 'STRIPE' : 'MOCK'));
+      if (p.status !== 'SUCCEEDED') {
+        results.push({ id: p.id, skipped: true });
+        continue;
+      }
+      const provider = getRefundProvider(
+        p.gateway || (p.stripePaymentIntentId ? 'STRIPE' : 'MOCK')
+      );
       const outcome = await provider.refund(p, prisma);
       results.push({ id: p.id, ...outcome });
     } catch (e) {
@@ -1116,20 +1295,20 @@ export const refundOfferPayments = async (offerId) => {
   // Create a summary notification to tenant and landlord
   try {
     const summary = `Refunds processed for ${results.length} payment(s).`;
-    
+
     // Get tenant ID from rental request
     if (offer.rentalRequestId) {
       const rentalRequest = await prisma.rentalRequest.findUnique({
         where: { id: offer.rentalRequestId },
-        select: { tenantGroupId: true }
+        select: { tenantGroupId: true },
       });
-      
+
       if (rentalRequest?.tenantGroupId) {
         const tenantMember = await prisma.tenantGroupMember.findFirst({
           where: { tenantGroupId: rentalRequest.tenantGroupId },
-          select: { userId: true }
+          select: { userId: true },
         });
-        
+
         if (tenantMember?.userId) {
           const notif = await prisma.notification.create({
             data: {
@@ -1137,29 +1316,32 @@ export const refundOfferPayments = async (offerId) => {
               type: 'SYSTEM_ANNOUNCEMENT',
               entityId: offerId,
               title: 'Refund processed',
-              body: summary
-            }
+              body: summary,
+            },
           });
           // Best-effort realtime emit (if available)
           try {
-            const { default: createIO } = await import('../socket/socketServer.js');
+            const { default: createIO } = await import(
+              '../socket/socketServer.js'
+            );
             const io = createIO?.io || global.io;
-            if (io?.emitNotification) await io.emitNotification(tenantMember.userId, notif);
+            if (io?.emitNotification)
+              await io.emitNotification(tenantMember.userId, notif);
           } catch {}
         }
       }
     }
-    
+
     // Get landlord ID from organization
     if (offer.organizationId) {
       const landlordMember = await prisma.organizationMember.findFirst({
         where: {
           organizationId: offer.organizationId,
-          role: 'OWNER'
+          role: 'OWNER',
         },
-        select: { userId: true }
+        select: { userId: true },
       });
-      
+
       if (landlordMember?.userId) {
         const notif = await prisma.notification.create({
           data: {
@@ -1167,13 +1349,16 @@ export const refundOfferPayments = async (offerId) => {
             type: 'SYSTEM_ANNOUNCEMENT',
             entityId: offerId,
             title: 'Refund processed',
-            body: summary
-          }
+            body: summary,
+          },
         });
         try {
-          const { default: createIO } = await import('../socket/socketServer.js');
+          const { default: createIO } = await import(
+            '../socket/socketServer.js'
+          );
           const io = createIO?.io || global.io;
-          if (io?.emitNotification) await io.emitNotification(landlordMember.userId, notif);
+          if (io?.emitNotification)
+            await io.emitNotification(landlordMember.userId, notif);
         } catch {}
       }
     }

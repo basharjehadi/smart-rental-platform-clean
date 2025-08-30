@@ -1,13 +1,27 @@
 import express from 'express';
 import {
-  getUserIdentity, getUserProfile, updateUserProfile,
-  updateUserIdentity, saveUserSignature, saveContractSignatures, getContractSignatures,
-  uploadIdentityDocument, getProfileStatus, uploadProfilePhoto, deleteProfilePhoto,
-  getPendingKYC, reviewKYC, findUserByEmail, getUserRank
+  getUserIdentity,
+  getUserProfile,
+  updateUserProfile,
+  updateUserIdentity,
+  saveUserSignature,
+  saveContractSignatures,
+  getContractSignatures,
+  uploadIdentityDocument,
+  getProfileStatus,
+  uploadProfilePhoto,
+  deleteProfilePhoto,
+  getPendingKYC,
+  reviewKYC,
+  findUserByEmail,
+  getUserRank,
 } from '../controllers/userController.js';
 import { validateProfileData } from '../middlewares/profileValidationMiddleware.js';
 import verifyToken from '../middlewares/verifyToken.js';
-import { uploadIdentityDocument as uploadIdentityMiddleware, uploadProfileImage } from '../middlewares/uploadMiddleware.js';
+import {
+  uploadIdentityDocument as uploadIdentityMiddleware,
+  uploadProfileImage,
+} from '../middlewares/uploadMiddleware.js';
 
 const router = express.Router();
 
@@ -27,7 +41,11 @@ router.get('/identity', getUserIdentity);
 router.put('/identity', validateProfileData, updateUserIdentity);
 router.post('/signature', saveUserSignature);
 router.delete('/signature', saveUserSignature); // TODO: Create separate deleteSignature function
-router.post('/upload-identity-document', uploadIdentityMiddleware, uploadIdentityDocument);
+router.post(
+  '/upload-identity-document',
+  uploadIdentityMiddleware,
+  uploadIdentityDocument
+);
 router.get('/contracts/:rentalRequestId/signatures', getContractSignatures);
 router.post('/contracts/:rentalRequestId/signatures', saveContractSignatures);
 
@@ -41,4 +59,4 @@ router.post('/find-by-email', findUserByEmail);
 // User rank routes
 router.get('/:userId/rank', getUserRank);
 
-export default router; 
+export default router;

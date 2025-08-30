@@ -1,15 +1,22 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
-const FileUpload = ({ 
-  onImagesUploaded, 
-  onVideoUploaded, 
+const FileUpload = ({
+  onImagesUploaded,
+  onVideoUploaded,
   onFileDeleted,
   maxImages = 10,
   maxVideoSize = 50 * 1024 * 1024, // 50MB
   maxImageSize = 10 * 1024 * 1024, // 10MB
   acceptedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-  acceptedVideoTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/webm']
+  acceptedVideoTypes = [
+    'video/mp4',
+    'video/avi',
+    'video/mov',
+    'video/wmv',
+    'video/flv',
+    'video/webm',
+  ],
 }) => {
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -22,30 +29,30 @@ const FileUpload = ({
   const fileInputRef = useRef(null);
   const videoInputRef = useRef(null);
 
-  const handleDrag = (e) => {
+  const handleDrag = e => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
+    if (e.type === 'dragenter' || e.type === 'dragover') {
       setDragActive(true);
-    } else if (e.type === "dragleave") {
+    } else if (e.type === 'dragleave') {
       setDragActive(false);
     }
   };
 
-  const handleDrop = (e) => {
+  const handleDrop = e => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFiles(e.dataTransfer.files);
     }
   };
 
-  const handleFiles = async (files) => {
+  const handleFiles = async files => {
     setError('');
     setSuccess('');
-    
+
     const imageFiles = [];
     const videoFiles = [];
 
@@ -69,7 +76,7 @@ const FileUpload = ({
     }
   };
 
-  const uploadImages = async (files) => {
+  const uploadImages = async files => {
     if (uploadedImages.length + files.length > maxImages) {
       setError(`Maximum ${maxImages} images allowed`);
       return;
@@ -78,7 +85,9 @@ const FileUpload = ({
     // Validate file sizes
     for (const file of files) {
       if (file.size > maxImageSize) {
-        setError(`Image ${file.name} is too large. Maximum size is ${maxImageSize / (1024 * 1024)}MB`);
+        setError(
+          `Image ${file.name} is too large. Maximum size is ${maxImageSize / (1024 * 1024)}MB`
+        );
         return;
       }
       if (!acceptedImageTypes.includes(file.type)) {
@@ -89,7 +98,7 @@ const FileUpload = ({
 
     try {
       setUploading(true);
-      
+
       const formData = new FormData();
       files.forEach(file => {
         formData.append('propertyImages', file);
@@ -104,13 +113,12 @@ const FileUpload = ({
       const newImages = response.data.imageUrls;
       const updatedImages = [...uploadedImages, ...newImages];
       setUploadedImages(updatedImages);
-      
+
       if (onImagesUploaded) {
         onImagesUploaded(updatedImages);
       }
-      
+
       setSuccess(`${files.length} image(s) uploaded successfully`);
-      
     } catch (error) {
       console.error('Error uploading images:', error);
       setError(error.response?.data?.error || 'Failed to upload images');
@@ -119,14 +127,18 @@ const FileUpload = ({
     }
   };
 
-  const uploadVideo = async (file) => {
+  const uploadVideo = async file => {
     if (uploadedVideo) {
-      setError('Only one video is allowed. Please delete the current video first.');
+      setError(
+        'Only one video is allowed. Please delete the current video first.'
+      );
       return;
     }
 
     if (file.size > maxVideoSize) {
-      setError(`Video is too large. Maximum size is ${maxVideoSize / (1024 * 1024)}MB`);
+      setError(
+        `Video is too large. Maximum size is ${maxVideoSize / (1024 * 1024)}MB`
+      );
       return;
     }
 
@@ -137,7 +149,7 @@ const FileUpload = ({
 
     try {
       setUploading(true);
-      
+
       const formData = new FormData();
       formData.append('propertyVideo', file);
 
@@ -149,13 +161,12 @@ const FileUpload = ({
 
       const videoUrl = response.data.videoUrl;
       setUploadedVideo(videoUrl);
-      
+
       if (onVideoUploaded) {
         onVideoUploaded(videoUrl);
       }
-      
+
       setSuccess('Video uploaded successfully');
-      
     } catch (error) {
       console.error('Error uploading video:', error);
       setError(error.response?.data?.error || 'Failed to upload video');
@@ -167,7 +178,7 @@ const FileUpload = ({
   const deleteFile = async (fileUrl, isVideo = false) => {
     try {
       await api.delete('/property-upload/file', {
-        data: { fileUrl }
+        data: { fileUrl },
       });
 
       if (isVideo) {
@@ -188,14 +199,13 @@ const FileUpload = ({
       }
 
       setSuccess('File deleted successfully');
-      
     } catch (error) {
       console.error('Error deleting file:', error);
       setError('Failed to delete file');
     }
   };
 
-  const triggerFileInput = (type) => {
+  const triggerFileInput = type => {
     if (type === 'images') {
       fileInputRef.current?.click();
     } else if (type === 'video') {
@@ -204,24 +214,26 @@ const FileUpload = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className='space-y-6'>
       {/* Error and Success Messages */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        <div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded'>
           {error}
         </div>
       )}
-      
+
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+        <div className='bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded'>
           {success}
         </div>
       )}
 
       {/* Image Upload Section */}
       <div>
-        <h4 className="text-sm font-medium text-gray-900 mb-3">Property Images</h4>
-        
+        <h4 className='text-sm font-medium text-gray-900 mb-3'>
+          Property Images
+        </h4>
+
         {/* Drag & Drop Area */}
         <div
           className={`border-2 border-dashed rounded-lg p-6 text-center ${
@@ -232,25 +244,37 @@ const FileUpload = ({
           onDragOver={handleDrag}
           onDrop={handleDrop}
         >
-          <div className="space-y-2">
-            <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-              <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          <div className='space-y-2'>
+            <svg
+              className='mx-auto h-12 w-12 text-gray-400'
+              stroke='currentColor'
+              fill='none'
+              viewBox='0 0 48 48'
+            >
+              <path
+                d='M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02'
+                strokeWidth={2}
+                strokeLinecap='round'
+                strokeLinejoin='round'
+              />
             </svg>
-            <div className="text-sm text-gray-600">
-              <label className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500">
+            <div className='text-sm text-gray-600'>
+              <label className='relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500'>
                 <span>Upload images</span>
                 <input
                   ref={fileInputRef}
-                  type="file"
+                  type='file'
                   multiple
-                  accept="image/*"
-                  className="sr-only"
-                  onChange={(e) => e.target.files && uploadImages(Array.from(e.target.files))}
+                  accept='image/*'
+                  className='sr-only'
+                  onChange={e =>
+                    e.target.files && uploadImages(Array.from(e.target.files))
+                  }
                 />
               </label>
-              <span className="ml-1">or drag and drop</span>
+              <span className='ml-1'>or drag and drop</span>
             </div>
-            <p className="text-xs text-gray-500">
+            <p className='text-xs text-gray-500'>
               PNG, JPG, GIF, WEBP up to 10MB each. Max {maxImages} images.
             </p>
           </div>
@@ -258,21 +282,23 @@ const FileUpload = ({
 
         {/* Uploaded Images Preview */}
         {uploadedImages.length > 0 && (
-          <div className="mt-4">
-            <h5 className="text-sm font-medium text-gray-700 mb-2">Uploaded Images ({uploadedImages.length}/{maxImages})</h5>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className='mt-4'>
+            <h5 className='text-sm font-medium text-gray-700 mb-2'>
+              Uploaded Images ({uploadedImages.length}/{maxImages})
+            </h5>
+            <div className='grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4'>
               {uploadedImages.map((imageUrl, index) => (
-                <div key={index} className="relative group">
+                <div key={index} className='relative group'>
                   <img
                     src={imageUrl}
                     alt={`Property ${index + 1}`}
-                    className="w-full h-24 object-cover rounded-lg border"
-                    onError={(e) => e.target.style.display = 'none'}
+                    className='w-full h-24 object-cover rounded-lg border'
+                    onError={e => (e.target.style.display = 'none')}
                   />
                   <button
                     onClick={() => deleteFile(imageUrl)}
-                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Delete image"
+                    className='absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity'
+                    title='Delete image'
                   >
                     ×
                   </button>
@@ -285,43 +311,57 @@ const FileUpload = ({
 
       {/* Video Upload Section */}
       <div>
-        <h4 className="text-sm font-medium text-gray-900 mb-3">Property Video</h4>
-        
+        <h4 className='text-sm font-medium text-gray-900 mb-3'>
+          Property Video
+        </h4>
+
         {!uploadedVideo ? (
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-            <div className="space-y-2">
-              <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          <div className='border-2 border-dashed border-gray-300 rounded-lg p-6 text-center'>
+            <div className='space-y-2'>
+              <svg
+                className='mx-auto h-12 w-12 text-gray-400'
+                stroke='currentColor'
+                fill='none'
+                viewBox='0 0 48 48'
+              >
+                <path
+                  d='M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02'
+                  strokeWidth={2}
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                />
               </svg>
-              <div className="text-sm text-gray-600">
-                <label className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500">
+              <div className='text-sm text-gray-600'>
+                <label className='relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500'>
                   <span>Upload video</span>
                   <input
                     ref={videoInputRef}
-                    type="file"
-                    accept="video/*"
-                    className="sr-only"
-                    onChange={(e) => e.target.files && uploadVideo(e.target.files[0])}
+                    type='file'
+                    accept='video/*'
+                    className='sr-only'
+                    onChange={e =>
+                      e.target.files && uploadVideo(e.target.files[0])
+                    }
                   />
                 </label>
-                <span className="ml-1">or drag and drop</span>
+                <span className='ml-1'>or drag and drop</span>
               </div>
-              <p className="text-xs text-gray-500">
+              <p className='text-xs text-gray-500'>
                 MP4, AVI, MOV, WMV, FLV, WEBM up to 50MB.
               </p>
             </div>
           </div>
         ) : (
-          <div className="relative group">
+          <div className='relative group'>
             <video
               src={uploadedVideo}
               controls
-              className="w-full h-48 object-cover rounded-lg border"
+              className='w-full h-48 object-cover rounded-lg border'
             />
             <button
               onClick={() => deleteFile(uploadedVideo, true)}
-              className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              title="Delete video"
+              className='absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity'
+              title='Delete video'
             >
               ×
             </button>
@@ -331,13 +371,13 @@ const FileUpload = ({
 
       {/* Loading State */}
       {uploading && (
-        <div className="text-center py-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-600">Uploading...</p>
+        <div className='text-center py-4'>
+          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto'></div>
+          <p className='mt-2 text-sm text-gray-600'>Uploading...</p>
         </div>
       )}
     </div>
   );
 };
 
-export default FileUpload; 
+export default FileUpload;

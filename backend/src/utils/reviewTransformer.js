@@ -1,6 +1,6 @@
 /**
  * 🔄 Review Transformer Utility
- * 
+ *
  * This utility transforms review data and adds appropriate labels
  * for different review stages and types.
  */
@@ -11,7 +11,7 @@
 export function transformReview(review) {
   const transformed = {
     ...review,
-    labels: []
+    labels: [],
   };
 
   // Add stage-specific labels
@@ -54,7 +54,7 @@ export function transformReview(review) {
     transformed.hasReply = true;
     transformed.reply = {
       ...review.reply,
-      labels: ['Review reply']
+      labels: ['Review reply'],
     };
   } else {
     transformed.hasReply = false;
@@ -83,7 +83,7 @@ export function getReviewStageInfo(stage) {
         label: 'Move-in check (no score impact)',
         color: 'blue',
         weight: 0,
-        affectsScore: false
+        affectsScore: false,
       };
     case 'END_OF_LEASE':
       return {
@@ -92,7 +92,7 @@ export function getReviewStageInfo(stage) {
         label: 'Lease end review (affects score)',
         color: 'purple',
         weight: 0.4,
-        affectsScore: true
+        affectsScore: true,
       };
     case 'INITIAL':
       return {
@@ -101,7 +101,7 @@ export function getReviewStageInfo(stage) {
         label: 'Initial rating (minimal impact)',
         color: 'gray',
         weight: 0.1,
-        affectsScore: true
+        affectsScore: true,
       };
     default:
       return {
@@ -110,7 +110,7 @@ export function getReviewStageInfo(stage) {
         label: 'Unknown stage',
         color: 'gray',
         weight: 0,
-        affectsScore: false
+        affectsScore: false,
       };
   }
 }
@@ -118,5 +118,5 @@ export function getReviewStageInfo(stage) {
 export default {
   transformReview,
   transformReviews,
-  getReviewStageInfo
+  getReviewStageInfo,
 };
