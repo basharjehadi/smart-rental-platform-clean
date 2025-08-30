@@ -8,7 +8,7 @@ import {
   adminDecision,
 } from '../controllers/moveInIssueController.js';
 import verifyToken from '../middlewares/verifyToken.js';
-import { upload } from '../middlewares/uploadMiddleware.js';
+import upload from '../middlewares/uploadMiddleware.js';
 
 const router = express.Router();
 

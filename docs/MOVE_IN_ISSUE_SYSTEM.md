@@ -547,7 +547,6 @@ The tenant dashboard now includes a dedicated move-in issues section:
 
 - **Issues Overview**: List of all move-in issues associated with the tenant's rental requests
 - **Status Tracking**: Visual status indicators (OPEN, IN_PROGRESS, RESOLVED, CLOSED)
-- **Priority Display**: Clear priority levels (LOW, MEDIUM, HIGH, URGENT)
 - **Quick Access**: "View Details" button navigates directly to issue discussion
 - **Comment Count**: Shows number of comments for each issue
 - **Property Context**: Displays which property and rental request each issue relates to
