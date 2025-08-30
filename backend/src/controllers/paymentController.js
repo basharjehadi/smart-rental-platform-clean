@@ -302,15 +302,15 @@ const completeMockPayment = async (req, res) => {
             console.error('❌ Error updating property availability:', propErr);
           }
 
-          // Update rental request status to MATCHED (moves it out of Active in UIs)
+          // Update rental request status to LOCKED (prevents editing/deleting after payment)
           try {
             if (paidOffer?.rentalRequestId) {
               await prisma.rentalRequest.update({
                 where: { id: paidOffer.rentalRequestId },
-                data: { status: 'MATCHED', updatedAt: new Date() },
+                data: { status: 'LOCKED', updatedAt: new Date() },
               });
               console.log(
-                '✅ Rental request marked as MATCHED:',
+                '✅ Rental request marked as LOCKED:',
                 paidOffer.rentalRequestId
               );
 
@@ -335,7 +335,7 @@ const completeMockPayment = async (req, res) => {
             }
           } catch (rrErr) {
             console.error(
-              '❌ Error updating rental request status to MATCHED:',
+              '❌ Error updating rental request status to LOCKED:',
               rrErr
             );
           }
@@ -353,6 +353,17 @@ const completeMockPayment = async (req, res) => {
                 contractId: contract?.id,
                 contractNumber: contract?.contractNumber,
               });
+
+              // Create lease after successful contract generation
+              try {
+                await createLeaseFromOffer(
+                  paidOffer.id,
+                  paidOffer.rentalRequestId
+                );
+                console.log('✅ Lease created after contract generation');
+              } catch (leaseErr) {
+                console.error('❌ Error creating lease:', leaseErr);
+              }
             }
           } catch (contractErr) {
             console.error(
@@ -872,6 +883,14 @@ const handlePaymentSucceeded = async (paymentIntent) => {
             );
             await generateContractForRentalRequest(rentalRequestId);
             console.log('✅ Contract auto-generated successfully');
+
+            // Create lease after successful contract generation
+            try {
+              await createLeaseFromOffer(offerId, rentalRequestId);
+              console.log('✅ Lease created after contract generation');
+            } catch (leaseErr) {
+              console.error('❌ Error creating lease:', leaseErr);
+            }
           } else {
             console.log('ℹ️ Contract already exists, skipping generation');
           }
@@ -1365,4 +1384,103 @@ export const refundOfferPayments = async (offerId) => {
   } catch {}
 
   return { success: true, results };
+};
+
+// Create lease from paid offer
+const createLeaseFromOffer = async (offerId, rentalRequestId) => {
+  try {
+    console.log(
+      '🔧 Creating lease from offer:',
+      offerId,
+      'for rental request:',
+      rentalRequestId
+    );
+
+    // Get the paid offer with all necessary data
+    const offer = await prisma.offer.findUnique({
+      where: { id: offerId },
+      include: {
+        rentalRequest: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!offer) {
+      throw new Error('Offer not found');
+    }
+
+    // Check if lease already exists
+    const existingLease = await prisma.lease.findFirst({
+      where: { rentalRequestId: rentalRequestId },
+    });
+
+    if (existingLease) {
+      console.log(
+        'ℹ️ Lease already exists for this rental request:',
+        existingLease.id
+      );
+      return existingLease;
+    }
+
+    // Calculate lease dates
+    const leaseStartDate = new Date(offer.availableFrom);
+    const leaseEndDate = new Date(leaseStartDate);
+    leaseEndDate.setMonth(leaseEndDate.getMonth() + offer.leaseDuration);
+
+    // Create a virtual unit for the lease (since we don't have actual units)
+    const virtualUnit = await prisma.unit.create({
+      data: {
+        unitNumber: `VIRTUAL-${rentalRequestId}`,
+        floor: 1,
+        bedrooms:
+          offer.propertyType === 'Room'
+            ? 1
+            : offer.propertyType === 'Studio'
+              ? 0
+              : 1,
+        bathrooms: 1,
+        area: offer.propertySize ? parseFloat(offer.propertySize) : 19,
+        rentAmount: offer.rentAmount,
+        status: 'RENTED',
+        propertyId: offer.propertyId || null,
+      },
+    });
+
+    // Create the lease
+    const lease = await prisma.lease.create({
+      data: {
+        startDate: leaseStartDate,
+        endDate: leaseEndDate,
+        rentAmount: offer.rentAmount,
+        depositAmount: offer.depositAmount || offer.rentAmount,
+        status: 'ACTIVE',
+        unitId: virtualUnit.id,
+        offerId: offerId,
+        propertyId: offer.propertyId || null,
+        rentalRequestId: rentalRequestId,
+        tenantGroupId: offer.rentalRequest.tenantGroup.id,
+        organizationId: offer.organizationId || null,
+      },
+    });
+
+    console.log('✅ Lease created successfully:', {
+      id: lease.id,
+      startDate: lease.startDate,
+      endDate: lease.endDate,
+      rentAmount: lease.rentAmount,
+      depositAmount: lease.depositAmount,
+    });
+
+    return lease;
+  } catch (error) {
+    console.error('❌ Error creating lease from offer:', error);
+    throw error;
+  }
 };

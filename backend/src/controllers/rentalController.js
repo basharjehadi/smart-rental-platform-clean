@@ -2287,14 +2287,14 @@ const updateTenantOfferStatus = async (req, res) => {
       // Remove the rental request from the pool and update its status
       try {
         console.log(
-          `🔄 Updating rental request ${result.rentalRequestId} status to MATCHED...`
+          `🔄 Updating rental request ${result.rentalRequestId} status to LOCKED...`
         );
 
-        // First, update the rental request status to MATCHED
+        // First, update the rental request status to LOCKED (prevents editing/deleting after payment)
         const updatedRequest = await prisma.rentalRequest.update({
           where: { id: result.rentalRequestId },
           data: {
-            status: 'MATCHED',
+            status: 'LOCKED',
             poolStatus: 'MATCHED',
             updatedAt: new Date(),
           },

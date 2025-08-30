@@ -77,7 +77,16 @@ export const getTenantDashboardData = async (req, res) => {
         moveInVerificationStatus: { not: 'CANCELLED' },
       },
       include: {
-        rentalRequest: true,
+        rentalRequest: {
+          include: {
+            leases: {
+              where: { status: 'ACTIVE' },
+              include: {
+                unit: true,
+              },
+            },
+          },
+        },
         organization: {
           select: {
             id: true,
@@ -109,6 +118,30 @@ export const getTenantDashboardData = async (req, res) => {
     console.log('🔍 Active leases found:', activeLeases.length);
     const activeLease = activeLeases[0] || null;
     console.log('🔍 Primary active lease ID:', activeLease?.id);
+
+    // Log lease data for debugging
+    if (activeLease) {
+      console.log(
+        '🔍 Primary active lease rental request ID:',
+        activeLease.rentalRequest.id
+      );
+      console.log(
+        '🔍 Primary active lease has leases:',
+        !!activeLease.rentalRequest.leases
+      );
+      console.log(
+        '🔍 Primary active lease leases count:',
+        activeLease.rentalRequest.leases?.length || 0
+      );
+      if (activeLease.rentalRequest.leases?.[0]) {
+        console.log('🔍 Primary active lease lease data:', {
+          id: activeLease.rentalRequest.leases[0].id,
+          startDate: activeLease.rentalRequest.leases[0].startDate,
+          endDate: activeLease.rentalRequest.leases[0].endDate,
+          status: activeLease.rentalRequest.leases[0].status,
+        });
+      }
+    }
 
     // If no active lease, return appropriate empty state data
     if (!activeLease) {
@@ -166,6 +199,7 @@ export const getTenantDashboardData = async (req, res) => {
       return {
         offerId: offer.id,
         rentalRequestId: offer.rentalRequest.id,
+        hasActualLease: !!offer.rentalRequest.leases?.[0],
         property: {
           id: offer.property?.id,
           address: propertyAddress,
@@ -205,13 +239,29 @@ export const getTenantDashboardData = async (req, res) => {
           address: offer.organization?.address || 'Not provided',
           profileImage: null,
         },
-        lease: {
-          startDate: leaseStartDate,
-          endDate: leaseEndDate,
-          monthlyRent: offer.rentAmount || offer.rentalRequest.budget || 0,
-          securityDeposit:
-            offer.depositAmount || offer.rentalRequest.budget || 0,
-        },
+        lease: (() => {
+          // Use actual lease data if available, otherwise fallback to offer data
+          const actualLease = offer.rentalRequest.leases?.[0];
+          if (actualLease) {
+            return {
+              id: actualLease.id,
+              startDate: actualLease.startDate,
+              endDate: actualLease.endDate,
+              monthlyRent: actualLease.rentAmount,
+              securityDeposit: actualLease.depositAmount,
+              status: actualLease.status,
+              unitId: actualLease.unitId,
+            };
+          }
+          // Fallback to offer data
+          return {
+            startDate: leaseStartDate,
+            endDate: leaseEndDate,
+            monthlyRent: offer.rentAmount || offer.rentalRequest.budget || 0,
+            securityDeposit:
+              offer.depositAmount || offer.rentalRequest.budget || 0,
+          };
+        })(),
       };
     });
 
@@ -303,20 +353,36 @@ export const getTenantDashboardData = async (req, res) => {
         address: activeLease.organization?.address || 'Not provided',
         profileImage: null,
       },
-      lease: {
-        startDate: activeLease.rentalRequest.moveInDate,
-        endDate: (() => {
-          if (activeLease.leaseEndDate) return activeLease.leaseEndDate;
-          const start = new Date(activeLease.rentalRequest.moveInDate);
-          const end = new Date(start);
-          end.setMonth(end.getMonth() + (activeLease.leaseDuration || 12));
-          return end;
-        })(),
-        monthlyRent:
-          activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
-        securityDeposit:
-          activeLease.depositAmount || activeLease.rentalRequest.budget || 0,
-      },
+      lease: (() => {
+        // Use actual lease data if available, otherwise fallback to offer data
+        const actualLease = activeLease.rentalRequest.leases?.[0];
+        if (actualLease) {
+          return {
+            id: actualLease.id,
+            startDate: actualLease.startDate,
+            endDate: actualLease.endDate,
+            monthlyRent: actualLease.rentAmount,
+            securityDeposit: actualLease.depositAmount,
+            status: actualLease.status,
+            unitId: actualLease.unitId,
+          };
+        }
+        // Fallback to offer data
+        return {
+          startDate: activeLease.rentalRequest.moveInDate,
+          endDate: (() => {
+            if (activeLease.leaseEndDate) return activeLease.leaseEndDate;
+            const start = new Date(activeLease.rentalRequest.moveInDate);
+            const end = new Date(start);
+            end.setMonth(end.getMonth() + (activeLease.leaseDuration || 12));
+            return end;
+          })(),
+          monthlyRent:
+            activeLease.rentAmount || activeLease.rentalRequest.budget || 0,
+          securityDeposit:
+            activeLease.depositAmount || activeLease.rentalRequest.budget || 0,
+        };
+      })(),
       leases,
       rentalRequests,
       payments: await getTenantPaymentsData(tenantId),

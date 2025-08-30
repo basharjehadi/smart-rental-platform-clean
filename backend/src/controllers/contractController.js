@@ -730,6 +730,18 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
       pdfUrl: contract.pdfUrl,
     });
 
+    // Create lease after successful contract generation
+    try {
+      await createLeaseFromContract(contract, rentalRequestId);
+      console.log('✅ Lease created after contract generation');
+    } catch (leaseErr) {
+      console.error(
+        '❌ Error creating lease after contract generation:',
+        leaseErr
+      );
+      // Don't fail contract generation if lease creation fails
+    }
+
     return contract;
   } catch (error) {
     console.error('❌ Error generating contract for rental request:', error);
@@ -819,9 +831,21 @@ export const generateAllMissingContracts = async (req, res) => {
         status: 'ACTIVE',
       },
       include: {
-        offer: {
+        offers: {
           where: {
             status: 'PAID',
+          },
+        },
+        tenantGroup: {
+          include: {
+            members: {
+              where: { isPrimary: true },
+              include: {
+                user: {
+                  select: { id: true },
+                },
+              },
+            },
           },
         },
         payments: {
@@ -838,12 +862,12 @@ export const generateAllMissingContracts = async (req, res) => {
     let paymentsCreated = 0;
 
     for (const request of rentalRequests) {
-      if (!request.offer) continue;
+      if (!request.offers || request.offers.length === 0) continue;
 
       const result = {
         rentalRequestId: request.id,
         title: request.title,
-        offerStatus: request.offer.status,
+        offerStatus: request.offers[0].status,
         hasPayments: request.payments.length > 0,
         hasContract: !!request.contract,
         actions: [],
@@ -852,7 +876,8 @@ export const generateAllMissingContracts = async (req, res) => {
       // Create payment if missing
       if (request.payments.length === 0) {
         const expectedAmount =
-          (request.offer.rentAmount || 0) + (request.offer.depositAmount || 0);
+          (request.offers[0].rentAmount || 0) +
+          (request.offers[0].depositAmount || 0);
 
         try {
           const payment = await prisma.payment.create({
@@ -860,7 +885,7 @@ export const generateAllMissingContracts = async (req, res) => {
               amount: expectedAmount,
               status: 'SUCCEEDED',
               purpose: 'DEPOSIT_AND_FIRST_MONTH',
-              userId: request.tenantId,
+              userId: request.tenantGroup.members[0].user.id,
               rentalRequestId: request.id,
               stripePaymentIntentId: `manual_fix_${Date.now()}_${request.id}`,
             },
@@ -1258,7 +1283,13 @@ export const getMyContracts = async (req, res) => {
     const contracts = await prisma.contract.findMany({
       where: {
         rentalRequest: {
-          tenantId: userId,
+          tenantGroup: {
+            members: {
+              some: {
+                userId: userId,
+              },
+            },
+          },
         },
         // Hide expired/terminated contracts from standard "my contracts" list
         NOT: {
@@ -1338,11 +1369,20 @@ export const getLandlordContracts = async (req, res) => {
       include: {
         rentalRequest: {
           include: {
-            tenant: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                      },
+                    },
+                  },
+                },
               },
             },
             offers: {
@@ -1621,5 +1661,108 @@ export const downloadSignedContract = async (req, res) => {
   } catch (error) {
     console.error('❌ Error downloading signed contract:', error);
     res.status(500).json({ error: 'Failed to download signed contract' });
+  }
+};
+
+// Create lease from contract
+const createLeaseFromContract = async (contract, rentalRequestId) => {
+  try {
+    console.log(
+      '🔧 Creating lease from contract for rental request:',
+      rentalRequestId
+    );
+
+    // Check if lease already exists
+    const existingLease = await prisma.lease.findFirst({
+      where: { rentalRequestId: parseInt(rentalRequestId) },
+    });
+
+    if (existingLease) {
+      console.log(
+        'ℹ️ Lease already exists for this rental request:',
+        existingLease.id
+      );
+      return existingLease;
+    }
+
+    // Get the rental request with offer data
+    const rentalRequest = await prisma.rentalRequest.findUnique({
+      where: { id: parseInt(rentalRequestId) },
+      include: {
+        offers: {
+          where: { status: 'PAID' },
+        },
+        tenantGroup: true,
+      },
+    });
+
+    if (!rentalRequest || rentalRequest.offers.length === 0) {
+      throw new Error('No paid offer found for this rental request');
+    }
+
+    const paidOffer = rentalRequest.offers[0];
+
+    // Calculate lease dates
+    const leaseStartDate = new Date(paidOffer.availableFrom);
+    const leaseEndDate = new Date(leaseStartDate);
+    leaseEndDate.setMonth(leaseEndDate.getMonth() + paidOffer.leaseDuration);
+
+    console.log('📅 Lease dates calculated:', {
+      startDate: leaseStartDate,
+      endDate: leaseEndDate,
+      duration: paidOffer.leaseDuration + ' months',
+    });
+
+    // Create a virtual unit for the lease
+    const virtualUnit = await prisma.unit.create({
+      data: {
+        unitNumber: `VIRTUAL-${rentalRequestId}`,
+        floor: 1,
+        bedrooms:
+          paidOffer.propertyType === 'Room'
+            ? 1
+            : paidOffer.propertyType === 'Studio'
+              ? 0
+              : 1,
+        bathrooms: 1,
+        area: paidOffer.propertySize ? parseFloat(paidOffer.propertySize) : 19,
+        rentAmount: paidOffer.rentAmount,
+        status: 'RENTED',
+        propertyId: paidOffer.propertyId || null,
+      },
+    });
+
+    console.log('✅ Virtual unit created:', virtualUnit.id);
+
+    // Create the lease
+    const lease = await prisma.lease.create({
+      data: {
+        startDate: leaseStartDate,
+        endDate: leaseEndDate,
+        rentAmount: paidOffer.rentAmount,
+        depositAmount: paidOffer.depositAmount || paidOffer.rentAmount,
+        status: 'ACTIVE',
+        unitId: virtualUnit.id,
+        offerId: paidOffer.id,
+        propertyId: paidOffer.propertyId || null,
+        rentalRequestId: parseInt(rentalRequestId),
+        tenantGroupId: rentalRequest.tenantGroup.id,
+        organizationId: paidOffer.organizationId || null,
+      },
+    });
+
+    console.log('✅ Lease created successfully:', {
+      id: lease.id,
+      startDate: lease.startDate,
+      endDate: lease.endDate,
+      rentAmount: lease.rentAmount,
+      depositAmount: lease.depositAmount,
+      unitId: lease.unitId,
+    });
+
+    return lease;
+  } catch (error) {
+    console.error('❌ Error creating lease from contract:', error);
+    throw error;
   }
 };

@@ -58,10 +58,32 @@ router.post('/generate-by-offer/:offerId', verifyToken, async (req, res) => {
     const offer = await prisma.offer.findUnique({
       where: { id: offerId },
       include: {
-        landlord: true,
+        organization: {
+          include: {
+            members: {
+              where: { role: 'OWNER' },
+              include: {
+                user: {
+                  select: { id: true },
+                },
+              },
+            },
+          },
+        },
         rentalRequest: {
           include: {
-            tenant: true,
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: {
+                      select: { id: true },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -75,10 +97,14 @@ router.post('/generate-by-offer/:offerId', verifyToken, async (req, res) => {
     }
 
     // Verify the user is authorized (either tenant or landlord)
-    if (
-      offer.rentalRequest.tenant.id !== userId &&
-      offer.landlord.id !== userId
-    ) {
+    const isTenant = offer.rentalRequest.tenantGroup.members.some(
+      (member) => member.user.id === userId
+    );
+    const isLandlord = offer.organization.members.some(
+      (member) => member.user.id === userId && member.role === 'OWNER'
+    );
+
+    if (!isTenant && !isLandlord) {
       return res.status(403).json({
         success: false,
         error:
@@ -147,23 +173,41 @@ router.get('/:contractId', verifyToken, async (req, res) => {
       include: {
         rentalRequest: {
           include: {
-            tenant: {
-              select: {
-                id: true,
-                name: true,
-                firstName: true,
-                lastName: true,
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        firstName: true,
+                        lastName: true,
+                      },
+                    },
+                  },
+                },
               },
             },
             offers: {
               where: { status: 'PAID' },
               include: {
-                landlord: {
-                  select: {
-                    id: true,
-                    name: true,
-                    firstName: true,
-                    lastName: true,
+                organization: {
+                  include: {
+                    members: {
+                      where: { role: 'OWNER' },
+                      include: {
+                        user: {
+                          select: {
+                            id: true,
+                            name: true,
+                            firstName: true,
+                            lastName: true,
+                          },
+                        },
+                      },
+                    },
                   },
                 },
               },
@@ -181,9 +225,17 @@ router.get('/:contractId', verifyToken, async (req, res) => {
     }
 
     // Verify the user is authorized (either tenant or landlord)
-    const { tenant, offers } = contract.rentalRequest;
+    const { tenantGroup, offers } = contract.rentalRequest;
     const paidOffer = offers?.[0];
-    if (tenant.id !== userId && paidOffer?.landlord.id !== userId) {
+
+    const isTenant = tenantGroup.members.some(
+      (member) => member.user.id === userId
+    );
+    const isLandlord = paidOffer?.organization.members.some(
+      (member) => member.user.id === userId && member.role === 'OWNER'
+    );
+
+    if (!isTenant && !isLandlord) {
       return res.status(403).json({
         success: false,
         error:

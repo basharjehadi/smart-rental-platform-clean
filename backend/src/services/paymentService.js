@@ -12,22 +12,23 @@ import { prisma } from '../utils/prisma.js';
  */
 const calculateFirstMonthPayment = (monthlyRent, moveInDate) => {
   const startDate = new Date(moveInDate);
-  
+
   // Calculate the last day of the first month (when move-in occurs)
   const endDate = new Date(
     startDate.getFullYear(),
     startDate.getMonth() + 1,
     0
   ); // Last day of first month
-  
+
   // Calculate days in first month (from move-in date to end of month)
-  const daysInFirstMonth = Math.ceil(
-    (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-  ) + 1; // +1 to include both start and end dates
-  
+  const daysInFirstMonth =
+    Math.ceil(
+      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+    ) + 1; // +1 to include both start and end dates
+
   // Calculate prorated amount using Polish rental standard (30 days per month)
   const proratedAmount = Math.round((monthlyRent * daysInFirstMonth) / 30);
-  
+
   // Deposit is typically the full monthly rent amount (security deposit)
   const depositAmount = monthlyRent;
 
@@ -186,14 +187,15 @@ export const getUnifiedPaymentData = async (userId, landlordId = null) => {
               relatedOffer.rentAmount,
               relatedOffer.rentalRequest.moveInDate
             );
-            
+
             // Use corrected proration calculation
             const firstMonthAmount = isFirstDay
               ? relatedOffer.rentAmount
               : proration.proratedAmount;
-            
+
             // Use the actual deposit amount from the offer, or default to full monthly rent
-            const depositAmount = relatedOffer.depositAmount || relatedOffer.rentAmount;
+            const depositAmount =
+              relatedOffer.depositAmount || relatedOffer.rentAmount;
 
             // Push deposit line
             allPayments.push({
@@ -364,8 +366,9 @@ export const getUnifiedPaymentData = async (userId, landlordId = null) => {
 
           // Calculate what should have been paid for first month + deposit
           // Deposit is full monthly rent, prorated rent is additional
-          const expectedTotal = prorationDetails.depositAmount + prorationDetails.proratedAmount;
-          
+          const expectedTotal =
+            prorationDetails.depositAmount + prorationDetails.proratedAmount;
+
           prorationAnalysis = {
             actualPaid: firstMonthPayment.amount,
             shouldHaveBeen: expectedTotal,
@@ -375,14 +378,15 @@ export const getUnifiedPaymentData = async (userId, landlordId = null) => {
             daysInFirstMonth: prorationDetails.daysInFirstMonth,
             totalDaysInMonth: prorationDetails.totalDaysInMonth,
             moveInDate: tenantLease.rentalRequest.moveInDate,
-            isCorrectlyProrated: Math.abs(firstMonthPayment.amount - expectedTotal) < 50, // Allow small rounding differences
+            isCorrectlyProrated:
+              Math.abs(firstMonthPayment.amount - expectedTotal) < 50, // Allow small rounding differences
             calculationDetails: {
               monthlyRent: tenantLease.rentAmount,
               prorationFormula: `${prorationDetails.daysInFirstMonth} days / ${prorationDetails.totalDaysInMonth} days × ${tenantLease.rentAmount} PLN`,
               proratedAmount: prorationDetails.proratedAmount,
               depositAmount: prorationDetails.depositAmount,
-              totalExpected: `${prorationDetails.depositAmount} PLN deposit + ${prorationDetails.proratedAmount} PLN prorated rent = ${expectedTotal} PLN`
-            }
+              totalExpected: `${prorationDetails.depositAmount} PLN deposit + ${prorationDetails.proratedAmount} PLN prorated rent = ${expectedTotal} PLN`,
+            },
           };
         }
       }

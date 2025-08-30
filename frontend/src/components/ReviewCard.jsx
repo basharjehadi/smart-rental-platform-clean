@@ -136,13 +136,19 @@ const ReviewCard = ({ userId, isLandlord = false }) => {
             ) : (
               <CheckCircle className='w-4 h-4 text-green-500' />
             )}
-            <span
-              className={`text-sm font-medium ${pendingReviews.length > 0 ? 'text-red-600' : 'text-green-600'}`}
-            >
-              {pendingReviews.length > 0
-                ? `${pendingReviews.length} pending`
-                : 'All caught up'}
-            </span>
+            {pendingReviews.length > 0 ? (
+              <button
+                onClick={() => navigate('/reviews')}
+                className='text-sm font-medium text-red-600 hover:text-red-700 underline cursor-pointer transition-colors'
+                title='Click to view pending reviews'
+              >
+                {pendingReviews.length} pending
+              </button>
+            ) : (
+              <span className='text-sm font-medium text-green-600'>
+                All caught up
+              </span>
+            )}
           </div>
         </div>
 

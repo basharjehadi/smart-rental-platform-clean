@@ -57,15 +57,18 @@ async function updateRentalRequestStatuses() {
       console.log('ℹ️ No rental requests need status updates');
     }
 
-    // Also update expired requests
+    // Also update expired requests (only if move-in date has actually passed)
     const now = new Date();
     const expiredRequests = await prisma.rentalRequest.findMany({
       where: {
         moveInDate: {
-          lt: now,
+          lt: now, // Only requests where move-in date has passed
         },
         status: {
-          not: 'CANCELLED',
+          notIn: ['CANCELLED', 'MATCHED', 'LOCKED'], // Don't touch already processed requests
+        },
+        poolStatus: {
+          not: 'MATCHED', // Don't touch matched requests
         },
       },
     });
@@ -77,6 +80,12 @@ async function updateRentalRequestStatuses() {
         console.log(
           `⏰ Updating expired request ${request.id} (${request.title}) to CANCELLED status`
         );
+        console.log(`   - Move-in date: ${request.moveInDate}`);
+        console.log(`   - Current date: ${now}`);
+        console.log(
+          `   - Days until move-in: ${Math.ceil((new Date(request.moveInDate) - now) / (1000 * 60 * 60 * 24))}`
+        );
+
         return prisma.rentalRequest.update({
           where: { id: request.id },
           data: {
@@ -90,6 +99,8 @@ async function updateRentalRequestStatuses() {
       console.log(
         '✅ Successfully updated all expired rental request statuses'
       );
+    } else {
+      console.log('ℹ️ No expired rental requests found');
     }
 
     console.log('🎉 All rental request status updates completed successfully!');

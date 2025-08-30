@@ -189,25 +189,28 @@ const TenantDashboardNew = () => {
       } else if (dashboardResponse.data?.offerId) {
         setFocusedOfferId(dashboardResponse.data.offerId);
       }
-      // Fetch lease meta for the focused or single offer
+      // Fetch lease meta for the focused or single offer (temporarily disabled)
+      // TODO: Implement proper lease metadata endpoints
       try {
-        const offerForMeta =
-          dashboardResponse.data?.leases?.[0]?.offerId ||
-          dashboardResponse.data?.offerId;
-        if (offerForMeta) {
-          const metaResp = await api.get(`/leases/by-offer/${offerForMeta}`);
-          setLeaseMeta(metaResp.data?.lease || null);
-          const leaseId = metaResp.data?.lease?.id;
-          if (leaseId) {
-            const threadResp = await api.get(`/leases/${leaseId}/renewals`);
-            setRenewals(threadResp.data?.renewals || []);
-          } else {
-            setRenewals([]);
-          }
-        } else {
-          setLeaseMeta(null);
-          setRenewals([]);
-        }
+        // const offerForMeta =
+        //   dashboardResponse.data?.leases?.[0]?.offerId ||
+        //   dashboardResponse.data?.offerId;
+        // if (offerForMeta) {
+        //   const metaResp = await api.get(`/leases/by-offer/${offerForMeta}`);
+        //   setLeaseMeta(metaResp.data?.lease || null);
+        //   const leaseId = metaResp.data?.lease?.id;
+        //   if (leaseId) {
+        //     const threadResp = await api.get(`/leases/${leaseId}/renewals`);
+        //     setRenewals(threadResp.data?.renewals || []);
+        //   } else {
+        //     setRenewals([]);
+        //   }
+        // } else {
+        //   setLeaseMeta(null);
+        //   setRenewals([]);
+        // }
+        setLeaseMeta(null);
+        setRenewals([]);
       } catch {
         setLeaseMeta(null);
         setRenewals([]);
@@ -593,7 +596,7 @@ const TenantDashboardNew = () => {
   };
 
   const calculateDaysToRenewal = () => {
-    const leaseObj = currentLeaseInfo || dashboardData.lease;
+    const leaseObj = dashboardData.lease;
     if (
       !dashboardData.hasActiveLease ||
       !leaseObj?.startDate ||
@@ -624,7 +627,7 @@ const TenantDashboardNew = () => {
   };
 
   const calculateLeaseProgress = () => {
-    const leaseObj = currentLeaseInfo || dashboardData.lease;
+    const leaseObj = dashboardData.lease;
     if (
       !dashboardData.hasActiveLease ||
       !leaseObj?.startDate ||
@@ -1164,14 +1167,14 @@ const TenantDashboardNew = () => {
                 Lease Progress
               </h3>
               {/* Empty when no active lease */}
-              {!leaseMeta?.id ? (
+              {!dashboardData.hasActiveLease || !dashboardData.lease ? (
                 <p className='text-sm text-gray-600'>No active lease yet.</p>
               ) : (
                 <div className='space-y-4'>
                   <div>
                     <p className='text-sm text-gray-600'>
-                      {formatDate(currentLeaseInfo?.startDate)} -{' '}
-                      {formatDate(currentLeaseInfo?.endDate)}
+                      {formatDate(dashboardData.lease?.startDate)} -{' '}
+                      {formatDate(dashboardData.lease?.endDate)}
                     </p>
                   </div>
                   <div>
@@ -1193,27 +1196,10 @@ const TenantDashboardNew = () => {
                       {calculateDaysToRenewal()} days until lease renewal
                     </p>
                   </div>
-                  {leaseMeta && (
-                    <div className='space-y-2'>
-                      {leaseMeta.terminationNoticeDate && (
-                        <div className='text-xs text-red-700 bg-red-50 border border-red-200 rounded p-2'>
-                          Termination notice submitted • effective{' '}
-                          {new Date(
-                            leaseMeta.terminationEffectiveDate
-                          ).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}
-                        </div>
-                      )}
-                      {leaseMeta.renewalStatus === 'DECLINED' && (
-                        <div className='text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded p-2'>
-                          Renewal declined
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* Lease metadata will be loaded separately if needed */}
+                  <div className='space-y-2'>
+                    {/* Placeholder for future lease metadata */}
+                  </div>
                   {/* Two-column layout: left stable actions, right renewal */}
                   <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
                     {/* Left column */}
@@ -1233,16 +1219,14 @@ const TenantDashboardNew = () => {
                       >
                         Download Contract
                       </button>
-                      {!leaseMeta?.terminationNoticeDate && (
-                        <button
-                          onClick={() => setShowEndModal(true)}
-                          className='w-full bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center space-x-2'
-                          title='End lease (30-day notice)'
-                        >
-                          <AlertTriangle className='w-4 h-4' />
-                          <span>End Lease</span>
-                        </button>
-                      )}
+                      <button
+                        onClick={() => setShowEndModal(true)}
+                        className='w-full bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center space-x-2'
+                        title='End lease (30-day notice)'
+                      >
+                        <AlertTriangle className='w-4 h-4' />
+                        <span>End Lease</span>
+                      </button>
                     </div>
 
                     {/* Right column */}
@@ -1466,7 +1450,7 @@ const TenantDashboardNew = () => {
                 Review System
               </h3>
               <p className='text-sm text-gray-600 mb-6'>
-                Your 3-stage review progress and rating
+                Your 2-stage review progress and rating
               </p>
               <ReviewCard userId={user?.id} isLandlord={false} />
 

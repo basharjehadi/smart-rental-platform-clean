@@ -94,6 +94,7 @@ const MyRequests = () => {
     const statusConfig = {
       ACTIVE: { color: 'bg-green-100 text-green-800', text: 'Active' },
       LOCKED: { color: 'bg-yellow-100 text-yellow-800', text: 'Locked' },
+      COMPLETED: { color: 'bg-purple-100 text-purple-800', text: 'Completed' },
       CANCELLED: { color: 'bg-red-100 text-red-800', text: 'Cancelled' },
     };
 
@@ -261,7 +262,7 @@ const MyRequests = () => {
                 <option value='all'>All Statuses</option>
                 <option value='ACTIVE'>Active</option>
                 <option value='LOCKED'>Locked</option>
-                <option value='LOCKED'>Locked</option>
+                <option value='COMPLETED'>Completed</option>
                 <option value='CANCELLED'>Cancelled</option>
                 <option value='EXPIRED'>Expired</option>
               </select>
@@ -355,12 +356,12 @@ const MyRequests = () => {
                           })()}
                         </div>
                         {/* Show offer status if request is locked */}
-                        {request.status === 'LOCKED' &&
-                          getOfferStatusText(request) && (
-                            <div className='mt-1 text-xs text-gray-600'>
-                              {getOfferStatusText(request)}
-                            </div>
-                          )}
+                        {request.status === 'LOCKED' && (
+                          <div className='mt-1 text-xs text-gray-600'>
+                            {getOfferStatusText(request) ||
+                              'Request locked - payment completed'}
+                          </div>
+                        )}
                       </div>
                     </div>
 
