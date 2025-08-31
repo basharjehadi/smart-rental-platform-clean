@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useInterval } from '../hooks/useInterval';
+import { useMoveInUiState, shouldShowReportIssue, shouldShowConfirmDeny } from '../hooks/useMoveInUiState';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -49,59 +50,12 @@ const useCountdown = (serverNow, targetTime) => {
 };
 
 const MoveInVerificationBanner = ({ offerId, onStatusChange }) => {
-  const [uiState, setUiState] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // Fetch UI state
-  const fetchUIState = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await api.get(`/move-in/offers/${offerId}/move-in/ui-state`);
-      
-      // Validate response structure
-      const data = response.data.data;
-      if (!data || typeof data !== 'object') {
-        throw new Error('Invalid response structure');
-      }
-      
-      // Ensure required fields exist
-      const requiredFields = ['verificationStatus', 'window', 'canReportIssue', 'canConfirmOrDeny'];
-      const missingFields = requiredFields.filter(field => !(field in data));
-      
-      if (missingFields.length > 0) {
-        console.warn('Missing fields in UI state response:', missingFields);
-      }
-      
-      setUiState(data);
-      setError(null);
-      
-      // Debug logging
-      console.log('Move-in UI state received:', {
-        verificationStatus: data.verificationStatus,
-        window: data.window,
-        canReportIssue: data.canReportIssue,
-        canConfirmOrDeny: data.canConfirmOrDeny,
-        now: data.now,
-        leaseStart: data.leaseStart,
-        windowClose: data.window?.windowClose
-      });
-    } catch (err) {
-      console.error('Failed to fetch move-in UI state:', err);
-      setError('Failed to load move-in status');
-    } finally {
-      setLoading(false);
-    }
-  }, [offerId]);
-
-  // Initial fetch
-  useEffect(() => {
-    fetchUIState();
-  }, [fetchUIState]);
+  // Use the shared hook for UI state
+  const { uiState, loading, error, refetch } = useMoveInUiState(offerId);
 
   // Refresh every 30 seconds to keep in sync
   useInterval(() => {
-    fetchUIState();
+    refetch();
   }, 30000);
 
   // Countdown hooks for different time displays
@@ -111,11 +65,11 @@ const MoveInVerificationBanner = ({ offerId, onStatusChange }) => {
   // Handle confirm move-in
   const handleConfirm = async () => {
     try {
-      await api.post(`/move-in/offers/${offerId}/verify`);
+      await api.post(`/api/offers/${offerId}/move-in/verify`);
       toast.success('Move-in confirmed successfully!');
-      fetchUIState(); // Refresh state
+      refetch(); // Refresh state
       if (onStatusChange) onStatusChange();
-    } catch (err) {
+    } catch (error) {
       toast.error('Failed to confirm move-in');
     }
   };
@@ -123,11 +77,11 @@ const MoveInVerificationBanner = ({ offerId, onStatusChange }) => {
   // Handle deny move-in
   const handleDeny = async () => {
     try {
-      await api.post(`/move-in/offers/${offerId}/deny`);
+      await api.post(`/api/offers/${offerId}/move-in/deny`);
       toast.success('Move-in denied');
-      fetchUIState(); // Refresh state
+      refetch(); // Refresh state
       if (onStatusChange) onStatusChange();
-    } catch (err) {
+    } catch (error) {
       toast.error('Failed to deny move-in');
     }
   };
@@ -157,7 +111,7 @@ const MoveInVerificationBanner = ({ offerId, onStatusChange }) => {
           ⚠️ {error || 'Failed to load move-in status'}
         </div>
         <button 
-          onClick={fetchUIState}
+          onClick={refetch}
           className="mt-2 text-xs text-red-700 underline hover:no-underline"
         >
           Retry
@@ -166,7 +120,7 @@ const MoveInVerificationBanner = ({ offerId, onStatusChange }) => {
     );
   }
 
-  const { verificationStatus, window, canConfirmOrDeny, canReportIssue } = uiState;
+  const { verificationStatus, window } = uiState;
 
   // VERIFIED or SUCCESS status - show success message
   if (verificationStatus === 'VERIFIED' || verificationStatus === 'SUCCESS') {
@@ -240,7 +194,7 @@ const MoveInVerificationBanner = ({ offerId, onStatusChange }) => {
         {/* Action buttons */}
         <div className="mt-3 flex space-x-2">
           {/* Confirm/Deny buttons - only show if canConfirmOrDeny */}
-          {canConfirmOrDeny && (
+          {shouldShowConfirmDeny(uiState) && (
             <>
               <button
                 onClick={handleConfirm}
@@ -258,7 +212,7 @@ const MoveInVerificationBanner = ({ offerId, onStatusChange }) => {
           )}
 
           {/* Report Issue button - only show if canReportIssue */}
-          {canReportIssue && (
+          {shouldShowReportIssue(uiState) && (
             <button
               onClick={handleReportIssue}
               className="px-3 py-1.5 rounded-md text-sm bg-orange-600 text-white hover:bg-orange-700 transition-colors"

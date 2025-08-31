@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from './StatusBadge';
 import ConfirmationModal from './ConfirmationModal';
-import api from '../utils/api';
+import { useMoveInUiState } from '../hooks/useMoveInUiState';
 
 const OfferCard = ({
   propertyTitle,
@@ -35,9 +35,12 @@ const OfferCard = ({
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [moveInPhase, setMoveInPhase] = useState(null);
-  const [moveInLoading, setMoveInLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Use the shared hook for move-in UI state
+  const { uiState: moveInState, loading: moveInLoading } = useMoveInUiState(
+    (status === 'ACCEPTED' || status === 'PAID') ? offerId : null
+  );
 
   const formatCurrency = amount => {
     return new Intl.NumberFormat('pl-PL', {
@@ -46,25 +49,7 @@ const OfferCard = ({
     }).format(amount);
   };
 
-  // Fetch move-in UI state for accepted/paid offers
-  const fetchMoveInState = async () => {
-    if (status === 'ACCEPTED' || status === 'PAID') {
-      try {
-        setMoveInLoading(true);
-        const response = await api.get(`/offers/${offerId}/move-in/ui-state`);
-        setMoveInPhase(response.data.data?.window?.phase || null);
-      } catch (error) {
-        console.error('Error fetching move-in state:', error);
-        setMoveInPhase(null);
-      } finally {
-        setMoveInLoading(false);
-      }
-    }
-  };
 
-  useEffect(() => {
-    fetchMoveInState();
-  }, [offerId, status]);
 
   // Show landlord name (unmasked for paid offers, masked for others)
   const getLandlordName = fullName => {
@@ -243,16 +228,16 @@ const OfferCard = ({
           <div className='pt-4 border-t border-gray-200'>
             <button
               onClick={() => navigate(`/move-in?offerId=${offerId}`)}
-              disabled={moveInPhase === 'WINDOW_CLOSED'}
+              disabled={moveInState?.window?.phase === 'WINDOW_CLOSED'}
               className={`w-full px-4 py-2 rounded-lg transition-colors ${
-                moveInPhase === 'WINDOW_CLOSED'
+                moveInState?.window?.phase === 'WINDOW_CLOSED'
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-purple-600 text-white hover:bg-purple-700'
               }`}
               title={
-                moveInPhase === 'PRE_MOVE_IN'
+                moveInState?.window?.phase === 'PRE_MOVE_IN'
                   ? 'Opens at check-in'
-                  : moveInPhase === 'WINDOW_CLOSED'
+                  : moveInState?.window?.phase === 'WINDOW_CLOSED'
                   ? 'Window closed'
                   : 'Access move-in center'
               }

@@ -1245,14 +1245,16 @@ export const getAdminMoveInIssues = async (req, res) => {
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // Build where clause for status filtering
-    const whereClause = {};
-    if (status && ['OPEN', 'ESCALATED'].includes(status)) {
-      whereClause.status = status;
-    } else {
-      // Default to both statuses if none specified
-      whereClause.status = { in: ['OPEN', 'ESCALATED'] };
+    // Parse status query parameter (comma-separated)
+    let statusArray = ['OPEN', 'IN_PROGRESS', 'ESCALATED']; // Default statuses
+    if (status) {
+      statusArray = status.split(',').map(s => s.trim().toUpperCase());
     }
+
+    // Build where clause for status filtering
+    const whereClause = {
+      status: { in: statusArray }
+    };
 
     // Get issues with pagination
     const [issues, total] = await Promise.all([
@@ -1261,55 +1263,23 @@ export const getAdminMoveInIssues = async (req, res) => {
         include: {
           lease: {
             include: {
-              tenantGroup: {
+              offer: {
                 include: {
-                  members: {
-                    select: {
-                      user: {
-                        select: {
-                          id: true,
-                          firstName: true,
-                          lastName: true,
-                          email: true,
-                        },
-                      },
-                    },
+                  tenantGroup: {
+                    include: {
+                      members: {
+                        include: {
+                          user: true
+                        }
+                      }
+                    }
                   },
-                },
-              },
-              property: {
-                select: {
-                  id: true,
-                  name: true,
-                  address: true,
-                },
-                organization: {
-                  select: {
-                    id: true,
-                    name: true,
-                    members: {
-                      where: { role: 'OWNER' },
-                      select: {
-                        user: {
-                          select: {
-                            id: true,
-                            firstName: true,
-                            lastName: true,
-                            email: true,
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          comments: {
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-            select: { createdAt: true },
-          },
+                  property: true,
+                  organization: true
+                }
+              }
+            }
+          }
         },
         orderBy: { updatedAt: 'desc' },
         skip: offset,
@@ -1322,27 +1292,27 @@ export const getAdminMoveInIssues = async (req, res) => {
     const formattedIssues = issues.map(issue => ({
       id: issue.id,
       title: issue.title,
-      description: issue.description,
       status: issue.status,
-      priority: issue.priority,
       createdAt: issue.createdAt,
       updatedAt: issue.updatedAt,
-      tenant: issue.lease.tenantGroup.members[0]?.user || null,
-      landlord: issue.lease.property.organization.members[0]?.user || null,
-      property: issue.lease.property,
-      lastCommentAt: issue.comments[0]?.createdAt || null,
+      leaseId: issue.leaseId,
+      offerId: issue.lease.offer.id,
+      tenantName: issue.lease.offer.tenantGroup.members[0]?.user 
+        ? `${issue.lease.offer.tenantGroup.members[0].user.firstName} ${issue.lease.offer.tenantGroup.members[0].user.lastName}`
+        : 'Unknown',
+      landlordName: issue.lease.offer.organization.members?.[0]?.user
+        ? `${issue.lease.offer.organization.members[0].user.firstName} ${issue.lease.offer.organization.members[0].user.lastName}`
+        : 'Unknown',
+      propertyTitle: issue.lease.offer.property.name || 'Unknown Property'
     }));
 
     return res.json({
       success: true,
       data: {
-        issues: formattedIssues,
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total,
-          totalPages: Math.ceil(total / limitNum),
-        },
+        items: formattedIssues,
+        total,
+        page: pageNum,
+        pageSize: limitNum,
       },
     });
   } catch (error) {

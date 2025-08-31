@@ -38,13 +38,19 @@ const AdminMoveInReviews = () => {
       const response = await api.get(`/api/move-in-issues/admin/move-in/issues?${params}`);
       
       if (response.data.success) {
-        setIssues(response.data.data.issues);
-        setPagination(response.data.data.pagination);
+        setIssues(response.data.data.items);
+        setPagination({
+          page: response.data.data.page,
+          limit: response.data.data.pageSize,
+          total: response.data.data.total,
+          totalPages: Math.ceil(response.data.data.total / response.data.data.pageSize),
+        });
       }
     } catch (error) {
       console.error('Error loading issues:', error);
-      setError('Failed to load issues');
-      toast.error('Failed to load issues');
+      const errorMessage = error.response?.data?.message || 'Failed to load issues';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -226,26 +232,26 @@ const AdminMoveInReviews = () => {
                         </span>
                       </div>
                       
-                      <p className="text-gray-600 mb-3">{issue.description}</p>
+                                             <p className="text-gray-600 mb-3">{issue.title}</p>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-500">Tenant:</span>
-                          <span className="ml-2 text-gray-900">
-                            {issue.tenant ? `${issue.tenant.firstName} ${issue.tenant.lastName}` : 'N/A'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Landlord:</span>
-                          <span className="ml-2 text-gray-900">
-                            {issue.landlord ? `${issue.landlord.firstName} ${issue.landlord.lastName}` : 'N/A'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Property:</span>
-                          <span className="ml-2 text-gray-900">{issue.property?.name || 'N/A'}</span>
-                        </div>
-                      </div>
+                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                         <div>
+                           <span className="text-gray-500">Tenant:</span>
+                           <span className="ml-2 text-gray-900">
+                             {issue.tenantName || 'N/A'}
+                           </span>
+                         </div>
+                         <div>
+                           <span className="text-gray-500">Landlord:</span>
+                           <span className="ml-2 text-gray-900">
+                             {issue.landlordName || 'N/A'}
+                           </span>
+                         </div>
+                         <div>
+                           <span className="text-gray-500">Property:</span>
+                           <span className="ml-2 text-gray-900">{issue.propertyTitle || 'N/A'}</span>
+                         </div>
+                       </div>
                       
                       <div className="flex items-center space-x-4 mt-3 text-xs text-gray-500">
                         <span>Created: {formatDate(issue.createdAt)}</span>
@@ -256,14 +262,20 @@ const AdminMoveInReviews = () => {
                       </div>
                     </div>
                     
-                    <div className="ml-4">
-                      <button
-                        onClick={() => handleViewIssue(issue)}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-                      >
-                        View
-                      </button>
-                    </div>
+                                         <div className="ml-4 flex space-x-2">
+                       <button
+                         onClick={() => handleViewIssue(issue)}
+                         className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                       >
+                         View Details
+                       </button>
+                       <button
+                         onClick={() => window.open(`/admin/issue/${issue.id}`, '_blank')}
+                         className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm font-medium"
+                       >
+                         Open Issue
+                       </button>
+                     </div>
                   </div>
                 </div>
               ))}
@@ -326,28 +338,28 @@ const AdminMoveInReviews = () => {
                 <p className="text-gray-600">{selectedIssue.description}</p>
               </div>
               
-              <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                <div>
-                  <span className="text-gray-500">Status:</span>
-                  <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedIssue.status)}`}>
-                    {selectedIssue.status}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Priority:</span>
-                  <span className="ml-2 text-gray-900">{selectedIssue.priority || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Tenant:</span>
-                  <span className="ml-2 text-gray-900">
-                    {selectedIssue.tenant ? `${selectedIssue.tenant.firstName} ${selectedIssue.tenant.lastName}` : 'N/A'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Property:</span>
-                  <span className="ml-2 text-gray-900">{selectedIssue.property?.name || 'N/A'}</span>
-                </div>
-              </div>
+                             <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                 <div>
+                   <span className="text-gray-500">Status:</span>
+                   <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedIssue.status)}`}>
+                     {selectedIssue.status}
+                   </span>
+                 </div>
+                 <div>
+                   <span className="text-gray-500">Tenant:</span>
+                   <span className="ml-2 text-gray-900">
+                     {selectedIssue.tenantName || 'N/A'}
+                   </span>
+                 </div>
+                 <div>
+                   <span className="text-gray-500">Property:</span>
+                   <span className="ml-2 text-gray-900">{selectedIssue.propertyTitle || 'N/A'}</span>
+                 </div>
+                 <div>
+                   <span className="text-gray-500">Offer ID:</span>
+                   <span className="ml-2 text-gray-900">{selectedIssue.offerId || 'N/A'}</span>
+                 </div>
+               </div>
               
               <div className="border-t pt-4">
                 <h4 className="text-sm font-medium text-gray-900 mb-3">Admin Actions</h4>
