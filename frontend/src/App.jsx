@@ -60,6 +60,7 @@ import BusinessUpgradePage from './pages/BusinessUpgradePage';
 import TenantGroupManagement from './pages/TenantGroupManagement';
 import AcceptInvitationPage from './pages/AcceptInvitationPage.jsx';
 import TenantMoveInIssuePage from './pages/TenantMoveInIssuePage';
+import MoveInCenter from './pages/MoveInCenter';
 // import PaymentDemo from './pages/PaymentDemo';
 // import PaymentExample from './pages/PaymentExample';
 
@@ -182,6 +183,14 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <TenantMoveInIssuePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/move-in'
+          element={
+            <ProtectedRoute>
+              <MoveInCenter />
             </ProtectedRoute>
           }
         />

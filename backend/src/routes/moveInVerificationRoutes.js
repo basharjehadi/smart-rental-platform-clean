@@ -4,7 +4,9 @@ import upload from '../middlewares/uploadMiddleware.js';
 import {
   getMoveInStatus,
   verifyMoveInSuccess,
+  denyMoveIn,
   getLatestPaidOfferStatusForProperty,
+  getOfferMoveInIssues,
   adminApproveCancellation,
   adminRejectCancellation,
 } from '../controllers/moveInVerificationController.js';
@@ -19,6 +21,8 @@ const router = Router();
 // Tenant and landlord must be authenticated
 router.get('/offers/:id/status', verifyToken, getMoveInStatus);
 router.post('/offers/:id/verify', verifyToken, verifyMoveInSuccess);
+router.post('/offers/:id/deny', verifyToken, denyMoveIn);
+router.get('/offers/:id/issues', verifyToken, getOfferMoveInIssues);
 
 router.get(
   '/property/:propertyId/latest-paid-status',

@@ -16,6 +16,19 @@ A full-stack, multi-user rental management system featuring a **reverse marketpl
 - **Review & Rating System**: Built-in review system for both tenants and landlords to build trust and reputation.
 - **Code Quality & Structure**: Professionally refactored with a clean folder structure, centralized documentation in `/docs`, and consistent code formatting with Prettier.
 
+## Move-In Quick Guide
+
+**24h Confirm/Deny Window**: After payment, tenants have 24 hours to confirm successful move-in or report issues. Only tenant group members can act; landlords cannot verify.
+
+**API Endpoints**:
+- `GET /move-in/offers/:id/status` - Get verification status
+- `POST /move-in/offers/:id/verify` - Confirm move-in  
+- `POST /move-in/offers/:id/deny` - Deny move-in
+
+**Frontend Page**: Navigate to `/move-in?offerId=YOUR_OFFER_ID` to access the Move-In Center.
+
+**Note**: Backend lives in `backend/src`; legacy folders are ignored for now.
+
 ## Tech Stack
 
 ### Frontend

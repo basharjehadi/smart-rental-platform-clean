@@ -81,12 +81,11 @@ export const createComment = async (req, res) => {
     const isLandlord = issue.lease.property.organization.members.some(
       (member) => member.userId === userId
     );
-    const isAdmin = req.user.role === 'ADMIN';
 
-    if (!isTenant && !isLandlord && !isAdmin) {
+    if (!isTenant && !isLandlord) {
       return res.status(403).json({
-        error: 'Unauthorized',
-        message: 'You are not authorized to comment on this issue',
+        error: 'Not allowed',
+        message: 'Only participants can comment on this issue',
       });
     }
 
@@ -233,12 +232,11 @@ export const getMoveInIssue = async (req, res) => {
     const isLandlord = issue.lease.property.organization.members.some(
       (member) => member.userId === userId
     );
-    const isAdmin = req.user.role === 'ADMIN';
 
-    if (!isTenant && !isLandlord && !isAdmin) {
+    if (!isTenant && !isLandlord) {
       return res.status(403).json({
-        error: 'Unauthorized',
-        message: 'You are not authorized to view this issue',
+        error: 'Not allowed',
+        message: 'Only participants can view this issue',
       });
     }
 
@@ -333,12 +331,11 @@ export const createMoveInIssue = async (req, res) => {
     const isLandlord = offer.property?.organization.members.some(
       (member) => member.userId === userId
     );
-    const isAdmin = req.user.role === 'ADMIN';
 
-    if (!isTenant && !isLandlord && !isAdmin) {
+    if (!isTenant && !isLandlord) {
       return res.status(403).json({
-        error: 'Unauthorized',
-        message: 'You are not authorized to create issues for this offer',
+        error: 'Not allowed',
+        message: 'Only participants can create issues for this offer',
       });
     }
 
@@ -559,12 +556,11 @@ export const updateIssueStatus = async (req, res) => {
     const isLandlord = issue.lease.property.organization.members.some(
       (member) => member.userId === userId
     );
-    const isAdmin = req.user.role === 'ADMIN';
 
-    if (!isTenant && !isLandlord && !isAdmin) {
+    if (!isTenant && !isLandlord) {
       return res.status(403).json({
-        error: 'Unauthorized',
-        message: 'You are not authorized to update this issue',
+        error: 'Not allowed',
+        message: 'Only participants can update this issue',
       });
     }
 
@@ -712,12 +708,11 @@ export const listLeaseMoveInIssues = async (req, res) => {
     const isLandlord = lease.property.organization.members.some(
       (member) => member.userId === userId
     );
-    const isAdmin = req.user.role === 'ADMIN';
 
-    if (!isTenant && !isLandlord && !isAdmin) {
+    if (!isTenant && !isLandlord) {
       return res.status(403).json({
-        error: 'Unauthorized',
-        message: 'You are not authorized to view issues for this lease',
+        error: 'Not allowed',
+        message: 'Only participants can view issues for this lease',
       });
     }
 
@@ -768,10 +763,10 @@ export const adminDecision = async (req, res) => {
     const { decision, notes, refundAmount } = req.body;
     const adminId = req.user.id;
 
-    // Verify admin role
+    // Verify admin role (route already uses requireAdmin middleware, but verify here too)
     if (req.user.role !== 'ADMIN') {
       return res.status(403).json({
-        error: 'Unauthorized',
+        error: 'Not allowed',
         message: 'Only administrators can make decisions on move-in issues',
       });
     }

@@ -31,7 +31,8 @@
     "translate:test": "echo 'test-libretranslate.js not found'",
     "test:renewal": "node src/scripts/test-renewal-termination.js",
     "backfill:names": "node src/scripts/backfill-user-names.js",
-    "backfill:publishAfter": "node src/scripts/backfillPublishAfter.js"
+    "backfill:publishAfter": "node src/scripts/backfillPublishAfter.js",
+    "seed:movein": "node src/scripts/seed-movein-demo.js"
   },
   "keywords": [
     "rental",

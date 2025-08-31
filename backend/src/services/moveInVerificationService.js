@@ -1,5 +1,11 @@
 import { prisma } from '../utils/prisma.js';
 
+// Export the deadline computation function
+export const computeVerificationDeadline = (moveInDate) => {
+  const base = moveInDate ? new Date(moveInDate) : new Date();
+  return new Date(base.getTime() + 24*60*60*1000);
+};
+
 const THRESHOLDS_HOURS = [24, 12, 1];
 let verificationScheduler;
 
@@ -38,6 +44,13 @@ export const runMoveInReminders = async () => {
 
     const diffMs = offer.moveInVerificationDeadline.getTime() - now.getTime();
     if (diffMs <= 0) continue; // handled by finalizer
+
+    // Minimal 1-hour reminder (console log only)
+    const oneHourMs = 60 * 60 * 1000;
+    const fiftyFiveMinMs = 55 * 60 * 1000;
+    if (diffMs <= oneHourMs && diffMs > fiftyFiveMinMs) { // Next 60 min but > 55 min to avoid spam
+      console.log(`[MoveIn] Offer ${offer.id} has ~1 hour left to confirm/deny (deadline: ${offer.moveInVerificationDeadline.toISOString()})`);
+    }
 
     for (const h of THRESHOLDS_HOURS) {
       if (withinWindow(diffMs, h)) {
@@ -90,7 +103,7 @@ export const runMoveInFinalization = async () => {
     const result = await prisma.offer.updateMany({
       where: { id: offer.id, moveInVerificationStatus: 'PENDING' },
       data: {
-        moveInVerificationStatus: 'SUCCESS',
+        moveInVerificationStatus: 'VERIFIED',
         moveInVerificationDate: now,
       },
     });

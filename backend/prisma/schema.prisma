@@ -966,6 +966,8 @@ model MoveInIssueComment {
 enum MoveInVerificationStatus {
   PENDING
   SUCCESS
+  VERIFIED
+  DENIED
   ISSUE_REPORTED
   CANCELLED
 }

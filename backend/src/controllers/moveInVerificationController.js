@@ -70,7 +70,7 @@ export const verifyMoveInSuccess = async (req, res) => {
     const updated = await prisma.offer.update({
       where: { id },
       data: {
-        moveInVerificationStatus: 'SUCCESS',
+        moveInVerificationStatus: 'VERIFIED',
         moveInVerificationDate: new Date(),
       },
       select: {
@@ -102,8 +102,8 @@ export const verifyMoveInSuccess = async (req, res) => {
             userId: landlordId,
             type: 'SYSTEM_ANNOUNCEMENT',
             entityId: id,
-            title: 'Tenant confirmed move-in',
-            body: 'The tenant confirmed successful move-in.',
+            title: 'Tenant verified move-in',
+            body: 'The tenant verified successful move-in.',
           },
         });
 
@@ -120,7 +120,7 @@ export const verifyMoveInSuccess = async (req, res) => {
           });
         }
         if (io?.emitMoveInVerificationUpdate) {
-          await io.emitMoveInVerificationUpdate(landlordId, id, 'SUCCESS');
+          await io.emitMoveInVerificationUpdate(landlordId, id, 'VERIFIED');
         }
       }
     }
@@ -129,6 +129,126 @@ export const verifyMoveInSuccess = async (req, res) => {
   } catch (error) {
     console.error('Error verifying move-in success:', error);
     return res.status(500).json({ error: 'Failed to verify move-in' });
+  }
+};
+
+// POST /offers/:id/deny-move-in
+export const denyMoveIn = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Find the offer and verify user authorization
+    const offer = await prisma.offer.findUnique({
+      where: { id },
+      include: {
+        tenantGroup: {
+          include: {
+            members: {
+              select: { userId: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!offer) {
+      return res.status(404).json({
+        error: 'Offer not found',
+        message: 'The specified offer does not exist'
+      });
+    }
+
+    // Check if user is a tenant member
+    const isTenantMember = offer.tenantGroup.members.some(
+      (member) => member.userId === userId
+    );
+
+    if (!isTenantMember) {
+      return res.status(403).json({
+        error: 'Not allowed',
+        message: 'Only tenant members can deny move-in'
+      });
+    }
+
+    // Check preconditions
+    if (offer.moveInVerificationStatus !== 'PENDING') {
+      return res.status(400).json({
+        error: 'Invalid status',
+        message: 'Move-in can only be denied when status is PENDING'
+      });
+    }
+
+    const now = new Date();
+    if (offer.moveInVerificationDeadline && now >= offer.moveInVerificationDeadline) {
+      return res.status(400).json({
+        error: 'Deadline expired',
+        message: 'Move-in verification deadline has expired'
+      });
+    }
+
+    // Update the offer status
+    const updated = await prisma.offer.update({
+      where: { id },
+      data: {
+        moveInVerificationStatus: 'DENIED',
+        moveInVerifiedAt: now,
+      },
+      select: {
+        id: true,
+        moveInVerificationStatus: true,
+        moveInVerifiedAt: true,
+        organizationId: true,
+        propertyId: true,
+        rentalRequestId: true,
+      },
+    });
+
+    // Notify landlord
+    if (updated?.organizationId) {
+      const landlordMember = await prisma.organizationMember.findFirst({
+        where: {
+          organizationId: updated.organizationId,
+          role: 'OWNER',
+        },
+        select: { userId: true },
+      });
+
+      if (landlordMember?.userId) {
+        const landlordId = landlordMember.userId;
+
+        await prisma.notification.create({
+          data: {
+            userId: landlordId,
+            type: 'SYSTEM_ANNOUNCEMENT',
+            entityId: id,
+            title: 'Tenant denied move-in',
+            body: 'The tenant denied successful move-in.',
+          },
+        });
+
+        // Get the io instance from the Express app
+        const io = req.app.get('io');
+        if (io?.emitNotification) {
+          await io.emitNotification(landlordId, {
+            id: `movein-deny-${id}`,
+            type: 'SYSTEM_ANNOUNCEMENT',
+            title: 'Tenant denied move-in',
+            body: 'The tenant denied successful move-in.',
+            createdAt: new Date(),
+            isRead: false,
+          });
+        }
+        if (io?.emitMoveInVerificationUpdate) {
+          await io.emitMoveInVerificationUpdate(landlordId, id, 'DENIED');
+        }
+      }
+    }
+
+    return res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Error denying move-in:', error);
+    return res.status(500).json({ error: 'Failed to deny move-in' });
   }
 };
 
@@ -495,5 +615,109 @@ export const adminRejectCancellation = async (req, res) => {
   } catch (e) {
     console.error('adminRejectCancellation error:', e);
     res.status(500).json({ error: 'Failed to reject cancellation' });
+  }
+};
+
+// GET /offers/:id/move-in-issues
+export const getOfferMoveInIssues = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Find the offer and verify user authorization
+    const offer = await prisma.offer.findUnique({
+      where: { id },
+      include: {
+        tenantGroup: {
+          include: {
+            members: {
+              select: { userId: true }
+            }
+          }
+        },
+        property: {
+          include: {
+            organization: {
+              include: {
+                members: {
+                  where: { role: 'OWNER' },
+                  select: { userId: true }
+                }
+              }
+            }
+          }
+        },
+        leases: {
+          take: 1,
+          orderBy: { createdAt: 'desc' }
+        }
+      }
+    });
+
+    if (!offer) {
+      return res.status(404).json({
+        error: 'Offer not found',
+        message: 'The specified offer does not exist'
+      });
+    }
+
+    // Check if user is authorized to view issues for this offer
+    const isTenant = offer.tenantGroup.members.some(
+      (member) => member.userId === userId
+    );
+    const isLandlord = offer.property?.organization.members.some(
+      (member) => member.userId === userId
+    );
+
+    if (!isTenant && !isLandlord) {
+      return res.status(403).json({
+        error: 'Not allowed',
+        message: 'Only participants can view issues for this offer'
+      });
+    }
+
+    // Get the lease for this offer
+    const lease = offer.leases[0];
+    if (!lease) {
+      return res.json({
+        success: true,
+        issues: []
+      });
+    }
+
+    // Get all move-in issues for this lease
+    const issues = await prisma.moveInIssue.findMany({
+      where: { leaseId: lease.id },
+      include: {
+        comments: {
+          orderBy: { createdAt: 'desc' },
+          take: 5, // Get last 5 comments for preview
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                role: true,
+                profileImage: true,
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({
+      success: true,
+      issues
+    });
+  } catch (error) {
+    console.error('Get offer move-in issues error:', error);
+    res.status(500).json({
+      error: 'Failed to get move-in issues',
+      message: 'An error occurred while fetching the issues'
+    });
   }
 };
