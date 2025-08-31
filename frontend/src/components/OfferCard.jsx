@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from './StatusBadge';
 import ConfirmationModal from './ConfirmationModal';
-import { useMoveInUiState } from '../hooks/useMoveInUiState';
+import useMoveInUiState from '../hooks/useMoveInUiState';
 
 const OfferCard = ({
   propertyTitle,
@@ -38,7 +38,7 @@ const OfferCard = ({
   const navigate = useNavigate();
 
   // Use the shared hook for move-in UI state
-  const { uiState: moveInState, loading: moveInLoading } = useMoveInUiState(
+  const { data: moveInState, loading: moveInLoading } = useMoveInUiState(
     (status === 'ACCEPTED' || status === 'PAID') ? offerId : null
   );
 

@@ -35,7 +35,7 @@ const AdminMoveInReviews = () => {
         params.append('status', status);
       }
 
-      const response = await api.get(`/api/move-in-issues/admin/move-in/issues?${params}`);
+      const response = await api.get(`/api/admin/move-in/issues?${params}`);
       
       if (response.data.success) {
         setIssues(response.data.data.items);
