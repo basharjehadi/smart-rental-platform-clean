@@ -21,6 +21,8 @@ import supportRoutes from './supportRoutes.js';
 import reviewRoutes from './reviewRoutes.js';
 import moveInVerificationRoutes from './moveInVerificationRoutes.js';
 import moveInIssueRoutes from './moveInIssueRoutes.js';
+import { getAdminMoveInIssues } from './moveInIssueRoutes.js';
+import requireAdmin from './middlewares/requireAdmin.js';
 import leaseRoutes from './leaseRoutes.js';
 import renewalRoutes from './renewalRoutes.js';
 import organizationRoutes from './organizationRoutes.js';
@@ -95,6 +97,9 @@ router.use('/move-in', moveInVerificationRoutes);
 
 // Move-in issue routes
 router.use('/move-in-issues', moveInIssueRoutes);
+
+// Admin move-in issues alias
+router.get('/admin/move-in/issues', requireAdmin, getAdminMoveInIssues);
 
 // Lease lifecycle routes
 router.use('/leases', leaseRoutes);
