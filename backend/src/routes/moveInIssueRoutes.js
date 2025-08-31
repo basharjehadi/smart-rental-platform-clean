@@ -17,7 +17,7 @@ router.use(verifyToken);
 
 // Create a new move-in issue
 // POST /api/move-in-issues
-router.post('/', createMoveInIssue);
+router.post('/', upload.array('evidence', 5), createMoveInIssue);
 
 // Get a single move-in issue with all comments and author profiles
 // GET /api/move-in-issues/:issueId

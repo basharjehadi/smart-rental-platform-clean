@@ -413,7 +413,14 @@ export const getContractStatus = async (req, res) => {
       include: {
         rentalRequest: {
           include: {
-            tenant: true,
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: { user: true },
+                },
+              },
+            },
             offers: {
               where: { status: 'PAID' },
               include: {
@@ -437,9 +444,10 @@ export const getContractStatus = async (req, res) => {
     }
 
     // Check authorization
-    const { tenant, offers } = contract.rentalRequest;
+    const { tenantGroup, offers } = contract.rentalRequest;
+    const primaryTenant = tenantGroup?.members?.[0];
     const paidOffer = offers?.[0];
-    const isTenant = tenant.id === userId;
+    const isTenant = primaryTenant?.user?.id === userId;
     const isLandlord =
       paidOffer?.organization?.members?.[0]?.user?.id === userId;
 
@@ -448,12 +456,17 @@ export const getContractStatus = async (req, res) => {
     }
 
     res.json({
-      contractNumber: contract.contractNumber,
-      status: contract.status,
-      generatedAt: contract.generatedAt,
-      signedAt: contract.signedAt,
-      tenantSignedAt: contract.tenantSignedAt,
-      landlordSignedAt: contract.landlordSignedAt,
+      success: true,
+      contract: {
+        id: contract.id,
+        contractNumber: contract.contractNumber,
+        status: contract.status,
+        pdfUrl: contract.pdfUrl,
+        generatedAt: contract.generatedAt,
+        signedAt: contract.signedAt,
+        tenantSignedAt: contract.tenantSignedAt,
+        landlordSignedAt: contract.landlordSignedAt,
+      },
       canSign: contract.status === 'GENERATED',
       isTenant: isTenant,
       isLandlord: isLandlord,
@@ -573,8 +586,12 @@ export const generateContractForRentalRequest = async (rentalRequestId) => {
     const contractNumber = generateContractNumber();
     console.log(`📄 Generated contract number: ${contractNumber}`);
 
-    // Calculate lease dates
-    const leaseStartDate = new Date(paidOffer.availableFrom);
+    // Calculate lease dates - use rental request move-in date as primary source
+    const leaseStartDate = rentalRequest.moveInDate 
+      ? new Date(rentalRequest.moveInDate)
+      : paidOffer.availableFrom 
+        ? new Date(paidOffer.availableFrom)
+        : new Date(); // Use current date as final fallback
     const leaseEndDate = new Date(leaseStartDate);
     leaseEndDate.setMonth(leaseEndDate.getMonth() + paidOffer.leaseDuration);
 
@@ -1291,9 +1308,9 @@ export const getMyContracts = async (req, res) => {
             },
           },
         },
-        // Hide expired/terminated contracts from standard "my contracts" list
+        // Hide expired contracts from standard "my contracts" list
         NOT: {
-          status: { in: ['EXPIRED', 'TERMINATED'] },
+          status: { in: ['EXPIRED'] },
         },
       },
       include: {
@@ -1441,12 +1458,21 @@ export const downloadGeneratedContract = async (req, res) => {
       include: {
         rentalRequest: {
           include: {
-            tenant: {
-              select: {
-                id: true,
-                name: true,
-                firstName: true,
-                lastName: true,
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        firstName: true,
+                        lastName: true,
+                      },
+                    },
+                  },
+                },
               },
             },
             offers: {
@@ -1480,17 +1506,18 @@ export const downloadGeneratedContract = async (req, res) => {
       return res.status(404).json({ error: 'Contract not found' });
     }
 
-    // If contract is expired/terminated, block download
-    if (contract.status === 'EXPIRED' || contract.status === 'TERMINATED') {
+    // If contract is expired, block download
+    if (contract.status === 'EXPIRED') {
       return res
         .status(410)
-        .json({ error: 'Contract is no longer available (cancelled/expired)' });
+        .json({ error: 'Contract is no longer available (expired)' });
     }
 
     // Verify the user is authorized (either tenant or landlord)
-    const { tenant, offers } = contract.rentalRequest;
+    const { tenantGroup, offers } = contract.rentalRequest;
+    const primaryTenant = tenantGroup?.members?.[0];
     const paidOffer = offers?.[0];
-    const isTenant = tenant.id === userId;
+    const isTenant = primaryTenant?.user?.id === userId;
     const isLandlord =
       paidOffer?.organization?.members?.[0]?.user?.id === userId;
 
@@ -1559,12 +1586,21 @@ export const downloadSignedContract = async (req, res) => {
       include: {
         rentalRequest: {
           include: {
-            tenant: {
-              select: {
-                id: true,
-                name: true,
-                firstName: true,
-                lastName: true,
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        firstName: true,
+                        lastName: true,
+                      },
+                    },
+                  },
+                },
               },
             },
             offers: {
@@ -1598,11 +1634,11 @@ export const downloadSignedContract = async (req, res) => {
       return res.status(404).json({ error: 'Contract not found' });
     }
 
-    // If contract is expired/terminated, block download
-    if (contract.status === 'EXPIRED' || contract.status === 'TERMINATED') {
+    // If contract is expired, block download
+    if (contract.status === 'EXPIRED') {
       return res
         .status(410)
-        .json({ error: 'Contract is no longer available (cancelled/expired)' });
+        .json({ error: 'Contract is no longer available (expired)' });
     }
 
     // Check if contract is signed
@@ -1611,9 +1647,10 @@ export const downloadSignedContract = async (req, res) => {
     }
 
     // Verify the user is authorized (either tenant or landlord)
-    const { tenant, offers } = contract.rentalRequest;
+    const { tenantGroup, offers } = contract.rentalRequest;
+    const primaryTenant = tenantGroup?.members?.[0];
     const paidOffer = offers?.[0];
-    const isTenant = tenant.id === userId;
+    const isTenant = primaryTenant?.user?.id === userId;
     const isLandlord =
       paidOffer?.organization?.members?.[0]?.user?.id === userId;
 
@@ -1702,8 +1739,12 @@ const createLeaseFromContract = async (contract, rentalRequestId) => {
 
     const paidOffer = rentalRequest.offers[0];
 
-    // Calculate lease dates
-    const leaseStartDate = new Date(paidOffer.availableFrom);
+    // Calculate lease dates - use rental request move-in date as primary source
+    const leaseStartDate = rentalRequest.moveInDate 
+      ? new Date(rentalRequest.moveInDate)
+      : paidOffer.availableFrom 
+        ? new Date(paidOffer.availableFrom)
+        : new Date(); // Use current date as final fallback
     const leaseEndDate = new Date(leaseStartDate);
     leaseEndDate.setMonth(leaseEndDate.getMonth() + paidOffer.leaseDuration);
 

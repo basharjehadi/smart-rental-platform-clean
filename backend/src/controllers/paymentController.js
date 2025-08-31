@@ -356,11 +356,15 @@ const completeMockPayment = async (req, res) => {
 
               // Create lease after successful contract generation
               try {
-                await createLeaseFromOffer(
-                  paidOffer.id,
-                  paidOffer.rentalRequestId
-                );
-                console.log('✅ Lease created after contract generation');
+                if (paidOffer.id) {
+                  await createLeaseFromOffer(
+                    paidOffer.id,
+                    paidOffer.rentalRequestId
+                  );
+                  console.log('✅ Lease created after contract generation');
+                } else {
+                  console.log('⚠️ Skipping lease creation: paidOffer.id not available');
+                }
               } catch (leaseErr) {
                 console.error('❌ Error creating lease:', leaseErr);
               }
@@ -706,7 +710,11 @@ const handlePaymentSucceeded = async (paymentIntent) => {
             request.payments.length === 0
           ) {
             rentalRequestId = request.id;
-            console.log('✅ Method 3 successful:', rentalRequestId);
+            // Also set offerId if we found it
+            if (!offerId) {
+              offerId = request.offer.id;
+            }
+            console.log('✅ Method 3 successful:', rentalRequestId, 'offerId:', offerId);
             break;
           }
         }
@@ -886,8 +894,12 @@ const handlePaymentSucceeded = async (paymentIntent) => {
 
             // Create lease after successful contract generation
             try {
-              await createLeaseFromOffer(offerId, rentalRequestId);
-              console.log('✅ Lease created after contract generation');
+              if (offerId) {
+                await createLeaseFromOffer(offerId, rentalRequestId);
+                console.log('✅ Lease created after contract generation');
+              } else {
+                console.log('⚠️ Skipping lease creation: offerId not available');
+              }
             } catch (leaseErr) {
               console.error('❌ Error creating lease:', leaseErr);
             }
@@ -1395,6 +1407,14 @@ const createLeaseFromOffer = async (offerId, rentalRequestId) => {
       'for rental request:',
       rentalRequestId
     );
+
+    // Validate input parameters
+    if (!offerId) {
+      throw new Error('offerId is required to create lease');
+    }
+    if (!rentalRequestId) {
+      throw new Error('rentalRequestId is required to create lease');
+    }
 
     // Get the paid offer with all necessary data
     const offer = await prisma.offer.findUnique({

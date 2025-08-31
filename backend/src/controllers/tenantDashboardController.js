@@ -55,6 +55,22 @@ export const getTenantDashboardData = async (req, res) => {
               },
             },
             organizationId: true,
+            propertyId: true,
+            property: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+                district: true,
+                city: true,
+                zipCode: true,
+                propertyType: true,
+                bedrooms: true,
+                bathrooms: true,
+                size: true,
+                houseRules: true,
+              },
+            },
           },
         },
         tenantGroup: {
@@ -856,4 +872,71 @@ export const getCurrentRental = async (req, res) => {
       .status(500)
       .json({ error: 'Failed to fetch current rental information' });
   }
+};
+
+// Get tenant's move-in issues
+export const getTenantMoveInIssues = async (req, res) => {
+  try {
+    const tenantId = req.user.id;
+    console.log('🔍 Fetching move-in issues for tenant:', tenantId);
+
+    // Get all move-in issues for the tenant's active leases
+    const issues = await prisma.moveInIssue.findMany({
+      where: {
+        lease: {
+          tenantGroup: {
+            members: { some: { userId: tenantId } }
+          }
+        }
+      },
+      include: {
+        lease: {
+          include: {
+            property: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+              }
+            }
+          }
+        },
+        comments: {
+          orderBy: { createdAt: 'desc' },
+          take: 1, // Get only the latest comment for preview
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                role: true,
+                profileImage: true,
+              }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    console.log(`✅ Found ${issues.length} move-in issues for tenant`);
+    
+    res.json({
+      success: true,
+      issues
+    });
+  } catch (error) {
+    console.error('Error fetching tenant move-in issues:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch move-in issues',
+      message: 'An error occurred while fetching your move-in issues'
+    });
+  }
+};
+
+export default {
+  getTenantDashboardData,
+  getTenantActiveLease,
+  getTenantMoveInIssues,
 };

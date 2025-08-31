@@ -11,6 +11,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 import dayjs from 'dayjs';
 
 import TenantGroupChoiceModal from '../components/TenantGroupChoiceModal.jsx';
+import ReportIssueForm from '../components/ReportIssueForm.jsx';
 
 const TenantDashboard = () => {
   const { user, logout } = useAuth();
@@ -28,8 +29,13 @@ const TenantDashboard = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showReportIssueModal, setShowReportIssueModal] = useState(false);
   const [requestToEdit, setRequestToEdit] = useState(null);
   const [requestToDelete, setRequestToDelete] = useState(null);
+  const [requestToReportIssue, setRequestToReportIssue] = useState(null);
+  const [offerToReportIssue, setOfferToReportIssue] = useState(null);
+  const [moveInIssues, setMoveInIssues] = useState([]);
+  const [issuesLoading, setIssuesLoading] = useState(false);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,6 +48,20 @@ const TenantDashboard = () => {
   const [showChat, setShowChat] = useState(false);
 
   const [isGroupChoiceModalOpen, setGroupChoiceModalOpen] = useState(false);
+
+  const fetchMoveInIssues = async () => {
+    try {
+      setIssuesLoading(true);
+      // Get all move-in issues for the tenant's active leases
+      const response = await api.get('/tenant-dashboard/move-in-issues');
+      setMoveInIssues(response.data.issues || []);
+    } catch (error) {
+      console.error('Error fetching move-in issues:', error);
+      setMoveInIssues([]);
+    } finally {
+      setIssuesLoading(false);
+    }
+  };
 
   const fetchRequests = async () => {
     try {
@@ -233,7 +253,7 @@ const TenantDashboard = () => {
             Move-in successful
           </button>
           <button
-                            onClick={() => {/* TODO: Implement new move-in issue system */}}
+            onClick={() => handleReportIssue(request, paidOffer)}
             className='px-3 py-1 rounded-md text-sm bg-red-600 text-white hover:bg-red-700'
           >
             Report issue
@@ -288,6 +308,27 @@ const TenantDashboard = () => {
   const handleDeleteCancel = () => {
     setShowDeleteModal(false);
     setRequestToDelete(null);
+  };
+
+  const handleReportIssue = (request, offer) => {
+    setRequestToReportIssue(request);
+    setOfferToReportIssue(offer);
+    setShowReportIssueModal(true);
+  };
+
+  const handleReportIssueClose = () => {
+    setShowReportIssueModal(false);
+    setRequestToReportIssue(null);
+    setOfferToReportIssue(null);
+  };
+
+  const handleReportIssueSuccess = () => {
+    setShowReportIssueModal(false);
+    setRequestToReportIssue(null);
+    setOfferToReportIssue(null);
+    // Refresh the requests to show the new issue
+    fetchRequests();
+    fetchMoveInIssues(); // Refresh the move-in issues to show the new issue
   };
 
   const formatDate = dateString => {
@@ -373,6 +414,20 @@ const TenantDashboard = () => {
     return null;
   };
 
+  // Helper function to get issue status colors
+  const getIssueStatusColor = (status) => {
+    const statusConfig = {
+      OPEN: 'bg-red-100 text-red-800',
+      IN_PROGRESS: 'bg-yellow-100 text-yellow-800',
+      RESOLVED: 'bg-green-100 text-green-800',
+      CLOSED: 'bg-gray-100 text-gray-800',
+      ADMIN_APPROVED: 'bg-green-100 text-green-800',
+      ADMIN_REJECTED: 'bg-red-100 text-red-800',
+      ESCALATED: 'bg-orange-100 text-orange-800',
+    };
+    return statusConfig[status] || 'bg-gray-100 text-gray-800';
+  };
+
   // Filter and sort requests
   const filteredAndSortedRequests = requests
     .filter(request => {
@@ -406,6 +461,7 @@ const TenantDashboard = () => {
     if (user) {
       console.log('✅ Dashboard: User is authenticated, fetching requests...');
       fetchRequests();
+      fetchMoveInIssues();
       // Mark rental request notifications as read once per mount
       if (!didMarkReadRef.current) {
         didMarkReadRef.current = true;
@@ -856,102 +912,68 @@ const TenantDashboard = () => {
             )}
 
             {/* Move-In Issues Section */}
-            <div className='mt-12'>
-              <div className='flex items-center justify-between mb-6'>
-                <h2 className='text-lg font-semibold text-gray-900'>
-                  Move-In Issues
-                </h2>
-              </div>
-              
-              {(() => {
-                // Get move-in issues from rental requests that have paid offers
-                const moveInIssues = filteredAndSortedRequests
-                  .filter(request => {
-                    const paidOffer = (request.offers || []).find(o => o.status === 'PAID');
-                    return paidOffer && paidOffer.moveInIssues && paidOffer.moveInIssues.length > 0;
-                  })
-                  .flatMap(request => {
-                    const paidOffer = (request.offers || []).find(o => o.status === 'PAID');
-                    return (paidOffer.moveInIssues || []).map(issue => ({
-                      ...issue,
-                      requestTitle: request.title,
-                      propertyName: paidOffer.property?.name || 'Unknown Property'
-                    }));
-                  });
-
-                if (moveInIssues.length === 0) {
-                  return (
-                    <div className='card-modern p-8 text-center'>
-                      <div className='text-gray-400 text-4xl mb-4'>✅</div>
-                      <p className='text-gray-600 text-lg mb-4'>
-                        No move-in issues reported
-                      </p>
-                      <p className='text-gray-500'>
-                        All your move-ins are proceeding smoothly!
-                      </p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className='space-y-4'>
-                    {moveInIssues.map(issue => (
-                      <div key={issue.id} className='card-elevated p-6'>
-                        <div className='flex items-start justify-between'>
-                          <div className='flex-1'>
-                            <div className='flex items-center gap-2 mb-2'>
-                              <h3 className='text-lg font-semibold text-gray-900'>
-                                {issue.title}
-                              </h3>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                issue.status === 'OPEN' ? 'bg-red-100 text-red-800' :
-                                issue.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
-                                issue.status === 'RESOLVED' ? 'bg-green-100 text-green-800' :
-                                'bg-gray-100 text-gray-800'
-                              }`}>
-                                {issue.status}
-                              </span>
-
+            {moveInIssues.length > 0 && (
+              <div className='mt-8'>
+                <div className='flex items-center justify-between mb-6'>
+                  <h2 className='text-lg font-semibold text-gray-900'>
+                    Move-In Issues
+                  </h2>
+                </div>
+                
+                <div className='space-y-4'>
+                  {moveInIssues.map(issue => (
+                    <div key={issue.id} className='card-elevated p-6'>
+                      <div className='flex items-start justify-between'>
+                        <div className='flex-1'>
+                          <div className='flex items-center gap-2 mb-2'>
+                            <h3 className='text-lg font-semibold text-gray-900'>
+                              {issue.title}
+                            </h3>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getIssueStatusColor(issue.status)}`}>
+                              {issue.status}
+                            </span>
+                          </div>
+                          <p className='text-gray-600 mb-3'>
+                            {issue.description}
+                          </p>
+                          <div className='grid grid-cols-2 md:grid-cols-3 gap-4 text-sm'>
+                            <div>
+                              <span className='text-gray-500'>Property:</span>
+                              <p className='font-medium'>
+                                {issue.lease?.property?.name || 'Unknown Property'}
+                              </p>
                             </div>
-                            
-                            <p className='text-gray-600 mb-3'>{issue.description}</p>
-                            
-                            <div className='grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-4'>
-                              <div>
-                                <span className='text-gray-500'>Request:</span>
-                                <p className='font-medium'>{issue.requestTitle}</p>
-                              </div>
-                              <div>
-                                <span className='text-gray-500'>Property:</span>
-                                <p className='font-medium'>{issue.propertyName}</p>
-                              </div>
-                              <div>
-                                <span className='text-gray-500'>Reported:</span>
-                                <p className='font-medium'>
-                                  {new Date(issue.createdAt).toLocaleDateString()}
-                                </p>
-                              </div>
+                            <div>
+                              <span className='text-gray-500'>Created:</span>
+                              <p className='font-medium'>
+                                {formatDate(issue.createdAt)}
+                              </p>
                             </div>
-
-                            <div className='flex items-center justify-between pt-3 border-t border-gray-100'>
-                              <div className='text-xs text-gray-500'>
-                                {issue.comments?.length || 0} comment{issue.comments?.length !== 1 ? 's' : ''}
-                              </div>
-                              <button
-                                onClick={() => navigate(`/tenant/issue/${issue.id}`)}
-                                className='px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors'
-                              >
-                                View Details
-                              </button>
+                            <div>
+                              <span className='text-gray-500'>Comments:</span>
+                              <p className='font-medium'>
+                                {issue.comments?.length || 0}
+                              </p>
                             </div>
                           </div>
                         </div>
+                        <div className='ml-4'>
+                          <button
+                            onClick={() => navigate(`/tenant/issue/${issue.id}`)}
+                            className='btn-primary'
+                          >
+                            View Details
+                          </button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+
+
           </div>
         </main>
       </div>
@@ -1083,6 +1105,53 @@ const TenantDashboard = () => {
           }
         }}
       />
+
+      {/* Report Issue Modal */}
+      {showReportIssueModal && requestToReportIssue && offerToReportIssue && (
+        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
+          <div className='bg-white rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto'>
+            <div className='flex items-center justify-between mb-4'>
+              <h3 className='text-lg font-semibold text-gray-900'>
+                Report Move-In Issue
+              </h3>
+              <button
+                onClick={handleReportIssueClose}
+                className='text-gray-400 hover:text-gray-600 transition-colors'
+              >
+                <svg
+                  className='w-6 h-6'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M6 18L18 6M6 6l12 12'
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className='mb-4 p-4 bg-gray-50 rounded-lg'>
+              <h4 className='font-medium text-gray-900 mb-2'>Rental Request Details</h4>
+              <div className='text-sm text-gray-600'>
+                <p><strong>Request:</strong> {requestToReportIssue.title}</p>
+                <p><strong>Property:</strong> {offerToReportIssue.property?.name || 'Unknown Property'}</p>
+                <p><strong>Move-in Date:</strong> {formatDate(requestToReportIssue.moveInDate)}</p>
+              </div>
+            </div>
+
+            <ReportIssueForm
+              offerId={offerToReportIssue.id}
+              rentalRequestId={requestToReportIssue.id}
+              onSuccess={handleReportIssueSuccess}
+              onCancel={handleReportIssueClose}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

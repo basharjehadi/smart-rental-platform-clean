@@ -756,7 +756,32 @@ const PaymentSuccessPage = () => {
                   <button
                     onClick={async () => {
                       try {
-                        // Prefer offerId when available from state or rentalRequest context
+                        // First, check if contract already exists
+                        if (rentalRequest?.id) {
+                          const checkResp = await fetch(
+                            `/api/contracts/status/${rentalRequest.id}`,
+                            {
+                              method: 'GET',
+                              headers: {
+                                Authorization: `Bearer ${localStorage.getItem('token')}`,
+                              },
+                            }
+                          );
+                          
+                          if (checkResp.ok) {
+                            const checkData = await checkResp.json();
+                            if (checkData.contract && checkData.contract.pdfUrl) {
+                              // Contract exists, open it directly
+                              window.open(
+                                `http://localhost:3001${checkData.contract.pdfUrl}`,
+                                '_blank'
+                              );
+                              return;
+                            }
+                          }
+                        }
+
+                        // If no existing contract, try to generate one
                         const offerId =
                           location.state?.offerId ||
                           rentalRequest?.offerId ||
@@ -799,8 +824,9 @@ const PaymentSuccessPage = () => {
                             return;
                           }
                         }
+                        console.error('Contract generation failed:', data);
                         alert(
-                          'Unable to generate contract right now. Please try from your dashboard.'
+                          `Contract generation failed: ${data?.error || data?.message || 'Unknown error'}. Please try from your dashboard.`
                         );
                       } catch (e) {
                         console.error(
@@ -808,7 +834,7 @@ const PaymentSuccessPage = () => {
                           e
                         );
                         alert(
-                          'Unable to open contract. Please try from your dashboard.'
+                          `Error: ${e.message || 'Unable to open contract. Please try from your dashboard.'}`
                         );
                       }
                     }}

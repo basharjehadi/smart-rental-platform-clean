@@ -64,28 +64,8 @@ async function tenantTrustLevel(userId, prismaClient = defaultPrisma) {
     const onTimePercentage =
       payments.length > 0 ? (onTimePayments / payments.length) * 100 : 0;
 
-    // Get unresolved disputes count
-    const unresolvedDisputes = await prismaClient.dispute.count({
-      where: {
-        OR: [
-          { tenantId: userId },
-          {
-            rentalRequest: {
-              tenantGroup: {
-                members: {
-                  some: {
-                    userId: userId,
-                  },
-                },
-              },
-            },
-          },
-        ],
-        status: {
-          in: ['OPEN', 'IN_PROGRESS', 'ESCALATED'],
-        },
-      },
-    });
+    // No dispute system in current schema - set to 0
+    const unresolvedDisputes = 0;
 
     // Determine trust level based on Option B thresholds
     if (reviewCount === 0) {
@@ -223,15 +203,8 @@ async function landlordTrustLevel(userId, prismaClient = defaultPrisma) {
         ? (accurateMoveIns / moveInReviews.length) * 100
         : 0;
 
-    // Get unresolved disputes count
-    const unresolvedDisputes = await prismaClient.dispute.count({
-      where: {
-        landlordId: userId,
-        status: {
-          in: ['OPEN', 'IN_PROGRESS', 'ESCALATED'],
-        },
-      },
-    });
+    // No dispute system in current schema - set to 0
+    const unresolvedDisputes = 0;
 
     // Determine trust level based on Option B thresholds
     if (reviewCount === 0) {

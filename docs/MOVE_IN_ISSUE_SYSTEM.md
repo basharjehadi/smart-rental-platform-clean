@@ -260,7 +260,49 @@ Updates the status of a move-in issue.
 
 Lists all move-in issues for a specific lease.
 
-### 6. Admin Decision on Move-In Issue
+### 6. Get Tenant Move-In Issues
+
+**GET** `/api/tenant-dashboard/move-in-issues`
+
+Lists all move-in issues for the authenticated tenant across all their leases.
+
+**Authorization:**
+- Tenant users only
+
+**Response:**
+```json
+{
+  "success": true,
+  "issues": [
+    {
+      "id": "string",
+      "title": "string",
+      "description": "string",
+      "status": "string",
+      "leaseId": "string",
+      "createdAt": "datetime",
+      "updatedAt": "datetime",
+      "lease": {
+        "property": {
+          "id": "string",
+          "name": "string",
+          "address": "string"
+        }
+      },
+      "comments": [
+        {
+          "id": "string",
+          "content": "string",
+          "createdAt": "datetime",
+          "author": { /* author details */ }
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 7. Admin Decision on Move-In Issue
 
 **POST** `/api/move-in-issues/:issueId/admin-decision`
 
@@ -546,10 +588,11 @@ Tenants now have a dedicated page for move-in issue management:
 The tenant dashboard now includes a dedicated move-in issues section:
 
 - **Issues Overview**: List of all move-in issues associated with the tenant's rental requests
-- **Status Tracking**: Visual status indicators (OPEN, IN_PROGRESS, RESOLVED, CLOSED)
+- **Status Tracking**: Visual status indicators (OPEN, IN_PROGRESS, RESOLVED, CLOSED, ADMIN_APPROVED, ADMIN_REJECTED, ESCALATED)
 - **Quick Access**: "View Details" button navigates directly to issue discussion
 - **Comment Count**: Shows number of comments for each issue
 - **Property Context**: Displays which property and rental request each issue relates to
+- **Real-time Updates**: Issues appear immediately after creation with automatic refresh
 
 ### Tenant Features
 

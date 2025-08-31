@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useSocket } from '../contexts/SocketContext';
+
 import LandlordSidebar from '../components/LandlordSidebar';
 import NotificationHeader from '../components/common/NotificationHeader';
 import {
@@ -18,7 +18,7 @@ import {
 
 const LandlordMyProperty = () => {
   const { user, logout, api } = useAuth();
-  const { socket } = useSocket();
+
   const navigate = useNavigate();
   const location = useLocation();
   const [properties, setProperties] = useState([]);
@@ -57,37 +57,27 @@ const LandlordMyProperty = () => {
     fetchProfileData();
   }, []);
 
-  // Listen for move-in verification updates
-  useEffect(() => {
-    if (!socket) return;
 
-    const handleMoveInVerificationUpdate = data => {
-      console.log(
-        '🏠 Move-in verification update received in properties:',
-        data
-      );
-      // Refresh properties data when move-in status changes
-      fetchProperties();
-    };
-
-    socket.on('movein-verification:update', handleMoveInVerificationUpdate);
-
-    return () => {
-      socket.off('movein-verification:update', handleMoveInVerificationUpdate);
-    };
-  }, [socket]);
 
   const fetchProperties = async () => {
     try {
       setLoading(true);
+      // Properties endpoint now includes enhanced data with move-in issues
       const response = await api.get('/properties');
       setProperties(response.data.properties || []);
+      console.log('✅ Properties fetched with move-in issues:', response.data.properties);
     } catch (error) {
       console.error('Error fetching properties:', error);
       setError('Failed to load properties');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Function to refresh properties (can be called from other components)
+  const refreshProperties = () => {
+    console.log('🔄 Refreshing properties to show new move-in issues...');
+    fetchProperties();
   };
 
   const fetchProfileData = async () => {
@@ -224,41 +214,9 @@ const LandlordMyProperty = () => {
     return ['RENTED'].includes(property.status);
   };
 
-  const [moveInStatusByProperty, setMoveInStatusByProperty] = useState({});
 
-  // Fetch latest paid offer verification status for each property
-  const loadMoveInStatuses = async () => {
-    try {
-      const entries = await Promise.all(
-        properties.map(async p => {
-          try {
-            const res = await api.get(
-              `/move-in/property/${p.id}/latest-paid-status`
-            );
-            return [p.id, res.data?.data || null];
-          } catch {
-            return [p.id, null];
-          }
-        })
-      );
-      setMoveInStatusByProperty(Object.fromEntries(entries));
-    } catch {}
-  };
 
-  useEffect(() => {
-    if (properties.length > 0) {
-      loadMoveInStatuses();
-    }
-  }, [properties]);
 
-  // Light polling to reflect admin decisions without manual refresh
-  useEffect(() => {
-    if (properties.length === 0) return;
-    const id = setInterval(() => {
-      loadMoveInStatuses();
-    }, 10000); // every 10s
-    return () => clearInterval(id);
-  }, [properties]);
 
   const filteredProperties = filterAndSortProperties();
 
@@ -303,13 +261,25 @@ const LandlordMyProperty = () => {
                 </p>
               </div>
 
-              <Link
-                to='/landlord-add-property'
-                className='btn-primary flex items-center space-x-2'
-              >
-                <Plus className='w-4 h-4' />
-                <span>Add New Property</span>
-              </Link>
+              <div className='flex items-center space-x-3'>
+                <button
+                  onClick={refreshProperties}
+                  className='btn-secondary flex items-center space-x-2'
+                  title='Refresh to see new move-in issues'
+                >
+                  <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' />
+                  </svg>
+                  <span>Refresh</span>
+                </button>
+                <Link
+                  to='/landlord-add-property'
+                  className='btn-primary flex items-center space-x-2'
+                >
+                  <Plus className='w-4 h-4' />
+                  <span>Add New Property</span>
+                </Link>
+              </div>
             </div>
 
             {/* Filters and Search */}
@@ -581,74 +551,7 @@ const LandlordMyProperty = () => {
                               This property is {property.status.toLowerCase()}.
                               Edit and delete actions are disabled.
                             </p>
-                            <div className='mt-2 p-2 bg-blue-50 border border-blue-200 rounded'>
-                              <div className='text-xs text-blue-900 font-medium'>
-                                Tenant move-in verification
-                              </div>
-                              {(() => {
-                                const s =
-                                  moveInStatusByProperty[property.id] ||
-                                  property._moveIn ||
-                                  null;
-                                if (s) {
-                                  const deadline = s.deadline
-                                    ? new Date(s.deadline)
-                                    : null;
-                                  const now = new Date();
-                                  let chip = 'PENDING';
-                                  if (s.status === 'SUCCESS') chip = 'SUCCESS';
-                                  else if (s.status === 'ISSUE_REPORTED')
-                                    chip = 'ISSUE';
-                                  else if (s.status === 'CANCELLED')
-                                    chip = 'CANCELLED';
 
-                                  // Only show countdown while waiting (PENDING)
-                                  let countdown = '';
-                                  if (s.status === 'PENDING' && deadline) {
-                                    const diffMs = Math.max(
-                                      0,
-                                      deadline.getTime() - now.getTime()
-                                    );
-                                    const totalHours = Math.floor(
-                                      diffMs / (1000 * 60 * 60)
-                                    );
-                                    const days = Math.floor(totalHours / 24);
-                                    const hours = totalHours % 24;
-                                    countdown = `${days}d ${hours}h left`;
-                                  }
-
-                                  return (
-                                    <div className='text-xs text-blue-800 mt-1 flex items-center space-x-2'>
-                                      <span
-                                        className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                                          chip === 'SUCCESS'
-                                            ? 'bg-green-100 text-green-700'
-                                            : chip === 'ISSUE'
-                                              ? 'bg-red-100 text-red-700'
-                                              : chip === 'CANCELLED'
-                                                ? 'bg-gray-200 text-gray-700'
-                                                : 'bg-yellow-100 text-yellow-700'
-                                        }`}
-                                      >
-                                        {chip}
-                                      </span>
-                                      {countdown && <span>{countdown}</span>}
-                                    </div>
-                                  );
-                                }
-                                // If no status payload, default to Pending until tenant confirms/admin decides/cron finalizes
-                                return (
-                                  <div className='text-xs text-blue-800 mt-1'>
-                                    <span className='px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-700'>
-                                      PENDING
-                                    </span>
-                                    <span className='ml-2'>
-                                      Awaiting tenant move-in verification…
-                                    </span>
-                                  </div>
-                                );
-                              })()}
-                            </div>
                           </div>
                         )}
                       </div>

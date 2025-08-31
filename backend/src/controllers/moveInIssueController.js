@@ -261,19 +261,37 @@ export const getMoveInIssue = async (req, res) => {
  */
 export const createMoveInIssue = async (req, res) => {
   try {
-      const { leaseId, title, description } = req.body;
-  const userId = req.user.id;
+      const { offerId, title, description } = req.body;
+      const userId = req.user.id;
 
-  if (!leaseId || !title || !description) {
+      // Handle file uploads for initial issue creation
+      let evidence = [];
+      let evidenceType = null;
+      
+      if (req.files && req.files.length > 0) {
+        evidence = req.files.map(file => `/uploads/move_in_evidence/${file.filename}`);
+        
+        // Determine evidence type based on first file
+        const firstFile = req.files[0];
+        if (firstFile.mimetype.startsWith('image/')) {
+          evidenceType = 'IMAGE';
+        } else if (firstFile.mimetype.startsWith('video/')) {
+          evidenceType = 'VIDEO';
+        } else {
+          evidenceType = 'DOCUMENT';
+        }
+      }
+
+  if (!offerId || !title || !description) {
     return res.status(400).json({
       error: 'Missing required fields',
-      message: 'Lease ID, title, and description are required',
+      message: 'Offer ID, title, and description are required',
     });
   }
 
-    // Find the lease and verify user authorization
-    const lease = await prisma.lease.findUnique({
-      where: { id: leaseId },
+    // Find the offer and verify user authorization
+    const offer = await prisma.offer.findUnique({
+      where: { id: offerId },
       include: {
         tenantGroup: {
           include: {
@@ -294,21 +312,25 @@ export const createMoveInIssue = async (req, res) => {
             },
           },
         },
+        leases: {
+          take: 1,
+          orderBy: { createdAt: 'desc' }
+        }
       },
     });
 
-    if (!lease) {
+    if (!offer) {
       return res.status(404).json({
-        error: 'Lease not found',
-        message: 'The specified lease does not exist',
+        error: 'Offer not found',
+        message: 'The specified offer does not exist',
       });
     }
 
-    // Check if user is authorized to create an issue for this lease
-    const isTenant = lease.tenantGroup.members.some(
+    // Check if user is authorized to create an issue for this offer
+    const isTenant = offer.tenantGroup.members.some(
       (member) => member.userId === userId
     );
-    const isLandlord = lease.property.organization.members.some(
+    const isLandlord = offer.property?.organization.members.some(
       (member) => member.userId === userId
     );
     const isAdmin = req.user.role === 'ADMIN';
@@ -316,8 +338,59 @@ export const createMoveInIssue = async (req, res) => {
     if (!isTenant && !isLandlord && !isAdmin) {
       return res.status(403).json({
         error: 'Unauthorized',
-        message: 'You are not authorized to create issues for this lease',
+        message: 'You are not authorized to create issues for this offer',
       });
+    }
+
+    // Get or create a lease for this offer
+    let lease = offer.leases[0];
+    
+    if (!lease) {
+      console.log('🔍 No existing lease found, creating new lease for offer:', offerId);
+      
+      // First, check if a unit exists for this property, create one if it doesn't
+      let unit = await prisma.unit.findFirst({
+        where: { propertyId: offer.propertyId }
+      });
+      
+      if (!unit) {
+        console.log('🔍 No unit found for property, creating default unit');
+        // Create a default unit for the property
+        unit = await prisma.unit.create({
+          data: {
+            unitNumber: '1', // Default unit number
+            floor: 1, // Default floor
+            bedrooms: offer.property?.bedrooms || 1,
+            bathrooms: offer.property?.bathrooms || 1,
+            area: offer.property?.size || 50, // Default area
+            rentAmount: offer.rentAmount,
+            status: 'OCCUPIED', // Since it's being leased
+            propertyId: offer.propertyId,
+          },
+        });
+        console.log('✅ Created unit:', unit.id);
+      } else {
+        console.log('✅ Found existing unit:', unit.id);
+      }
+      
+      // Create a lease linked to the unit
+      lease = await prisma.lease.create({
+        data: {
+          startDate: offer.availableFrom,
+          endDate: new Date(new Date(offer.availableFrom).getTime() + offer.leaseDuration * 30 * 24 * 60 * 60 * 1000), // Add months
+          rentAmount: offer.rentAmount,
+          depositAmount: offer.depositAmount || offer.rentAmount,
+          status: 'ACTIVE',
+          offerId: offer.id,
+          propertyId: offer.propertyId,
+          tenantGroupId: offer.tenantGroupId,
+          organizationId: offer.organizationId,
+          unitId: unit.id, // Link to the unit
+        },
+      });
+      console.log('✅ Created lease:', lease.id, 'linked to unit:', unit.id);
+    } else {
+      console.log('✅ Using existing lease:', lease.id);
     }
 
     // Create the move-in issue
@@ -325,7 +398,7 @@ export const createMoveInIssue = async (req, res) => {
       data: {
         title: title.trim(),
         description: description.trim(),
-        leaseId,
+        leaseId: lease.id,
       },
       include: {
         lease: {
@@ -355,22 +428,37 @@ export const createMoveInIssue = async (req, res) => {
       },
     });
 
+    // Create initial comment with evidence if files were uploaded
+    if (evidence.length > 0) {
+      await prisma.moveInIssueComment.create({
+        data: {
+          content: `Issue reported with evidence: ${evidence.length} file(s)`,
+          evidence,
+          evidenceType,
+          authorId: userId,
+          issueId: moveInIssue.id,
+        },
+      });
+    }
+
     // Create notifications for other participants
     const otherParticipants = new Set();
     
     // Add tenant group members
-    lease.tenantGroup.members.forEach((member) => {
+    offer.tenantGroup.members.forEach((member) => {
       if (member.userId !== userId) {
         otherParticipants.add(member.userId);
       }
     });
     
     // Add landlord
-    lease.property.organization.members.forEach((member) => {
-      if (member.userId !== userId) {
-        otherParticipants.add(member.userId);
-      }
-    });
+    if (offer.property?.organization?.members) {
+      offer.property.organization.members.forEach((member) => {
+        if (member.userId !== userId) {
+          otherParticipants.add(member.userId);
+        }
+      });
+    }
 
     // Create notifications
     const notificationPromises = Array.from(otherParticipants).map((participantId) =>

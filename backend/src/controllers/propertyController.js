@@ -22,10 +22,31 @@ export const getLandlordProperties = async (req, res) => {
           orderBy: { updatedAt: 'desc' },
           select: {
             id: true,
-            moveInVerificationStatus: true,
-            moveInVerificationDeadline: true,
-            moveInVerificationDate: true,
             rentalRequest: { select: { moveInDate: true } },
+          },
+        },
+        // Include leases to get move-in issues
+        leases: {
+          include: {
+            moveInIssues: {
+              where: { status: 'OPEN' },
+              include: {
+                comments: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 1, // Get latest comment for preview
+                  include: {
+                    author: {
+                      select: {
+                        id: true,
+                        name: true,
+                        role: true,
+                        profileImage: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -34,29 +55,23 @@ export const getLandlordProperties = async (req, res) => {
       },
     });
 
-    // Shape with inline move-in status for quick UI
+    // Properties now include leases and move-in issues directly
     const shaped = properties.map((p) => {
-      const latest = (p.offers && p.offers[0]) || null;
-      const deadline =
-        latest?.moveInVerificationDeadline ||
-        (latest?.rentalRequest?.moveInDate
-          ? new Date(
-              new Date(latest.rentalRequest.moveInDate).getTime() +
-                24 * 60 * 60 * 1000
-            )
-          : null);
       const { offers, ...rest } = p;
-      return {
-        ...rest,
-        _moveIn: latest
-          ? {
-              offerId: latest.id,
-              status: latest.moveInVerificationStatus,
-              deadline,
-              verifiedAt: latest.moveInVerificationDate,
-            }
-          : null,
-      };
+      
+      // Debug: Log property data to see what's being included
+      console.log(`🔍 Property ${p.id} (${p.name}):`, {
+        hasLeases: !!p.leases,
+        leasesCount: p.leases?.length || 0,
+        moveInIssuesCount: p.leases?.flatMap(lease => lease.moveInIssues || []).length || 0,
+        leases: p.leases?.map(lease => ({
+          id: lease.id,
+          hasMoveInIssues: !!lease.moveInIssues,
+          moveInIssuesCount: lease.moveInIssues?.length || 0
+        }))
+      });
+      
+      return rest;
     });
 
     res.json({

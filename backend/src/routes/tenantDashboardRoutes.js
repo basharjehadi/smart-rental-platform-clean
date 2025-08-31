@@ -5,6 +5,7 @@ import {
   getTenantActiveLease,
   getTenantPaymentHistory,
   getCurrentRental,
+  getTenantMoveInIssues,
 } from '../controllers/tenantDashboardController.js';
 import { verifyToken, requireTenant } from '../middlewares/authMiddleware.js';
 
@@ -22,5 +23,6 @@ router.get(
 );
 router.get('/active-lease', verifyToken, requireTenant, getTenantActiveLease);
 router.get('/current-rental', verifyToken, requireTenant, getCurrentRental);
+router.get('/move-in-issues', verifyToken, requireTenant, getTenantMoveInIssues);
 
 export default router;
