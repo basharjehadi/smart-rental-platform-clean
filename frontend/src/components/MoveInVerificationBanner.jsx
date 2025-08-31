@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import useMoveInUiState from '../hooks/useMoveInUiState';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
@@ -8,6 +8,32 @@ import toast from 'react-hot-toast';
 const MoveInVerificationBanner = ({ offerId, onStatusChange }) => {
   // Use the simple hook for UI state
   const { data, loading, error } = useMoveInUiState(offerId);
+  const [countdown, setCountdown] = useState(null);
+
+  // Server-based countdown logic
+  useEffect(() => {
+    if (!data?.window?.windowClose) return;
+
+    const updateCountdown = () => {
+      const now = new Date(data.now);
+      const close = new Date(data.window.windowClose);
+      const diff = close - now;
+
+      if (diff <= 0) {
+        setCountdown('Window closed');
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      setCountdown(`${hours}h ${minutes}m`);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, [data?.window?.windowClose, data?.now]);
 
   // Handle confirm move-in
   const handleConfirm = async () => {
@@ -69,9 +95,9 @@ const MoveInVerificationBanner = ({ offerId, onStatusChange }) => {
           <div className="text-sm text-green-900 font-medium">
             ✅ Move-in successful
           </div>
-          {window.phase === 'WINDOW_OPEN' && (
+          {window.phase === 'WINDOW_OPEN' && countdown && (
             <div className="text-xs text-green-800">
-              Issue window closes in: ... (server time)
+              Issue window closes in: {countdown}
             </div>
           )}
         </div>
@@ -97,7 +123,7 @@ const MoveInVerificationBanner = ({ offerId, onStatusChange }) => {
         break;
 
       case 'WINDOW_OPEN':
-        countdownText = 'Issue window closes in: ... (server time)';
+        countdownText = countdown ? `Issue window closes in: ${countdown}` : 'Issue window open';
         break;
 
       case 'WINDOW_CLOSED':

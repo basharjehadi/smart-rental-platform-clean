@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import api from '../utils/api';
+import useMoveInUiState from '../hooks/useMoveInUiState';
 
 const MoveInCenter = () => {
   const [searchParams] = useSearchParams();
@@ -10,12 +11,14 @@ const MoveInCenter = () => {
   const { user } = useAuth();
   
   const [offerId, setOfferId] = useState('');
-  const [moveInStatus, setMoveInStatus] = useState(null);
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+
+  // Use the shared hook for move-in UI state
+  const { data: uiState, loading: uiLoading, error: uiError } = useMoveInUiState(offerId);
 
   // Get offerId from query params
   useEffect(() => {
@@ -28,18 +31,14 @@ const MoveInCenter = () => {
     setOfferId(offerIdParam);
   }, [searchParams]);
 
-  // Fetch move-in status and issues
+  // Fetch move-in issues
   useEffect(() => {
     if (!offerId) return;
 
-    const fetchData = async () => {
+    const fetchIssues = async () => {
       try {
         setLoading(true);
         
-        // Fetch move-in status
-        const statusResponse = await api.get(`/move-in/offers/${offerId}/status`);
-        setMoveInStatus(statusResponse.data.data);
-
         // Fetch move-in issues for this offer
         try {
           const issuesResponse = await api.get(`/move-in/offers/${offerId}/issues`);
@@ -50,20 +49,14 @@ const MoveInCenter = () => {
         }
 
       } catch (error) {
-        console.error('Error fetching move-in data:', error);
-        if (error.response?.status === 404) {
-          setError('Offer not found');
-        } else if (error.response?.status === 403) {
-          setError('You are not authorized to view this offer');
-        } else {
-          setError('Failed to load move-in data');
-        }
+        console.error('Error fetching move-in issues:', error);
+        setError('Failed to load move-in issues');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    fetchIssues();
   }, [offerId]);
 
   // Handle move-in verification (confirm)
@@ -125,18 +118,14 @@ const MoveInCenter = () => {
   };
 
   // Check if user is a tenant for this offer
-  const isTenant = moveInStatus && user && moveInStatus.tenantGroup?.members?.some(
+  const isTenant = uiState && user && uiState.tenantGroup?.members?.some(
     member => member.userId === user.id
   );
 
-  // Check if verification is pending and before deadline
-  const canVerify = moveInStatus && 
-    (moveInStatus.status === 'PENDING' || moveInStatus.status === 'SUCCESS') && 
-    moveInStatus.deadline && 
-    new Date() < new Date(moveInStatus.deadline) &&
-    isTenant;
+  // Use server UI state for verification logic
+  const canVerify = uiState?.canConfirmOrDeny === true && isTenant;
 
-  if (loading) {
+  if (loading || uiLoading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4">
@@ -149,13 +138,13 @@ const MoveInCenter = () => {
     );
   }
 
-  if (error) {
+  if (error || uiError) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4">
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
             <h2 className="text-xl font-semibold text-red-800 mb-2">Error</h2>
-            <p className="text-red-600 mb-4">{error}</p>
+            <p className="text-red-600 mb-4">{error || uiError}</p>
             <button
               onClick={() => navigate('/tenant-dashboard')}
               className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
@@ -178,7 +167,7 @@ const MoveInCenter = () => {
         </div>
 
         {/* Move-In Status */}
-        {moveInStatus && (
+        {uiState && (
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Move-In Status</h2>
             
@@ -187,30 +176,37 @@ const MoveInCenter = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <div className="flex items-center">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    moveInStatus.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                    moveInStatus.status === 'VERIFIED' || moveInStatus.status === 'SUCCESS' ? 'bg-green-100 text-green-800' :
-                    moveInStatus.status === 'DENIED' ? 'bg-red-100 text-red-800' :
+                    uiState.verificationStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                    uiState.verificationStatus === 'VERIFIED' ? 'bg-green-100 text-green-800' :
+                    uiState.verificationStatus === 'DENIED' ? 'bg-red-100 text-red-800' :
                     'bg-gray-100 text-gray-800'
                   }`}>
-                    {moveInStatus.status}
+                    {uiState.verificationStatus}
                   </span>
                 </div>
               </div>
 
-              {moveInStatus.deadline && (
+              {uiState.window?.windowClose && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Verification Deadline</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Verification Window</label>
                   <p className="text-sm text-gray-900">
-                    {new Date(moveInStatus.deadline).toLocaleString()}
+                    {uiState.window.phase === 'PRE_MOVE_IN' ? 'Pre Move-in' :
+                     uiState.window.phase === 'WINDOW_OPEN' ? 'Window Open' :
+                     uiState.window.phase === 'WINDOW_CLOSED' ? 'Window Closed' : 'Unknown'}
                   </p>
+                  {uiState.window.phase === 'WINDOW_OPEN' && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Closes: {new Date(uiState.window.windowClose).toLocaleString()}
+                    </p>
+                  )}
                 </div>
               )}
 
-              {moveInStatus.verifiedAt && (
+              {uiState.leaseStart && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Verified At</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Lease Start</label>
                   <p className="text-sm text-gray-900">
-                    {new Date(moveInStatus.verifiedAt).toLocaleString()}
+                    {new Date(uiState.leaseStart).toLocaleDateString()}
                   </p>
                 </div>
               )}
@@ -234,12 +230,26 @@ const MoveInCenter = () => {
               </div>
             )}
 
-            {(moveInStatus.status === 'PENDING' || moveInStatus.status === 'SUCCESS') && !canVerify && (
+            {/* Report Issue Button */}
+            {uiState?.canReportIssue && (
+              <div className="mt-3">
+                <button
+                  onClick={() => navigate(`/report-issue?offerId=${offerId}`)}
+                  className="bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700 transition-colors font-medium"
+                >
+                  🚨 Report Issue
+                </button>
+              </div>
+            )}
+
+            {uiState?.verificationStatus === 'PENDING' && !canVerify && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <p className="text-yellow-800">
                   {!isTenant 
                     ? 'Only tenants can verify move-in status'
-                    : 'Verification deadline has passed'
+                    : uiState.window?.phase === 'WINDOW_CLOSED'
+                    ? 'Verification window has closed'
+                    : 'Waiting for move-in window to open'
                   }
                 </p>
               </div>

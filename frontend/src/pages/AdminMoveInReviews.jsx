@@ -75,45 +75,38 @@ const AdminMoveInReviews = () => {
     loadIssues(newPage, statusFilter);
   };
 
-  // Handle admin decision
-  const handleAdminDecision = async (issueId, decision, notes = '') => {
-    try {
-      setSubmitting(true);
-      
-      const response = await api.post(`/api/move-in-issues/${issueId}/admin-decision`, {
-        decision,
-        notes,
-      });
+     // Handle admin decision
+   const handleAdminDecision = async (issueId, action) => {
+     try {
+       setSubmitting(true);
+       
+       const response = await api.patch(`/api/move-in-issues/${issueId}/status`, {
+         action,
+       });
 
-      if (response.data.success) {
-        // Update the issue in the list optimistically
-        setIssues(prevIssues => 
-          prevIssues.map(issue => 
-            issue.id === issueId 
-              ? { ...issue, status: response.data.data.status, adminDecision: decision }
-              : issue
-          )
-        );
+       if (response.data.success) {
+         // Close the detail modal
+         setShowDetailModal(false);
+         setSelectedIssue(null);
 
-        // Close the detail modal
-        setShowDetailModal(false);
-        setSelectedIssue(null);
+         // Show success message
+         const actionText = action === 'RESOLVED' ? 'resolved (tenant approved)' : 'closed (tenant rejected)';
+         toast.success(`Issue ${actionText} successfully`);
 
-        // Show success message
-        const actionText = decision === 'APPROVE' ? 'resolved' : 'closed';
-        toast.success(`Issue ${actionText} successfully`);
+         // Navigate back to admin reviews page
+         navigate('/admin/move-in-reviews');
 
-        // Reload issues to get updated list
-        loadIssues(pagination.page, statusFilter);
-      }
-    } catch (error) {
-      console.error('Error making admin decision:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to make decision';
-      toast.error(errorMessage);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+         // Reload issues to get updated list
+         loadIssues(pagination.page, statusFilter);
+       }
+     } catch (error) {
+       console.error('Error making admin decision:', error);
+       const errorMessage = error.response?.data?.message || 'Failed to make decision';
+       toast.error(errorMessage);
+     } finally {
+       setSubmitting(false);
+     }
+   };
 
   // View issue detail
   const handleViewIssue = (issue) => {
@@ -377,28 +370,28 @@ const AdminMoveInReviews = () => {
                  </div>
                </div>
               
-              <div className="border-t pt-4">
-                <h4 className="text-sm font-medium text-gray-900 mb-3">Admin Actions</h4>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => handleAdminDecision(selectedIssue.id, 'APPROVE')}
-                    disabled={submitting}
-                    className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
-                  >
-                    {submitting ? 'Processing...' : 'Resolve Issue'}
-                  </button>
-                  <button
-                    onClick={() => handleAdminDecision(selectedIssue.id, 'REJECT')}
-                    disabled={submitting}
-                    className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
-                  >
-                    {submitting ? 'Processing...' : 'Close Issue'}
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Resolve: Approves the issue • Close: Rejects the issue
-                </p>
-              </div>
+                             <div className="border-t pt-4">
+                 <h4 className="text-sm font-medium text-gray-900 mb-3">Admin Actions</h4>
+                 <div className="flex space-x-3">
+                   <button
+                     onClick={() => handleAdminDecision(selectedIssue.id, 'RESOLVED')}
+                     disabled={submitting}
+                     className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
+                   >
+                     {submitting ? 'Processing...' : 'Resolve (approve tenant)'}
+                   </button>
+                   <button
+                     onClick={() => handleAdminDecision(selectedIssue.id, 'CLOSED')}
+                     disabled={submitting}
+                     className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
+                   >
+                     {submitting ? 'Processing...' : 'Close (reject)'}
+                   </button>
+                 </div>
+                 <p className="text-xs text-gray-500 mt-2">
+                   Resolve: Approves the tenant's claim • Close: Rejects the tenant's claim
+                 </p>
+               </div>
             </div>
           </div>
         </div>

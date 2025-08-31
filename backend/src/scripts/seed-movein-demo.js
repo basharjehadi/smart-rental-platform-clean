@@ -237,9 +237,8 @@ async function seedMoveInDemo() {
 
     // Create offer with move-in verification
     console.log('💼 Creating PAID offer with move-in verification...');
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(10, 0, 0, 0); // 10:00 AM local time
+    const today = new Date();
+    today.setHours(10, 0, 0, 0); // 10:00 AM local time
 
     let offer = await prisma.offer.findFirst({
       where: { 
@@ -256,13 +255,13 @@ async function seedMoveInDemo() {
           leaseDuration: 12,
           description: 'Demo offer for move-in testing',
           utilitiesIncluded: true,
-          availableFrom: tomorrow,
+          availableFrom: today,
           status: 'ACCEPTED',
           isPaid: true,
           paymentDate: new Date(),
-          leaseStartDate: tomorrow,
+          leaseStartDate: today,
           moveInVerificationStatus: 'PENDING',
-          moveInVerificationDeadline: computeVerificationDeadline(tomorrow),
+          moveInVerificationDeadline: computeVerificationDeadline(today),
           rentalRequestId: rentalRequest.id,
           propertyId: property.id,
           organizationId: organization.id,
@@ -276,7 +275,7 @@ async function seedMoveInDemo() {
 
     // Create lease linked to the offer
     console.log('📋 Creating lease...');
-    const leaseEndDate = new Date(tomorrow);
+    const leaseEndDate = new Date(today);
     leaseEndDate.setMonth(leaseEndDate.getMonth() + 12);
 
     let lease = await prisma.lease.findFirst({
@@ -286,7 +285,7 @@ async function seedMoveInDemo() {
     if (!lease) {
       lease = await prisma.lease.create({
         data: {
-          startDate: tomorrow,
+          startDate: today,
           endDate: leaseEndDate,
           rentAmount: 3500.0,
           depositAmount: 3500.0,
@@ -335,7 +334,7 @@ async function seedMoveInDemo() {
     console.log('🏠 Property ID:', property.id);
     console.log('👥 Tenant Group ID:', tenantGroup.id);
     console.log('🏢 Organization ID:', organization.id);
-    console.log('\n⏰ Move-in verification window opens at:', tomorrow.toLocaleString());
+    console.log('\n⏰ Move-in verification window opens at:', today.toLocaleString());
     console.log('⏰ Move-in verification deadline:', offer.moveInVerificationDeadline.toLocaleString());
 
   } catch (error) {

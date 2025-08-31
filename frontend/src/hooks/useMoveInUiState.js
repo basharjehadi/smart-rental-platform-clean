@@ -1,16 +1,43 @@
 import { useEffect, useState } from 'react';
+import api from '../utils/api';
 
 export default function useMoveInUiState(offerId) {
-  const [data, setData] = useState(null), [loading, setLoading] = useState(true), [error, setError] = useState(null);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   useEffect(() => {
     if (!offerId) return;
-    let off = false; setLoading(true);
-    fetch(`/api/move-in/offers/${offerId}/ui-state`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e)))
-      .then(j => { if (!off) setData(j); })
-      .catch(e => { if (!off) setError(e?.error || 'Failed to load'); })
-      .finally(() => { if (!off) setLoading(false); });
-    return () => { off = true; };
+
+    let isMounted = true;
+    setLoading(true);
+    setError(null);
+
+    const fetchUiState = async () => {
+      try {
+        const response = await api.get(`/api/move-in/offers/${offerId}/move-in/ui-state`);
+        
+        if (isMounted && response.data.success) {
+          setData(response.data.data);
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.error('Error fetching move-in UI state:', err);
+          setError(err.response?.data?.message || 'Failed to load move-in status');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchUiState();
+
+    return () => {
+      isMounted = false;
+    };
   }, [offerId]);
+
   return { data, loading, error };
 }
