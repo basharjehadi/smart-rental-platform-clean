@@ -26,14 +26,17 @@ const AdminMoveInReviews = () => {
       setLoading(true);
       setError(null);
       
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: pagination.limit.toString(),
-      });
-      
-      if (status && status !== 'ALL') {
-        params.append('status', status);
-      }
+             const params = new URLSearchParams({
+         page: page.toString(),
+         limit: pagination.limit.toString(),
+       });
+       
+       if (status && status !== 'ALL') {
+         params.append('status', status);
+       } else {
+         // For "ALL", send explicit default list
+         params.append('status', 'OPEN,IN_PROGRESS,ESCALATED');
+       }
 
       const response = await api.get(`/admin/move-in/issues?${params}`);
       

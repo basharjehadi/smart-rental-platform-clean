@@ -1263,16 +1263,28 @@ export const getAdminMoveInIssues = async (req, res) => {
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // Parse status query parameter (comma-separated)
-    let statusArray = ['OPEN', 'IN_PROGRESS', 'ESCALATED']; // Default statuses
-    if (status) {
-      statusArray = status.split(',').map(s => s.trim().toUpperCase());
-    }
+                    // Parse status query parameter (comma-separated)
+                const raw = (req.query.status || '').trim();
+                const ALLOWED = ['OPEN','IN_PROGRESS','ESCALATED','RESOLVED','CLOSED'];
+                let list = raw
+                  ? raw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
+                  : [];
 
-    // Build where clause for status filtering
-    const whereClause = {
-      status: { in: statusArray }
-    };
+                // map legacy/synonyms -> current
+                list = list.map(s => (s === 'UNDER_REVIEW' ? 'IN_PROGRESS'
+                              : s === 'RESOLVED_APPROVED' ? 'RESOLVED'
+                              : s === 'RESOLVED_REJECTED' ? 'CLOSED'
+                              : s));
+
+                // if "ALL" present or list empty/invalid -> default open queues
+                const DEFAULT_OPEN = ['OPEN','IN_PROGRESS','ESCALATED'];
+                const valid = list.filter(s => ALLOWED.includes(s));
+                const statuses = (list.includes('ALL') || valid.length === 0) ? DEFAULT_OPEN : valid;
+
+                // Build where clause for status filtering
+                const whereClause = {
+                  status: { in: statuses }
+                };
 
     // Test simple query first
     console.log('Testing simple moveInIssue count...');
