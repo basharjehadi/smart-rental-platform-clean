@@ -29,22 +29,8 @@ export const getLandlordProperties = async (req, res) => {
         leases: {
           include: {
             moveInIssues: {
-              where: { status: 'OPEN' },
-              include: {
-                comments: {
-                  orderBy: { createdAt: 'desc' },
-                  take: 1, // Get latest comment for preview
-                  include: {
-                    author: {
-                      select: {
-                        id: true,
-                        name: true,
-                        role: true,
-                        profileImage: true,
-                      },
-                    },
-                  },
-                },
+              where: { 
+                status: { in: ['OPEN', 'IN_PROGRESS', 'ESCALATED'] }
               },
             },
           },
@@ -57,21 +43,41 @@ export const getLandlordProperties = async (req, res) => {
 
     // Properties now include leases and move-in issues directly
     const shaped = properties.map((p) => {
-      const { offers, ...rest } = p;
+      const { offers, leases, ...rest } = p;
+      
+      // Calculate move-in issue counts
+      const allMoveInIssues = leases?.flatMap(lease => lease.moveInIssues || []) || [];
+      const openIssues = allMoveInIssues.filter(issue => issue.status === 'OPEN');
+      const inProgressIssues = allMoveInIssues.filter(issue => issue.status === 'IN_PROGRESS');
+      const escalatedIssues = allMoveInIssues.filter(issue => issue.status === 'ESCALATED');
+      
+      const moveInIssuesSummary = {
+        total: allMoveInIssues.length,
+        open: openIssues.length,
+        inProgress: inProgressIssues.length,
+        escalated: escalatedIssues.length,
+        hasIssues: allMoveInIssues.length > 0,
+        urgentCount: openIssues.length + escalatedIssues.length, // Open and escalated are urgent
+        firstIssueId: allMoveInIssues.length > 0 ? allMoveInIssues[0].id : null, // Include first issue ID for direct navigation
+      };
       
       // Debug: Log property data to see what's being included
       console.log(`🔍 Property ${p.id} (${p.name}):`, {
-        hasLeases: !!p.leases,
-        leasesCount: p.leases?.length || 0,
-        moveInIssuesCount: p.leases?.flatMap(lease => lease.moveInIssues || []).length || 0,
-        leases: p.leases?.map(lease => ({
+        hasLeases: !!leases,
+        leasesCount: leases?.length || 0,
+        moveInIssuesCount: allMoveInIssues.length,
+        moveInIssuesSummary,
+        leases: leases?.map(lease => ({
           id: lease.id,
           hasMoveInIssues: !!lease.moveInIssues,
           moveInIssuesCount: lease.moveInIssues?.length || 0
         }))
       });
       
-      return rest;
+      return {
+        ...rest,
+        moveInIssues: moveInIssuesSummary
+      };
     });
 
     res.json({
@@ -783,6 +789,91 @@ export const getPropertyAvailabilitySummary = async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to get property availability summary',
+    });
+  }
+};
+
+// Get move-in issues for a specific property
+export const getPropertyMoveInIssues = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const landlordId = req.user.id;
+
+    // Check if property belongs to landlord
+    const property = await prisma.property.findFirst({
+      where: {
+        id: id,
+        organization: {
+          members: {
+            some: { userId: landlordId },
+          },
+        },
+      },
+    });
+
+    if (!property) {
+      return res.status(404).json({
+        success: false,
+        error: 'Property not found',
+      });
+    }
+
+    // Get all move-in issues for this property
+    const issues = await prisma.moveInIssue.findMany({
+      where: {
+        lease: {
+          propertyId: id,
+        },
+      },
+      include: {
+        lease: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        name: true,
+                        email: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        comments: {
+          include: {
+            author: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                name: true,
+                role: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      success: true,
+      issues: issues,
+    });
+  } catch (error) {
+    console.error('Get property move-in issues error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch move-in issues',
     });
   }
 };

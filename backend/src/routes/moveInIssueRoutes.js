@@ -6,9 +6,12 @@ import {
   updateIssueStatus,
   listLeaseMoveInIssues,
   adminDecision,
+  requestAdminReview,
+  getAdminMoveInIssues,
 } from '../controllers/moveInIssueController.js';
 import verifyToken from '../middlewares/verifyToken.js';
 import upload from '../middlewares/uploadMiddleware.js';
+import { requireAdmin } from '../middlewares/requireAdmin.js';
 
 const router = express.Router();
 
@@ -33,7 +36,15 @@ router.put('/:issueId/status', updateIssueStatus);
 
 // Admin decision on move-in issue
 // POST /api/move-in-issues/:issueId/admin-decision
-router.post('/:issueId/admin-decision', adminDecision);
+router.post('/:issueId/admin-decision', requireAdmin, adminDecision);
+
+// Request admin review (tenants only)
+// POST /api/move-in-issues/:issueId/request-admin-review
+router.post('/:issueId/request-admin-review', requestAdminReview);
+
+// Admin routes
+// GET /api/admin/move-in/issues - Get move-in issues for admin review
+router.get('/admin/move-in/issues', requireAdmin, getAdminMoveInIssues);
 
 // List move-in issues for a specific lease
 // GET /api/leases/:leaseId/move-in-issues

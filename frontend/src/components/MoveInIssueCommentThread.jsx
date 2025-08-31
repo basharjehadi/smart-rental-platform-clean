@@ -61,6 +61,38 @@ const MoveInIssueCommentThread = ({
     }
   };
 
+  // Request admin review
+  const handleRequestAdminReview = async () => {
+    try {
+      const response = await fetch(`/api/move-in-issues/${issue.id}/request-admin-review`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          reason: 'Requesting administrator review of this issue' 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to request admin review');
+      }
+
+      const data = await response.json();
+      
+      // Add the admin review request comment to the issue
+      if (onCommentSubmit) {
+        await onCommentSubmit(data.comment.content);
+      }
+      
+      toast.success('Admin review requested successfully');
+    } catch (error) {
+      console.error('Error requesting admin review:', error);
+      toast.error('Failed to request admin review');
+    }
+  };
+
   // Handle file selection
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
@@ -222,22 +254,81 @@ const MoveInIssueCommentThread = ({
         {showStatusUpdate && (
           <div className="mt-6 pt-6 border-t border-gray-200">
             <h3 className="text-sm font-medium text-gray-500 mb-3">Update Status</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].map((status) => (
-                <button
-                  key={status}
-                  onClick={() => handleStatusUpdate(status)}
-                  disabled={issue.status === status}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    issue.status === status
-                      ? 'bg-blue-100 text-blue-800 cursor-not-allowed'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {status}
-                </button>
-              ))}
-            </div>
+            
+            {/* Role-based status controls */}
+            {userRole === 'TENANT' && (
+              <div className="space-y-3">
+                <div className="text-sm text-gray-600">
+                  Current status: <span className="font-medium">{issue.status}</span>
+                </div>
+                <div className="text-sm text-gray-500">
+                  Tenants cannot change issue status. Use the button below to request admin review.
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleRequestAdminReview()}
+                    className="px-4 py-2 text-sm font-medium bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
+                  >
+                    Request Admin Review
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {userRole === 'LANDLORD' && (
+              <div className="space-y-3">
+                <div className="text-sm text-gray-600">
+                  Current status: <span className="font-medium">{issue.status}</span>
+                </div>
+                <div className="text-sm text-gray-500">
+                  Landlords can only mark OPEN issues as IN_PROGRESS. Only administrators can resolve or close issues.
+                </div>
+                {issue.status === 'OPEN' && (
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleStatusUpdate('IN_PROGRESS')}
+                      className="px-4 py-2 text-sm font-medium bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+                    >
+                      Mark In Progress
+                    </button>
+                  </div>
+                )}
+                {issue.status === 'IN_PROGRESS' && (
+                  <div className="text-sm text-gray-500">
+                    Issue is in progress. Only administrators can resolve or close issues.
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {userRole === 'ADMIN' && (
+              <div className="space-y-3">
+                <div className="text-sm text-gray-600">
+                  Current status: <span className="font-medium">{issue.status}</span>
+                </div>
+                <div className="text-sm text-gray-500">
+                  Administrators can resolve or close issues. These are final statuses that cannot be undone.
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {issue.status !== 'RESOLVED' && (
+                    <button
+                      onClick={() => handleStatusUpdate('RESOLVED')}
+                      className="px-4 py-2 text-sm font-medium bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                    >
+                      Resolve Issue
+                    </button>
+                  )}
+                  {issue.status !== 'CLOSED' && (
+                    <button
+                      onClick={() => handleStatusUpdate('CLOSED')}
+                      className="px-4 py-2 text-sm font-medium bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                    >
+                      Close Issue
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

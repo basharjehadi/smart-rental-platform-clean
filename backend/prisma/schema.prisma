@@ -933,6 +933,10 @@ model MoveInIssue {
   refundAmount      Float?      // Amount to refund if approved
   propertyHoldUntil DateTime?   // Property hold period end date
   
+  // Resolution fields
+  resolvedAt        DateTime?   // When issue was resolved/closed
+  resolvedByUserId  String?     // User ID who resolved the issue
+  
   // Indexes for performance
   @@index([leaseId])
   @@index([status])

@@ -1,12 +1,33 @@
 import { PrismaClient } from '@prisma/client';
+import { computeVerificationDeadline } from '../services/moveInVerificationService.js';
 
 const prisma = new PrismaClient();
 
-// Helper to compute deadline based on move-in date (+24h)
-const computeVerificationDeadline = (moveInDate) => {
-  const base = moveInDate ? new Date(moveInDate) : new Date();
-  return new Date(base.getTime() + 24 * 60 * 60 * 1000);
+// Helper function to check if user is a tenant on the offer
+const isTenantOnOffer = async (userId, offerId) => {
+  const offer = await prisma.offer.findUnique({
+    where: { id: offerId },
+    include: {
+      tenantGroup: {
+        include: {
+          members: {
+            select: { userId: true }
+          }
+        }
+      }
+    }
+  });
+
+  if (!offer || !offer.tenantGroup) {
+    return false;
+  }
+
+  return offer.tenantGroup.members.some(
+    (member) => member.userId === userId
+  );
 };
+
+
 
 // GET /offers/:id/move-in-status
 export const getMoveInStatus = async (req, res) => {
@@ -66,12 +87,54 @@ export const getMoveInStatus = async (req, res) => {
 export const verifyMoveInSuccess = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id;
+
+    // Check if user is a tenant on the offer
+    const isTenant = await isTenantOnOffer(userId, id);
+    if (!isTenant) {
+      return res.status(403).json({
+        error: 'Not allowed',
+        message: 'Only tenant members can verify move-in'
+      });
+    }
+
+    // Find the offer to check preconditions
+    const offer = await prisma.offer.findUnique({
+      where: { id },
+      select: {
+        moveInVerificationStatus: true,
+        moveInVerificationDeadline: true
+      }
+    });
+
+    if (!offer) {
+      return res.status(404).json({
+        error: 'Offer not found',
+        message: 'The specified offer does not exist'
+      });
+    }
+
+    // Check preconditions
+    if (offer.moveInVerificationStatus !== 'PENDING') {
+      return res.status(400).json({
+        error: 'Invalid status',
+        message: 'Move-in can only be verified when status is PENDING'
+      });
+    }
+
+    const now = new Date();
+    if (offer.moveInVerificationDeadline && now >= offer.moveInVerificationDeadline) {
+      return res.status(400).json({
+        error: 'Deadline expired',
+        message: 'Move-in verification deadline has expired'
+      });
+    }
 
     const updated = await prisma.offer.update({
       where: { id },
       data: {
         moveInVerificationStatus: 'VERIFIED',
-        moveInVerificationDate: new Date(),
+        moveInVerificationDate: now,
       },
       select: {
         id: true,
@@ -138,17 +201,21 @@ export const denyMoveIn = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
 
-    // Find the offer and verify user authorization
+    // Check if user is a tenant member
+    const isTenant = await isTenantOnOffer(userId, id);
+    if (!isTenant) {
+      return res.status(403).json({
+        error: 'Not allowed',
+        message: 'Only tenant members can deny move-in'
+      });
+    }
+
+    // Find the offer to check preconditions
     const offer = await prisma.offer.findUnique({
       where: { id },
-      include: {
-        tenantGroup: {
-          include: {
-            members: {
-              select: { userId: true }
-            }
-          }
-        }
+      select: {
+        moveInVerificationStatus: true,
+        moveInVerificationDeadline: true
       }
     });
 
@@ -156,18 +223,6 @@ export const denyMoveIn = async (req, res) => {
       return res.status(404).json({
         error: 'Offer not found',
         message: 'The specified offer does not exist'
-      });
-    }
-
-    // Check if user is a tenant member
-    const isTenantMember = offer.tenantGroup.members.some(
-      (member) => member.userId === userId
-    );
-
-    if (!isTenantMember) {
-      return res.status(403).json({
-        error: 'Not allowed',
-        message: 'Only tenant members can deny move-in'
       });
     }
 
@@ -249,6 +304,107 @@ export const denyMoveIn = async (req, res) => {
   } catch (error) {
     console.error('Error denying move-in:', error);
     return res.status(500).json({ error: 'Failed to deny move-in' });
+  }
+};
+
+// GET /offers/:id/move-in/ui-state
+export const getMoveInUIState = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const now = new Date();
+
+    // Find the offer and verify user authorization
+    const offer = await prisma.offer.findUnique({
+      where: { id },
+      include: {
+        tenantGroup: {
+          include: {
+            members: {
+              select: { userId: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!offer) {
+      return res.status(404).json({
+        error: 'Offer not found',
+        message: 'The specified offer does not exist'
+      });
+    }
+
+    // Check if user is a tenant member
+    const isTenantMember = offer.tenantGroup?.members?.some(
+      (member) => member.userId === userId
+    ) || false;
+    
+    if (!offer.tenantGroup) {
+      console.warn(`Offer ${id} has no tenant group`);
+    }
+
+    // Get lease start date and compute window close
+    const leaseStart = offer.leaseStartDate;
+    const windowClose = leaseStart ? computeVerificationDeadline(leaseStart) : null;
+    
+    if (!leaseStart) {
+      console.warn(`Offer ${id} has no lease start date`);
+    }
+
+    // Determine window phase
+    let phase = 'PRE_MOVE_IN';
+    if (leaseStart && windowClose) {
+      if (now >= leaseStart && now < windowClose) {
+        phase = 'WINDOW_OPEN';
+      } else if (now >= windowClose) {
+        phase = 'WINDOW_CLOSED';
+      }
+    }
+    
+    // Debug logging
+    console.log('Move-in UI state calculation:', {
+      offerId: id,
+      userId,
+      now: now.toISOString(),
+      leaseStart: leaseStart?.toISOString(),
+      windowClose: windowClose?.toISOString(),
+      phase,
+      verificationStatus: offer.moveInVerificationStatus,
+      canConfirmOrDeny,
+      canReportIssue
+    });
+
+    // Determine permissions
+    const canConfirmOrDeny = isTenantMember && 
+      offer.moveInVerificationStatus === 'PENDING' && 
+      leaseStart && 
+      phase !== 'WINDOW_CLOSED' &&
+      now < windowClose;
+
+    const canReportIssue = phase === 'WINDOW_OPEN';
+
+    return res.json({
+      success: true,
+      data: {
+        now: now.toISOString(),
+        leaseStart: leaseStart ? leaseStart.toISOString() : null,
+        verificationStatus: offer.moveInVerificationStatus,
+        window: {
+          phase,
+          windowClose: windowClose ? windowClose.toISOString() : null
+        },
+        canReportIssue,
+        canConfirmOrDeny
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting move-in UI state:', error);
+    return res.status(500).json({ 
+      error: 'Failed to get move-in UI state',
+      message: 'An error occurred while fetching the UI state'
+    });
   }
 };
 

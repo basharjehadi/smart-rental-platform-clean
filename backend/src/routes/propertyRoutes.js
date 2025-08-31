@@ -8,6 +8,7 @@ import {
   updatePropertyStatus,
   updatePropertyAvailability,
   getPropertyAvailabilitySummary,
+  getPropertyMoveInIssues,
 } from '../controllers/propertyController.js';
 import { verifyToken, requireLandlord } from '../middlewares/authMiddleware.js';
 import { uploadMultipleFiles } from '../middlewares/uploadMiddleware.js';
@@ -59,5 +60,8 @@ router.get(
   requireLandlord,
   getPropertyAvailabilitySummary
 );
+
+// Get move-in issues for a property
+router.get('/:id/move-in-issues', verifyToken, requireLandlord, getPropertyMoveInIssues);
 
 export default router;

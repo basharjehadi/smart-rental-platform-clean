@@ -564,6 +564,134 @@ export const updateIssueStatus = async (req, res) => {
       });
     }
 
+    // Role-based status transition control
+    const currentStatus = issue.status;
+    
+    // Check if user is admin (for RESOLVED/CLOSED statuses)
+    const isAdmin = req.user.role === 'ADMIN';
+    
+    // Tenants: cannot change status (only comment)
+    if (isTenant) {
+      return res.status(403).json({
+        error: 'Not allowed',
+        message: 'Tenants cannot change issue status',
+      });
+    }
+    
+    // Landlords: can only set IN_PROGRESS
+    if (isLandlord && !isAdmin) {
+      if (status !== 'IN_PROGRESS') {
+        return res.status(403).json({
+          error: 'Not allowed',
+          message: 'Landlords can only mark issues as IN_PROGRESS',
+        });
+      }
+      // Only allow transition from OPEN to IN_PROGRESS
+      if (currentStatus !== 'OPEN') {
+        return res.status(403).json({
+          error: 'Not allowed',
+          message: 'Can only mark OPEN issues as IN_PROGRESS',
+        });
+      }
+    }
+    
+    // Admin: can set RESOLVED or CLOSED (final statuses)
+    if (status === 'RESOLVED' || status === 'CLOSED') {
+      if (!isAdmin) {
+        return res.status(403).json({
+          error: 'Not allowed',
+          message: 'Only admins can resolve or close issues',
+        });
+      }
+      // Set resolvedAt and resolvedByUserId for final statuses
+      const updateData = { 
+        status,
+        updatedAt: new Date(),
+        resolvedAt: new Date(),
+        resolvedByUserId: userId,
+      };
+      
+      // Update the issue status
+      const updatedIssue = await prisma.moveInIssue.update({
+        where: { id: issueId },
+        data: updateData,
+        include: {
+          lease: {
+            include: {
+              tenantGroup: {
+                include: {
+                  members: {
+                    select: { userId: true },
+                  },
+                },
+              },
+              property: {
+                include: {
+                  organization: {
+                    include: {
+                      members: {
+                        where: { role: 'OWNER' },
+                        select: { userId: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          comments: {
+            orderBy: { createdAt: 'asc' },
+            include: {
+              author: {
+                select: {
+                  id: true,
+                  name: true,
+                  role: true,
+                  profileImage: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // Create notifications for all participants
+      const allParticipants = new Set();
+      
+      // Add tenant group members
+      issue.lease.tenantGroup.members.forEach((member) => {
+        allParticipants.add(member.userId);
+      });
+      
+      // Add landlord
+      issue.lease.property.organization.members.forEach((member) => {
+        allParticipants.add(member.userId);
+      });
+
+      // Create notifications
+      const notificationPromises = Array.from(allParticipants).map((participantId) =>
+        prisma.notification.create({
+          data: {
+            userId: participantId,
+            type: 'SYSTEM_ANNOUNCEMENT',
+            entityId: issueId,
+            title: 'Move-in issue resolved',
+            body: `The move-in issue "${issue.title}" has been ${status.toLowerCase()}`,
+          },
+        })
+      );
+
+      await Promise.all(notificationPromises);
+
+      return res.json({
+        success: true,
+        message: `Issue ${status.toLowerCase()} successfully`,
+        issue: updatedIssue,
+      });
+    }
+
     // Update the issue status
     const updatedIssue = await prisma.moveInIssue.update({
       where: { id: issueId },
@@ -772,11 +900,11 @@ export const adminDecision = async (req, res) => {
     }
 
     // Validate decision
-    const validDecisions = ['ACCEPTED', 'REJECTED', 'ESCALATED'];
+    const validDecisions = ['ACCEPTED', 'REJECTED', 'ESCALATED', 'RESOLVED_APPROVED', 'RESOLVED_REJECTED'];
     if (!validDecisions.includes(decision)) {
       return res.status(400).json({
         error: 'Invalid decision',
-        message: 'Decision must be one of: ACCEPTED, REJECTED, ESCALATED',
+        message: 'Decision must be one of: ACCEPTED, REJECTED, ESCALATED, RESOLVED_APPROVED, RESOLVED_REJECTED',
       });
     }
 
@@ -842,7 +970,9 @@ export const adminDecision = async (req, res) => {
       where: { id: issueId },
       data: {
         status: decision === 'ACCEPTED' ? 'ADMIN_APPROVED' : 
-               decision === 'REJECTED' ? 'ADMIN_REJECTED' : 'ESCALATED',
+               decision === 'REJECTED' ? 'ADMIN_REJECTED' : 
+               decision === 'RESOLVED_APPROVED' ? 'RESOLVED' :
+               decision === 'RESOLVED_REJECTED' ? 'CLOSED' : 'ESCALATED',
         adminDecision: decision,
         adminDecisionAt: new Date(),
         adminDecisionBy: adminId,
@@ -943,6 +1073,220 @@ export const adminDecision = async (req, res) => {
     res.status(500).json({
       error: 'Failed to process admin decision',
       message: 'An error occurred while processing the decision',
+    });
+  }
+};
+
+/**
+ * Request admin review for a move-in issue
+ * POST /api/move-in-issues/:issueId/request-admin-review
+ */
+export const requestAdminReview = async (req, res) => {
+  try {
+    const { issueId } = req.params;
+    const { reason } = req.body;
+    const userId = req.user.id;
+
+    // Find the move-in issue
+    const issue = await prisma.moveInIssue.findUnique({
+      where: { id: issueId },
+      include: {
+        lease: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: {
+                  select: { userId: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!issue) {
+      return res.status(404).json({
+        error: 'Move-in issue not found',
+        message: 'The specified move-in issue does not exist',
+      });
+    }
+
+    // Check if user is a tenant member
+    const isTenant = issue.lease.tenantGroup.members.some(
+      (member) => member.userId === userId
+    );
+
+    if (!isTenant) {
+      return res.status(403).json({
+        error: 'Not allowed',
+        message: 'Only tenants can request admin review',
+      });
+    }
+
+    // Create a comment with admin review request tag
+    const comment = await prisma.moveInIssueComment.create({
+      data: {
+        content: `[ADMIN_REVIEW_REQUEST] ${reason || 'Requesting administrator review of this issue'}`,
+        authorId: userId,
+        issueId: issueId,
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            profileImage: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    // Create notification for admins (you may want to implement admin notification system)
+    // For now, we'll create a system notification
+    await prisma.notification.create({
+      data: {
+        userId: userId, // Notify the requesting tenant
+        type: 'SYSTEM_ANNOUNCEMENT',
+        entityId: issueId,
+        title: 'Admin review requested',
+        body: 'Your request for admin review has been submitted. An administrator will review your issue soon.',
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Admin review requested successfully',
+      comment,
+    });
+  } catch (error) {
+    console.error('Request admin review error:', error);
+    res.status(500).json({
+      error: 'Failed to request admin review',
+      message: 'An error occurred while requesting admin review',
+    });
+  }
+};
+
+/**
+ * Get move-in issues for admin review (paginated)
+ * GET /api/admin/move-in/issues
+ */
+export const getAdminMoveInIssues = async (req, res) => {
+  try {
+    const { status, page = 1, limit = 10 } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const offset = (pageNum - 1) * limitNum;
+
+    // Build where clause for status filtering
+    const whereClause = {};
+    if (status && ['OPEN', 'UNDER_REVIEW'].includes(status)) {
+      whereClause.status = status;
+    } else {
+      // Default to both statuses if none specified
+      whereClause.status = { in: ['OPEN', 'UNDER_REVIEW'] };
+    }
+
+    // Get issues with pagination
+    const [issues, total] = await Promise.all([
+      prisma.moveInIssue.findMany({
+        where: whereClause,
+        include: {
+          lease: {
+            include: {
+              tenantGroup: {
+                include: {
+                  members: {
+                    select: {
+                      user: {
+                        select: {
+                          id: true,
+                          firstName: true,
+                          lastName: true,
+                          email: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              property: {
+                select: {
+                  id: true,
+                  name: true,
+                  address: true,
+                },
+                organization: {
+                  select: {
+                    id: true,
+                    name: true,
+                    members: {
+                      where: { role: 'OWNER' },
+                      select: {
+                        user: {
+                          select: {
+                            id: true,
+                            firstName: true,
+                            lastName: true,
+                            email: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          comments: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { createdAt: true },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip: offset,
+        take: limitNum,
+      }),
+      prisma.moveInIssue.count({ where: whereClause }),
+    ]);
+
+    // Format the response
+    const formattedIssues = issues.map(issue => ({
+      id: issue.id,
+      title: issue.title,
+      description: issue.description,
+      status: issue.status,
+      priority: issue.priority,
+      createdAt: issue.createdAt,
+      updatedAt: issue.updatedAt,
+      tenant: issue.lease.tenantGroup.members[0]?.user || null,
+      landlord: issue.lease.property.organization.members[0]?.user || null,
+      property: issue.lease.property,
+      lastCommentAt: issue.comments[0]?.createdAt || null,
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        issues: formattedIssues,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error getting admin move-in issues:', error);
+    return res.status(500).json({
+      error: 'Failed to get admin move-in issues',
+      message: 'An error occurred while fetching the issues',
     });
   }
 };

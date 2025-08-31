@@ -12,6 +12,7 @@ import dayjs from 'dayjs';
 
 import TenantGroupChoiceModal from '../components/TenantGroupChoiceModal.jsx';
 import ReportIssueForm from '../components/ReportIssueForm.jsx';
+import MoveInVerificationBanner from '../components/MoveInVerificationBanner';
 
 const TenantDashboard = () => {
   const { user, logout } = useAuth();

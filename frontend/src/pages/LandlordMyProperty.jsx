@@ -486,11 +486,52 @@ const LandlordMyProperty = () => {
                           </span>
                         </div>
 
-                        <div className='flex items-center justify-between text-sm text-gray-500 mb-6'>
+                        <div className='flex items-center justify-between text-sm text-gray-500 mb-4'>
                           <span>
                             Available: {formatDate(property.availableFrom)}
                           </span>
                         </div>
+
+                        {/* Move-In Issues Alert */}
+                        {property.moveInIssues?.hasIssues && (
+                          <div className='mb-4 p-3 bg-red-50 border-l-4 border-red-400 rounded-r-lg'>
+                            <div className='flex items-center justify-between'>
+                              <div>
+                                <div className='flex items-center'>
+                                  <span className='text-red-800 font-medium text-sm'>
+                                    ⚠️ {property.moveInIssues.total} Move-In Issue{property.moveInIssues.total > 1 ? 's' : ''}
+                                  </span>
+                                  {property.moveInIssues.urgentCount > 0 && (
+                                    <span className='ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-full'>
+                                      {property.moveInIssues.urgentCount} urgent
+                                    </span>
+                                  )}
+                                </div>
+                                <p className='text-red-600 text-xs mt-1'>
+                                  {property.moveInIssues.open > 0 && `${property.moveInIssues.open} open`}
+                                  {property.moveInIssues.open > 0 && property.moveInIssues.inProgress > 0 && ', '}
+                                  {property.moveInIssues.inProgress > 0 && `${property.moveInIssues.inProgress} in progress`}
+                                  {(property.moveInIssues.open > 0 || property.moveInIssues.inProgress > 0) && property.moveInIssues.escalated > 0 && ', '}
+                                  {property.moveInIssues.escalated > 0 && `${property.moveInIssues.escalated} escalated`}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  // Go directly to the first issue if available
+                                  if (property.moveInIssues.firstIssueId) {
+                                    navigate(`/landlord/issue/${property.moveInIssues.firstIssueId}`);
+                                  } else {
+                                    // Fallback to issues list if no direct issue ID
+                                    navigate(`/landlord/properties/${property.id}/issues`);
+                                  }
+                                }}
+                                className='bg-red-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-red-700 transition-colors'
+                              >
+                                View Issues
+                              </button>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Action Buttons */}
                         <div className='flex space-x-3'>

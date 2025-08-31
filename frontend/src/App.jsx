@@ -33,6 +33,7 @@ import LandlordRentalRequests from './pages/LandlordRentalRequests';
 import LandlordMyTenants from './pages/LandlordMyTenants';
 import LandlordTenantProfile from './pages/LandlordTenantProfile';
 import LandlordMoveInIssuePage from './pages/LandlordMoveInIssuePage';
+import LandlordPropertyIssuesPage from './pages/LandlordPropertyIssuesPage';
 
 import MyOffers from './pages/MyOffers';
 import PropertyDetailsView from './pages/PropertyDetailsView';
@@ -47,6 +48,7 @@ import ReviewPage from './pages/ReviewPage';
 
 import AdminDashboard from './pages/AdminDashboard';
 import AdminMoveInIssues from './pages/AdminMoveInIssues.jsx';
+import AdminMoveInReviews from './pages/AdminMoveInReviews.jsx';
 import AdminPropertyReview from './pages/AdminPropertyReview.jsx';
 import AuthCallback from './pages/AuthCallback';
 import TestPage from './pages/TestPage';
@@ -94,6 +96,7 @@ const AppContent = () => {
     '/landlord-help-center',
     '/landlord-my-tenants',
     '/landlord-tenant-profile',
+    '/landlord/issue/:issueId',
     '/admin',
     '/payment-success',
     '/payment-history',
@@ -308,6 +311,14 @@ const AppContent = () => {
           }
         />
         <Route
+          path='/admin/move-in-reviews'
+          element={
+            <ProtectedRoute>
+              <AdminMoveInReviews />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path='/admin/property-review/:offerId'
           element={
             <ProtectedRoute>
@@ -389,6 +400,15 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <LandlordMoveInIssuePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path='/landlord/properties/:propertyId/issues'
+          element={
+            <ProtectedRoute>
+              <LandlordPropertyIssuesPage />
             </ProtectedRoute>
           }
         />

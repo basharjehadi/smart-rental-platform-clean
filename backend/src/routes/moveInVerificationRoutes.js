@@ -9,6 +9,7 @@ import {
   getOfferMoveInIssues,
   adminApproveCancellation,
   adminRejectCancellation,
+  getMoveInUIState,
 } from '../controllers/moveInVerificationController.js';
 import {
   runMoveInReminders,
@@ -20,6 +21,7 @@ const router = Router();
 
 // Tenant and landlord must be authenticated
 router.get('/offers/:id/status', verifyToken, getMoveInStatus);
+router.get('/offers/:id/move-in/ui-state', verifyToken, getMoveInUIState);
 router.post('/offers/:id/verify', verifyToken, verifyMoveInSuccess);
 router.post('/offers/:id/deny', verifyToken, denyMoveIn);
 router.get('/offers/:id/issues', verifyToken, getOfferMoveInIssues);

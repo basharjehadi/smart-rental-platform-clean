@@ -86,29 +86,11 @@ const TenantMoveInIssuePage = () => {
     }
   };
 
-  // Update issue status (tenants can update their own issues)
+  // Update issue status (tenants cannot update status anymore)
   const handleStatusUpdate = async (newStatus) => {
-    try {
-      const response = await fetch(`/api/move-in-issues/${issueId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update status');
-      }
-
-      const data = await response.json();
-      setIssue(data.issue);
-      return data.issue;
-    } catch (error) {
-      console.error('Error updating status:', error);
-      throw error;
-    }
+    // Tenants cannot update issue status
+    toast.error('Tenants cannot change issue status');
+    throw new Error('Tenants cannot change issue status');
   };
 
   if (loading) {
