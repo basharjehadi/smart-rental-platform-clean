@@ -42,9 +42,8 @@ router.post('/:issueId/admin-decision', requireAdmin, adminDecision);
 // POST /api/move-in-issues/:issueId/request-admin-review
 router.post('/:issueId/request-admin-review', requestAdminReview);
 
-// Admin routes
-// GET /api/admin/move-in/issues - Get move-in issues for admin review
-router.get('/admin/move-in/issues', requireAdmin, getAdminMoveInIssues);
+// Admin routes - REMOVED (now mounted at root level in index.js)
+// router.get('/admin/move-in/issues', requireAdmin, getAdminMoveInIssues);
 
 // List move-in issues for a specific lease
 // GET /api/leases/:leaseId/move-in-issues

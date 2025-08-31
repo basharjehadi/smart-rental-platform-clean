@@ -23,6 +23,7 @@ import moveInVerificationRoutes from './moveInVerificationRoutes.js';
 import moveInIssueRoutes from './moveInIssueRoutes.js';
 import { getAdminMoveInIssues } from '../controllers/moveInIssueController.js';
 import { requireAdmin } from '../middlewares/requireAdmin.js';
+import verifyToken from '../middlewares/verifyToken.js';
 import leaseRoutes from './leaseRoutes.js';
 import renewalRoutes from './renewalRoutes.js';
 import organizationRoutes from './organizationRoutes.js';
@@ -55,6 +56,9 @@ router.use('/payments', paymentRoutes);
 
 // Contract routes
 router.use('/contracts', contractRoutes);
+
+// Custom admin routes (must come BEFORE general admin routes)
+router.get('/admin/move-in/issues', verifyToken, requireAdmin, getAdminMoveInIssues);
 
 // Admin routes
 router.use('/admin', adminRoutes);
@@ -97,9 +101,6 @@ router.use('/move-in', moveInVerificationRoutes);
 
 // Move-in issue routes
 router.use('/move-in-issues', moveInIssueRoutes);
-
-// Admin move-in issues alias
-router.get('/admin/move-in/issues', requireAdmin, getAdminMoveInIssues);
 
 // Lease lifecycle routes
 router.use('/leases', leaseRoutes);

@@ -1240,6 +1240,24 @@ export const requestAdminReview = async (req, res) => {
  */
 export const getAdminMoveInIssues = async (req, res) => {
   try {
+    console.log('getAdminMoveInIssues called with query:', req.query);
+    
+    // Test database connection first
+    console.log('Testing database connection...');
+    await prisma.$queryRaw`SELECT 1`;
+    console.log('Database connection successful');
+    
+    // Test if move_in_issues table exists
+    console.log('Testing if move_in_issues table exists...');
+    const tableExists = await prisma.$queryRaw`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'move_in_issues'
+      );
+    `;
+    console.log('Table exists check result:', tableExists);
+    
     const { status, page = 1, limit = 10 } = req.query;
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
@@ -1255,6 +1273,16 @@ export const getAdminMoveInIssues = async (req, res) => {
     const whereClause = {
       status: { in: statusArray }
     };
+
+    // Test simple query first
+    console.log('Testing simple moveInIssue count...');
+    const simpleCount = await prisma.moveInIssue.count();
+    console.log('Total move-in issues in database:', simpleCount);
+    
+    // Test if any issues exist with the statuses we're looking for
+    console.log('Testing status filter...');
+    const statusCount = await prisma.moveInIssue.count({ where: whereClause });
+    console.log('Issues matching status filter:', statusCount);
 
     // Get issues with pagination
     const [issues, total] = await Promise.all([
@@ -1317,9 +1345,15 @@ export const getAdminMoveInIssues = async (req, res) => {
     });
   } catch (error) {
     console.error('Error getting admin move-in issues:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code
+    });
     return res.status(500).json({
       error: 'Failed to get admin move-in issues',
-      message: 'An error occurred while fetching the issues',
+      message: error.message || 'An error occurred while fetching the issues',
     });
   }
 };
