@@ -11,6 +11,8 @@ const LandlordMoveInIssuePage = () => {
   
   const [issue, setIssue] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [commentError, setCommentError] = useState('');
 
   // Fetch issue details
   useEffect(() => {
@@ -239,21 +241,33 @@ const LandlordMoveInIssuePage = () => {
               {/* Status Update */}
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <h3 className="text-sm font-medium text-gray-500 mb-3">Update Status</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].map((status) => (
-                    <button
-                      key={status}
-                      onClick={() => handleStatusUpdate(status)}
-                      disabled={issue.status === status}
-                      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                        issue.status === status
-                          ? 'bg-blue-100 text-blue-800 cursor-not-allowed'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {status}
-                    </button>
-                  ))}
+                
+                {/* Landlord Status Controls */}
+                <div className="space-y-3">
+                  {/* Mark In Progress Button - Only enabled when status is OPEN */}
+                  <button
+                    onClick={() => handleStatusUpdate('IN_PROGRESS')}
+                    disabled={issue.status !== 'OPEN'}
+                    className={`w-full px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      issue.status === 'OPEN'
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {issue.status === 'IN_PROGRESS' ? 'Already In Progress' : 'Mark In Progress'}
+                  </button>
+                  
+                  {/* Helper Text */}
+                  <p className="text-xs text-gray-500 text-center">
+                    Only administrators can resolve or close issues.
+                  </p>
+                  
+                  {/* Status Display */}
+                  <div className="text-center">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(issue.status)}`}>
+                      Current Status: {issue.status}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
