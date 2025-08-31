@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StatusBadge from './StatusBadge';
 import ConfirmationModal from './ConfirmationModal';
+import api from '../utils/api';
 
 const OfferCard = ({
   propertyTitle,
@@ -34,6 +35,8 @@ const OfferCard = ({
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [moveInPhase, setMoveInPhase] = useState(null);
+  const [moveInLoading, setMoveInLoading] = useState(false);
   const navigate = useNavigate();
 
   const formatCurrency = amount => {
@@ -42,6 +45,26 @@ const OfferCard = ({
       currency: 'PLN',
     }).format(amount);
   };
+
+  // Fetch move-in UI state for accepted/paid offers
+  const fetchMoveInState = async () => {
+    if (status === 'ACCEPTED' || status === 'PAID') {
+      try {
+        setMoveInLoading(true);
+        const response = await api.get(`/offers/${offerId}/move-in/ui-state`);
+        setMoveInPhase(response.data.data?.window?.phase || null);
+      } catch (error) {
+        console.error('Error fetching move-in state:', error);
+        setMoveInPhase(null);
+      } finally {
+        setMoveInLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchMoveInState();
+  }, [offerId, status]);
 
   // Show landlord name (unmasked for paid offers, masked for others)
   const getLandlordName = fullName => {
@@ -211,6 +234,30 @@ const OfferCard = ({
               className='flex-1 px-4 py-2 text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors'
             >
               Proceed to Payment
+            </button>
+          </div>
+        )}
+
+        {/* Move-In Button for Accepted/Paid Offers */}
+        {(status === 'ACCEPTED' || status === 'PAID') && (
+          <div className='pt-4 border-t border-gray-200'>
+            <button
+              onClick={() => navigate(`/move-in?offerId=${offerId}`)}
+              disabled={moveInPhase === 'WINDOW_CLOSED'}
+              className={`w-full px-4 py-2 rounded-lg transition-colors ${
+                moveInPhase === 'WINDOW_CLOSED'
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-purple-600 text-white hover:bg-purple-700'
+              }`}
+              title={
+                moveInPhase === 'PRE_MOVE_IN'
+                  ? 'Opens at check-in'
+                  : moveInPhase === 'WINDOW_CLOSED'
+                  ? 'Window closed'
+                  : 'Access move-in center'
+              }
+            >
+              {moveInLoading ? 'Loading...' : 'Move-In'}
             </button>
           </div>
         )}

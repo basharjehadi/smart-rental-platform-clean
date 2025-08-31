@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client';
+import { computeVerificationDeadline } from '../services/moveInVerificationService.js';
+import { applyAdminDecision } from '../services/moveInDecisionService.js';
 
 const prisma = new PrismaClient();
 
@@ -339,6 +341,31 @@ export const createMoveInIssue = async (req, res) => {
       });
     }
 
+    // Validate move-in window
+    if (!offer.leaseStartDate) {
+      return res.status(400).json({
+        error: 'Move-in date not set',
+        message: 'Cannot create move-in issue: move-in date has not been set for this offer',
+      });
+    }
+
+    const now = new Date();
+    const windowClose = computeVerificationDeadline(offer.leaseStartDate);
+
+    if (now < offer.leaseStartDate) {
+      return res.status(400).json({
+        error: 'Issue window not open yet',
+        message: 'Cannot create move-in issue: the move-in window has not opened yet',
+      });
+    }
+
+    if (now >= windowClose) {
+      return res.status(400).json({
+        error: 'Issue window closed',
+        message: 'Cannot create move-in issue: the move-in window has already closed',
+      });
+    }
+
     // Get or create a lease for this offer
     let lease = offer.leases[0];
     
@@ -388,6 +415,25 @@ export const createMoveInIssue = async (req, res) => {
       console.log('✅ Created lease:', lease.id, 'linked to unit:', unit.id);
     } else {
       console.log('✅ Using existing lease:', lease.id);
+    }
+
+    // Check if there's already an open move-in issue for this lease
+    const existingOpenIssue = await prisma.moveInIssue.findFirst({
+      where: { 
+        leaseId: lease.id, 
+        status: { in: ['OPEN', 'IN_PROGRESS'] } 
+      }
+    });
+
+    if (existingOpenIssue) {
+      console.log('🔄 Found existing open issue:', existingOpenIssue.id, 'reusing instead of creating new one');
+      return res.status(200).json({
+        success: true,
+        issueId: existingOpenIssue.id,
+        reused: true,
+        message: 'An open move-in issue already exists for this lease',
+        issue: existingOpenIssue
+      });
     }
 
     // Create the move-in issue
@@ -900,11 +946,11 @@ export const adminDecision = async (req, res) => {
     }
 
     // Validate decision
-    const validDecisions = ['ACCEPTED', 'REJECTED', 'ESCALATED', 'RESOLVED_APPROVED', 'RESOLVED_REJECTED'];
+    const validDecisions = ['ACCEPTED', 'REJECTED', 'ESCALATED', 'RESOLVED_APPROVED', 'RESOLVED_REJECTED', 'APPROVE', 'REJECT'];
     if (!validDecisions.includes(decision)) {
       return res.status(400).json({
         error: 'Invalid decision',
-        message: 'Decision must be one of: ACCEPTED, REJECTED, ESCALATED, RESOLVED_APPROVED, RESOLVED_REJECTED',
+        message: 'Decision must be one of: ACCEPTED, REJECTED, ESCALATED, RESOLVED_APPROVED, RESOLVED_REJECTED, APPROVE, REJECT',
       });
     }
 
@@ -972,7 +1018,9 @@ export const adminDecision = async (req, res) => {
         status: decision === 'ACCEPTED' ? 'ADMIN_APPROVED' : 
                decision === 'REJECTED' ? 'ADMIN_REJECTED' : 
                decision === 'RESOLVED_APPROVED' ? 'RESOLVED' :
-               decision === 'RESOLVED_REJECTED' ? 'CLOSED' : 'ESCALATED',
+               decision === 'RESOLVED_REJECTED' ? 'CLOSED' : 
+               decision === 'APPROVE' ? 'RESOLVED' :
+               decision === 'REJECT' ? 'CLOSED' : 'ESCALATED',
         adminDecision: decision,
         adminDecisionAt: new Date(),
         adminDecisionBy: adminId,
@@ -982,6 +1030,21 @@ export const adminDecision = async (req, res) => {
         updatedAt: new Date(),
       },
     });
+
+    // Apply business logic for admin decision
+    try {
+      const businessLogicResult = await applyAdminDecision({
+        issueId,
+        decision,
+        adminId,
+        notes: notes || '',
+      });
+      console.log('✅ Business logic applied successfully:', businessLogicResult);
+    } catch (error) {
+      console.error('❌ Error applying business logic:', error);
+      // Continue with notifications even if business logic fails
+      // The issue status has already been updated
+    }
 
     // If admin accepted the issue, perform automatic actions
     if (decision === 'ACCEPTED') {
@@ -1184,11 +1247,11 @@ export const getAdminMoveInIssues = async (req, res) => {
 
     // Build where clause for status filtering
     const whereClause = {};
-    if (status && ['OPEN', 'UNDER_REVIEW'].includes(status)) {
+    if (status && ['OPEN', 'ESCALATED'].includes(status)) {
       whereClause.status = status;
     } else {
       // Default to both statuses if none specified
-      whereClause.status = { in: ['OPEN', 'UNDER_REVIEW'] };
+      whereClause.status = { in: ['OPEN', 'ESCALATED'] };
     }
 
     // Get issues with pagination

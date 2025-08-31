@@ -547,6 +547,28 @@ const LandlordMyProperty = () => {
                             <span>View Details</span>
                           </button>
 
+                          {/* Move-In Button for Properties with Paid Offers */}
+                          {property.moveInIssues?.moveInOfferId && (
+                            <button
+                              onClick={() => navigate(`/move-in?offerId=${property.moveInIssues.moveInOfferId}`)}
+                              disabled={property.moveInIssues.moveInPhase === 'WINDOW_CLOSED'}
+                              className={`flex-1 px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
+                                property.moveInIssues.moveInPhase === 'WINDOW_CLOSED'
+                                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                  : 'bg-purple-600 text-white hover:bg-purple-700'
+                              }`}
+                              title={
+                                property.moveInIssues.moveInPhase === 'PRE_MOVE_IN'
+                                  ? 'Opens at check-in'
+                                  : property.moveInIssues.moveInPhase === 'WINDOW_CLOSED'
+                                  ? 'Window closed'
+                                  : 'Access move-in center'
+                              }
+                            >
+                              <span>Move-In</span>
+                            </button>
+                          )}
+
                           {/* Edit Button - Disabled for occupied/rented properties */}
                           <button
                             onClick={() => handleEditProperty(property)}

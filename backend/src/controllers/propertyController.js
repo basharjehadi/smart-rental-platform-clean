@@ -22,6 +22,8 @@ export const getLandlordProperties = async (req, res) => {
           orderBy: { updatedAt: 'desc' },
           select: {
             id: true,
+            leaseStartDate: true,
+            moveInVerificationStatus: true,
             rentalRequest: { select: { moveInDate: true } },
           },
         },
@@ -51,6 +53,28 @@ export const getLandlordProperties = async (req, res) => {
       const inProgressIssues = allMoveInIssues.filter(issue => issue.status === 'IN_PROGRESS');
       const escalatedIssues = allMoveInIssues.filter(issue => issue.status === 'ESCALATED');
       
+      // Calculate move-in phase for the first paid offer
+      let moveInPhase = null;
+      let moveInOfferId = null;
+      if (offers && offers.length > 0) {
+        const firstOffer = offers[0];
+        moveInOfferId = firstOffer.id;
+        
+        if (firstOffer.leaseStartDate) {
+          const now = new Date();
+          const leaseStart = new Date(firstOffer.leaseStartDate);
+          const windowClose = new Date(leaseStart.getTime() + 24 * 60 * 60 * 1000); // 24 hours after lease start
+          
+          if (now < leaseStart) {
+            moveInPhase = 'PRE_MOVE_IN';
+          } else if (now >= leaseStart && now < windowClose) {
+            moveInPhase = 'WINDOW_OPEN';
+          } else {
+            moveInPhase = 'WINDOW_CLOSED';
+          }
+        }
+      }
+      
       const moveInIssuesSummary = {
         total: allMoveInIssues.length,
         open: openIssues.length,
@@ -59,6 +83,8 @@ export const getLandlordProperties = async (req, res) => {
         hasIssues: allMoveInIssues.length > 0,
         urgentCount: openIssues.length + escalatedIssues.length, // Open and escalated are urgent
         firstIssueId: allMoveInIssues.length > 0 ? allMoveInIssues[0].id : null, // Include first issue ID for direct navigation
+        moveInPhase, // Add move-in phase
+        moveInOfferId, // Add offer ID for move-in button
       };
       
       // Debug: Log property data to see what's being included
@@ -67,6 +93,8 @@ export const getLandlordProperties = async (req, res) => {
         leasesCount: leases?.length || 0,
         moveInIssuesCount: allMoveInIssues.length,
         moveInIssuesSummary,
+        moveInPhase,
+        moveInOfferId,
         leases: leases?.map(lease => ({
           id: lease.id,
           hasMoveInIssues: !!lease.moveInIssues,

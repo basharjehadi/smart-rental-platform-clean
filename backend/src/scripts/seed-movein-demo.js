@@ -3,13 +3,10 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-// Helper to compute deadline based on move-in date (+24h)
-const computeVerificationDeadline = (moveInDate) => {
-  const base = moveInDate ? new Date(moveInDate) : new Date();
-  return new Date(base.getTime() + 24*60*60*1000);
-};
+// Import the computeVerificationDeadline function from the service
+import { computeVerificationDeadline } from '../services/moveInVerificationService.js';
 
-async function main() {
+async function seedMoveInDemo() {
   console.log('🌱 Starting move-in demo seeding...');
 
   try {
@@ -326,30 +323,20 @@ async function main() {
     });
     console.log('✅ Updated property status to RENTED');
 
-    console.log('\n🎉 Move-in demo seeding completed successfully!');
-    console.log('\n📋 Demo Credentials:');
-    console.log('==================');
-    console.log('👤 Tenant:');
-    console.log(`   Email: ${tenant.email}`);
-    console.log('   Password: password123');
-    console.log(`   User ID: ${tenant.id}`);
-    console.log('');
-    console.log('🏠 Landlord:');
-    console.log(`   Email: ${landlord.email}`);
-    console.log('   Password: password123');
-    console.log(`   User ID: ${landlord.id}`);
-    console.log('');
-    console.log('🔑 Test Data:');
-    console.log(`   Offer ID: ${offer.id}`);
-    console.log(`   Lease ID: ${lease.id}`);
-    console.log(`   Property ID: ${property.id}`);
-    console.log(`   Organization ID: ${organization.id}`);
-    console.log(`   Tenant Group ID: ${tenantGroup.id}`);
-    console.log('');
-    console.log('🌐 Test URLs:');
-    console.log(`   Move-In Center: /move-in?offerId=${offer.id}`);
-    console.log(`   Frontend: http://localhost:3002/move-in?offerId=${offer.id}`);
-    console.log(`   Backend API: http://localhost:3001/api/move-in/offers/${offer.id}/status`);
+    // Print credentials and IDs
+    console.log('\n🎉 Move-In Demo Data Created Successfully!');
+    console.log('==========================================');
+    console.log('📧 Tenant Email:', tenant.email);
+    console.log('🔑 Tenant Password: password123');
+    console.log('📧 Landlord Email:', landlord.email);
+    console.log('🔑 Landlord Password: password123');
+    console.log('📋 Offer ID:', offer.id);
+    console.log('📄 Lease ID:', lease.id);
+    console.log('🏠 Property ID:', property.id);
+    console.log('👥 Tenant Group ID:', tenantGroup.id);
+    console.log('🏢 Organization ID:', organization.id);
+    console.log('\n⏰ Move-in verification window opens at:', tomorrow.toLocaleString());
+    console.log('⏰ Move-in verification deadline:', offer.moveInVerificationDeadline.toLocaleString());
 
   } catch (error) {
     console.error('❌ Seeding failed:', error);
@@ -357,11 +344,13 @@ async function main() {
   }
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Seeding failed:', e);
-    process.exit(1);
+// Run the seed function
+seedMoveInDemo()
+  .then(() => {
+    console.log('\n✅ Move-in demo seeding completed successfully!');
+    process.exit(0);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
+  .catch((error) => {
+    console.error('\n❌ Move-in demo seeding failed:', error);
+    process.exit(1);
   });

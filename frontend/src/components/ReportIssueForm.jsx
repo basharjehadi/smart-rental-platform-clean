@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 
 const ReportIssueForm = ({ offerId, rentalRequestId, onSuccess, onCancel }) => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     title: '',
     description: ''
@@ -89,7 +93,23 @@ const ReportIssueForm = ({ offerId, rentalRequestId, onSuccess, onCancel }) => {
       });
 
       if (response.data.success) {
-        onSuccess();
+        // Check if this is a reused issue
+        if (response.data.reused) {
+          console.log('🔄 Reusing existing issue:', response.data.issueId);
+          
+          // Navigate to the appropriate issue page based on user role
+          if (user.role === 'TENANT') {
+            navigate(`/tenant/issue/${response.data.issueId}`);
+          } else if (user.role === 'LANDLORD') {
+            navigate(`/landlord/issue/${response.data.issueId}`);
+          } else {
+            // Fallback to the move-in center
+            navigate(`/move-in?offerId=${offerId}`);
+          }
+        } else {
+          // New issue created, call onSuccess
+          onSuccess();
+        }
       } else {
         setError(response.data.error || 'Failed to report issue. Please try again.');
       }

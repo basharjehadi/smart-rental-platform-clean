@@ -91,7 +91,7 @@ const AdminMoveInReviews = () => {
         setSelectedIssue(null);
 
         // Show success message
-        const actionText = decision === 'RESOLVED_APPROVED' ? 'resolved' : 'closed';
+        const actionText = decision === 'APPROVE' ? 'resolved' : 'closed';
         toast.success(`Issue ${actionText} successfully`);
 
         // Reload issues to get updated list
@@ -127,7 +127,7 @@ const AdminMoveInReviews = () => {
   const getStatusColor = (status) => {
     const colors = {
       'OPEN': 'bg-red-100 text-red-800',
-      'UNDER_REVIEW': 'bg-yellow-100 text-yellow-800',
+      'ESCALATED': 'bg-yellow-100 text-yellow-800',
       'IN_PROGRESS': 'bg-blue-100 text-blue-800',
       'RESOLVED': 'bg-green-100 text-green-800',
       'CLOSED': 'bg-gray-100 text-gray-800',
@@ -188,7 +188,7 @@ const AdminMoveInReviews = () => {
               >
                 <option value="ALL">All Issues</option>
                 <option value="OPEN">Open</option>
-                <option value="UNDER_REVIEW">Under Review</option>
+                <option value="ESCALATED">Escalated</option>
               </select>
             </div>
             
@@ -353,14 +353,14 @@ const AdminMoveInReviews = () => {
                 <h4 className="text-sm font-medium text-gray-900 mb-3">Admin Actions</h4>
                 <div className="flex space-x-3">
                   <button
-                    onClick={() => handleAdminDecision(selectedIssue.id, 'RESOLVED_APPROVED')}
+                    onClick={() => handleAdminDecision(selectedIssue.id, 'APPROVE')}
                     disabled={submitting}
                     className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
                   >
                     {submitting ? 'Processing...' : 'Resolve Issue'}
                   </button>
                   <button
-                    onClick={() => handleAdminDecision(selectedIssue.id, 'RESOLVED_REJECTED')}
+                    onClick={() => handleAdminDecision(selectedIssue.id, 'REJECT')}
                     disabled={submitting}
                     className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
                   >
