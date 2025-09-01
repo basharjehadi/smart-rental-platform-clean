@@ -24,28 +24,26 @@ async function tenantTrustLevel(userId, prismaClient = defaultPrisma) {
       },
     });
 
-    // Get payment history for on-time percentage
-    const payments = await prismaClient.payment.findMany({
+    // Get rent payment history for on-time percentage
+    const rentPayments = await prismaClient.rentPayment.findMany({
       where: {
         OR: [
           { userId: userId },
           {
-            rentalRequest: {
-              tenantGroup: {
-                members: {
-                  some: {
-                    userId: userId,
-                  },
+            tenantGroup: {
+              members: {
+                some: {
+                  userId: userId,
                 },
               },
             },
           },
         ],
-        status: 'COMPLETED',
+        status: 'SUCCEEDED',
       },
       select: {
         dueDate: true,
-        paidAt: true,
+        paidDate: true,
       },
     });
 
@@ -57,12 +55,12 @@ async function tenantTrustLevel(userId, prismaClient = defaultPrisma) {
         : 0;
 
     // Calculate on-time payment percentage
-    const onTimePayments = payments.filter((payment) => {
-      if (!payment.paidAt || !payment.dueDate) return false;
-      return new Date(payment.paidAt) <= new Date(payment.dueDate);
+    const onTimePayments = rentPayments.filter((payment) => {
+      if (!payment.paidDate || !payment.dueDate) return false;
+      return new Date(payment.paidDate) <= new Date(payment.dueDate);
     }).length;
     const onTimePercentage =
-      payments.length > 0 ? (onTimePayments / payments.length) * 100 : 0;
+      rentPayments.length > 0 ? (onTimePayments / rentPayments.length) * 100 : 0;
 
     // No dispute system in current schema - set to 0
     const unresolvedDisputes = 0;

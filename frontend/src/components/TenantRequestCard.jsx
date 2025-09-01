@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api.js';
 import TrustLevelBadge from './TrustLevelBadge';
 import BadgeCollection from './BadgeCollection';
+import MoveInVerificationBanner from './MoveInVerificationBanner';
 
 const TenantRequestCard = ({
   tenant,
@@ -382,6 +383,53 @@ const TenantRequestCard = ({
   };
 
   const budgetSentence = deriveBudgetSentence();
+
+  // Render Move-In Verification Banner for paid offers
+  const renderMoveInVerificationBanner = () => {
+    // Only show for paid/active offers that need move-in verification
+    if (!tenant.offers || !Array.isArray(tenant.offers)) return null;
+    
+    // Find paid, accepted, or active offer
+    const paidOffer = tenant.offers.find(o => o.status === 'PAID');
+    const activeOffer = tenant.offers.find(o => o.status === 'ACCEPTED');
+    const targetOffer = paidOffer || activeOffer;
+    
+    if (!targetOffer) return null;
+
+    const handleConfirm = async () => {
+      try {
+        await api.post(`move-in/offers/${targetOffer.id}/verify`);
+        // Note: In a real app, you'd want to refresh the data or show success feedback
+      } catch (error) {
+        console.error('Error confirming move-in:', error);
+      }
+    };
+
+    const handleDeny = async () => {
+      try {
+        await api.post(`move-in/offers/${targetOffer.id}/deny`);
+        // Note: In a real app, you'd want to refresh the data or show success feedback
+      } catch (error) {
+        console.error('Error denying move-in:', error);
+      }
+    };
+
+    const handleReportIssue = () => {
+      // Navigate to report issue page or open modal
+      console.log('Report issue for offer:', targetOffer.id);
+    };
+
+    return (
+      <div className="mb-4">
+        <MoveInVerificationBanner
+          offerId={targetOffer.id}
+          onConfirm={handleConfirm}
+          onDeny={handleDeny}
+          onReportIssue={handleReportIssue}
+        />
+      </div>
+    );
+  };
 
   // Mask contact information
   const maskEmail = email => {
@@ -1090,6 +1138,9 @@ const TenantRequestCard = ({
               </h4>
               <p className='text-sm text-gray-600'>{tenant.requirements}</p>
             </div>
+
+            {/* Move-In Verification Banner */}
+            {renderMoveInVerificationBanner()}
 
             {/* Action Buttons or Status */}
             {(() => {

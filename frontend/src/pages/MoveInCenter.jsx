@@ -41,7 +41,7 @@ const MoveInCenter = () => {
         
         // Fetch move-in issues for this offer
         try {
-          const issuesResponse = await api.get(`/move-in/offers/${offerId}/issues`);
+          const issuesResponse = await api.get(`move-in/offers/${offerId}/issues`);
           setIssues(issuesResponse.data.issues || []);
         } catch (issuesError) {
           console.log('No issues found or endpoint not available');
@@ -62,7 +62,7 @@ const MoveInCenter = () => {
   // Handle move-in verification (confirm)
   const handleConfirmMoveIn = async () => {
     try {
-      const response = await api.post(`/move-in/offers/${offerId}/verify`);
+      const response = await api.post(`move-in/offers/${offerId}/verify`);
       if (response.data.success) {
         toast.success('Move-in confirmed successfully!');
         // Refresh the data
@@ -77,7 +77,7 @@ const MoveInCenter = () => {
   // Handle move-in denial
   const handleDenyMoveIn = async () => {
     try {
-      const response = await api.post(`/move-in/offers/${offerId}/deny`);
+      const response = await api.post(`move-in/offers/${offerId}/deny`);
       if (response.data.success) {
         toast.success('Move-in denied successfully!');
         // Refresh the data
@@ -98,7 +98,7 @@ const MoveInCenter = () => {
 
     try {
       setSubmittingComment(true);
-      const response = await api.post(`/move-in-issues/${issueId}/comments`, {
+      const response = await api.post(`move-in-issues/${issueId}/comments`, {
         content: newComment.trim()
       });
 
@@ -106,7 +106,7 @@ const MoveInCenter = () => {
         toast.success('Comment added successfully!');
         setNewComment('');
         // Refresh issues to show new comment
-        const issuesResponse = await api.get(`/move-in/offers/${offerId}/issues`);
+        const issuesResponse = await api.get(`move-in/offers/${offerId}/issues`);
         setIssues(issuesResponse.data.issues || []);
       }
     } catch (error) {

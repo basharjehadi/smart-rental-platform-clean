@@ -362,6 +362,15 @@ export const getMoveInUIState = async (req, res) => {
       }
     }
     
+    // Determine permissions
+    const canConfirmOrDeny = isTenantMember && 
+      offer.moveInVerificationStatus === 'PENDING' && 
+      leaseStart && 
+      phase !== 'WINDOW_CLOSED' &&
+      now < windowClose;
+
+    const canReportIssue = phase === 'WINDOW_OPEN';
+    
     // Debug logging
     console.log('Move-in UI state calculation:', {
       offerId: id,
@@ -374,15 +383,6 @@ export const getMoveInUIState = async (req, res) => {
       canConfirmOrDeny,
       canReportIssue
     });
-
-    // Determine permissions
-    const canConfirmOrDeny = isTenantMember && 
-      offer.moveInVerificationStatus === 'PENDING' && 
-      leaseStart && 
-      phase !== 'WINDOW_CLOSED' &&
-      now < windowClose;
-
-    const canReportIssue = phase === 'WINDOW_OPEN';
 
     return res.json({
       success: true,

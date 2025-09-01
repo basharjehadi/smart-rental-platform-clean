@@ -125,141 +125,33 @@ const TenantDashboard = () => {
       return null;
     const paidOffer = request.offers.find(o => o.status === 'PAID');
     if (!paidOffer) return null;
-    const status = verificationStatuses[paidOffer.id];
-    const statusValue = status?.status || 'PENDING';
-    const deadline = status?.deadline
-      ? dayjs(status.deadline)
-      : request.moveInDate
-        ? dayjs(request.moveInDate).add(24, 'hour')
-        : null;
-    const now = dayjs();
-    let remainingText = '—';
-    if (deadline) {
-      const diffMs = Math.max(0, deadline.diff(now));
-      const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
-      const days = Math.floor(totalHours / 24);
-      const hours = totalHours % 24;
-      remainingText = `${days}d ${hours}h`;
-    }
 
-    // If admin rejected -> SUCCESS, show verified message and no actions
-    if (statusValue === 'SUCCESS') {
-      return (
-        <div className='mt-3 p-3 bg-green-50 border border-green-200 rounded-md'>
-          <div className='flex items-center justify-between'>
-            <div className='text-sm text-green-900 font-medium'>
-              ✅ Move-in verified
-            </div>
-            {deadline && (
-              <div className='text-xs text-green-800'>Finalized</div>
-            )}
-          </div>
-          <div className='mt-1 text-xs text-green-800'>
-            Your move-in has been confirmed. Enjoy your stay!
-          </div>
-        </div>
-      );
-    }
+    const handleConfirm = async () => {
+      try {
+        await api.post(`/move-in/offers/${paidOffer.id}/verify`);
+        fetchRequests();
+      } catch {}
+    };
 
-    // If tenant reported -> awaiting admin
-    if (statusValue === 'ISSUE_REPORTED') {
-      return (
-        <div className='mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md'>
-          <div className='flex items-center justify-between'>
-            <div className='text-sm text-yellow-900 font-medium'>
-              ⚠️ Issue reported
-            </div>
-            {deadline && (
-              <div className='text-xs text-yellow-800'>
-                Awaiting admin review
-              </div>
-            )}
-          </div>
-          <div className='mt-1 text-xs text-yellow-800'>
-            Support is reviewing your report. We will notify you once a decision
-            is made.
-          </div>
-        </div>
-      );
-    }
+    const handleDeny = async () => {
+      try {
+        await api.post(`/move-in/offers/${paidOffer.id}/deny`);
+        fetchRequests();
+      } catch {}
+    };
 
-    // If admin approved cancellation
-    if (statusValue === 'CANCELLED') {
-      return (
-        <div className='mt-3 p-3 bg-red-50 border border-red-200 rounded-md'>
-          <div className='flex items-center justify-between'>
-            <div className='text-sm text-red-900 font-medium'>
-              ❌ Booking cancelled
-            </div>
-          </div>
-          <div className='mt-1 text-xs text-red-800'>
-            Support approved your cancellation request.
-          </div>
-        </div>
-      );
-    }
+    const handleReportIssueClick = () => {
+      handleReportIssue(request, paidOffer);
+    };
 
-    // Default PENDING view with actions
     return (
-      <div className='mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md'>
-        <div className='flex items-center justify-between'>
-          <div className='text-sm text-blue-900 font-medium'>
-            🏠 Move-in verification
-          </div>
-          <div className='text-xs text-blue-800'>⏰ {remainingText} left</div>
-        </div>
-        {/* Lease meta chips (termination / renewal decline) */}
-        {(() => {
-          const lm = leaseMetaByOffer[paidOffer.id];
-          if (!lm) return null;
-          const chips = [];
-          if (lm.terminationNoticeDate) {
-            const eff = lm.terminationEffectiveDate
-              ? new Date(lm.terminationEffectiveDate)
-              : null;
-            chips.push(
-              <span
-                key='term'
-                className='mt-2 inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 mr-2'
-              >
-                Termination notice
-                {eff
-                  ? ` • effective ${eff.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-                  : ''}
-              </span>
-            );
-          }
-          if (lm.renewalStatus === 'DECLINED') {
-            chips.push(
-              <span
-                key='renew'
-                className='mt-2 inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-800 mr-2'
-              >
-                Renewal declined
-              </span>
-            );
-          }
-          return chips.length > 0 ? <div className='mt-2'>{chips}</div> : null;
-        })()}
-        <div className='mt-2 flex space-x-2'>
-          <button
-            onClick={async () => {
-              try {
-                await api.post(`/move-in/offers/${paidOffer.id}/verify`);
-                fetchRequests();
-              } catch {}
-            }}
-            className='px-3 py-1 rounded-md text-sm bg-green-600 text-white hover:bg-green-700'
-          >
-            Move-in successful
-          </button>
-          <button
-            onClick={() => handleReportIssue(request, paidOffer)}
-            className='px-3 py-1 rounded-md text-sm bg-red-600 text-white hover:bg-red-700'
-          >
-            Report issue
-          </button>
-        </div>
+      <div className="mt-3">
+        <MoveInVerificationBanner
+          offerId={paidOffer.id}
+          onConfirm={handleConfirm}
+          onDeny={handleDeny}
+          onReportIssue={handleReportIssueClick}
+        />
       </div>
     );
   };
