@@ -15,7 +15,9 @@ export default function MoveInVerificationBanner({ offerId, onReportIssue, onCon
       )}
 
       {w?.phase === 'PRE_MOVE_IN' && (
-        <div className="note">Move-in starts soon.</div>
+        <div className="text-sm text-gray-500">
+          Move-in starts on {new Date(data.leaseStart).toLocaleString()}. The 24h issue window opens at that time.
+        </div>
       )}
 
       {w?.phase === 'WINDOW_OPEN' && (
