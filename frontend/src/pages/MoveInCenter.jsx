@@ -1,328 +1,73 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { toast } from 'react-hot-toast';
-import api from '../utils/api';
-import useMoveInUiState from '../hooks/useMoveInUiState';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import api from '../utils/api'; // axios with baseURL '/api' + auth
 
-const MoveInCenter = () => {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { user } = useAuth();
-  
-  const [issues, setIssues] = useState([]);
+export default function MoveInCenter() {
+  const [sp] = useSearchParams();
+  const offerId = sp.get('offerId');
+
+  const [ui, setUi] = useState(null);
+  const [st, setSt] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [newComment, setNewComment] = useState('');
-  const [submittingComment, setSubmittingComment] = useState(false);
-  const [status, setStatus] = useState(null);
+  const [err, setErr] = useState(null);
 
-  // Get offerId from query params
-  const offerId = new URLSearchParams(location.search).get('offerId');
-
-  // Use the shared hook for move-in UI state
-  const { data: uiState, loading: uiLoading, error: uiError } = useMoveInUiState(offerId);
-
-  // Fetch move-in data
-  useEffect(() => {
-    if (!offerId) {
-      setError('No offer ID provided');
-      setLoading(false);
-      return;
-    }
-
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch both UI state and status
-        const [{ data: ui }, { data: statusData }] = await Promise.all([
-          api.get(`move-in/offers/${offerId}/move-in/ui-state`),
-          api.get(`move-in/offers/${offerId}/status`),
-        ]);
-        
-        setStatus(statusData);
-        
-        // Fetch move-in issues for this offer
-        try {
-          const issuesResponse = await api.get(`move-in/offers/${offerId}/issues`);
-          setIssues(issuesResponse.data.issues || []);
-        } catch (issuesError) {
-          console.log('No issues found or endpoint not available');
-          setIssues([]);
-        }
-
-      } catch (error) {
-        console.error('Error fetching move-in data:', error);
-        setError('Failed to load move-in data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [offerId]);
-
-  // Handle move-in verification (confirm)
-  const handleConfirmMoveIn = async () => {
-    try {
-      const response = await api.post(`move-in/offers/${offerId}/verify`);
-      if (response.data.success) {
-        toast.success('Move-in confirmed successfully!');
-        // Refresh the data
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error('Error confirming move-in:', error);
-      toast.error(error.response?.data?.message || 'Failed to confirm move-in');
-    }
+  const load = () => {
+    if (!offerId) { setErr('Missing offerId'); setLoading(false); return; }
+    let off = false;
+    setLoading(true);
+    Promise.all([
+      api.get(`move-in/offers/${offerId}/move-in/ui-state`),
+      api.get(`move-in/offers/${offerId}/status`),
+    ])
+      .then(([a, b]) => { if (!off) { setUi(a.data); setSt(b.data); } })
+      .catch(e => { if (!off) setErr(e?.response?.data?.error || e.message); })
+      .finally(() => { if (!off) setLoading(false); });
+    return () => { off = true; };
   };
 
-  // Handle move-in denial
-  const handleDenyMoveIn = async () => {
-    try {
-      const response = await api.post(`move-in/offers/${offerId}/deny`);
-      if (response.data.success) {
-        toast.success('Move-in denied successfully!');
-        // Refresh the data
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error('Error denying move-in:', error);
-      toast.error(error.response?.data?.message || 'Failed to deny move-in');
-    }
-  };
+  useEffect(load, [offerId]);
 
-  // Handle adding a comment to an issue
-  const handleAddComment = async (issueId) => {
-    if (!newComment.trim()) {
-      toast.error('Please enter a comment');
-      return;
-    }
+  const refetch = load;
 
-    try {
-      setSubmittingComment(true);
-      const response = await api.post(`move-in-issues/${issueId}/comments`, {
-        content: newComment.trim()
-      });
+  const onConfirm = async () => { await api.post(`move-in/offers/${offerId}/verify`); refetch(); };
+  const onDeny    = async () => { await api.post(`move-in/offers/${offerId}/deny`); refetch(); };
 
-      if (response.data.success) {
-        toast.success('Comment added successfully!');
-        setNewComment('');
-        // Refresh issues to show new comment
-        const issuesResponse = await api.get(`move-in/offers/${offerId}/issues`);
-        setIssues(issuesResponse.data.issues || []);
-      }
-    } catch (error) {
-      console.error('Error adding comment:', error);
-      toast.error(error.response?.data?.message || 'Failed to add comment');
-    } finally {
-      setSubmittingComment(false);
-    }
-  };
+  if (loading) return <div className="card"><div className="p-4">Loading…</div></div>;
+  if (err)      return <div className="card"><div className="p-4 text-red-600">Error: {err}</div></div>;
+  if (!ui || !st) return null;
 
-  // Check if user is a tenant for this offer
-  const isTenant = uiState && user && uiState.tenantGroup?.members?.some(
-    member => member.userId === user.id
-  );
-
-  // Use server UI state for verification logic
-  const canVerify = uiState?.canConfirmOrDeny === true && isTenant;
-
-  if (loading || uiLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading move-in information...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || uiError) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-            <h2 className="text-xl font-semibold text-red-800 mb-2">Error</h2>
-            <p className="text-red-600 mb-4">{error || uiError}</p>
-            <button
-              onClick={() => navigate('/tenant-dashboard')}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Back to Dashboard
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const phase = ui?.window?.phase;
+  const leaseStart = ui?.leaseStart ? new Date(ui.leaseStart).toLocaleString() : '';
+  const windowClose = ui?.window?.windowClose ? new Date(ui.window.windowClose).toLocaleString() : '';
+  const status = st?.moveInVerificationStatus || ui?.verificationStatus;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Move-In Center</h1>
-          <p className="text-gray-600">Manage your move-in verification and report any issues</p>
-        </div>
+    <div>
+      <section className="card p-4 mb-6">
+        <h3 className="font-semibold mb-2">Move-In Status</h3>
+        <div className="mb-2">Status: <b>{status}</b></div>
 
-        {/* Move-In Status */}
-        {(uiState || status) && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Move-In Status</h2>
-            
-            <div className="mb-6">
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <div className="flex items-center">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    status?.moveInVerificationStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                    status?.moveInVerificationStatus === 'VERIFIED' ? 'bg-green-100 text-green-800' :
-                    status?.moveInVerificationStatus === 'DENIED' ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {status?.moveInVerificationStatus || 'Loading...'}
-                  </span>
-                </div>
-              </div>
+        {phase === 'PRE_MOVE_IN'   && <div>Move-in starts on <b>{leaseStart}</b>. The 24h issue window opens then.</div>}
+        {phase === 'WINDOW_OPEN'   && <div>Issue window closes at <b>{windowClose}</b>.</div>}
+        {phase === 'WINDOW_CLOSED' && <div>Verification window closed.</div>}
 
-              {/* Phase-specific messages and actions */}
-              {uiState?.window?.phase === 'PRE_MOVE_IN' && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                  <p className="text-blue-800">
-                    Move-in starts on {new Date(uiState.leaseStart).toLocaleString()}. Issue window opens then.
-                  </p>
-                </div>
-              )}
-
-              {uiState?.window?.phase === 'WINDOW_OPEN' && (
-                <>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                    <p className="text-green-800">
-                      Issue window closes at {new Date(uiState.window.windowClose).toLocaleString()}
-                    </p>
-                  </div>
-                  {uiState?.canConfirmOrDeny && (
-                    <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                      <button
-                        onClick={handleConfirmMoveIn}
-                        className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
-                      >
-                        ✅ Confirm Move-In
-                      </button>
-                      <button
-                        onClick={handleDenyMoveIn}
-                        className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors font-medium"
-                      >
-                        ❌ Deny Move-In
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {uiState?.window?.phase === 'WINDOW_CLOSED' && (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
-                  <p className="text-gray-800">
-                    Verification window closed.
-                  </p>
-                </div>
-              )}
-
-              {/* Report Issue Button */}
-              {uiState?.canReportIssue && (
-                <div className="mt-3">
-                  <button
-                    onClick={() => navigate(`/report-issue?offerId=${offerId}`)}
-                    className="bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700 transition-colors font-medium"
-                  >
-                    🚨 Report Issue
-                  </button>
-                </div>
-              )}
-            </div>
+        {ui.canConfirmOrDeny && status === 'PENDING' && (
+          <div className="mt-3 flex gap-2">
+            <button className="btn btn-primary" onClick={onConfirm}>Confirm</button>
+            <button className="btn btn-outline" onClick={onDeny}>Deny</button>
           </div>
         )}
+      </section>
 
-        {/* Move-In Issues */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Move-In Issues</h2>
-          
-          {issues.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No issues reported yet.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {issues.map((issue) => (
-                <div key={issue.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-medium text-gray-900">{issue.title}</h3>
-                      <p className="text-sm text-gray-600">{issue.description}</p>
-                    </div>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      issue.status === 'OPEN' ? 'bg-red-100 text-red-800' :
-                      issue.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
-                      issue.status === 'RESOLVED' ? 'bg-green-100 text-green-800' :
-                      issue.status === 'CLOSED' ? 'bg-gray-100 text-gray-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
-                      {issue.status}
-                    </span>
-                  </div>
-
-                  {/* Comments */}
-                  {issue.comments && issue.comments.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      {issue.comments.map((comment) => (
-                        <div key={comment.id} className="bg-gray-50 rounded-lg p-3">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-sm text-gray-900">
-                              {comment.author?.firstName} {comment.author?.lastName}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {new Date(comment.createdAt).toLocaleString()}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-700">{comment.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Add Comment Form */}
-                  <div className="mt-4">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Add a comment..."
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                      <button
-                        onClick={() => handleAddComment(issue.id)}
-                        disabled={submittingComment || !newComment.trim()}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                      >
-                        {submittingComment ? 'Adding...' : 'Add'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      <section className="card p-4">
+        <h3 className="font-semibold mb-2">Move-In Issues</h3>
+        {!ui.canReportIssue && phase !== 'WINDOW_OPEN' && <div>No issues reported yet.</div>}
+        {ui.canReportIssue && (
+          <button className="btn btn-danger" onClick={() => {/* open your report issue flow */}}>
+            Report issue
+          </button>
+        )}
+      </section>
     </div>
   );
-};
-
-export default MoveInCenter;
+}
