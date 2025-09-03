@@ -4,7 +4,7 @@ This document explains how refunds are handled after a move‑in cancellation ap
 
 ## Overview
 
-When an admin approves a reported move‑in issue, the booking is unwound and refunds are triggered for all booking payments.
+When an admin approves a reported move‑in issue (during the extended move-in window from payment date to 2 days after expected move-in date), the booking is unwound and refunds are triggered for all booking payments.
 
 - Entry point: `adminApproveCancellation` in `backend/src/controllers/moveInVerificationController.js`
 - Refund orchestration: `refundOfferPayments(offerId)` in `backend/src/controllers/paymentController.js`

@@ -317,13 +317,14 @@ Get move-in UI state.
   "success": true,
   "data": {
     "now": "2025-01-01T00:00:00.000Z",
+    "paymentDate": "2024-12-15T00:00:00.000Z",
     "leaseStart": "2025-02-01T00:00:00.000Z",
     "verificationStatus": "PENDING",
     "window": {
-      "phase": "PRE_MOVE_IN", // PRE_MOVE_IN, WINDOW_OPEN, WINDOW_CLOSED
-      "windowClose": "2025-02-02T00:00:00.000Z"
+      "phase": "WINDOW_OPEN", // PRE_MOVE_IN, WINDOW_OPEN, WINDOW_CLOSED
+      "windowClose": "2025-02-03T00:00:00.000Z"
     },
-    "canReportIssue": false,
+    "canReportIssue": true,
     "canConfirmOrDeny": true
   }
 }
@@ -465,9 +466,9 @@ api.get('/move-in/offers/123/status')
 ## Key Features
 
 ### Move-In Verification System
-- **24-Hour Window**: After payment, tenants have 24 hours to verify move-in
+- **Extended Window**: From payment date until 2 days after expected move-in date
 - **Three Phases**: PRE_MOVE_IN, WINDOW_OPEN, WINDOW_CLOSED
-- **Issue Reporting**: Tenants can report problems during move-in
+- **Issue Reporting**: Tenants can report problems during the entire move-in window
 
 ### Payment Gateways
 - **Stripe**: Credit card processing

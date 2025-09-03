@@ -344,18 +344,23 @@ export const getMoveInUIState = async (req, res) => {
       console.warn(`Offer ${id} has no tenant group`);
     }
 
-    // Get lease start date and compute window close
+    // Get lease start date and payment date
     const leaseStart = offer.leaseStartDate;
+    const paymentDate = offer.paymentDate;
     const windowClose = leaseStart ? computeVerificationDeadline(leaseStart) : null;
     
     if (!leaseStart) {
       console.warn(`Offer ${id} has no lease start date`);
     }
+    if (!paymentDate) {
+      console.warn(`Offer ${id} has no payment date`);
+    }
 
     // Determine window phase
+    // Window opens from payment date and closes 2 days after expected move-in date
     let phase = 'PRE_MOVE_IN';
-    if (leaseStart && windowClose) {
-      if (now >= leaseStart && now < windowClose) {
+    if (paymentDate && windowClose) {
+      if (now >= paymentDate && now < windowClose) {
         phase = 'WINDOW_OPEN';
       } else if (now >= windowClose) {
         phase = 'WINDOW_CLOSED';
@@ -365,7 +370,7 @@ export const getMoveInUIState = async (req, res) => {
     // Determine permissions
     const canConfirmOrDeny = isTenantMember && 
       offer.moveInVerificationStatus === 'PENDING' && 
-      leaseStart && 
+      paymentDate && 
       phase !== 'WINDOW_CLOSED' &&
       now < windowClose;
 
@@ -376,6 +381,7 @@ export const getMoveInUIState = async (req, res) => {
       offerId: id,
       userId,
       now: now.toISOString(),
+      paymentDate: paymentDate?.toISOString(),
       leaseStart: leaseStart?.toISOString(),
       windowClose: windowClose?.toISOString(),
       phase,
@@ -388,6 +394,7 @@ export const getMoveInUIState = async (req, res) => {
       success: true,
       data: {
         now: now.toISOString(),
+        paymentDate: paymentDate ? paymentDate.toISOString() : null,
         leaseStart: leaseStart ? leaseStart.toISOString() : null,
         verificationStatus: offer.moveInVerificationStatus,
         window: {

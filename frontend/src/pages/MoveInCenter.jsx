@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import ReportIssueForm from '../components/ReportIssueForm';
 
 export default function MoveInCenter() {
   const [sp] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const offerId = sp.get('offerId');
 
   const [ui, setUi] = useState(null);
@@ -58,6 +60,7 @@ export default function MoveInCenter() {
   if (!ui) return <div className="p-4 text-red-600">No UI data available</div>;
 
   const phase = ui?.window?.phase;
+  const paymentDate = ui?.paymentDate ? new Date(ui.paymentDate).toLocaleString() : '';
   const leaseStart = ui?.leaseStart ? new Date(ui.leaseStart).toLocaleString() : '';
   const windowClose = ui?.window?.windowClose ? new Date(ui.window.windowClose).toLocaleString() : '';
   // tolerate different shapes from the API
@@ -75,7 +78,13 @@ export default function MoveInCenter() {
             {/* Back Button */}
       <div className="mb-6">
             <button
-          onClick={() => navigate('/my-offers?tab=PAID')} 
+          onClick={() => {
+            if (user?.role === 'LANDLORD') {
+              navigate('/landlord-my-property');
+            } else {
+              navigate('/my-offers?tab=PAID');
+            }
+          }} 
           className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -97,7 +106,7 @@ export default function MoveInCenter() {
           {phase === 'PRE_MOVE_IN' && (
             <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-yellow-800">
-                Move-in starts on <strong>{leaseStart}</strong>. The 24h issue window opens then.
+                Issue window opens from payment date <strong>{paymentDate}</strong> and closes 2 days after move-in date <strong>{leaseStart}</strong>.
               </p>
                 </div>
               )}
@@ -105,14 +114,14 @@ export default function MoveInCenter() {
           {phase === 'WINDOW_OPEN' && (
             <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-green-800">
-                Issue window closes at <strong>{windowClose}</strong>.
+                Issue window is open! You can report issues from payment date until <strong>{windowClose}</strong> (2 days after move-in).
                   </p>
                 </div>
               )}
           
           {phase === 'WINDOW_CLOSED' && (
             <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-              <p className="text-gray-800">Verification window closed.</p>
+              <p className="text-gray-800">Issue window closed (2 days after move-in date).</p>
               </div>
             )}
 
@@ -137,12 +146,12 @@ export default function MoveInCenter() {
         <section className="card p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-semibold">Move-In Issues</h3>
-            {ui?.canReportIssue && (
+            {ui?.canReportIssue && moveInIssues.length === 0 && (
               <button 
                 className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
                 onClick={() => setShowReportModal(true)}
               >
-                Report New Issue
+                Report Move-In Issue
               </button>
             )}
           </div>
@@ -215,7 +224,13 @@ export default function MoveInCenter() {
                     </div>
                     <div className="ml-4">
                       <button
-                        onClick={() => navigate(`/tenant/issue/${issue.id}`)}
+                        onClick={() => {
+                          if (user?.role === 'LANDLORD') {
+                            navigate(`/landlord/issue/${issue.id}`);
+                          } else {
+                            navigate(`/tenant/issue/${issue.id}`);
+                          }
+                        }}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                       >
                         View Details

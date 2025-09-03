@@ -4,8 +4,30 @@
 
 The Move-In Issue System provides a comprehensive three-way communication platform for tenants, landlords, and administrators to report, discuss, and resolve issues that arise during the move-in process. This system replaces the previous simple issue reporting with a full-featured communication thread.
 
+## Move-In Window System
+
+The system implements a flexible move-in window that provides comprehensive coverage for issue reporting:
+
+- **Window Opens**: From the payment date (when tenant pays for the offer)
+- **Window Closes**: 2 days after the expected move-in date
+- **Duration**: Covers the entire period from payment to post-move-in
+
+### Window Phases
+
+1. **PRE_MOVE_IN**: Before payment date - window not yet open
+2. **WINDOW_OPEN**: From payment date until 2 days after move-in date - issues can be reported
+3. **WINDOW_CLOSED**: After 2 days past move-in date - no new issues can be reported
+
+### Benefits of Extended Window
+
+- **Early Issue Detection**: Problems can be reported during property visits before move-in
+- **Flexible Timing**: Accommodates early move-ins, delayed move-ins, and post-move-in discoveries
+- **Comprehensive Coverage**: No gaps in protection during the critical move-in period
+- **Reduced Stress**: No pressure to find all issues within a 24-hour window
+
 ## Features
 
+- **One Issue Per Rental**: Only one move-in issue is allowed per rental - for serious problems that warrant contract cancellation
 - **Three-way Communication**: Tenants, landlords, and admins can all participate in issue discussions
 - **Real-time Notifications**: Automatic notifications when new comments are added or status changes
 - **Status Tracking**: Issues can be tracked through OPEN → IN_PROGRESS → RESOLVED → CLOSED
@@ -16,6 +38,7 @@ The Move-In Issue System provides a comprehensive three-way communication platfo
 - **File Management**: Visual file previews, download links, and file type detection
 - **Admin Decision System**: Binding decisions that automatically affect rental requests and refunds
 - **Property Hold Management**: Automatic property holds with landlord update requirements
+- **Minor Issues**: Non-serious problems should be discussed through the live messaging system
 
 ## Database Schema
 
@@ -123,6 +146,16 @@ Creates a new move-in issue for a specific lease.
 - Tenant members of the lease's tenant group
 - Landlord (owner) of the property
 - Admin users
+
+**Window Validation:**
+- Issues can only be created when the move-in window is open
+- Window opens from payment date and closes 2 days after expected move-in date
+- Returns error if window is not yet open or has already closed
+
+**One Issue Limit:**
+- Only one move-in issue is allowed per rental
+- Returns error if an issue already exists for this offer
+- Additional concerns should be discussed through live messaging system
 
 **Response:**
 ```json
@@ -694,6 +727,13 @@ const properties = await prisma.property.findMany({
 {
   "error": "Missing required fields",
   "message": "Lease ID, title, and description are required"
+}
+```
+
+```json
+{
+  "error": "Move-in issue already exists",
+  "message": "Only one move-in issue is allowed per rental. Please use the live messaging system for additional concerns."
 }
 ```
 

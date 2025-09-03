@@ -1,9 +1,11 @@
 import { prisma } from '../utils/prisma.js';
 
 // Export the deadline computation function
+// New logic: Window opens from payment date and closes 2 days after expected move-in date
 export const computeVerificationDeadline = (moveInDate) => {
   const base = moveInDate ? new Date(moveInDate) : new Date();
-  return new Date(base.getTime() + 24*60*60*1000);
+  // Add 2 days (48 hours) after the expected move-in date
+  return new Date(base.getTime() + 2*24*60*60*1000);
 };
 
 const THRESHOLDS_HOURS = [24, 12, 1];
@@ -72,7 +74,7 @@ export const runMoveInReminders = async () => {
                 type: 'SYSTEM_ANNOUNCEMENT',
                 entityId: offer.id,
                 title,
-                body: 'Please confirm your move-in or report an issue within the 24h window.',
+                body: 'Please confirm your move-in or report an issue within the move-in window (from payment date to 2 days after move-in).',
               },
             });
           }
@@ -125,7 +127,7 @@ export const runMoveInFinalization = async () => {
           type: 'SYSTEM_ANNOUNCEMENT',
           entityId: offer.id,
           title: 'Move-in auto-confirmed',
-          body: 'Your move-in was automatically confirmed after 24h.',
+          body: 'Your move-in was automatically confirmed after the move-in window closed.',
         },
       });
     }

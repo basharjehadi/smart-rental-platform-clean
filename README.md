@@ -38,7 +38,8 @@ A full-stack, multi-user rental management system featuring a **reverse marketpl
 - **Payment Analytics**: Comprehensive payment tracking with landlord filtering and unified payment data.
 
 ### 🏠 **Move-In & Verification System**
-- **24-Hour Move-In Window**: After payment, tenants have 24 hours to confirm successful move-in or report issues.
+- **Extended Move-In Window**: From payment date until 2 days after expected move-in date for comprehensive issue reporting.
+- **One Issue Per Rental**: Only one move-in issue allowed per rental - for serious problems that warrant contract cancellation.
 - **Move-In Issue Reporting**: Three-way communication system (tenant, landlord, admin) for issue resolution with evidence upload.
 - **Admin Decision System**: Admin approval workflow for move-in cancellations with automatic refund processing.
 
@@ -58,21 +59,21 @@ A full-stack, multi-user rental management system featuring a **reverse marketpl
 The Smart Rental System features a comprehensive move-in verification process with three distinct phases:
 
 ### **Phase 1: PRE_MOVE_IN**
-- **Timeline**: Before lease start date
-- **Status**: "Move-in starts on [date]. The 24h issue window opens then."
+- **Timeline**: Before payment date
+- **Status**: "Issue window opens from payment date and closes 2 days after move-in date"
 - **Actions**: No action buttons available
 
 ### **Phase 2: WINDOW_OPEN** 
-- **Timeline**: 24 hours after lease start date
-- **Status**: "Issue window closes at [date]"
+- **Timeline**: From payment date until 2 days after expected move-in date
+- **Status**: "Issue window is open! You can report issues from payment date until [close date]"
 - **Actions**: 
   - ✅ **Confirm Move-In** - Tenant confirms successful move-in
   - ❌ **Deny Move-In** - Tenant reports issues
   - 🚨 **Report Issue** - Submit detailed issue reports
 
 ### **Phase 3: WINDOW_CLOSED**
-- **Timeline**: After 24-hour window expires
-- **Status**: "Verification window closed"
+- **Timeline**: After 2 days past expected move-in date
+- **Status**: "Issue window closed (2 days after move-in date)"
 - **Actions**: No action buttons available
 
 ### **API Endpoints**:

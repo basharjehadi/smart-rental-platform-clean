@@ -355,10 +355,10 @@ export const createMoveInIssue = async (req, res) => {
     const now = new Date();
     const windowClose = computeVerificationDeadline(offer.leaseStartDate);
 
-    if (now < offer.leaseStartDate) {
+    if (now < offer.paymentDate) {
       return res.status(400).json({
         error: 'Issue window not open yet',
-        message: 'Cannot create move-in issue: the move-in window has not opened yet',
+        message: 'Cannot create move-in issue: the move-in window has not opened yet (opens from payment date)',
       });
     }
 
@@ -366,6 +366,22 @@ export const createMoveInIssue = async (req, res) => {
       return res.status(400).json({
         error: 'Issue window closed',
         message: 'Cannot create move-in issue: the move-in window has already closed',
+      });
+    }
+
+    // Check if there's already an existing move-in issue for this offer
+    const existingIssue = await prisma.moveInIssue.findFirst({
+      where: {
+        lease: {
+          offerId: offerId
+        }
+      }
+    });
+
+    if (existingIssue) {
+      return res.status(400).json({
+        error: 'Move-in issue already exists',
+        message: 'Only one move-in issue is allowed per rental. Please use the live messaging system for additional concerns.',
       });
     }
 
