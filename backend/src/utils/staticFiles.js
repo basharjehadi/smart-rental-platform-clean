@@ -35,6 +35,7 @@ export const setupStaticFiles = (app) => {
     'rules',
     'contracts',
     'chat_attachments',
+    'move_in_evidence',
   ];
 
   uploadDirs.forEach((dir) => {

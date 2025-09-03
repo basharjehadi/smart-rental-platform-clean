@@ -97,18 +97,11 @@ const ReportIssueForm = ({ offerId, rentalRequestId, onSuccess, onCancel }) => {
         if (response.data.reused) {
           console.log('🔄 Reusing existing issue:', response.data.issueId);
           
-          // Navigate to the appropriate issue page based on user role
-          if (user.role === 'TENANT') {
-            navigate(`/tenant/issue/${response.data.issueId}`);
-          } else if (user.role === 'LANDLORD') {
-            navigate(`/landlord/issue/${response.data.issueId}`);
-          } else {
-            // Fallback to the move-in center
-            navigate(`/move-in?offerId=${offerId}`);
-          }
+          // Call onSuccess with the existing issue ID so the parent can handle navigation
+          onSuccess(response.data.issueId);
         } else {
-          // New issue created, call onSuccess
-          onSuccess();
+          // New issue created, call onSuccess with issueId
+          onSuccess(response.data.issueId);
         }
       } else {
         setError(response.data.error || 'Failed to report issue. Please try again.');

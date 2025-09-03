@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import api from '../utils/api';
@@ -8,11 +8,14 @@ import TenantSidebar from '../components/TenantSidebar';
 import NotificationHeader from '../components/common/NotificationHeader';
 import { LogOut, CheckCircle, X } from 'lucide-react';
 
+
+
 const MyOffers = () => {
   const { user, logout } = useAuth();
   const { markByTypeAsRead } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   const [offers, setOffers] = useState([]);
   const [profileData, setProfileData] = useState(null);
@@ -20,6 +23,14 @@ const MyOffers = () => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('PENDING');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Set active tab based on URL parameter
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['PENDING', 'ACCEPTED', 'PAID', 'DECLINED'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   const fetchOffers = async () => {
     try {
@@ -400,6 +411,8 @@ const MyOffers = () => {
                   ))}
                 </div>
               )}
+
+
             </div>
           </div>
         </main>

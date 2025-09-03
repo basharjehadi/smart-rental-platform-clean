@@ -394,8 +394,9 @@ const MoveInIssueCommentThread = ({
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                           {comment.evidence.map((filePath, idx) => {
                             const fileName = filePath.split('/').pop();
-                            const isImage = comment.evidenceType === 'IMAGE';
-                            const isVideo = comment.evidenceType === 'VIDEO';
+                            const fileExtension = fileName.split('.').pop().toLowerCase();
+                            const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(fileExtension);
+                            const isVideo = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm'].includes(fileExtension);
                             
                             return (
                               <div key={idx} className="relative">

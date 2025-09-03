@@ -41,7 +41,7 @@ const storage = multer.diskStorage({
       uploadPath = path.join(uploadPath, 'rules');
     } else if (file.fieldname === 'attachment') {
       uploadPath = path.join(uploadPath, 'chat_attachments');
-    } else if (file.fieldname === 'moveInEvidence') {
+    } else if (file.fieldname === 'moveInEvidence' || file.fieldname === 'evidence') {
       uploadPath = path.join(uploadPath, 'move_in_evidence');
     }
 

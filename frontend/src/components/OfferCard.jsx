@@ -223,8 +223,8 @@ const OfferCard = ({
           </div>
         )}
 
-        {/* Move-In Button for Accepted/Paid Offers */}
-        {(status === 'ACCEPTED' || status === 'PAID') && (
+        {/* Move-In Button for Paid Offers Only */}
+        {status === 'PAID' && (
           <div className='pt-4 border-t border-gray-200'>
             <button
               onClick={() => navigate(`/move-in?offerId=${offerId}`)}

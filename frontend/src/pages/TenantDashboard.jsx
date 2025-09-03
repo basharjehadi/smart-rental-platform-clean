@@ -35,7 +35,7 @@ const TenantDashboard = () => {
   const [requestToDelete, setRequestToDelete] = useState(null);
   const [requestToReportIssue, setRequestToReportIssue] = useState(null);
   const [offerToReportIssue, setOfferToReportIssue] = useState(null);
-  const [moveInIssues, setMoveInIssues] = useState([]);
+
   const [issuesLoading, setIssuesLoading] = useState(false);
 
   // Filter states
@@ -50,19 +50,7 @@ const TenantDashboard = () => {
 
   const [isGroupChoiceModalOpen, setGroupChoiceModalOpen] = useState(false);
 
-  const fetchMoveInIssues = async () => {
-    try {
-      setIssuesLoading(true);
-      // Get all move-in issues for the tenant's active leases
-      const response = await api.get('/tenant-dashboard/move-in-issues');
-      setMoveInIssues(response.data.issues || []);
-    } catch (error) {
-      console.error('Error fetching move-in issues:', error);
-      setMoveInIssues([]);
-    } finally {
-      setIssuesLoading(false);
-    }
-  };
+
 
   const fetchRequests = async () => {
     try {
@@ -221,7 +209,7 @@ const TenantDashboard = () => {
     setOfferToReportIssue(null);
     // Refresh the requests to show the new issue
     fetchRequests();
-    fetchMoveInIssues(); // Refresh the move-in issues to show the new issue
+
   };
 
   const formatDate = dateString => {
@@ -354,7 +342,7 @@ const TenantDashboard = () => {
     if (user) {
       console.log('✅ Dashboard: User is authenticated, fetching requests...');
       fetchRequests();
-      fetchMoveInIssues();
+
       // Mark rental request notifications as read once per mount
       if (!didMarkReadRef.current) {
         didMarkReadRef.current = true;
@@ -804,66 +792,7 @@ const TenantDashboard = () => {
               </div>
             )}
 
-            {/* Move-In Issues Section */}
-            {moveInIssues.length > 0 && (
-              <div className='mt-8'>
-                <div className='flex items-center justify-between mb-6'>
-                  <h2 className='text-lg font-semibold text-gray-900'>
-                    Move-In Issues
-                  </h2>
-                </div>
-                
-                <div className='space-y-4'>
-                  {moveInIssues.map(issue => (
-                    <div key={issue.id} className='card-elevated p-6'>
-                      <div className='flex items-start justify-between'>
-                        <div className='flex-1'>
-                          <div className='flex items-center gap-2 mb-2'>
-                            <h3 className='text-lg font-semibold text-gray-900'>
-                              {issue.title}
-                            </h3>
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getIssueStatusColor(issue.status)}`}>
-                              {issue.status}
-                            </span>
-                          </div>
-                          <p className='text-gray-600 mb-3'>
-                            {issue.description}
-                          </p>
-                          <div className='grid grid-cols-2 md:grid-cols-3 gap-4 text-sm'>
-                            <div>
-                              <span className='text-gray-500'>Property:</span>
-                              <p className='font-medium'>
-                                {issue.lease?.property?.name || 'Unknown Property'}
-                              </p>
-                            </div>
-                            <div>
-                              <span className='text-gray-500'>Created:</span>
-                              <p className='font-medium'>
-                                {formatDate(issue.createdAt)}
-                              </p>
-                            </div>
-                            <div>
-                              <span className='text-gray-500'>Comments:</span>
-                              <p className='font-medium'>
-                                {issue.comments?.length || 0}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className='ml-4'>
-                          <button
-                            onClick={() => navigate(`/tenant/issue/${issue.id}`)}
-                            className='btn-primary'
-                          >
-                            View Details
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+
 
 
 

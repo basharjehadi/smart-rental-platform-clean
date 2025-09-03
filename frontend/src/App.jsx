@@ -12,7 +12,7 @@ import { ChatBadgeProvider } from './contexts/ChatBadgeContext';
 import ToastContainer from './components/common/ToastContainer';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
-import ProfileCompletionGuard from './components/ProfileCompletionGuard';
+// import ProfileCompletionGuard from './components/ProfileCompletionGuard'; // COMMENTED OUT FOR TESTING
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -97,6 +97,7 @@ const AppContent = () => {
     '/landlord-my-tenants',
     '/landlord-tenant-profile',
     '/landlord/issue/:issueId',
+    '/tenant/issue/:issueId',
     '/admin',
     '/payment-success',
     '/payment-history',
@@ -106,6 +107,7 @@ const AppContent = () => {
     '/messaging',
     '/tenant-group-management',
     '/business-upgrade',
+    '/move-in',
   ];
 
   // Check if current path should hide navbar (including parameterized routes)

@@ -181,6 +181,9 @@ export const getMoveInIssue = async (req, res) => {
       include: {
         lease: {
           include: {
+            offer: {
+              select: { id: true }
+            },
             tenantGroup: {
               include: {
                 members: {
