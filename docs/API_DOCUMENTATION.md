@@ -1,8 +1,10 @@
 # Smart Rental System API Documentation
 
+*Updated: January 2025 - Based on Actual Implementation*
+
 ## Overview
 
-The Smart Rental System API provides a comprehensive set of endpoints for managing rental properties, users, payments, and contracts. This document outlines all available endpoints, their parameters, and expected responses.
+The Smart Rental System API provides a comprehensive set of endpoints for managing rental properties, users, payments, contracts, and move-in verification. This document outlines all **actually implemented** endpoints, their parameters, and expected responses.
 
 ## Base URL
 
@@ -19,71 +21,64 @@ Most endpoints require authentication using JWT tokens. Include the token in the
 Authorization: Bearer <your_jwt_token>
 ```
 
+**JWT Token Details:**
+- **Expiration**: 7 days
+- **Payload**: `{ userId, email, role }`
+- **Storage**: localStorage (frontend)
+
 ## Response Format
 
-All API responses follow a consistent format:
+API responses vary by endpoint. Some follow a consistent format, others return data directly:
 
-### Success Response
+### Success Response (varies by endpoint)
 ```json
 {
-  "success": true,
   "message": "Operation completed successfully",
-  "data": { ... },
-  "timestamp": "2024-01-01T00:00:00.000Z"
+  "data": { ... }
 }
 ```
 
 ### Error Response
 ```json
 {
-  "success": false,
-  "message": "Error description",
-  "errors": [
-    {
-      "field": "fieldName",
-      "message": "Validation error message"
-    }
-  ],
-  "timestamp": "2024-01-01T00:00:00.000Z"
+  "error": "Error description",
+  "details": "Additional error details"
 }
 ```
 
 ## Endpoints
 
-### Authentication
+### Authentication (`/api/auth`)
 
-#### POST /auth/register
+#### POST /api/auth/register
 Register a new user.
 
 **Request Body:**
 ```json
 {
-  "name": "John Doe",
+  "name": "John Doe", // or firstName + lastName
   "email": "john@example.com",
   "password": "password123",
-  "role": "TENANT"
+  "role": "TENANT" // TENANT, LANDLORD, ADMIN
 }
 ```
 
 **Response:**
 ```json
 {
-  "success": true,
-  "message": "User registered successfully",
-  "data": {
-    "user": {
-      "id": "user_id",
-      "name": "John Doe",
-      "email": "john@example.com",
-      "role": "TENANT",
-      "createdAt": "2024-01-01T00:00:00.000Z"
-    },
-    "token": "jwt_token_here"
-  }
+  "message": "User registered successfully.",
+  "user": {
+    "id": "user_id",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "TENANT",
+    "createdAt": "2025-01-01T00:00:00.000Z"
+  },
+  "token": "jwt_token_here"
 }
 ```
 
-#### POST /auth/login
+#### POST /api/auth/login
 Login user.
 
 **Request Body:**
@@ -97,362 +92,333 @@ Login user.
 **Response:**
 ```json
 {
-  "success": true,
-  "message": "Login successful",
-  "data": {
-    "user": {
-      "id": "user_id",
-      "name": "John Doe",
-      "email": "john@example.com",
-      "role": "TENANT"
-    },
-    "token": "jwt_token_here"
-  }
+  "message": "Login successful.",
+  "user": {
+    "id": "user_id",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role": "TENANT"
+  },
+  "token": "jwt_token_here"
 }
 ```
 
-#### POST /auth/logout
-Logout user (requires authentication).
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Logout successful"
-}
-```
-
-#### GET /auth/me
+#### GET /api/auth/me
 Get current user information (requires authentication).
 
 **Response:**
 ```json
 {
-  "success": true,
-  "data": {
+  "user": {
     "id": "user_id",
     "name": "John Doe",
     "email": "john@example.com",
     "role": "TENANT",
-    "profileImage": "url_to_image",
-    "createdAt": "2024-01-01T00:00:00.000Z"
+    "isVerified": false,
+    "kycStatus": "PENDING"
   }
 }
 ```
 
-### Social Authentication
+### Social Authentication (`/api/auth`)
 
-#### GET /auth/google
+#### GET /api/auth/google
 Initiate Google OAuth login.
 
-#### GET /auth/google/callback
+#### GET /api/auth/google/callback
 Google OAuth callback (handled automatically).
 
-#### GET /auth/facebook
-Initiate Facebook OAuth login.
+### Properties (`/api/properties`)
 
-#### GET /auth/facebook/callback
-Facebook OAuth callback (handled automatically).
-
-### Properties
-
-#### GET /properties
-Get all properties with optional filtering.
-
-**Query Parameters:**
-- `city` (string): Filter by city
-- `minRent` (number): Minimum rent amount
-- `maxRent` (number): Maximum rent amount
-- `bedrooms` (number): Number of bedrooms
-- `furnished` (boolean): Furnished property
-- `petsAllowed` (boolean): Pets allowed
-- `page` (number): Page number (default: 1)
-- `limit` (number): Items per page (default: 10, max: 50)
+#### GET /api/properties
+Get landlord's properties (requires LANDLORD role).
 
 **Response:**
 ```json
 {
-  "success": true,
-  "data": {
-    "properties": [
-      {
-        "id": "property_id",
-        "title": "Modern Apartment",
-        "description": "Beautiful apartment in city center",
-        "address": "123 Main St",
-        "city": "Warsaw",
-        "postalCode": "00-001",
-        "rentAmount": 2500,
-        "depositAmount": 2500,
-        "bedrooms": 2,
-        "bathrooms": 1,
-        "area": 65,
-        "furnished": true,
-        "parking": false,
-        "petsAllowed": true,
-        "availableFrom": "2024-02-01T00:00:00.000Z",
-        "utilitiesIncluded": false,
-        "landlord": {
-          "id": "landlord_id",
-          "name": "Jane Smith"
-        },
-        "images": ["url1", "url2"],
-        "createdAt": "2024-01-01T00:00:00.000Z"
-      }
-    ],
-    "pagination": {
-      "page": 1,
-      "limit": 10,
-      "total": 25,
-      "pages": 3
+  "properties": [
+    {
+      "id": "property_id",
+      "name": "Downtown Apartment",
+      "address": "123 Main St",
+      "city": "Warsaw",
+      "status": "AVAILABLE",
+      "images": ["image1.jpg"]
     }
-  }
+  ]
 }
 ```
 
-#### POST /properties
+#### POST /api/properties
 Create a new property (requires LANDLORD role).
 
 **Request Body:**
 ```json
 {
-  "title": "Modern Apartment",
-  "description": "Beautiful apartment in city center",
+  "name": "Downtown Apartment",
   "address": "123 Main St",
   "city": "Warsaw",
-  "postalCode": "00-001",
-  "rentAmount": 2500,
-  "depositAmount": 2500,
+  "zipCode": "00-001",
+  "propertyType": "Apartment",
   "bedrooms": 2,
   "bathrooms": 1,
-  "area": 65,
+  "size": "80m²",
   "furnished": true,
   "parking": false,
   "petsAllowed": true,
-  "availableFrom": "2024-02-01T00:00:00.000Z",
-  "utilitiesIncluded": false
+  "description": "Beautiful apartment in downtown",
+  "images": ["image1.jpg", "image2.jpg"],
+  "rulesText": "No smoking, no pets"
 }
 ```
 
-#### GET /properties/:id
-Get property details by ID.
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "property_id",
-    "title": "Modern Apartment",
-    "description": "Beautiful apartment in city center",
-    "address": "123 Main St",
-    "city": "Warsaw",
-    "postalCode": "00-001",
-    "rentAmount": 2500,
-    "depositAmount": 2500,
-    "bedrooms": 2,
-    "bathrooms": 1,
-    "area": 65,
-    "furnished": true,
-    "parking": false,
-    "petsAllowed": true,
-    "availableFrom": "2024-02-01T00:00:00.000Z",
-    "utilitiesIncluded": false,
-    "landlord": {
-      "id": "landlord_id",
-      "name": "Jane Smith",
-      "email": "jane@example.com",
-      "phone": "+48123456789"
-    },
-    "images": ["url1", "url2"],
-    "videos": ["video_url"],
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
-  }
-}
-```
-
-#### PUT /properties/:id
+#### PUT /api/properties/:id
 Update property (requires LANDLORD role and ownership).
 
-**Request Body:** (same as POST, but all fields optional)
-
-#### DELETE /properties/:id
+#### DELETE /api/properties/:id
 Delete property (requires LANDLORD role and ownership).
 
-### Rental Requests
+### Rental Requests (`/api/`)
 
-#### POST /rental-requests
+#### POST /api/rental-request
 Create a rental request (requires TENANT role).
 
 **Request Body:**
 ```json
 {
-  "title": "Looking for 2-bedroom apartment",
-  "description": "I'm looking for a modern 2-bedroom apartment in Warsaw",
-  "location": "Warsaw",
-  "moveInDate": "2024-02-01T00:00:00.000Z",
+  "title": "Looking for 2BR apartment",
+  "description": "Need a 2-bedroom apartment in downtown",
+  "location": "Warsaw, Poland",
+  "moveInDate": "2025-02-01T00:00:00.000Z",
   "budget": 3000,
+  "budgetFrom": 2500,
+  "budgetTo": 3500,
+  "propertyType": "Apartment",
   "bedrooms": 2,
   "bathrooms": 1,
   "furnished": true,
   "parking": false,
-  "petsAllowed": true
+  "petsAllowed": true,
+  "additionalRequirements": "Near metro station"
 }
 ```
 
-#### GET /rental-requests
-Get all rental requests (filtered by user role).
+#### GET /api/rental-requests
+Get all rental requests (requires LANDLORD role).
 
-**Query Parameters:**
-- `status` (string): Filter by status (ACTIVE, INACTIVE, LOCKED)
-- `page` (number): Page number
-- `limit` (number): Items per page
+#### GET /api/pool/rental-requests
+Get active rental requests from pool (requires LANDLORD role).
 
-<!-- Removed: GET /my-requests (tenants manage via UI and dashboard summary) -->
+#### PUT /api/rental-request/:id
+Update rental request (requires TENANT role).
 
-#### GET /rental-requests/:id
-Get rental request details.
+#### DELETE /api/rental-request/:id
+Delete rental request (requires TENANT role).
 
-### Offers
+### Offers (`/api/`)
 
-#### POST /offers
+#### POST /api/rental-request/:requestId/offer
 Create an offer for a rental request (requires LANDLORD role).
 
 **Request Body:**
 ```json
 {
-  "rentalRequestId": "request_id",
-  "propertyId": "property_id",
-  "rentAmount": 2500,
-  "depositAmount": 2500,
+  "rentAmount": 2800,
+  "depositAmount": 2800,
   "leaseDuration": 12,
-  "description": "Perfect match for your requirements",
-  "availableFrom": "2024-02-01T00:00:00.000Z",
-  "utilitiesIncluded": false
+  "description": "Great apartment in downtown",
+  "utilitiesIncluded": false,
+  "availableFrom": "2025-02-01T00:00:00.000Z",
+  "propertyAddress": "123 Main St, Warsaw",
+  "propertyType": "Apartment",
+  "rulesText": "No smoking, no pets"
 }
 ```
 
-#### GET /offers
-Get offers (filtered by user role).
+#### GET /api/tenant/offers
+Get tenant's offers (requires TENANT role).
 
-#### GET /offers/:requestId
-Get offers for a specific rental request.
+#### GET /api/tenant/offer/:offerId
+Get offer details (requires TENANT role).
 
-#### PUT /offers/:id/accept
-Accept an offer (requires TENANT role).
+#### PATCH /api/tenant/offer/:offerId
+Update offer status (requires TENANT role).
 
-#### PUT /offers/:id/reject
-Reject an offer (requires TENANT role).
+#### PUT /api/offers/:id/status
+Update offer status (requires TENANT role).
 
-### Payments
+### Payments (`/api/payments`)
 
-#### POST /payments/create-intent
-Create a Stripe payment intent.
+#### POST /api/payments/create-intent
+Create a payment intent.
 
 **Request Body:**
 ```json
 {
-  "amount": 2500,
-  "purpose": "RENT",
-  "rentalRequestId": "request_id"
+  "offerId": "offer_id",
+  "amount": 5600,
+  "purpose": "DEPOSIT_AND_FIRST_MONTH",
+  "paymentGateway": "STRIPE" // STRIPE, PAYU, P24, TPAY, MOCK
 }
 ```
 
 **Response:**
 ```json
 {
-  "success": true,
-  "data": {
-    "clientSecret": "pi_xxx_secret_xxx",
-    "paymentId": "payment_id",
-    "amount": 2500,
-    "purpose": "RENT"
+  "paymentIntent": {
+    "id": "payment_intent_id",
+    "clientSecret": "client_secret",
+    "amount": 5600
   }
 }
 ```
 
-#### POST /payments/confirm
-Confirm payment completion.
+#### POST /api/payments/complete-mock
+Complete mock payment (development).
 
 **Request Body:**
 ```json
 {
-  "paymentId": "payment_id",
-  "stripePaymentIntentId": "pi_xxx"
+  "offerId": "offer_id",
+  "amount": 5600,
+  "purpose": "DEPOSIT_AND_FIRST_MONTH"
 }
 ```
 
-#### GET /payments/history
+#### GET /api/payments/history
 Get payment history (requires authentication).
 
-### Contracts
+### Move-In Verification (`/api/move-in`)
 
-#### GET /contracts
-Get contracts (filtered by user role).
+#### GET /api/move-in/offers/:id/status
+Get move-in verification status.
 
-#### GET /contracts/:id
-Get contract details.
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "offerId": "offer_id",
+    "status": "PENDING", // PENDING, VERIFIED, DENIED
+    "deadline": "2025-02-02T00:00:00.000Z",
+    "verifiedAt": null,
+    "cancellationReason": null,
+    "evidence": []
+  }
+}
+```
 
-#### POST /contracts/:id/sign
-Sign a contract (requires authentication).
+#### GET /api/move-in/offers/:id/move-in/ui-state
+Get move-in UI state.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "now": "2025-01-01T00:00:00.000Z",
+    "leaseStart": "2025-02-01T00:00:00.000Z",
+    "verificationStatus": "PENDING",
+    "window": {
+      "phase": "PRE_MOVE_IN", // PRE_MOVE_IN, WINDOW_OPEN, WINDOW_CLOSED
+      "windowClose": "2025-02-02T00:00:00.000Z"
+    },
+    "canReportIssue": false,
+    "canConfirmOrDeny": true
+  }
+}
+```
+
+#### POST /api/move-in/offers/:id/verify
+Confirm move-in.
+
+**Response:**
+```json
+{
+  "message": "Move-in verified successfully."
+}
+```
+
+#### POST /api/move-in/offers/:id/deny
+Deny move-in.
 
 **Request Body:**
 ```json
 {
-  "signature": "base64_signature_data"
+  "reason": "Property condition issues"
 }
 ```
 
-#### GET /contracts/:id/download
-Download contract PDF.
+#### GET /api/move-in/offers/:id/issues
+Get move-in issues for an offer.
 
-### File Upload
+### User Management (`/api/users`)
 
-#### POST /upload/profile-image
-Upload profile image (requires authentication).
+#### GET /api/users/profile
+Get user profile (requires authentication).
 
-**Form Data:**
-- `image`: Image file (max 2MB)
+#### PUT /api/users/profile
+Update user profile (requires authentication).
 
-#### POST /upload/property-images
-Upload property images (requires LANDLORD role).
-
-**Form Data:**
-- `images`: Multiple image files (max 5MB each)
-- `propertyId`: Property ID
-
-#### POST /upload/identity-document
+#### POST /api/users/upload-identity
 Upload identity document (requires authentication).
 
-**Form Data:**
-- `document`: Document file (PDF, DOC, DOCX)
-- `type`: Document type
+#### GET /api/users/trust-level/:userId
+Get user trust level.
 
-### Admin Endpoints
+### Messaging (`/api/messaging`)
 
-#### GET /admin/users
+#### GET /api/messaging/conversations
+Get user conversations (requires authentication).
+
+#### GET /api/messaging/conversations/:id/messages
+Get conversation messages (requires authentication).
+
+#### POST /api/messaging/conversations/:id/messages
+Send a message (requires authentication).
+
+### Reviews (`/api/reviews`)
+
+#### GET /api/reviews/user/:userId
+Get user reviews.
+
+#### POST /api/reviews
+Create a review (requires authentication).
+
+### Support (`/api/support`)
+
+#### POST /api/support/tickets
+Create support ticket (requires authentication).
+
+#### GET /api/support/tickets
+Get user's support tickets (requires authentication).
+
+### Admin (`/api/admin`)
+
+#### GET /api/admin/users
 Get all users (requires ADMIN role).
 
-#### GET /admin/statistics
-Get system statistics (requires ADMIN role).
+#### PUT /api/admin/users/:id/kyc
+Verify user KYC (requires ADMIN role).
 
-#### POST /admin/trigger-daily-check
-Manually trigger daily rent check (requires ADMIN role).
+#### GET /api/admin/analytics
+Get system analytics (requires ADMIN role).
 
-### Health Check
+#### GET /api/admin/move-in/issues
+Get move-in issues (requires ADMIN role).
 
-#### GET /health
+### System (`/api/system`)
+
+#### GET /api/system/status
 Get system health status.
 
 **Response:**
 ```json
 {
   "status": "OK",
-  "timestamp": "2024-01-01T00:00:00.000Z",
+  "timestamp": "2025-01-01T00:00:00.000Z",
   "uptime": 3600,
-  "database": "connected",
-  "version": "1.0.0"
+  "database": "connected"
 }
 ```
 
@@ -468,68 +434,53 @@ Get system health status.
 | 422 | Unprocessable Entity - Validation failed |
 | 500 | Internal Server Error - Server error |
 
-## Rate Limiting
+## Development Notes
 
-API requests are rate-limited to prevent abuse:
-- 100 requests per minute per IP address
-- 1000 requests per hour per authenticated user
+### Mock Payment System
+- Use `MOCK` payment gateway for development
+- Mock payments always succeed
+- No real payment processing required
 
-## Webhooks
+### WebSocket Events
+- Real-time messaging via Socket.IO
+- Connection: `ws://localhost:3001`
+- Events: `message`, `notification`, `typing`
 
-### Stripe Webhook
-**Endpoint:** `POST /stripe-webhook`
+### File Uploads
+- Use `multipart/form-data` for file uploads
+- Supported formats: images, PDFs
+- Max file size: 10MB
 
-Handles Stripe payment events automatically. Configure in Stripe Dashboard with the following events:
-- `payment_intent.succeeded`
-- `payment_intent.payment_failed`
-- `payment_intent.canceled`
-
-## SDKs and Libraries
-
-### JavaScript/Node.js
+### Frontend API Client
 ```javascript
-import axios from 'axios';
+import api from '../utils/api';
 
-const api = axios.create({
-  baseURL: 'http://localhost:3001/api',
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// Add auth token
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// The frontend uses a centralized axios instance
+// with automatic JWT token injection and error handling
+api.get('/move-in/offers/123/status')
+  .then(response => console.log(response.data))
+  .catch(error => console.error(error));
 ```
 
-### Python
-```python
-import requests
+## Key Features
 
-class SmartRentalAPI:
-    def __init__(self, base_url, token=None):
-        self.base_url = base_url
-        self.token = token
-        self.session = requests.Session()
-        
-        if token:
-            self.session.headers.update({
-                'Authorization': f'Bearer {token}'
-            })
-    
-    def get_properties(self, **params):
-        response = self.session.get(f'{self.base_url}/properties', params=params)
-        return response.json()
-```
+### Move-In Verification System
+- **24-Hour Window**: After payment, tenants have 24 hours to verify move-in
+- **Three Phases**: PRE_MOVE_IN, WINDOW_OPEN, WINDOW_CLOSED
+- **Issue Reporting**: Tenants can report problems during move-in
 
-## Support
+### Payment Gateways
+- **Stripe**: Credit card processing
+- **PayU**: Polish payment gateway
+- **Przelewy24**: Bank transfer integration
+- **TPay**: Mobile payments
+- **Mock**: Development/testing mode
 
-For API support and questions:
-- Create an issue in the repository
-- Check the documentation in `/docs`
-- Review the error logs 
+### User Roles
+- **TENANT**: Default role, can post rental requests and accept offers
+- **LANDLORD**: Can list properties and make offers on tenant requests
+- **ADMIN**: System administration and user management
+
+---
+
+*This API documentation reflects the actual implementation as of January 2025. All endpoints and request/response formats are verified against the real codebase.* 

@@ -95,7 +95,7 @@ npm run dev:setup
 | Service | Port | Description |
 |---------|------|-------------|
 | Backend API | 3001 | Express.js API server |
-| Frontend Dev | 5173 | Vite development server |
+| Frontend Dev | 3002 | Vite development server |
 | PostgreSQL | 5432 | Database |
 | Redis | 6379 | Cache/Queue |
 | MinIO API | 9000 | Object storage API |

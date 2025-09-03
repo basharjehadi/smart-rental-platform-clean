@@ -4,49 +4,131 @@ A full-stack, multi-user rental management system featuring a **reverse marketpl
 
 ## Key Features
 
+### 🏠 **Core Marketplace Features**
 - **Reverse Marketplace**: Innovative tenant-driven model where tenants post rental requests and landlords compete with competitive offers, flipping traditional rental dynamics.
+- **Smart Request Pool System**: Advanced matching algorithm with 5-minute delay system and dynamic expiration (3 days before move-in).
+- **Property-Based Availability**: Scalable property management system supporting unlimited properties per landlord with individual availability controls.
+
+### 👥 **User Management & Authentication**
 - **Role-Based Access Control**: Separate dashboards and functionalities for Tenants, Landlords, and Admins with secure authentication and authorization.
-- **Dynamic Rental Workflows**: Support for Individual Tenants, Group Tenants (with an invitation system), and Business Tenants (with occupant management).
-- **Advanced Landlord Accounts**: Differentiates between Private and Business landlords with a seamless upgrade path and organization management.
-- **Automated Contract Generation**: Dynamically creates and populates bilingual (English/Polish) PDF rental agreements based on user data and property details, powered by LibreTranslate for accurate language localization.
+- **Social Login Integration**: Google OAuth authentication for seamless user onboarding.
+- **KYC Verification System**: Comprehensive identity verification with document upload and admin approval workflow.
+- **Trust Level System**: Dynamic user ranking (NEW_USER, RELIABLE, TRUSTED, EXCELLENT) based on reviews, payments, and activity.
+
+### 🏢 **Advanced Rental Workflows**
+- **Multi-Tenant Support**: Individual Tenants, Group Tenants (with invitation system), and Business Tenants (with occupant management).
+- **Organization Management**: Business landlords with seamless upgrade path, organization management, and member roles (OWNER, ADMIN, AGENT).
+- **Tenant Group System**: Group-based tenancy with primary member designation, invitation system, and ownership transfer capabilities.
+
+### 📄 **Contract & Legal Features**
+- **Automated Contract Generation**: Dynamically creates and populates bilingual (English/Polish) PDF rental agreements based on user data and property details.
+- **LibreTranslate Integration**: Powered by LibreTranslate for accurate language localization and real-time translation.
 - **Digital Signatures**: Securely capture and embed digital signatures from all parties into the final contract for legal compliance.
-- **Real-Time Messaging**: A fully integrated chat system for communication between landlords and tenants with instant notifications.
-- **Payment Integration**: Comprehensive payment processing with support for deposits, rent payments, and multiple payment gateways.
-- **Property Management**: Advanced property listing, search, and matching algorithms with detailed filtering and location-based services.
-- **Review & Rating System**: Built-in review system for both tenants and landlords to build trust and reputation.
-- **Code Quality & Structure**: Professionally refactored with a clean folder structure, centralized documentation in `/docs`, and consistent code formatting with Prettier.
+- **Lease Lifecycle Management**: Complete lease management with termination notices, renewal handling, and automatic property marketing.
 
-## Move-In Quick Guide
+### 💬 **Communication & Notifications**
+- **Real-Time Messaging**: Fully integrated chat system with offer-based conversations, payment-gated access, and Socket.IO real-time communication.
+- **Smart Notification System**: Separated business and system notifications with real-time updates and role-based filtering.
+- **Support Ticket System**: Comprehensive support system with ticket creation, admin management, and status tracking.
 
-**24h Confirm/Deny Window**: After payment, tenants have 24 hours to confirm successful move-in or report issues. Only tenant group members can act; landlords cannot verify.
+### 💰 **Payment & Financial Management**
+- **Multi-Gateway Payment Processing**: Support for Stripe, PayU, Przelewy24, and Tpay with comprehensive payment tracking.
+- **Monthly Rent System**: Automated monthly rent collection with payment schedules, proration calculations, and overdue tracking.
+- **Refund System**: Automated refund processing with provider-specific implementations and real-time notifications.
+- **Payment Analytics**: Comprehensive payment tracking with landlord filtering and unified payment data.
 
-**API Endpoints**:
-- `GET /move-in/offers/:id/status` - Get verification status
-- `POST /move-in/offers/:id/verify` - Confirm move-in  
-- `POST /move-in/offers/:id/deny` - Deny move-in
+### 🏠 **Move-In & Verification System**
+- **24-Hour Move-In Window**: After payment, tenants have 24 hours to confirm successful move-in or report issues.
+- **Move-In Issue Reporting**: Three-way communication system (tenant, landlord, admin) for issue resolution with evidence upload.
+- **Admin Decision System**: Admin approval workflow for move-in cancellations with automatic refund processing.
 
-**Frontend Page**: Navigate to `/move-in?offerId=YOUR_OFFER_ID` to access the Move-In Center.
+### ⭐ **Review & Gamification System**
+- **3-Stage Review System**: INITIAL (5-star), MOVE_IN, and END_OF_LEASE reviews with weighted rating calculations.
+- **Badge System**: Gamification with Perfect Payer, Accurate Host, and Quick Responder badges for user engagement.
+- **Bidirectional Reviews**: Both landlords and tenants can review each other to build trust and reputation.
 
-**Note**: Backend lives in `backend/src`; legacy folders are ignored for now.
+### 🛠️ **Technical Excellence**
+- **Modern Tech Stack**: React 19, Node.js, Express.js, Prisma ORM, PostgreSQL, Socket.IO, and TailwindCSS.
+- **Real-Time Architecture**: Socket.IO for live updates, notifications, and chat functionality.
+- **Comprehensive API**: RESTful API with 50+ endpoints covering all system functionality.
+- **Code Quality**: Professionally refactored with clean architecture, centralized documentation, and Prettier formatting.
 
-## Tech Stack
+## 🏠 Move-In Verification System
 
-### Frontend
+The Smart Rental System features a comprehensive move-in verification process with three distinct phases:
+
+### **Phase 1: PRE_MOVE_IN**
+- **Timeline**: Before lease start date
+- **Status**: "Move-in starts on [date]. The 24h issue window opens then."
+- **Actions**: No action buttons available
+
+### **Phase 2: WINDOW_OPEN** 
+- **Timeline**: 24 hours after lease start date
+- **Status**: "Issue window closes at [date]"
+- **Actions**: 
+  - ✅ **Confirm Move-In** - Tenant confirms successful move-in
+  - ❌ **Deny Move-In** - Tenant reports issues
+  - 🚨 **Report Issue** - Submit detailed issue reports
+
+### **Phase 3: WINDOW_CLOSED**
+- **Timeline**: After 24-hour window expires
+- **Status**: "Verification window closed"
+- **Actions**: No action buttons available
+
+### **API Endpoints**:
+- `GET /api/move-in/offers/:id/status` - Get verification status
+- `GET /api/move-in/offers/:id/move-in/ui-state` - Get UI state and phase information
+- `POST /api/move-in/offers/:id/verify` - Confirm move-in  
+- `POST /api/move-in/offers/:id/deny` - Deny move-in
+- `POST /api/move-in-issues` - Report move-in issues
+
+### **Frontend Access**: 
+Navigate to `/move-in?offerId=YOUR_OFFER_ID` to access the Move-In Center.
+
+### **Issue Resolution Flow**:
+1. **Tenant Reports Issue** → Upload evidence and detailed description
+2. **Landlord Response** → Landlord can respond with solutions
+3. **Admin Decision** → Admin reviews and makes final decision
+4. **Automatic Refunds** → If approved, system automatically processes refunds
+
+## 🛠️ Tech Stack
+
+### **Frontend**
 - **React 19** - Latest React framework with modern hooks and features
-- **Vite** - Fast build tool and development server
+- **Vite** - Fast build tool and development server with hot module replacement
 - **TailwindCSS** - Utility-first CSS framework for rapid UI development
 - **Socket.IO Client** - Real-time communication capabilities
+- **React Router** - Client-side routing and navigation
+- **Axios** - HTTP client with automatic authorization and error handling
 
-### Backend
+### **Backend**
 - **Node.js** - Server-side JavaScript runtime
-- **Express.js** - Fast, unopinionated web framework
-- **Prisma ORM** - Type-safe database client and migrations
-- **Socket.IO** - Real-time bidirectional communication
-- **JWT** - Secure authentication and authorization
+- **Express.js** - Fast, unopinionated web framework with middleware support
+- **Prisma ORM** - Type-safe database client with migrations and schema management
+- **Socket.IO** - Real-time bidirectional communication for chat and notifications
+- **JWT** - Secure authentication and authorization with role-based access control
+- **Bcrypt** - Password hashing and security
+- **Multer** - File upload handling for documents and images
 - **LibreTranslate** - Open-source machine translation service for bilingual contract generation
 
-### Database
-- **PostgreSQL** - Robust, open-source relational database
+### **Database & Infrastructure**
+- **PostgreSQL** - Robust, open-source relational database with advanced features
+- **Redis** - In-memory data store for caching and session management
+- **Docker** - Containerization for consistent development and deployment
+- **Adminer** - Web-based database administration tool
+
+### **Payment & External Services**
+- **Stripe** - Payment processing for international transactions
+- **PayU** - Payment gateway for European markets
+- **Przelewy24 (P24)** - Polish payment system integration
+- **Tpay** - Additional payment gateway support
+- **Google OAuth** - Social authentication integration
+
+### **Development Tools**
+- **Prettier** - Code formatting and style consistency
+- **ESLint** - Code linting and quality assurance
+- **Prisma Studio** - Database management and visualization
+- **Docker Compose** - Multi-container application orchestration
 
 ## Getting Started
 
@@ -173,47 +255,56 @@ npm run preview          # Preview production build
 npm run format           # Format code with Prettier
 ```
 
-## Documentation
+## 📚 Documentation
 
-This project includes comprehensive documentation covering various aspects of the system:
+This project includes comprehensive documentation covering all aspects of the system:
 
-### **API & Integration Documentation**
-- [API Documentation](docs/API_DOCUMENTATION.md) - Complete API reference and endpoints
-- [Organization API Implementation](docs/ORGANIZATION_API_IMPLEMENTATION.md) - Organization management features
+### **🚀 Getting Started**
+- [Quick Start Guide](docs/QUICK_START.md) - Quick setup and getting started
+- [Docker Setup](docs/DOCKER_SETUP.md) - Docker configuration and setup
+- [Hybrid Dev Setup](docs/HYBRID_DEV_SETUP.md) - Development environment configuration
+- [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) - System deployment instructions
+
+### **🔌 API & Integration**
+- [API Documentation](docs/API_DOCUMENTATION.md) - Complete API reference with 50+ endpoints
+- [Organization API Implementation](docs/ORGANIZATION_API_IMPLEMENTATION.md) - Business organization management
 - [Tenant Group API Implementation](docs/TENANT_GROUP_API_IMPLEMENTATION.md) - Tenant group functionality
 - [Tenant Group UI Summary](docs/TENANT_GROUP_UI_SUMMARY.md) - Frontend tenant group features
 
-### **Business Features Documentation**
+### **🏠 Core Business Features**
+- [Landlord Journey System](docs/LANDLORD_JOURNEY_SYSTEM.md) - Landlord onboarding and workflow
+- [Request Pool System](docs/REQUEST_POOL_SYSTEM.md) - Smart rental request matching system
+- [Property Availability System](docs/PROPERTY_AVAILABILITY_SYSTEM.md) - Property availability management
+- [Move-In Issue System](docs/MOVE_IN_ISSUE_SYSTEM.md) - Move-in verification and issue reporting
+
+### **🏢 Business & Organization Management**
 - [Business Account Upgrade UI](docs/BUSINESS_ACCOUNT_UPGRADE_UI.md) - Business account management
 - [Business Occupant Management](docs/BUSINESS_OCCUPANT_MANAGEMENT_SUMMARY.md) - Occupant management system
-- [Monthly Payment System](docs/MONTHLY_PAYMENT_SYSTEM_DOCUMENTATION.md) - Payment processing documentation
-- [Property Availability System](docs/PROPERTY_AVAILABILITY_SYSTEM.md) - Property availability management
-- [Landlord Journey System](docs/LANDLORD_JOURNEY_SYSTEM.md) - Landlord onboarding and workflow
-- [Request Pool System](docs/REQUEST_POOL_SYSTEM.md) - Rental request management system
+- [Lease Lifecycle](docs/LEASE_LIFECYCLE.md) - Complete lease management workflow
 
-### **System & Technical Documentation**
-- [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) - System deployment instructions
-- [Docker Setup](docs/DOCKER_SETUP.md) - Docker configuration and setup
-- [Hybrid Dev Setup](docs/HYBRID_DEV_SETUP.md) - Development environment configuration
-- [Quick Start Guide](docs/QUICK_START.md) - Quick setup and getting started
-- [Database Cleanup Guide](docs/DATABASE_CLEANUP_GUIDE.md) - Database maintenance procedures
-- [Migration Summary](docs/MIGRATION_SUMMARY.md) - Database migration history
-- [Lease Lifecycle](docs/LEASE_LIFECYCLE.md) - Lease management workflow
+### **💰 Payment & Financial Systems**
+- [Monthly Payment System](docs/MONTHLY_PAYMENT_SYSTEM_DOCUMENTATION.md) - Payment processing and tracking
+- [Refunds System](docs/REFUNDS.md) - Automated refund processing
+- [Badge System](docs/BADGE_SYSTEM.md) - Gamification and user rewards
 
-### **Contract & Legal Documentation**
-- [Enhanced Contract Template](docs/ENHANCED_CONTRACT_TEMPLATE.md) - Contract generation system
+### **📄 Contract & Legal**
 - [Dynamic Contract Generation](docs/DYNAMIC_CONTRACT_GENERATION.md) - Automated contract creation
-- [Refunds System](docs/REFUNDS.md) - Refund processing documentation
-
-### **Development & Testing**
-- [Messaging Tests](docs/README_MESSAGING_TESTS.md) - Messaging system testing
+- [Enhanced Contract Template](docs/ENHANCED_CONTRACT_TEMPLATE.md) - Bilingual contract templates
 - [LibreTranslate Setup](docs/LIBRETRANSLATE_SETUP.md) - Translation service configuration
-- [Updated Rental Request Logic](docs/UPDATED_RENTAL_REQUEST_LOGIC.md) - Rental request system updates
-- [Review System Documentation](docs/REVIEW_SYSTEM_DOCUMENTATION.md) - Comprehensive review system guide
-- [Chat System Documentation](docs/README_CHAT_SYSTEM.md) - Chat and messaging system overview
 
-### **Admin & Management**
+### **💬 Communication & Reviews**
+- [Chat System Documentation](docs/README_CHAT_SYSTEM.md) - Real-time messaging system
+- [Review System Documentation](docs/REVIEW_SYSTEM_DOCUMENTATION.md) - 3-stage review system
+- [Notification System Update](docs/NOTIFICATION_SYSTEM_UPDATE.md) - Smart notification management
+- [Messaging Tests](docs/README_MESSAGING_TESTS.md) - Messaging system testing
+
+### **👨‍💼 Admin & Management**
 - [Admin Dashboard Documentation](docs/ADMIN_DASHBOARD_DOCUMENTATION.md) - Admin panel and management features
+- [Database Cleanup Guide](docs/DATABASE_CLEANUP_GUIDE.md) - Database maintenance procedures
+
+### **🔄 System Updates & Migration**
+- [Migration Summary](docs/MIGRATION_SUMMARY.md) - Database migration history
+- [Updated Rental Request Logic](docs/UPDATED_RENTAL_REQUEST_LOGIC.md) - Rental request system updates
 
 For detailed information about any specific feature or system component, please refer to the appropriate documentation file in the `/docs` directory.
 
@@ -245,24 +336,76 @@ Smart-rental-System/
 └── README.md
 ```
 
-## Business Vision
+## 🚀 Business Vision
 
 Smart Rental Platform is positioned as a disruptive force in the traditional rental market, offering:
 
-- **Market Disruption**: The reverse marketplace model challenges conventional landlord-centric approaches
-- **Scalable SaaS**: Built for rapid expansion across multiple markets and regions
-- **Revenue Streams**: Multiple monetization channels including subscription fees, transaction fees, and premium features
-- **Market Opportunity**: Targeting the growing demand for flexible, technology-driven rental solutions
+### **🎯 Market Disruption**
+- **Reverse Marketplace Model**: Challenges conventional landlord-centric approaches by empowering tenants
+- **Technology-First Approach**: Leverages AI, real-time communication, and automation for superior user experience
+- **Comprehensive Solution**: End-to-end rental management from request to contract signing and beyond
 
-## Screenshots
+### **📈 Scalable SaaS Architecture**
+- **Multi-Tenant Architecture**: Built for rapid expansion across multiple markets and regions
+- **Modular Design**: Feature-rich system with 50+ API endpoints and comprehensive functionality
+- **Real-Time Capabilities**: Socket.IO integration for live updates, chat, and notifications
+- **Multi-Language Support**: Bilingual contracts and LibreTranslate integration for international expansion
 
-*[Landlord Dashboard]*
-*[Tenant Rental Request Card]*
-*[Generated PDF Contract]*
-*[Group Tenant Management]*
-*[Business Account Upgrade]*
+### **💰 Revenue Streams**
+- **Transaction Fees**: Commission on successful rental transactions
+- **Subscription Models**: Premium features for landlords and business accounts
+- **Payment Processing**: Revenue from payment gateway integrations
+- **Premium Services**: Advanced analytics, priority support, and enhanced features
+
+### **🌍 Market Opportunity**
+- **Growing Demand**: Targeting the increasing need for flexible, technology-driven rental solutions
+- **Digital Transformation**: Capitalizing on the shift from traditional to digital rental processes
+- **Trust & Safety**: Comprehensive KYC, review systems, and move-in verification for secure transactions
+- **Business Focus**: Supporting both individual and business rental needs with organization management
+
+## 📸 Key Features Showcase
+
+### **🏠 Core Platform Features**
+*[Landlord Dashboard with Property Management]*
+*[Tenant Rental Request Creation]*
+*[Smart Request Pool Matching System]*
+*[Property Availability Management]*
+
+### **🏢 Business & Organization Features**
+*[Business Account Upgrade Interface]*
+*[Organization Management Dashboard]*
+*[Tenant Group Management]*
+*[Occupant Management System]*
+
+### **📄 Contract & Legal Features**
+*[Generated Bilingual PDF Contract]*
+*[Digital Signature Capture]*
+*[Contract Generation Process]*
+*[Lease Lifecycle Management]*
+
+### **💬 Communication & Reviews**
 *[Real-Time Chat Interface]*
+*[Move-In Verification Center]*
+*[Issue Reporting System]*
+*[3-Stage Review System]*
+
+### **💰 Payment & Financial**
 *[Payment Processing Flow]*
+*[Monthly Rent Management]*
+*[Refund Processing System]*
+*[Payment Analytics Dashboard]*
+
+### **👨‍💼 Admin & Management**
+*[Admin Dashboard]*
+*[KYC Verification System]*
+*[Support Ticket Management]*
+*[System Analytics]*
+
+### **⭐ Gamification & Trust**
+*[Badge System Display]*
+*[Trust Level Indicators]*
+*[User Ranking System]*
+*[Review and Rating Interface]*
 
 ## Development & Collaboration
 

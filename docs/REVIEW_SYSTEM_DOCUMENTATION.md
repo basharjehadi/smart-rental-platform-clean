@@ -3,7 +3,7 @@
 ## 📋 Table of Contents
 1. [Overview](#overview)
 2. [Review System Architecture](#review-system-architecture)
-3. [2-Stage Review Process](#2-stage-review-process)
+3. [3-Stage Review Process](#3-stage-review-process)
 4. [Rating System & Calculations](#rating-system--calculations)
 5. [User Ranking System](#user-ranking-system)
 6. [User Experience Flow](#user-experience-flow)
@@ -30,10 +30,10 @@
 The Smart Rental System implements a comprehensive **bidirectional review system** that allows both landlords and tenants to review each other at three key stages of the rental process. This system builds trust, provides authentic feedback, and helps users make informed decisions.
 
 ### Key Features
-- ✅ **2-Stage Review Process**: Move-in and Lease End
+- ✅ **3-Stage Review Process**: Initial (5-star), Move-in, and Lease End
 - ✅ **Bidirectional Reviews**: Both parties review each other
 - ✅ **Weighted Rating System**: Different stages have different importance
-- ✅ **Dynamic User Ranking**: Bronze, Silver, Gold, Platinum, Diamond tiers
+- ✅ **Dynamic User Ranking**: NEW_USER, RELIABLE, TRUSTED, EXCELLENT tiers
 - ✅ **Role-Specific Interface**: Different experiences for landlords vs tenants
 - ✅ **Real-time Updates**: Ratings and ranks update automatically
 - ✅ **Payment Tracking**: Private signals for payment events without affecting ratings
@@ -62,27 +62,35 @@ The Smart Rental System implements a comprehensive **bidirectional review system
 
 ---
 
-## 🔄 2-Stage Review Process
+## 🔄 3-Stage Review Process
 
-### Stage 1: Move-in Experience
+### Stage 1: Initial Rating
+- **Trigger**: When user creates account
+- **Weight**: **System-generated** (5.0 stars)
+- **Purpose**: Provide starting point for new accounts
+- **Reviewers**: System automatically creates initial review
+- **Label**: "New user - Initial rating"
+
+### Stage 2: Move-in Experience
 - **Trigger**: When tenant moves into the property
-- **Weight**: **0%** of total rating (no score impact)
+- **Weight**: **Varies** based on implementation
 - **Purpose**: Evaluate property condition, move-in process, and initial interactions
 - **Reviewers**: Both landlord and tenant review each other
-- **Label**: "Move-in check (no score impact)"
+- **Label**: "Move-in review"
 
-### Stage 2: Lease End
+### Stage 3: Lease End
 - **Trigger**: When lease term expires
-- **Weight**: **40%** of total rating
+- **Weight**: **Varies** based on implementation
 - **Purpose**: Assess overall experience, property maintenance, and relationship quality
 - **Reviewers**: Both landlord and tenant review each other
-- **Label**: "Lease end review (affects score)"
+- **Label**: "Lease end review"
 
 ### Stage Progression
 ```
-New User (5.0) → Move-in Stage → Lease End Stage
-     ↓              ↓              ↓
-Initial Rating → Updated Rating → Final Rating
+New User → Initial Rating → Move-in Stage → Lease End Stage
+    ↓           ↓              ↓              ↓
+Account    System 5.0    User Reviews   Final Reviews
+Created    Stars         (MOVE_IN)      (END_OF_LEASE)
 ```
 
 ---

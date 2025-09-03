@@ -20,7 +20,7 @@ This guide will help you run the Smart Rental System using Docker, which elimina
    .\docker-setup.ps1 start
    ```
 3. **Access the application:**
-   - Frontend: http://localhost:5173
+   - Frontend: http://localhost:3002
    - Backend API: http://localhost:3001
    - Adminer (Database): http://localhost:8080 (optional)
 
@@ -138,7 +138,7 @@ VITE_DEV_SERVER_HOST=0.0.0.0
 
 ### Ports
 
-- **Frontend**: http://localhost:3002 (dev server) or http://localhost:5173 (alt)
+- **Frontend**: http://localhost:3002
 - **Backend API**: http://localhost:3001
 - **Adminer**: http://localhost:8080 (optional)
 - **Redis**: localhost:6379 (optional)
@@ -274,7 +274,7 @@ If you encounter any issues:
 Once everything is running, you should see:
 
 - ✅ Backend API running on http://localhost:3001
-- ✅ Frontend application running on http://localhost:5173
+- ✅ Frontend application running on http://localhost:3002
 - ✅ Database initialized and seeded
 - ✅ All services healthy
 

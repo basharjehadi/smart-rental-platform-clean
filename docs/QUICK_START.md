@@ -29,9 +29,9 @@ docker-compose logs -f
 
 ### 3. Access the Application
 
-- **Frontend**: http://localhost:5173
+- **Frontend**: http://localhost:3002
 - **Backend API**: http://localhost:3001
-- **Health Check**: http://localhost:3001/health
+- **Health Check**: http://localhost:3001/api/system/status
 - **Database Admin**: http://localhost:8080 (Adminer)
 - **Redis Admin**: http://localhost:8081 (Redis Commander)
 
