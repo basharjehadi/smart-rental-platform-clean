@@ -43,7 +43,7 @@ A full-stack, multi-user rental management system featuring a **reverse marketpl
 - **Admin Decision System**: Admin approval workflow for move-in cancellations with automatic refund processing.
 
 ### ⭐ **Review & Gamification System**
-- **3-Stage Review System**: INITIAL (5-star), MOVE_IN, and END_OF_LEASE reviews with weighted rating calculations.
+- **2-Stage Review System**: MOVE_IN (visible feedback, no score impact) and END_OF_LEASE (affects rating) reviews with weighted calculations.
 - **Badge System**: Gamification with Perfect Payer, Accurate Host, and Quick Responder badges for user engagement.
 - **Bidirectional Reviews**: Both landlords and tenants can review each other to build trust and reputation.
 
