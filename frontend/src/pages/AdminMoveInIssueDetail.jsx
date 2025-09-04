@@ -162,6 +162,21 @@ const AdminMoveInIssueDetail = () => {
     );
   }
 
+  // Helpers
+  const getLandlordName = () => {
+    // Prefer organization OWNER member name
+    const owner = issue?.lease?.property?.organization?.members?.find?.(
+      (m) => m?.user?.role === 'OWNER' || m?.role === 'OWNER'
+    );
+    if (owner?.user?.name) return owner.user.name;
+    // Fallbacks if schema changes
+    return (
+      issue?.lease?.property?.landlord?.name ||
+      issue?.lease?.property?.organization?.members?.[0]?.user?.name ||
+      'Unknown'
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -209,9 +224,7 @@ const AdminMoveInIssueDetail = () => {
               </div>
               <div>
                 <span className="text-sm font-medium text-gray-500">Landlord:</span>
-                <span className="ml-2 text-gray-900">
-                  {issue.lease?.property?.landlord?.name || 'Unknown'}
-                </span>
+                <span className="ml-2 text-gray-900">{getLandlordName()}</span>
               </div>
               <div>
                 <span className="text-sm font-medium text-gray-500">Property:</span>
@@ -268,7 +281,7 @@ const AdminMoveInIssueDetail = () => {
             onCommentSubmit={handleCommentSubmit}
             userRole="ADMIN"
             onStatusUpdate={() => loadIssue()}
-            showAdminActions={false}
+            showStatusUpdate={false}
           />
         </div>
       </div>

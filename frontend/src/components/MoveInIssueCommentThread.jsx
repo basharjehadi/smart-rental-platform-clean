@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 
 const MoveInIssueCommentThread = ({ 
@@ -7,13 +8,27 @@ const MoveInIssueCommentThread = ({
   onStatusUpdate, 
   userRole = 'USER',
   showStatusUpdate = true,
-  showCommentForm = true 
+  showCommentForm = true,
+  showRequestAdminReview = false,
 }) => {
+  const { api } = useAuth();
   const [newComment, setNewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [commentError, setCommentError] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [fileError, setFileError] = useState('');
+
+  // Resolve profile image URL across different storage formats
+  const getProfilePhotoUrl = (profileImage) => {
+    if (!profileImage) return null;
+    const apiBase = api?.baseURL || 'http://localhost:3001/api';
+    const serverBase = apiBase.replace(/\/api$/, '');
+    if (profileImage.startsWith('http')) return profileImage;
+    if (profileImage.startsWith('/uploads/')) return `${serverBase}${profileImage}`;
+    if (profileImage.startsWith('uploads/')) return `${serverBase}/${profileImage}`;
+    // assume filename stored
+    return `${serverBase}/uploads/profile_images/${profileImage}`;
+  };
 
   // Submit new comment
   const handleSubmitComment = async (e) => {
@@ -261,17 +276,25 @@ const MoveInIssueCommentThread = ({
                 <div className="text-sm text-gray-600">
                   Current status: <span className="font-medium">{issue.status}</span>
                 </div>
-                <div className="text-sm text-gray-500">
-                  Tenants cannot change issue status. Use the button below to request admin review.
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleRequestAdminReview()}
-                    className="px-4 py-2 text-sm font-medium bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
-                  >
-                    Request Admin Review
-                  </button>
-                </div>
+                {showRequestAdminReview ? (
+                  <>
+                    <div className="text-sm text-gray-500">
+                      Tenants cannot change issue status. Use the button below to request admin review.
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleRequestAdminReview()}
+                        className="px-4 py-2 text-sm font-medium bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
+                      >
+                        Request Admin Review
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-gray-500">
+                    Admin review requests are handled automatically by the system.
+                  </div>
+                )}
               </div>
             )}
             
@@ -350,18 +373,24 @@ const MoveInIssueCommentThread = ({
               <div key={comment.id} className="flex space-x-3">
                 {/* Author Avatar */}
                 <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
-                    {comment.author?.profileImage ? (
-                      <img
-                        src={comment.author.profileImage}
-                        alt={comment.author.name}
-                        className="w-8 h-8 rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-sm font-medium text-gray-700">
-                        {comment.author?.firstName?.[0] || comment.author?.name?.[0] || 'U'}
-                      </span>
-                    )}
+                  <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center overflow-hidden">
+                    {(() => {
+                      const src = getProfilePhotoUrl(comment.author?.profileImage);
+                      if (src) {
+                        return (
+                          <img
+                            src={src}
+                            alt={comment.author?.name || 'User'}
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                        );
+                      }
+                      return (
+                        <span className="text-sm font-medium text-gray-700">
+                          {comment.author?.firstName?.[0] || comment.author?.name?.[0] || 'U'}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
 

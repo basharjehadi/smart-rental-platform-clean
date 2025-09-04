@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import MoveInIssueCommentThread from '../components/MoveInIssueCommentThread';
@@ -10,19 +10,33 @@ export default function LandlordMoveInIssuePage() {
   const [issue, setIssue] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
+  const [now, setNow] = useState(Date.now());
 
   async function load() {
     if (!issueId) { setErr('Missing issue id'); setLoading(false); return; }
     try {
       setLoading(true);
-      const { data } = await api.get(`move-in-issues/${issueId}`);
-      setIssue(data);
-      setErr(null);
+      const response = await api.get(`/move-in-issues/${issueId}`);
+      console.log('🔍 Landlord full API response:', response);
+
+      // Support both wrapper shapes due to spread in api client
+      const issuePayload = response.success && response.data
+        ? response.data
+        : (response.data?.success && response.data?.data ? response.data.data : null);
+
+      if (issuePayload) {
+        setIssue(issuePayload);
+        setErr(null);
+      } else {
+        setErr('Invalid response format');
+      }
     } catch (e) {
       const msg = e?.response?.data?.error || e?.message || 'Failed to fetch issue';
       console.error('Landlord issue fetch failed:', e?.response?.status, msg);
       setErr(msg);
-      if (e?.response?.status === 401) navigate('/landlord-dashboard');
+      if (e?.response?.status === 401 || e?.response?.status === 403) {
+        navigate('/landlord-dashboard');
+      }
     } finally {
       setLoading(false);
     }
@@ -30,10 +44,28 @@ export default function LandlordMoveInIssuePage() {
 
   useEffect(() => { load(); }, [issueId]);
 
+  // Tick every second for countdown
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Compute countdown until auto-escalation (24h since createdAt) when OPEN
+  const countdown = useMemo(() => {
+    if (!issue || issue.status !== 'OPEN') return null;
+    const created = new Date(issue.createdAt).getTime();
+    const deadline = created + 24 * 60 * 60 * 1000;
+    const remaining = Math.max(0, deadline - now);
+    const hrs = Math.floor(remaining / (1000 * 60 * 60));
+    const mins = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+    const secs = Math.floor((remaining % (1000 * 60)) / 1000);
+    return { remaining, hrs, mins, secs };
+  }, [issue, now]);
+
   // posting comments (if present on this page)
   async function submitComment(formData) {
     try {
-      await api.post(`move-in-issues/${issueId}/comments`, formData);
+      await api.post(`/move-in-issues/${issueId}/comments`, formData);
       await load();
     } catch (e) {
       alert(e?.response?.data?.error || 'Failed to post comment');
@@ -117,44 +149,26 @@ export default function LandlordMoveInIssuePage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Issue Details */}
+          {/* Left column: Countdown panel */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Issue Details</h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Title</h3>
-                  <p className="text-gray-900">{issue.title}</p>
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Response Window</h2>
+              {countdown ? (
+                <div className="text-center">
+                  <div className="text-3xl font-bold tracking-wider text-gray-900">
+                    {String(countdown.hrs).padStart(2, '0')}:{String(countdown.mins).padStart(2, '0')}:{String(countdown.secs).padStart(2, '0')}
+                  </div>
+                  <p className="mt-2 text-sm text-gray-600">Time left to respond before auto-escalation to admin</p>
+                  <p className="mt-3 text-xs text-gray-500">Reported: {formatDate(issue.createdAt)}</p>
                 </div>
-                
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Description</h3>
-                  <p className="text-gray-900">{issue.description}</p>
-                </div>
-                
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Reported</h3>
-                  <p className="text-gray-900">{formatDate(issue.createdAt)}</p>
-                </div>
-                
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Last Updated</h3>
-                  <p className="text-gray-900">{formatDate(issue.updatedAt)}</p>
-                </div>
-              </div>
-
-              {/* Status Display */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
+              ) : (
                 <div className="text-center">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(issue.status)}`}>
                     Current Status: {issue.status}
                   </span>
+                  <p className="mt-2 text-xs text-gray-500">Status updates automatically when you respond to the issue.</p>
                 </div>
-                <p className="text-xs text-gray-500 text-center mt-2">
-                  Status updates automatically when you respond to the issue.
-                </p>
-              </div>
+              )}
             </div>
           </div>
 

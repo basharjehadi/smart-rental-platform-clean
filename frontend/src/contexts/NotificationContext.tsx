@@ -177,6 +177,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       );
       // Refresh counts
       await fetchCounts();
+      // Notify other count sources (e.g., sidebar badges) to refresh immediately
+      try {
+        window.dispatchEvent(new Event('notif-unread-refresh'));
+      } catch {}
     } catch (error) {
       console.error('Error marking notifications by type as read:', error);
     }
@@ -197,6 +201,26 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       setNotifications(prev => [notification, ...prev]);
       // Refresh counts
       fetchCounts();
+
+      // Dispatch lightweight window events so specific pages can live-refresh
+      try {
+        if (notification.type === 'NEW_RENTAL_REQUEST') {
+          window.dispatchEvent(
+            new CustomEvent('rental-request:new', {
+              detail: { entityId: notification.entityId },
+            })
+          );
+        }
+        if (notification.type === 'NEW_OFFER') {
+          window.dispatchEvent(
+            new CustomEvent('offer:new', {
+              detail: { entityId: notification.entityId },
+            })
+          );
+        }
+        // Also trigger any header/sidebar badge refresh listeners
+        window.dispatchEvent(new Event('notif-unread-refresh'));
+      } catch {}
     });
 
     // Listen for move-in issue notifications

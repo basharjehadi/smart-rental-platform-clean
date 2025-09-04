@@ -46,6 +46,12 @@ export class NotificationService {
     propertyAddress
   ) {
     try {
+      if (!tenantId) {
+        console.warn('createOfferNotification skipped: tenantId is undefined', {
+          offerId,
+        });
+        return null;
+      }
       const notification = await prisma.notification.create({
         data: {
           userId: tenantId,

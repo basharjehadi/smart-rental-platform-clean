@@ -72,14 +72,22 @@ export const autoEscalateIssues = async () => {
           }
         });
 
-        // Create auto-escalation comment
-        await prisma.moveInIssueComment.create({
-          data: {
-            content: '⚠️ **AUTO-ESCALATED**: This issue has been automatically escalated to admin review due to no landlord response within 24 hours.',
-            authorId: 'system', // System user ID
-            issueId: issue.id,
+        // Create auto-escalation comment (skip if system user doesn't exist)
+        try {
+          await prisma.moveInIssueComment.create({
+            data: {
+              content: '⚠️ **AUTO-ESCALATED**: This issue has been automatically escalated to admin review due to no landlord response within 24 hours.',
+              authorId: 'system', // System user ID
+              issueId: issue.id,
+            }
+          });
+        } catch (error) {
+          if (error.code === 'P2003') {
+            console.log('⚠️ Skipping auto-escalation comment: system user not found');
+          } else {
+            throw error;
           }
-        });
+        }
 
         // Create notifications for all participants
         const participants = new Set();
@@ -97,24 +105,32 @@ export const autoEscalateIssues = async () => {
         }
 
         // Create notifications
-        const notificationPromises = Array.from(participants).map((participantId) =>
-          prisma.notification.create({
-            data: {
-              userId: participantId,
-              type: 'MOVE_IN_ISSUE_UPDATED',
-              entityId: issue.id,
-              title: 'Issue Auto-Escalated to Admin',
-              body: `Issue "${issue.title}" has been automatically escalated due to no landlord response.`,
-            },
-          })
+        const createdNotifs = await Promise.all(
+          Array.from(participants).map(async (participantId) => ({
+            participantId,
+            notification: await prisma.notification.create({
+              data: {
+                userId: participantId,
+                type: 'SYSTEM_ANNOUNCEMENT',
+                entityId: issue.id,
+                title: 'Issue Auto-Escalated to Admin',
+                body: `Issue "${issue.title}" has been automatically escalated due to no landlord response.`,
+              },
+            }),
+          }))
         );
 
-        await Promise.all(notificationPromises);
+        // Emit header bell updates immediately
+        if (global.io?.emitNotification) {
+          for (const { participantId, notification } of createdNotifs) {
+            await global.io.emitNotification(participantId, notification);
+          }
+        }
 
         // Emit socket events
         if (global.io) {
           Array.from(participants).forEach((participantId) => {
-            global.io.to(`user:${participantId}`).emit('move-in-issue:updated', {
+            global.io.to(`user-${participantId}`).emit('move-in-issue:updated', {
               issueId: issue.id,
               status: 'ESCALATED',
               reason: 'auto-escalated',
@@ -179,35 +195,50 @@ export const autoMarkInProgress = async (issueId, landlordUserId) => {
         }
       });
 
-      // Create auto-progress comment
-      await prisma.moveInIssueComment.create({
-        data: {
-          content: '🔄 **AUTO-UPDATED**: Issue status automatically changed to IN_PROGRESS as landlord has responded.',
-          authorId: 'system', // System user ID
-          issueId: issueId,
+      // Create auto-progress comment (skip if system user doesn't exist)
+      try {
+        await prisma.moveInIssueComment.create({
+          data: {
+            content: '🔄 **AUTO-UPDATED**: Issue status automatically changed to IN_PROGRESS as landlord has responded.',
+            authorId: 'system', // System user ID
+            issueId: issueId,
+          }
+        });
+      } catch (error) {
+        if (error.code === 'P2003') {
+          console.log('⚠️ Skipping auto-progress comment: system user not found');
+        } else {
+          throw error;
         }
-      });
+      }
 
       // Create notifications for tenant group members
       const tenantMembers = issue.lease.offer.tenantGroup.members;
-      const notificationPromises = tenantMembers.map((member) =>
-        prisma.notification.create({
-          data: {
-            userId: member.userId,
-            type: 'MOVE_IN_ISSUE_UPDATED',
-            entityId: issueId,
-            title: 'Issue Status Updated',
-            body: `Issue "${issue.title}" is now being addressed by the landlord.`,
-          },
-        })
+      const createdNotifs = await Promise.all(
+        tenantMembers.map(async (member) => ({
+          participantId: member.userId,
+          notification: await prisma.notification.create({
+            data: {
+              userId: member.userId,
+              type: 'SYSTEM_ANNOUNCEMENT',
+              entityId: issueId,
+              title: 'Issue Status Updated',
+              body: `Issue "${issue.title}" is now being addressed by the landlord.`,
+            },
+          }),
+        }))
       );
 
-      await Promise.all(notificationPromises);
+      if (global.io?.emitNotification) {
+        for (const { participantId, notification } of createdNotifs) {
+          await global.io.emitNotification(participantId, notification);
+        }
+      }
 
       // Emit socket events
       if (global.io) {
         tenantMembers.forEach((member) => {
-          global.io.to(`user:${member.userId}`).emit('move-in-issue:updated', {
+          global.io.to(`user-${member.userId}`).emit('move-in-issue:updated', {
             issueId: issueId,
             status: 'IN_PROGRESS',
             reason: 'landlord-responded',
@@ -264,14 +295,22 @@ export const autoCloseResolvedIssues = async () => {
         }
       });
 
-      // Create auto-close comment
-      await prisma.moveInIssueComment.create({
-        data: {
-          content: '✅ **AUTO-CLOSED**: This issue has been automatically closed after 7 days of resolution.',
-          authorId: 'system',
-          issueId: issue.id,
+      // Create auto-close comment (skip if system user doesn't exist)
+      try {
+        await prisma.moveInIssueComment.create({
+          data: {
+            content: '✅ **AUTO-CLOSED**: This issue has been automatically closed after 7 days of resolution.',
+            authorId: 'system',
+            issueId: issue.id,
+          }
+        });
+      } catch (error) {
+        if (error.code === 'P2003') {
+          console.log('⚠️ Skipping auto-close comment: system user not found');
+        } else {
+          throw error;
         }
-      });
+      }
 
       console.log(`✅ Auto-closed resolved issue ${issue.id}: "${issue.title}"`);
     }

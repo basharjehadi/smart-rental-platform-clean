@@ -614,7 +614,7 @@ export const createMoveInIssue = async (req, res) => {
     if (global.io) {
       // Notify all participants about the new issue
       Array.from(otherParticipants).forEach((participantId) => {
-        global.io.to(`user:${participantId}`).emit('move-in-issue:reported', {
+        global.io.to(`user-${participantId}`).emit('move-in-issue:reported', {
           issueId: moveInIssue.id,
           title: moveInIssue.title,
           propertyName: offer.property?.name || 'Unknown Property',
@@ -626,6 +626,7 @@ export const createMoveInIssue = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Move-in issue created successfully',
+      issueId: moveInIssue.id,
       issue: moveInIssue,
     });
   } catch (error) {
@@ -1269,20 +1270,27 @@ export const adminDecision = async (req, res) => {
       otherParticipants.add(member.userId);
     });
 
-    // Create notifications
-    const notificationPromises = Array.from(otherParticipants).map((participantId) =>
-      prisma.notification.create({
-        data: {
-          userId: participantId,
-          type: 'SYSTEM_ANNOUNCEMENT',
-          entityId: issueId,
-          title: `Admin decision: ${decision}`,
-          body: `An administrator has made a decision on your move-in issue: ${decision}. ${notes ? `Notes: ${notes}` : ''}`,
-        },
-      })
+    // Create notifications and emit them immediately for real-time bell updates
+    const createdNotifs = await Promise.all(
+      Array.from(otherParticipants).map(async (participantId) => ({
+        participantId,
+        notification: await prisma.notification.create({
+          data: {
+            userId: participantId,
+            type: 'SYSTEM_ANNOUNCEMENT',
+            entityId: issueId,
+            title: `Admin decision: ${decision}`,
+            body: `An administrator has made a decision on your move-in issue: ${decision}. ${notes ? `Notes: ${notes}` : ''}`,
+          },
+        }),
+      }))
     );
 
-    await Promise.all(notificationPromises);
+    if (global.io?.emitNotification) {
+      for (const { participantId, notification } of createdNotifs) {
+        await global.io.emitNotification(participantId, notification);
+      }
+    }
 
     res.json({
       success: true,

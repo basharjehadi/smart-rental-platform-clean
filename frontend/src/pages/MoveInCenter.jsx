@@ -76,7 +76,8 @@ export default function MoveInCenter() {
 
 
 
-  const canConfirm = ui?.canConfirmOrDeny && status === 'PENDING';
+  // Hide confirm when any issue exists for this offer
+  const canConfirm = ui?.canConfirmOrDeny && status === 'PENDING' && moveInIssues.length === 0;
 
   // Debug logging
   console.log('🔍 MoveInCenter: Phase and permissions:', {

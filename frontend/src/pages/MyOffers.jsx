@@ -102,6 +102,13 @@ const MyOffers = () => {
     })();
   }, []);
 
+  // Live-refresh on new offer notifications
+  useEffect(() => {
+    const onNewOffer = () => fetchOffers();
+    window.addEventListener('offer:new', onNewOffer);
+    return () => window.removeEventListener('offer:new', onNewOffer);
+  }, []);
+
   useEffect(() => {
     // Check for success message in location state
     if (location.state?.message) {

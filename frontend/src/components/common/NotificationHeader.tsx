@@ -176,11 +176,26 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({
     return date.toLocaleDateString();
   };
 
+  const handleToggleDropdown = async () => {
+    const next = !isOpen;
+    setIsOpen(next);
+    if (next && counts.total > 0) {
+      try {
+        await markAllAsRead();
+        try {
+          window.dispatchEvent(new Event('notif-unread-refresh'));
+        } catch {}
+      } catch (e) {
+        console.error('Failed to auto-mark notifications as read:', e);
+      }
+    }
+  };
+
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       {/* Notification Bell Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggleDropdown}
         className='relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200'
         title='Notifications'
       >
@@ -206,16 +221,6 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({
                 Notifications
               </h3>
               <div className='flex items-center space-x-2'>
-                {(() => {
-                  return counts.total > 0 ? (
-                    <button
-                      onClick={markAllAsRead}
-                      className='text-xs text-blue-600 hover:text-blue-700 font-medium'
-                    >
-                      Mark all read
-                    </button>
-                  ) : null;
-                })()}
                 <button
                   onClick={() => setIsOpen(false)}
                   className='text-gray-400 hover:text-gray-600'
@@ -304,17 +309,6 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({
                             </span>
 
                             <div className='flex items-center space-x-2'>
-                              {!notification.isRead && (
-                                <button
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    markAsRead(notification.id);
-                                  }}
-                                  className='text-xs text-blue-600 hover:text-blue-700 font-medium'
-                                >
-                                  Mark read
-                                </button>
-                              )}
                               <ExternalLink className='w-3 h-3 text-gray-400' />
                             </div>
                           </div>

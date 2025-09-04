@@ -80,73 +80,96 @@ export async function applyAdminDecision({ issueId, decision, adminId, notes = '
 
     if (decision === 'APPROVE') {
       console.log('✅ Processing APPROVE decision - terminating lease and processing refund');
-      
-      // 1. Mark lease as terminated
-      await prisma.lease.update({
-        where: { id: lease.id },
-        data: {
-          status: 'TERMINATED',
-          terminatedAt: now,
-          updatedAt: now,
-        },
-      });
 
-      // 2. Update offer status to cancelled
-      await prisma.offer.update({
-        where: { id: lease.offerId },
-        data: {
-          status: 'CANCELLED',
-          updatedAt: now,
-        },
-      });
+      // Execute all cascading updates in a single transaction
+      await prisma.$transaction(async (tx) => {
+        // 1) Terminate lease
+        await tx.lease.update({
+          where: { id: lease.id },
+          data: {
+            status: 'TERMINATED',
+            updatedAt: now,
+          },
+        });
 
-      // 3. Unlock the rental request (remove the lock from the offer)
-      const rentalRequest = await prisma.rentalRequest.findFirst({
-        where: {
-          offers: {
-            some: { id: lease.offerId }
+        // 2) Cancel offer
+        await tx.offer.update({
+          where: { id: lease.offerId },
+          data: {
+            status: 'REJECTED',
+            updatedAt: now,
+            isPaid: false,
+            paymentDate: null,
+          },
+        });
+
+        // 3) Unlock rental request (if any)
+        const rentalRequest = await tx.rentalRequest.findFirst({
+          where: { offers: { some: { id: lease.offerId } } },
+          select: { id: true },
+        });
+
+        if (rentalRequest) {
+          await tx.rentalRequest.update({
+            where: { id: rentalRequest.id },
+            data: {
+              isLocked: false,
+              poolStatus: 'CANCELLED',
+              status: 'CANCELLED',
+              updatedAt: now,
+            },
+          });
+          console.log('🔓 Rental request unlocked');
+        }
+
+        // 4) Make property available again
+        await tx.property.update({
+          where: { id: lease.propertyId },
+          data: {
+            status: 'AVAILABLE',
+            availability: true,
+            updatedAt: now,
+          },
+        });
+
+        // 5) Archive conversations related to the offer
+        await tx.conversation.updateMany({
+          where: { offerId: lease.offerId },
+          data: { status: 'ARCHIVED' },
+        });
+
+        // 6) Delete contract (record and PDF) if exists for this rental request
+        if (lease.rentalRequestId) {
+          const existingContract = await tx.contract.findUnique({
+            where: { rentalRequestId: lease.rentalRequestId },
+          });
+          if (existingContract) {
+            await tx.contract.delete({ where: { id: existingContract.id } });
+            try {
+              const fs = await import('fs');
+              const path = await import('path');
+              if (existingContract.pdfUrl) {
+                const filePath = path.join(process.cwd(), existingContract.pdfUrl);
+                if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+              }
+            } catch (fileErr) {
+              console.warn('⚠️ Contract file cleanup skipped:', fileErr?.message);
+            }
           }
         }
       });
 
-      if (rentalRequest) {
-        await prisma.rentalRequest.update({
-          where: { id: rentalRequest.id },
-          data: {
-            lockedByOfferId: null,
-            updatedAt: now,
-          },
-        });
-        console.log('🔓 Rental request unlocked');
+      // 7) Refund payments using existing refund pipeline (best-effort, outside transaction)
+      try {
+        const { refundOfferPayments } = await import('../controllers/paymentController.js');
+        await refundOfferPayments(lease.offerId);
+      } catch (e) {
+        console.warn('⚠️ Refund processing unavailable:', e?.message);
       }
 
-      // 4. Update property status to available (since lease is terminated)
-      await prisma.property.update({
-        where: { id: lease.propertyId },
-        data: {
-          status: 'AVAILABLE',
-          availability: true,
-          updatedAt: now,
-        },
-      });
-
-      // 5. Mark all related payments as refunded
-      await prisma.payment.updateMany({
-        where: {
-          offerId: lease.offerId,
-          status: { in: ['COMPLETED', 'PENDING'] }
-        },
-        data: {
-          status: 'REFUNDED',
-          updatedAt: now,
-        },
-      });
-
-      // 6. Create refund request record (stub for now)
-      // TODO: Implement RefundRequest model when payment system is ready
+      // 8) Log refund stub (until real RefundRequest model exists)
       const refundAmount = lease.offer.depositAmount || lease.offer.rentAmount;
       const tenantId = lease.offer.tenantGroup.members[0]?.userId;
-      
       console.log('💰 Refund request stub created:', {
         issueId,
         leaseId: lease.id,
@@ -159,10 +182,7 @@ export async function applyAdminDecision({ issueId, decision, adminId, notes = '
         notes: notes || 'Automatic refund request due to approved move-in issue',
       });
 
-      // For now, we'll just log the refund action
-      // In production, this would create a RefundRequest record and integrate with payment provider
-
-      console.log('🏠 Property marked as available and tenant data cleaned up');
+      console.log('🏠 Property marked as available, conversations archived, and tenant data cleaned up');
 
     } else if (decision === 'REJECT') {
       console.log('❌ Processing REJECT decision - no lease changes, issue closed');

@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 import LandlordSidebar from '../components/LandlordSidebar';
+import { useSocket } from '../contexts/SocketContext';
 import NotificationHeader from '../components/common/NotificationHeader';
 import {
   LogOut,
@@ -52,10 +53,33 @@ const LandlordMyProperty = () => {
     }
   };
 
+  const { socket } = useSocket();
+
   useEffect(() => {
     fetchProperties();
     fetchProfileData();
   }, []);
+
+  // Live-refresh when a move-in issue is reported/updated
+  useEffect(() => {
+    const onIssueReported = () => fetchProperties();
+    const onIssueUpdated = () => fetchProperties();
+    window.addEventListener('move-in-issue:reported', onIssueReported);
+    window.addEventListener('move-in-issue:updated', onIssueUpdated);
+    // Also listen on socket channel if available
+    if (socket) {
+      socket.on('move-in-issue:reported', onIssueReported);
+      socket.on('move-in-issue:updated', onIssueUpdated);
+    }
+    return () => {
+      window.removeEventListener('move-in-issue:reported', onIssueReported);
+      window.removeEventListener('move-in-issue:updated', onIssueUpdated);
+      if (socket) {
+        socket.off('move-in-issue:reported', onIssueReported);
+        socket.off('move-in-issue:updated', onIssueUpdated);
+      }
+    };
+  }, [socket]);
 
 
 
@@ -520,7 +544,9 @@ const LandlordMyProperty = () => {
                                   navigate(`/landlord/properties/${property.id}/issues`);
                                 }
                               }}
-                              className="flex-1 px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2 bg-purple-600 text-white hover:bg-purple-700"
+                              className={`flex-1 px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
+                                property.moveInIssues?.hasIssues ? 'bg-red-600 hover:bg-red-700' : 'bg-purple-600 hover:bg-purple-700'
+                              } text-white`}
                               title="View move-in issues for this property"
                             >
                               <span>Move-In Issues</span>

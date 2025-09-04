@@ -75,16 +75,17 @@ export const getLandlordProperties = async (req, res) => {
         }
       }
       
+      // Only surface moveInOfferId when issues exist, so the UI hides the button
       const moveInIssuesSummary = {
         total: allMoveInIssues.length,
         open: openIssues.length,
         inProgress: inProgressIssues.length,
         escalated: escalatedIssues.length,
         hasIssues: allMoveInIssues.length > 0,
-        urgentCount: openIssues.length + escalatedIssues.length, // Open and escalated are urgent
-        firstIssueId: allMoveInIssues.length > 0 ? allMoveInIssues[0].id : null, // Include first issue ID for direct navigation
-        moveInPhase, // Add move-in phase
-        moveInOfferId, // Add offer ID for move-in button
+        urgentCount: openIssues.length + escalatedIssues.length,
+        firstIssueId: allMoveInIssues.length > 0 ? allMoveInIssues[0].id : null,
+        moveInPhase,
+        moveInOfferId: allMoveInIssues.length > 0 ? moveInOfferId : null,
       };
       
       // Debug: Log property data to see what's being included

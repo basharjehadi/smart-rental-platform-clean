@@ -65,6 +65,16 @@ const LandlordRentalRequests = () => {
     markByTypeAsRead('NEW_RENTAL_REQUEST');
   }, []);
 
+  // Live-refresh on rental request matching notifications
+  useEffect(() => {
+    const onNewRentalRequest = () => {
+      fetchRentalRequests();
+      fetchAcceptedRequests();
+    };
+    window.addEventListener('rental-request:new', onNewRentalRequest);
+    return () => window.removeEventListener('rental-request:new', onNewRentalRequest);
+  }, []);
+
   // Listen for move-in verification updates
   useEffect(() => {
     if (!socket) return;

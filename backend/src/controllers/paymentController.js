@@ -1454,24 +1454,29 @@ const createLeaseFromOffer = async (offerId, rentalRequestId) => {
     const leaseEndDate = new Date(leaseStartDate);
     leaseEndDate.setMonth(leaseEndDate.getMonth() + offer.leaseDuration);
 
-    // Create a virtual unit for the lease (since we don't have actual units)
-    const virtualUnit = await prisma.unit.create({
-      data: {
-        unitNumber: `VIRTUAL-${rentalRequestId}`,
-        floor: 1,
-        bedrooms:
-          offer.propertyType === 'Room'
-            ? 1
-            : offer.propertyType === 'Studio'
-              ? 0
-              : 1,
-        bathrooms: 1,
-        area: offer.propertySize ? parseFloat(offer.propertySize) : 19,
-        rentAmount: offer.rentAmount,
-        status: 'RENTED',
-        propertyId: offer.propertyId || null,
-      },
+    // Reuse an existing unit for this property; create one default if none exists
+    let virtualUnit = await prisma.unit.findFirst({
+      where: { propertyId: offer.propertyId || undefined },
     });
+    if (!virtualUnit) {
+      virtualUnit = await prisma.unit.create({
+        data: {
+          unitNumber: '1',
+          floor: 1,
+          bedrooms:
+            offer.propertyType === 'Room'
+              ? 1
+              : offer.propertyType === 'Studio'
+                ? 0
+                : 1,
+          bathrooms: 1,
+          area: offer.propertySize ? parseFloat(offer.propertySize) : 19,
+          rentAmount: offer.rentAmount,
+          status: 'AVAILABLE',
+          propertyId: offer.propertyId || null,
+        },
+      });
+    }
 
     // Create the lease
     const lease = await prisma.lease.create({
@@ -1489,6 +1494,16 @@ const createLeaseFromOffer = async (offerId, rentalRequestId) => {
         organizationId: offer.organizationId || null,
       },
     });
+
+    // Mark unit as rented now that the lease is active
+    try {
+      await prisma.unit.update({
+        where: { id: virtualUnit.id },
+        data: { status: 'RENTED' },
+      });
+    } catch (e) {
+      // non-fatal
+    }
 
     console.log('✅ Lease created successfully:', {
       id: lease.id,

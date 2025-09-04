@@ -1037,7 +1037,7 @@ const createOffer = async (req, res) => {
         where: { tenantGroupId: rentalRequest.tenantGroupId },
         include: {
           user: {
-            select: { name: true, email: true },
+            select: { id: true, name: true, email: true },
           },
         },
       });

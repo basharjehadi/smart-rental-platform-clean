@@ -11,18 +11,43 @@ export default function TenantMoveInIssuePage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
 
+
   async function load() {
     if (!issueId) { setErr('Missing issue id'); setLoading(false); return; }
     try {
       setLoading(true);
-      const { data } = await api.get(`move-in-issues/${issueId}`);
-      setIssue(data);
-      setErr(null);
+      console.log('🔍 Fetching move-in issue:', issueId);
+      console.log('🔍 Current token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+      const response = await api.get(`/move-in-issues/${issueId}`);
+      console.log('🔍 Full API response:', response);
+      console.log('🔍 Response data:', response.data);
+      console.log('🔍 Response success:', response.success);
+      console.log('🔍 Response data.data:', response.data?.data);
+      
+      // Support both wrapper shapes due to spread in api client
+      const issuePayload = response.success && response.data
+        ? response.data
+        : (response.data?.success && response.data?.data ? response.data.data : null);
+
+      if (issuePayload) {
+        setIssue(issuePayload);
+        setErr(null);
+        console.log('✅ Issue loaded successfully:', issuePayload.title);
+      } else {
+        console.error('❌ Invalid response format:', response);
+        setErr('Invalid response format');
+      }
     } catch (e) {
       const msg = e?.response?.data?.error || e?.message || 'Failed to fetch issue';
-      console.error('Tenant issue fetch failed:', e?.response?.status, msg);
+      console.error('❌ Tenant issue fetch failed:', {
+        status: e?.response?.status,
+        message: msg,
+        error: e
+      });
       setErr(msg);
-      if (e?.response?.status === 401) navigate('/tenant-dashboard');
+      if (e?.response?.status === 401 || e?.response?.status === 403) {
+        navigate('/tenant-dashboard');
+      }
     } finally {
       setLoading(false);
     }
@@ -33,7 +58,7 @@ export default function TenantMoveInIssuePage() {
   // posting comments (if present on this page)
   async function submitComment(formData) {
     try {
-      await api.post(`move-in-issues/${issueId}/comments`, formData);
+      await api.post(`/move-in-issues/${issueId}/comments`, formData);
       await load();
     } catch (e) {
       alert(e?.response?.data?.error || 'Failed to post comment');
@@ -83,6 +108,7 @@ export default function TenantMoveInIssuePage() {
           userRole="TENANT"
           showStatusUpdate={true}
           showCommentForm={true}
+          showRequestAdminReview={false}
         />
       </div>
     </div>
