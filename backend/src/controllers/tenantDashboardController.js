@@ -217,6 +217,7 @@ export const getTenantDashboardData = async (req, res) => {
         offerId: offer.id,
         rentalRequestId: offer.rentalRequest.id,
         hasActualLease: !!offer.rentalRequest.leases?.[0],
+        moveInVerificationStatus: offer.moveInVerificationStatus,
         property: {
           id: offer.property?.id,
           address: propertyAddress,

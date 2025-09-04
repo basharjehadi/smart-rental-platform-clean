@@ -187,25 +187,33 @@ const completeMockPayment = async (req, res) => {
 
       for (const payment of selectedPayments) {
         console.log('🔍 Processing payment:', payment);
-        // Create a new rent payment record
-        const rentPayment = await prisma.rentPayment.create({
-          data: {
-            amount: payment.amount,
-            status: 'SUCCEEDED',
-            dueDate: new Date(payment.dueDate),
-            paidDate: new Date(),
-            month: new Date(payment.dueDate).getMonth() + 1,
-            year: new Date(payment.dueDate).getFullYear(),
-            lateFee: 0,
-            gracePeriod: 5,
-            isOverdue: false,
-            userId: userId,
-            paymentId: generalPayment.id, // Link to the general payment record
-          },
-        });
+        try {
+          // Create a new rent payment record
+          const rentPayment = await prisma.rentPayment.create({
+            data: {
+              amount: payment.amount,
+              status: 'SUCCEEDED',
+              dueDate: new Date(payment.dueDate),
+              paidDate: new Date(),
+              month: new Date(payment.dueDate).getMonth() + 1,
+              year: new Date(payment.dueDate).getFullYear(),
+              lateFee: 0,
+              gracePeriod: 5,
+              isOverdue: false,
+              userId: userId,
+              tenantGroupId: rentOffer?.tenantGroupId, // Add required tenantGroupId
+              paymentId: generalPayment.id, // Link to the general payment record
+            },
+          });
 
-        rentPayments.push(rentPayment);
-        console.log('✅ Created rent payment record:', rentPayment.id);
+          rentPayments.push(rentPayment);
+          console.log('✅ Created rent payment record:', rentPayment.id);
+        } catch (rentPaymentError) {
+          console.error('❌ Error creating rent payment record:', rentPaymentError);
+          console.error('❌ Payment data:', payment);
+          console.error('❌ RentOffer data:', rentOffer);
+          // Continue with other payments even if one fails
+        }
       }
 
       return res.json({
@@ -479,18 +487,36 @@ const createPaymentIntent = async (req, res) => {
         include: {
           rentalRequest: {
             include: {
-              tenant: {
-                select: {
-                  name: true,
-                  email: true,
+              tenantGroup: {
+                include: {
+                  members: {
+                    where: { isPrimary: true },
+                    include: {
+                      user: {
+                        select: {
+                          name: true,
+                          email: true,
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
           },
-          landlord: {
-            select: {
-              name: true,
-              email: true,
+          organization: {
+            include: {
+              members: {
+                where: { role: 'OWNER' },
+                include: {
+                  user: {
+                    select: {
+                      name: true,
+                      email: true,
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -1053,15 +1079,16 @@ const handlePaymentSucceeded = async (paymentIntent) => {
         const tenant = primaryMember?.user;
 
         // Send payment success notification to landlord
-        if (offer?.landlord?.email) {
+        const landlord = offer?.organization?.members?.[0]?.user;
+        if (landlord?.email) {
           console.log('📧 Sending payment success notification to landlord');
           const paymentDescription =
             metadata.purpose === 'DEPOSIT_AND_FIRST_MONTH'
               ? 'Deposit and First Month Rent'
               : 'Rent Payment';
           await sendPaymentSuccess(
-            offer.landlord.email,
-            offer.landlord.name,
+            landlord.email,
+            landlord.name,
             tenant?.name || 'Tenant',
             offer.rentalRequest.title,
             amount / 100,

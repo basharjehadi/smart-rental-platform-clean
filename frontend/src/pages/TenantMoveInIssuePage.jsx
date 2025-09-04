@@ -78,13 +78,7 @@ export default function TenantMoveInIssuePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => {
-                if (issue?.lease?.offer?.id) {
-                  navigate(`/move-in?offerId=${issue.lease.offer.id}`);
-                } else {
-                  navigate('/tenant-dashboard');
-                }
-              }}
+              onClick={() => navigate('/tenant-dashboard')}
               className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

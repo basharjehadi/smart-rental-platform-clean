@@ -435,24 +435,16 @@ export const getOverduePayments = async (req, res) => {
     if (search) {
       where.OR = [
         {
-          rentalRequest: {
-            tenant: { name: { contains: search, mode: 'insensitive' } },
-          },
+          user: { name: { contains: search, mode: 'insensitive' } },
         },
         {
-          rentalRequest: {
-            tenant: { email: { contains: search, mode: 'insensitive' } },
-          },
+          user: { email: { contains: search, mode: 'insensitive' } },
         },
         {
-          rentalRequest: {
-            tenant: { firstName: { contains: search, mode: 'insensitive' } },
-          },
+          user: { firstName: { contains: search, mode: 'insensitive' } },
         },
         {
-          rentalRequest: {
-            tenant: { lastName: { contains: search, mode: 'insensitive' } },
-          },
+          user: { lastName: { contains: search, mode: 'insensitive' } },
         },
       ];
     }
@@ -464,40 +456,35 @@ export const getOverduePayments = async (req, res) => {
         skip: parseInt(skip),
         take: parseInt(limit),
         include: {
-          rentalRequest: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phoneNumber: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          tenantGroup: {
             include: {
-              tenant: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                  phoneNumber: true,
-                  firstName: true,
-                  lastName: true,
-                },
-              },
-              offers: {
+              members: {
                 include: {
-                  landlord: {
+                  user: {
                     select: {
                       id: true,
                       name: true,
                       email: true,
                       phoneNumber: true,
-                    },
-                  },
-                  property: {
-                    select: {
-                      id: true,
-                      title: true,
-                      address: true,
-                      city: true,
+                      firstName: true,
+                      lastName: true,
                     },
                   },
                 },
               },
             },
           },
+          payment: true,
         },
         orderBy: { dueDate: 'asc' },
       }),
@@ -599,7 +586,7 @@ export const getSystemHealth = async (req, res) => {
     const activeUsers = await prisma.user
       .count({
         where: {
-          lastLoginAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+          lastActiveAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
         },
       })
       .catch(() => 0);

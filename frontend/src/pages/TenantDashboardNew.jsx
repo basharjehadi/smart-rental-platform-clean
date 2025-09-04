@@ -6,6 +6,7 @@ import TenantSidebar from '../components/TenantSidebar';
 import { LogOut, AlertTriangle } from 'lucide-react';
 import RenewalRequestModal from '../components/RenewalRequestModal.jsx';
 import EndLeaseModal from '../components/EndLeaseModal.jsx';
+import ReportIssueForm from '../components/ReportIssueForm';
 import { viewContract, downloadContract } from '../utils/contractGenerator.js';
 import NotificationHeader from '../components/common/NotificationHeader';
 import ReviewCard from '../components/ReviewCard';
@@ -47,6 +48,13 @@ const TenantDashboardNew = () => {
   const [isGroupChoiceModalOpen, setGroupChoiceModalOpen] = useState(false);
   const [invitations, setInvitations] = useState([]);
   const [invitationMsg, setInvitationMsg] = useState('');
+  
+  // Move-in center state
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [moveInIssues, setMoveInIssues] = useState([]);
+  const [moveInIssuesLoading, setMoveInIssuesLoading] = useState(false);
+  const [moveInConfirming, setMoveInConfirming] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   useEffect(() => {
     console.log('🔍 Frontend: User state changed:', user);
@@ -152,6 +160,14 @@ const TenantDashboardNew = () => {
     console.log('🔍 Frontend: Has active lease:', dashboardData.hasActiveLease);
     console.log('🔍 Frontend: Property data:', dashboardData.property);
     console.log('🔍 Frontend: Landlord data:', dashboardData.landlord);
+    
+    // Fetch move-in issues when dashboard loads with active lease
+    if (dashboardData.hasActiveLease && dashboardData.leases && dashboardData.leases.length > 0) {
+      const offerId = dashboardData.leases[0].offerId;
+      if (offerId) {
+        fetchMoveInIssues(offerId);
+      }
+    }
   }, [dashboardData]);
 
   const fetchDashboardData = async () => {
@@ -595,6 +611,57 @@ const TenantDashboardNew = () => {
     }
   };
 
+  // Move-in center functions
+  const fetchMoveInIssues = async (offerId) => {
+    try {
+      setMoveInIssuesLoading(true);
+      const response = await api.get(`/move-in/offers/${offerId}/issues`);
+      setMoveInIssues(response.data.issues || []);
+    } catch (error) {
+      console.error('Error fetching move-in issues:', error);
+      setMoveInIssues([]);
+    } finally {
+      setMoveInIssuesLoading(false);
+    }
+  };
+
+  const handleConfirmMoveIn = async (offerId) => {
+    try {
+      setMoveInConfirming(true);
+      await api.post(`/move-in/offers/${offerId}/verify`, {});
+      
+      // Show celebration animation
+      setShowCelebration(true);
+      
+      // Refresh dashboard data to update move-in status
+      await fetchDashboardData();
+      // Refresh move-in issues
+      await fetchMoveInIssues(offerId);
+      
+      // Hide the entire card after 1 minute (60 seconds)
+      setTimeout(() => {
+        setShowCelebration(false);
+      }, 60000);
+      
+    } catch (error) {
+      console.error('Error confirming move-in:', error);
+      alert('Error confirming move-in. Please try again.');
+    } finally {
+      setMoveInConfirming(false);
+    }
+  };
+
+  const handleReportIssueSuccess = async (issueOrId, offerId) => {
+    setShowReportModal(false);
+    // Refresh move-in issues to show the new issue
+    await fetchMoveInIssues(offerId);
+    // Navigate to the issue page
+    const createdIssueId = typeof issueOrId === 'object' ? issueOrId?.id : issueOrId;
+    if (createdIssueId) {
+      navigate(`/tenant/issue/${createdIssueId}`);
+    }
+  };
+
   const calculateDaysToRenewal = () => {
     const leaseObj = dashboardData.lease;
     if (
@@ -967,6 +1034,8 @@ const TenantDashboardNew = () => {
               </div>
             )}
 
+            {/* Move-In Center Card DUPLICATE REMOVED */}
+
             {/* Active Rentals & Detailed Information */}
             {dashboardData.hasActiveLease ? (
               <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
@@ -1158,6 +1227,157 @@ const TenantDashboardNew = () => {
                   Property details, landlord information, and lease progress
                   will appear here once you have an active rental.
                 </p>
+              </div>
+            )}
+
+            {/* Move-In Center Card */}
+            {dashboardData.hasActiveLease && 
+             dashboardData.leases && 
+             dashboardData.leases.length > 0 && 
+             dashboardData.leases[0].moveInVerificationStatus !== 'VERIFIED' && 
+             !showCelebration && (
+              <div className='bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6'>
+                <div className='flex items-center mb-4'>
+                  <div className='w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3'>
+                    <svg className='w-6 h-6 text-blue-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className='text-lg font-semibold text-gray-900'>Move-In Center</h3>
+                    <p className='text-sm text-gray-600'>Complete your move-in process</p>
+                  </div>
+                </div>
+                
+                <div className='bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4'>
+                  <p className='text-sm text-blue-800'>
+                    🎉 Your move-in window is now open! You can confirm your move-in or report any issues you encounter.
+                  </p>
+                </div>
+                {/* Existing move-in issues */}
+                {moveInIssuesLoading ? (
+                  <div className='mb-4 text-sm text-gray-600'>Loading your move-in issues…</div>
+                ) : (
+                  moveInIssues && moveInIssues.length > 0 && (
+                    <div className='mb-4'>
+                      <h4 className='text-sm font-medium text-gray-900 mb-2'>Your Move-In Issues</h4>
+                      <div className='space-y-2'>
+                        {moveInIssues.map(issue => (
+                          <div key={issue.id} className='flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg'>
+                            <div className='flex items-center space-x-2'>
+                              <svg className='w-4 h-4 text-orange-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z' />
+                              </svg>
+                              <span className='text-sm text-orange-800'>{issue.title}</span>
+                              <span className='text-xs text-orange-600'>({issue.status})</span>
+                            </div>
+                            <button
+                              onClick={() => navigate(`/tenant/issue/${issue.id}`)}
+                              className='text-xs text-orange-600 hover:text-orange-800 underline'
+                            >
+                              View Details
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                )}
+                
+                {/* Hide buttons when issues exist, just like Move-In Center page */}
+                {moveInIssues.length === 0 && (
+                  <div className='flex flex-col sm:flex-row gap-3'>
+                    <button
+                      onClick={() => handleConfirmMoveIn(dashboardData.leases[0].offerId)}
+                      disabled={moveInConfirming}
+                      className='flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed'
+                    >
+                      <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                        <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M5 13l4 4L19 7' />
+                      </svg>
+                      <span>{moveInConfirming ? 'Confirming...' : 'Confirm Move-In'}</span>
+                    </button>
+                    <button
+                      onClick={() => setShowReportModal(true)}
+                      className='flex-1 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center justify-center space-x-2'
+                    >
+                      <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                        <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z' />
+                      </svg>
+                      <span>Report Issue</span>
+                    </button>
+                  </div>
+                )}
+                
+                <div className='mt-3 text-xs text-gray-500 text-center'>
+                  ⏰ Move-in window closes on {(() => {
+                    if (dashboardData.leases && dashboardData.leases.length > 0) {
+                      const lease = dashboardData.leases[0];
+                      // Try different possible date fields
+                      const startDate = lease.startDate || lease.leaseStartDate || lease.lease?.startDate;
+                      
+                      if (startDate) {
+                        const leaseStartDate = new Date(startDate);
+                        if (!isNaN(leaseStartDate.getTime())) {
+                          const windowCloseDate = new Date(leaseStartDate);
+                          windowCloseDate.setDate(leaseStartDate.getDate() + 2);
+                          return windowCloseDate.toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          });
+                        }
+                      }
+                    }
+                    return 'lease start date + 2 days';
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* Celebration Card - Shows for 1 minute then disappears */}
+            {showCelebration && (
+              <div className='bg-gradient-to-r from-green-50 to-blue-50 rounded-lg shadow-lg border-2 border-green-200 p-8 mb-6 text-center animate-pulse'>
+                <div className='flex justify-center mb-6'>
+                  <div className='relative'>
+                    {/* Main celebration icon */}
+                    <div className='w-20 h-20 bg-green-500 rounded-full flex items-center justify-center text-white text-4xl animate-bounce'>
+                      🎉
+                    </div>
+                    {/* Floating confetti effect */}
+                    <div className='absolute -top-2 -right-2 w-6 h-6 bg-yellow-400 rounded-full animate-ping'></div>
+                    <div className='absolute -bottom-2 -left-2 w-4 h-4 bg-pink-400 rounded-full animate-ping' style={{animationDelay: '0.5s'}}></div>
+                    <div className='absolute top-2 -left-4 w-5 h-5 bg-blue-400 rounded-full animate-ping' style={{animationDelay: '1s'}}></div>
+                    <div className='absolute -top-4 left-2 w-3 h-3 bg-purple-400 rounded-full animate-ping' style={{animationDelay: '1.5s'}}></div>
+                  </div>
+                </div>
+                
+                <h2 className='text-3xl font-bold text-green-800 mb-4 animate-pulse'>
+                  🎉 Congratulations! 🎉
+                </h2>
+                
+                <p className='text-xl text-green-700 mb-2 font-semibold'>
+                  You have successfully confirmed your move-in!
+                </p>
+                
+                <p className='text-lg text-green-600 mb-6'>
+                  Welcome to your new home! We hope you enjoy your stay.
+                </p>
+                
+                <div className='flex justify-center space-x-4 text-sm text-green-600'>
+                  <span className='flex items-center'>
+                    <svg className='w-4 h-4 mr-1' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M5 13l4 4L19 7' />
+                    </svg>
+                    Move-in Confirmed
+                  </span>
+                  <span className='flex items-center'>
+                    <svg className='w-4 h-4 mr-1' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' />
+                    </svg>
+                    Card will disappear in 1 minute
+                  </span>
+                </div>
               </div>
             )}
 
@@ -1440,6 +1660,32 @@ const TenantDashboardNew = () => {
                   }
                 }}
               />
+
+              {/* Report Issue Modal */}
+              {showReportModal && dashboardData.leases && dashboardData.leases.length > 0 && (
+                <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
+                  <div className='bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto'>
+                    <div className='p-6'>
+                      <div className='flex justify-between items-center mb-6'>
+                        <h2 className='text-2xl font-semibold text-gray-900'>Report Move-In Issue</h2>
+                        <button
+                          onClick={() => setShowReportModal(false)}
+                          className='text-gray-400 hover:text-gray-600 transition-colors'
+                        >
+                          <svg className='w-6 h-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
+                          </svg>
+                        </button>
+                      </div>
+                      <ReportIssueForm
+                        offerId={dashboardData.leases[0].offerId}
+                        onSuccess={(issueId) => handleReportIssueSuccess(issueId, dashboardData.leases[0].offerId)}
+                        onCancel={() => setShowReportModal(false)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Tenant Group Choice Modal removed - no create request functionality */}
             </div>
