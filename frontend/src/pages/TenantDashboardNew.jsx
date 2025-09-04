@@ -1215,13 +1215,13 @@ const TenantDashboardNew = () => {
                       </button>
                       <button
                         onClick={handleDownloadContract}
-                        className='w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors'
+                        className='w-full bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors'
                       >
                         Download Contract
                       </button>
                       <button
                         onClick={() => setShowEndModal(true)}
-                        className='w-full bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center space-x-2'
+                        className='w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2'
                         title='End lease (30-day notice)'
                       >
                         <AlertTriangle className='w-4 h-4' />
@@ -1236,7 +1236,7 @@ const TenantDashboardNew = () => {
                       </div>
                       <button
                         onClick={() => setShowRenewalModal(true)}
-                        className='w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors'
+                        className='w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors'
                         title='Request lease renewal'
                       >
                         Request Renewal
