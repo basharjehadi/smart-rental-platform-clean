@@ -1317,13 +1317,7 @@ const TenantProfile = () => {
                           showTitle={false}
                         />
                       </div>
-                    ) : (
-                      <div className='mt-3 p-2 bg-gray-50 rounded-lg'>
-                        <p className='text-gray-600 text-xs'>
-                          🔍 Debug: No badges found. Badges array length: {badges.length}
-                        </p>
-                      </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
 

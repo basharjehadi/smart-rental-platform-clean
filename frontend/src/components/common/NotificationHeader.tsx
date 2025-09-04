@@ -79,6 +79,15 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({
           window.location.href = '/landlord-my-property';
         }
         break;
+      case 'MOVE_IN_ISSUE_REPORTED':
+      case 'MOVE_IN_ISSUE_UPDATED':
+        // Navigate to move-in issue page
+        if (user?.role === 'LANDLORD') {
+          window.location.href = `/landlord/issue/${notification.entityId}`;
+        } else {
+          window.location.href = `/tenant/issue/${notification.entityId}`;
+        }
+        break;
       case 'SYSTEM_ANNOUNCEMENT':
       case 'ACCOUNT_UPDATED':
         // System notifications - no specific navigation needed
@@ -109,6 +118,9 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({
         return <XCircle className='w-4 h-4 text-red-600' />;
       case 'PROPERTY_STATUS_CHANGED':
         return <Home className='w-4 h-4 text-orange-600' />;
+      case 'MOVE_IN_ISSUE_REPORTED':
+      case 'MOVE_IN_ISSUE_UPDATED':
+        return <XCircle className='w-4 h-4 text-red-600' />;
       case 'SYSTEM_ANNOUNCEMENT':
         return <Megaphone className='w-4 h-4 text-purple-600' />;
       case 'ACCOUNT_UPDATED':
@@ -137,6 +149,9 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({
         return 'bg-red-50 border-red-200';
       case 'PROPERTY_STATUS_CHANGED':
         return 'bg-orange-50 border-orange-200';
+      case 'MOVE_IN_ISSUE_REPORTED':
+      case 'MOVE_IN_ISSUE_UPDATED':
+        return 'bg-red-50 border-red-200';
       case 'SYSTEM_ANNOUNCEMENT':
         return 'bg-purple-50 border-purple-200';
       case 'ACCOUNT_UPDATED':

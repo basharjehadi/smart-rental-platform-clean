@@ -1148,6 +1148,7 @@ enum NotificationType {
   PROPERTY_STATUS_CHANGED
   SYSTEM_ANNOUNCEMENT
   ACCOUNT_UPDATED
+  MOVE_IN_ISSUE_REPORTED
 }
 
 enum SupportTicketCategory {

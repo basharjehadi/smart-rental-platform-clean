@@ -49,6 +49,7 @@ import ReviewPage from './pages/ReviewPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminMoveInIssues from './pages/AdminMoveInIssues.jsx';
 import AdminMoveInReviews from './pages/AdminMoveInReviews.jsx';
+import AdminMoveInIssueDetail from './pages/AdminMoveInIssueDetail.jsx';
 import AdminPropertyReview from './pages/AdminPropertyReview.jsx';
 import AuthCallback from './pages/AuthCallback';
 import TestPage from './pages/TestPage';
@@ -317,6 +318,14 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <AdminMoveInReviews />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path='/admin/issue/:issueId'
+          element={
+            <ProtectedRoute>
+              <AdminMoveInIssueDetail />
             </ProtectedRoute>
           }
         />

@@ -7,7 +7,7 @@ import MoveInIssueCommentThread from '../components/MoveInIssueCommentThread';
 const TenantMoveInIssuePage = () => {
   const { issueId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, api } = useAuth();
   
   const [issue, setIssue] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -18,31 +18,35 @@ const TenantMoveInIssuePage = () => {
     const fetchIssue = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`/api/move-in-issues/${issueId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json',
-          },
-        });
+        console.log('🔍 About to call API with issueId:', issueId);
+        console.log('🔍 API base URL:', api.baseURL);
+        console.log('🔍 Full URL will be:', `${api.baseURL}/move-in-issues/${issueId}`);
+        
+        const response = await api.get(`/move-in-issues/${issueId}`);
+        console.log('✅ API call successful, response:', response);
 
-        if (!response.ok) {
-          if (response.status === 403) {
-            toast.error('You are not authorized to view this issue');
-            navigate('/tenant-dashboard');
-            return;
-          }
-          if (response.status === 404) {
-            toast.error('Issue not found');
-            navigate('/tenant-dashboard');
-            return;
-          }
+        if (response.data.success) {
+          setIssue(response.data.data);
+        } else {
           throw new Error('Failed to fetch issue');
         }
-
-        const data = await response.json();
-        setIssue(data.issue);
       } catch (error) {
-        console.error('Error fetching issue:', error);
+        console.error('❌ Error fetching issue:', error);
+        console.error('❌ Error type:', typeof error);
+        console.error('❌ Error response:', error.response);
+        console.error('❌ Error status:', error.response?.status);
+        console.error('❌ Error message:', error.message);
+        
+        if (error.response?.status === 403) {
+          toast.error('You are not authorized to view this issue');
+          navigate('/tenant-dashboard');
+          return;
+        }
+        if (error.response?.status === 404) {
+          toast.error('Issue not found');
+          navigate('/tenant-dashboard');
+          return;
+        }
         toast.error('Failed to load issue details');
         navigate('/tenant-dashboard');
       } finally {
@@ -53,45 +57,33 @@ const TenantMoveInIssuePage = () => {
     if (issueId) {
       fetchIssue();
     }
-  }, [issueId, navigate]);
+  }, [issueId, navigate, api]);
 
   // Submit new comment
   const handleCommentSubmit = async (content) => {
     try {
-      const response = await fetch(`/api/move-in-issues/${issueId}/comments`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content }),
+      const response = await api.post(`/move-in-issues/${issueId}/comments`, {
+        content
       });
 
-      if (!response.ok) {
+      if (response.data.success) {
+        // Add new comment to the issue
+        setIssue(prevIssue => ({
+          ...prevIssue,
+          comments: [...prevIssue.comments, response.data.comment],
+        }));
+
+        return response.data.comment;
+      } else {
         throw new Error('Failed to submit comment');
       }
-
-      const data = await response.json();
-      
-      // Add new comment to the issue
-      setIssue(prevIssue => ({
-        ...prevIssue,
-        comments: [...prevIssue.comments, data.comment],
-      }));
-
-      return data.comment;
     } catch (error) {
       console.error('Error submitting comment:', error);
       throw error;
     }
   };
 
-  // Update issue status (tenants cannot update status anymore)
-  const handleStatusUpdate = async (newStatus) => {
-    // Tenants cannot update issue status
-    toast.error('Tenants cannot change issue status');
-    throw new Error('Tenants cannot change issue status');
-  };
+
 
   if (loading) {
     return (
@@ -137,7 +129,7 @@ const TenantMoveInIssuePage = () => {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Move-In Issue</h1>
               <p className="text-gray-600">
-                {issue.lease?.property?.name || 'Property'} • {issue.lease?.tenantGroup?.members?.[0]?.user?.name || 'Tenant'}
+                {issue.lease?.property?.name || 'Property'} • Your Issue
               </p>
             </div>
           </div>
@@ -148,7 +140,6 @@ const TenantMoveInIssuePage = () => {
         <MoveInIssueCommentThread
           issue={issue}
           onCommentSubmit={handleCommentSubmit}
-          onStatusUpdate={handleStatusUpdate}
           userRole="TENANT"
           showStatusUpdate={true}
           showCommentForm={true}

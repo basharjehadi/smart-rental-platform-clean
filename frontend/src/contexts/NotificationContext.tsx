@@ -28,7 +28,9 @@ interface Notification {
     | 'KYC_REJECTED'
     | 'PROPERTY_STATUS_CHANGED'
     | 'SYSTEM_ANNOUNCEMENT'
-    | 'ACCOUNT_UPDATED';
+    | 'ACCOUNT_UPDATED'
+    | 'MOVE_IN_ISSUE_REPORTED'
+    | 'MOVE_IN_ISSUE_UPDATED';
   entityId: string;
   title: string;
   body: string;
@@ -197,6 +199,19 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       fetchCounts();
     });
 
+    // Listen for move-in issue notifications
+    socket.on('move-in-issue:reported', (data: any) => {
+      console.log('🚨 Move-in issue reported:', data);
+      // Refresh notifications to show the new issue
+      fetchNotifications();
+    });
+
+    socket.on('move-in-issue:updated', (data: any) => {
+      console.log('🔄 Move-in issue updated:', data);
+      // Refresh notifications
+      fetchNotifications();
+    });
+
     // Listen for updated counts
     socket.on('notification:counts', (newCounts: NotificationCounts) => {
       console.log('🔔 Notification counts updated:', newCounts);
@@ -215,6 +230,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       socket.off('notification:new');
       socket.off('notification:counts');
       socket.off('notification-error');
+      socket.off('move-in-issue:reported');
+      socket.off('move-in-issue:updated');
     };
   }, [socket, user]);
 

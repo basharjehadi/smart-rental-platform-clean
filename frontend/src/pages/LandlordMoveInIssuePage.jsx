@@ -94,30 +94,7 @@ const LandlordMoveInIssuePage = () => {
     }
   };
 
-  // Update issue status
-  const handleStatusUpdate = async (newStatus) => {
-    try {
-      const response = await fetch(`/api/move-in-issues/${issueId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
 
-      if (!response.ok) {
-        throw new Error('Failed to update status');
-      }
-
-      const data = await response.json();
-      setIssue(data.issue);
-      toast.success(`Issue status updated to ${newStatus}`);
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update issue status');
-    }
-  };
 
   // Format date
   const formatDate = (dateString) => {
@@ -191,7 +168,7 @@ const LandlordMoveInIssuePage = () => {
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Move-In Issue</h1>
                 <p className="text-gray-600">
-                  {issue.lease?.property?.name || 'Property'} • {issue.lease?.tenantGroup?.members?.[0]?.user?.name || 'Tenant'}
+                  {issue.lease?.property?.name || 'Property'} • Issue from {issue.lease?.tenantGroup?.members?.[0]?.user?.name || 'Tenant'}
                 </p>
               </div>
             </div>
@@ -238,37 +215,16 @@ const LandlordMoveInIssuePage = () => {
                 </div>
               </div>
 
-              {/* Status Update */}
+              {/* Status Display */}
               <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="text-sm font-medium text-gray-500 mb-3">Update Status</h3>
-                
-                {/* Landlord Status Controls */}
-                <div className="space-y-3">
-                  {/* Mark In Progress Button - Only enabled when status is OPEN */}
-                  <button
-                    onClick={() => handleStatusUpdate('IN_PROGRESS')}
-                    disabled={issue.status !== 'OPEN'}
-                    className={`w-full px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                      issue.status === 'OPEN'
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {issue.status === 'IN_PROGRESS' ? 'Already In Progress' : 'Mark In Progress'}
-                  </button>
-                  
-                  {/* Helper Text */}
-                  <p className="text-xs text-gray-500 text-center">
-                    Only administrators can resolve or close issues.
-                  </p>
-                  
-                  {/* Status Display */}
-                  <div className="text-center">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(issue.status)}`}>
-                      Current Status: {issue.status}
-                    </span>
-                  </div>
+                <div className="text-center">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(issue.status)}`}>
+                    Current Status: {issue.status}
+                  </span>
                 </div>
+                <p className="text-xs text-gray-500 text-center mt-2">
+                  Status updates automatically when you respond to the issue.
+                </p>
               </div>
             </div>
           </div>
@@ -278,7 +234,6 @@ const LandlordMoveInIssuePage = () => {
             <MoveInIssueCommentThread
               issue={issue}
               onCommentSubmit={handleSubmitComment}
-              onStatusUpdate={handleStatusUpdate}
               userRole="LANDLORD"
               showStatusUpdate={true}
               showCommentForm={true}

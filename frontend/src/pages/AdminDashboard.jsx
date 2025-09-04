@@ -90,9 +90,7 @@ const AdminDashboard = () => {
             fetchOverduePayments(),
           ]);
           break;
-        case 'movein':
-      
-          break;
+
         case 'users':
           await fetchUsers();
           break;
@@ -1648,8 +1646,7 @@ const AdminDashboard = () => {
         return renderOverduePayments();
       case 'contracts':
         return renderContracts();
-      case 'movein':
-        return <div className='p-6 text-center text-gray-600'>Move-in issues are now managed through the dedicated Move-In Issues page.</div>;
+
       default:
         return renderOverview();
     }
@@ -1847,31 +1844,6 @@ const AdminDashboard = () => {
               </svg>
               Contracts
             </button>
-
-            {/* Move-in Issues */}
-            <Link
-              to='/admin?tab=movein'
-              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === 'movein'
-                  ? 'text-white bg-black'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              <svg
-                className='w-5 h-5 mr-3'
-                fill='none'
-                stroke='currentColor'
-                viewBox='0 0 24 24'
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth={2}
-                  d='M12 9v2m0 4h.01M5.455 19.045A8 8 0 1119.045 5.455 8 8 0 015.455 19.045z'
-                />
-              </svg>
-              Move-in Issues
-            </Link>
 
             {/* Move-in Reviews */}
             <Link

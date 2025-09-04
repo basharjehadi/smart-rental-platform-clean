@@ -41,7 +41,12 @@ export default function MoveInCenter() {
       api.get(`move-in/offers/${offerId}/status`),
     ])
       .then(([a, b]) => { 
-        if (!off) { setUi(a.data.data); setSt(b.data.data); } 
+        if (!off) { 
+          console.log('🔍 MoveInCenter: UI State Response:', a.data.data);
+          console.log('🔍 MoveInCenter: Status Response:', b.data.data);
+          setUi(a.data.data); 
+          setSt(b.data.data); 
+        } 
       })
       .catch(e => { 
         console.error('API Error:', e);
@@ -72,6 +77,18 @@ export default function MoveInCenter() {
 
 
   const canConfirm = ui?.canConfirmOrDeny && status === 'PENDING';
+
+  // Debug logging
+  console.log('🔍 MoveInCenter: Phase and permissions:', {
+    phase,
+    status,
+    canConfirm,
+    canConfirmOrDeny: ui?.canConfirmOrDeny,
+    canReportIssue: ui?.canReportIssue,
+    paymentDate,
+    leaseStart,
+    windowClose
+  });
 
     return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -131,16 +148,16 @@ export default function MoveInCenter() {
                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
                 onClick={() => api.post(`move-in/offers/${offerId}/verify`).then(()=>location.reload())}
               >
-                Confirm Move-In
+                ✅ Confirm Move-In
               </button>
-                <button
-                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
-                onClick={() => api.post(`move-in/offers/${offerId}/deny`).then(()=>location.reload())}
-                >
-                Deny Move-In
-                </button>
+              <div className="text-sm text-gray-600 flex items-center">
+                <span>or</span>
               </div>
-            )}
+              <div className="text-sm text-gray-600">
+                <span>Report a serious issue below that may result in contract cancellation</span>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="card p-6">

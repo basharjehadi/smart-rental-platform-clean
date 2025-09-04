@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { computeVerificationDeadline } from '../services/moveInVerificationService.js';
 import { applyAdminDecision } from '../services/moveInDecisionService.js';
+import { autoMarkInProgress } from '../services/moveInIssueAutomation.js';
 
 const prisma = new PrismaClient();
 
@@ -48,7 +49,16 @@ export const createComment = async (req, res) => {
             tenantGroup: {
               include: {
                 members: {
-                  select: { userId: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -58,7 +68,16 @@ export const createComment = async (req, res) => {
                   include: {
                     members: {
                       where: { role: 'OWNER' },
-                      select: { userId: true },
+                      include: {
+                        user: {
+                          select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            role: true,
+                          },
+                        },
+                      },
                     },
                   },
                 },
@@ -83,8 +102,9 @@ export const createComment = async (req, res) => {
     const isLandlord = issue.lease.property.organization.members.some(
       (member) => member.userId === userId
     );
+    const isAdmin = req.user.role === 'ADMIN';
 
-    if (!isTenant && !isLandlord) {
+    if (!isTenant && !isLandlord && !isAdmin) {
       return res.status(403).json({
         error: 'Not allowed',
         message: 'Only participants can comment on this issue',
@@ -119,6 +139,11 @@ export const createComment = async (req, res) => {
       where: { id: issueId },
       data: { updatedAt: new Date() },
     });
+
+    // Auto-mark as IN_PROGRESS if landlord is responding for the first time
+    if (req.user.role === 'LANDLORD') {
+      await autoMarkInProgress(issueId, userId);
+    }
 
     // Create notifications for other participants
     const otherParticipants = new Set();
@@ -187,7 +212,16 @@ export const getMoveInIssue = async (req, res) => {
             tenantGroup: {
               include: {
                 members: {
-                  select: { userId: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -197,7 +231,16 @@ export const getMoveInIssue = async (req, res) => {
                   include: {
                     members: {
                       where: { role: 'OWNER' },
-                      select: { userId: true },
+                      include: {
+                        user: {
+                          select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            role: true,
+                          },
+                        },
+                      },
                     },
                   },
                 },
@@ -237,8 +280,9 @@ export const getMoveInIssue = async (req, res) => {
     const isLandlord = issue.lease.property.organization.members.some(
       (member) => member.userId === userId
     );
+    const isAdmin = req.user.role === 'ADMIN';
 
-    if (!isTenant && !isLandlord) {
+    if (!isTenant && !isLandlord && !isAdmin) {
       return res.status(403).json({
         error: 'Not allowed',
         message: 'Only participants can view this issue',
@@ -247,7 +291,7 @@ export const getMoveInIssue = async (req, res) => {
 
     res.json({
       success: true,
-      issue,
+      data: issue,
     });
   } catch (error) {
     console.error('Get move-in issue error:', error);
@@ -318,6 +362,11 @@ export const createMoveInIssue = async (req, res) => {
         leases: {
           take: 1,
           orderBy: { createdAt: 'desc' }
+        },
+        rentalRequest: {
+          select: {
+            moveInDate: true
+          }
         }
       },
     });
@@ -344,8 +393,9 @@ export const createMoveInIssue = async (req, res) => {
       });
     }
 
-    // Validate move-in window
-    if (!offer.leaseStartDate) {
+    // Validate move-in window - use offer.leaseStartDate if available, otherwise fallback to rental request move-in date
+    const leaseStartDate = offer.leaseStartDate || offer.rentalRequest?.moveInDate;
+    if (!leaseStartDate) {
       return res.status(400).json({
         error: 'Move-in date not set',
         message: 'Cannot create move-in issue: move-in date has not been set for this offer',
@@ -353,7 +403,7 @@ export const createMoveInIssue = async (req, res) => {
     }
 
     const now = new Date();
-    const windowClose = computeVerificationDeadline(offer.leaseStartDate);
+    const windowClose = computeVerificationDeadline(leaseStartDate);
 
     if (now < offer.paymentDate) {
       return res.status(400).json({
@@ -468,7 +518,16 @@ export const createMoveInIssue = async (req, res) => {
             tenantGroup: {
               include: {
                 members: {
-                  select: { userId: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -478,7 +537,16 @@ export const createMoveInIssue = async (req, res) => {
                   include: {
                     members: {
                       where: { role: 'OWNER' },
-                      select: { userId: true },
+                      include: {
+                        user: {
+                          select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            role: true,
+                          },
+                        },
+                      },
                     },
                   },
                 },
@@ -522,20 +590,38 @@ export const createMoveInIssue = async (req, res) => {
       });
     }
 
-    // Create notifications
-    const notificationPromises = Array.from(otherParticipants).map((participantId) =>
-      prisma.notification.create({
-        data: {
-          userId: participantId,
-          type: 'SYSTEM_ANNOUNCEMENT',
-          entityId: moveInIssue.id,
-          title: 'New move-in issue reported',
-          body: `A new move-in issue has been reported: "${title}"`,
-        },
-      })
-    );
+    // Create notifications (with error handling to prevent rollback)
+    try {
+      const notificationPromises = Array.from(otherParticipants).map((participantId) =>
+        prisma.notification.create({
+          data: {
+            userId: participantId,
+            type: 'MOVE_IN_ISSUE_REPORTED',
+            entityId: moveInIssue.id,
+            title: 'New move-in issue reported',
+            body: `A new move-in issue has been reported: "${title}"`,
+          },
+        })
+      );
 
-    await Promise.all(notificationPromises);
+      await Promise.all(notificationPromises);
+    } catch (notificationError) {
+      console.error('Failed to create notifications for move-in issue:', notificationError);
+      // Don't fail the entire operation if notifications fail
+    }
+
+    // Emit socket events for real-time notifications
+    if (global.io) {
+      // Notify all participants about the new issue
+      Array.from(otherParticipants).forEach((participantId) => {
+        global.io.to(`user:${participantId}`).emit('move-in-issue:reported', {
+          issueId: moveInIssue.id,
+          title: moveInIssue.title,
+          propertyName: offer.property?.name || 'Unknown Property',
+          tenantName: offer.tenantGroup?.members?.[0]?.user?.name || 'Unknown Tenant'
+        });
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -586,7 +672,16 @@ export const updateIssueStatus = async (req, res) => {
             tenantGroup: {
               include: {
                 members: {
-                  select: { userId: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -596,7 +691,16 @@ export const updateIssueStatus = async (req, res) => {
                   include: {
                     members: {
                       where: { role: 'OWNER' },
-                      select: { userId: true },
+                      include: {
+                        user: {
+                          select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            role: true,
+                          },
+                        },
+                      },
                     },
                   },
                 },
@@ -621,8 +725,9 @@ export const updateIssueStatus = async (req, res) => {
     const isLandlord = issue.lease.property.organization.members.some(
       (member) => member.userId === userId
     );
+    const isAdmin = req.user.role === 'ADMIN';
 
-    if (!isTenant && !isLandlord) {
+    if (!isTenant && !isLandlord && !isAdmin) {
       return res.status(403).json({
         error: 'Not allowed',
         message: 'Only participants can update this issue',
@@ -631,9 +736,6 @@ export const updateIssueStatus = async (req, res) => {
 
     // Role-based status transition control
     const currentStatus = issue.status;
-    
-    // Check if user is admin (for RESOLVED/CLOSED statuses)
-    const isAdmin = req.user.role === 'ADMIN';
     
     // Tenants: cannot change status (only comment)
     if (isTenant) {
@@ -770,7 +872,16 @@ export const updateIssueStatus = async (req, res) => {
             tenantGroup: {
               include: {
                 members: {
-                  select: { userId: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -780,7 +891,16 @@ export const updateIssueStatus = async (req, res) => {
                   include: {
                     members: {
                       where: { role: 'OWNER' },
-                      select: { userId: true },
+                      include: {
+                        user: {
+                          select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            role: true,
+                          },
+                        },
+                      },
                     },
                   },
                 },
@@ -901,8 +1021,9 @@ export const listLeaseMoveInIssues = async (req, res) => {
     const isLandlord = lease.property.organization.members.some(
       (member) => member.userId === userId
     );
+    const isAdmin = req.user.role === 'ADMIN';
 
-    if (!isTenant && !isLandlord) {
+    if (!isTenant && !isLandlord && !isAdmin) {
       return res.status(403).json({
         error: 'Not allowed',
         message: 'Only participants can view issues for this lease',
@@ -990,7 +1111,16 @@ export const adminDecision = async (req, res) => {
             tenantGroup: {
               include: {
                 members: {
-                  select: { userId: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -1000,7 +1130,16 @@ export const adminDecision = async (req, res) => {
                   include: {
                     members: {
                       where: { role: 'OWNER' },
-                      select: { userId: true },
+                      include: {
+                        user: {
+                          select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            role: true,
+                          },
+                        },
+                      },
                     },
                   },
                 },
@@ -1178,7 +1317,16 @@ export const requestAdminReview = async (req, res) => {
             tenantGroup: {
               include: {
                 members: {
-                  select: { userId: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                      },
+                    },
+                  },
                 },
               },
             },

@@ -38,6 +38,12 @@ const startServer = async () => {
     );
     startMoveInVerificationScheduler();
 
+    // Start move-in issue automation scheduler
+    const { startMoveInIssueAutomation } = await import(
+      './services/moveInIssueAutomation.js'
+    );
+    startMoveInIssueAutomation();
+
     // Start lease lifecycle scheduler (termination execution)
     const { startLeaseLifecycleScheduler } = await import(
       './services/leaseLifecycleService.js'

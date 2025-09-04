@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
+import NotificationHeader from '../components/common/NotificationHeader';
 
 const AdminMoveInReviews = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedIssue, setSelectedIssue] = useState(null);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -15,10 +18,6 @@ const AdminMoveInReviews = () => {
     totalPages: 0,
   });
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  const navigate = useNavigate();
 
   // Load issues
   const loadIssues = async (page = 1, status = statusFilter) => {
@@ -73,45 +72,6 @@ const AdminMoveInReviews = () => {
   // Handle pagination
   const handlePageChange = (newPage) => {
     loadIssues(newPage, statusFilter);
-  };
-
-     // Handle admin decision
-   const handleAdminDecision = async (issueId, action) => {
-     try {
-       setSubmitting(true);
-       
-       const response = await api.patch(`/api/move-in-issues/${issueId}/status`, {
-         action,
-       });
-
-       if (response.data.success) {
-         // Close the detail modal
-         setShowDetailModal(false);
-         setSelectedIssue(null);
-
-         // Show success message
-         const actionText = action === 'RESOLVED' ? 'resolved (tenant approved)' : 'closed (tenant rejected)';
-         toast.success(`Issue ${actionText} successfully`);
-
-         // Navigate back to admin reviews page
-         navigate('/admin/move-in-reviews');
-
-         // Reload issues to get updated list
-         loadIssues(pagination.page, statusFilter);
-       }
-     } catch (error) {
-       console.error('Error making admin decision:', error);
-       const errorMessage = error.response?.data?.message || 'Failed to make decision';
-       toast.error(errorMessage);
-     } finally {
-       setSubmitting(false);
-     }
-   };
-
-  // View issue detail
-  const handleViewIssue = (issue) => {
-    setSelectedIssue(issue);
-    setShowDetailModal(true);
   };
 
   // Format date
@@ -170,26 +130,139 @@ const AdminMoveInReviews = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Move-In Issue Reviews</h1>
-              <p className="text-gray-600">Review and resolve move-in issues from tenants</p>
+    <div className='min-h-screen bg-white flex'>
+      {/* Sidebar */}
+      <div className='w-64 bg-gray-50 border-r border-gray-200 flex flex-col'>
+        {/* Logo */}
+        <div className='p-6 border-b border-gray-200'>
+          <div className='flex items-center'>
+            <div className='w-8 h-8 bg-black rounded-lg flex items-center justify-center mr-3'>
+              <span className='text-white font-bold text-lg'>R</span>
             </div>
-            <button
-              onClick={() => navigate('/admin')}
-              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors flex items-center space-x-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              <span>Back to Admin</span>
-            </button>
+            <span className='text-xl font-bold text-gray-900'>RentPlatform Poland</span>
           </div>
         </div>
+
+        {/* Navigation */}
+        <nav className='flex-1 p-4 space-y-2'>
+          <Link
+            to='/admin'
+            className='w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          >
+            <svg className='w-5 h-5 mr-3' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z' />
+              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z' />
+            </svg>
+            Overview
+          </Link>
+
+          <Link
+            to='/admin?tab=users'
+            className='w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          >
+            <svg className='w-5 h-5 mr-3' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z' />
+            </svg>
+            Users
+          </Link>
+
+          <Link
+            to='/admin?tab=kyc'
+            className='w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          >
+            <svg className='w-5 h-5 mr-3' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' />
+            </svg>
+            KYC Verification
+          </Link>
+
+          <Link
+            to='/admin?tab=requests'
+            className='w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          >
+            <svg className='w-5 h-5 mr-3' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' />
+            </svg>
+            Rental Requests
+          </Link>
+
+          <Link
+            to='/admin?tab=payments'
+            className='w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          >
+            <svg className='w-5 h-5 mr-3' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z' />
+            </svg>
+            Payments
+          </Link>
+
+          <Link
+            to='/admin?tab=overdue'
+            className='w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          >
+            <svg className='w-5 h-5 mr-3' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' />
+            </svg>
+            Overdue Payments
+          </Link>
+
+          <Link
+            to='/admin?tab=contracts'
+            className='w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          >
+            <svg className='w-5 h-5 mr-3' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' />
+            </svg>
+            Contracts
+          </Link>
+
+          {/* Move-in Reviews - Active */}
+          <Link
+            to='/admin/move-in-reviews'
+            className='w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors text-white bg-black'
+          >
+            <svg className='w-5 h-5 mr-3' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' />
+            </svg>
+            Move-in Reviews
+          </Link>
+        </nav>
+      </div>
+
+      {/* Main Content */}
+      <div className='flex-1 flex flex-col'>
+        {/* Header */}
+        <header className='bg-white border-b border-gray-200 px-6 py-4'>
+          <div className='flex items-center justify-between'>
+            <h1 className='text-2xl font-bold text-gray-900'>Move-In Issue Reviews</h1>
+            <div className='flex items-center space-x-4'>
+              <NotificationHeader />
+              <div className='flex items-center space-x-3'>
+                <div className='text-right'>
+                  <p className='text-sm font-medium text-gray-900'>{user?.name}</p>
+                  <p className='text-xs text-gray-500'>Administrator</p>
+                </div>
+                <div className='w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center'>
+                  <span className='text-sm font-medium text-gray-700'>{user?.name?.charAt(0)}</span>
+                </div>
+                <button
+                  onClick={logout}
+                  className='text-sm text-gray-500 hover:text-gray-700 transition-colors'
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Content */}
+        <main className='flex-1 bg-gray-50 p-6'>
+          <div className='max-w-7xl mx-auto'>
+            {/* Page Description */}
+            <div className='mb-6'>
+              <p className='text-gray-600'>Review and resolve move-in issues from tenants</p>
+            </div>
 
         {/* Filters and Stats */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -271,15 +344,9 @@ const AdminMoveInReviews = () => {
                       </div>
                     </div>
                     
-                                         <div className="ml-4 flex space-x-2">
+                                         <div className="ml-4">
                        <button
-                         onClick={() => handleViewIssue(issue)}
-                         className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-                       >
-                         View Details
-                       </button>
-                       <button
-                         onClick={() => window.open(`/admin/issue/${issue.id}`, '_blank')}
+                         onClick={() => navigate(`/admin/issue/${issue.id}`)}
                          className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm font-medium"
                        >
                          Open Issue
@@ -324,78 +391,9 @@ const AdminMoveInReviews = () => {
             </div>
           </div>
         )}
-      </div>
-
-      {/* Issue Detail Modal */}
-      {showDetailModal && selectedIssue && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">{selectedIssue.title}</h3>
-                <button
-                  onClick={() => setShowDetailModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="mb-4">
-                <p className="text-gray-600">{selectedIssue.description}</p>
-              </div>
-              
-                             <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                 <div>
-                   <span className="text-gray-500">Status:</span>
-                   <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedIssue.status)}`}>
-                     {selectedIssue.status}
-                   </span>
-                 </div>
-                 <div>
-                   <span className="text-gray-500">Tenant:</span>
-                   <span className="ml-2 text-gray-900">
-                     {selectedIssue.tenantName || 'N/A'}
-                   </span>
-                 </div>
-                 <div>
-                   <span className="text-gray-500">Property:</span>
-                   <span className="ml-2 text-gray-900">{selectedIssue.propertyTitle || 'N/A'}</span>
-                 </div>
-                 <div>
-                   <span className="text-gray-500">Offer ID:</span>
-                   <span className="ml-2 text-gray-900">{selectedIssue.offerId || 'N/A'}</span>
-                 </div>
-               </div>
-              
-                             <div className="border-t pt-4">
-                 <h4 className="text-sm font-medium text-gray-900 mb-3">Admin Actions</h4>
-                 <div className="flex space-x-3">
-                   <button
-                     onClick={() => handleAdminDecision(selectedIssue.id, 'RESOLVED')}
-                     disabled={submitting}
-                     className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50"
-                   >
-                     {submitting ? 'Processing...' : 'Resolve (approve tenant)'}
-                   </button>
-                   <button
-                     onClick={() => handleAdminDecision(selectedIssue.id, 'CLOSED')}
-                     disabled={submitting}
-                     className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50"
-                   >
-                     {submitting ? 'Processing...' : 'Close (reject)'}
-                   </button>
-                 </div>
-                 <p className="text-xs text-gray-500 mt-2">
-                   Resolve: Approves the tenant's claim • Close: Rejects the tenant's claim
-                 </p>
-               </div>
-            </div>
           </div>
-        </div>
-      )}
+        </main>
+      </div>
     </div>
   );
 };

@@ -81,7 +81,7 @@ export async function applyAdminDecision({ issueId, decision, adminId, notes = '
     if (decision === 'APPROVE') {
       console.log('✅ Processing APPROVE decision - terminating lease and processing refund');
       
-      // Mark lease as terminated
+      // 1. Mark lease as terminated
       await prisma.lease.update({
         where: { id: lease.id },
         data: {
@@ -91,7 +91,58 @@ export async function applyAdminDecision({ issueId, decision, adminId, notes = '
         },
       });
 
-      // Create refund request record (stub for now)
+      // 2. Update offer status to cancelled
+      await prisma.offer.update({
+        where: { id: lease.offerId },
+        data: {
+          status: 'CANCELLED',
+          updatedAt: now,
+        },
+      });
+
+      // 3. Unlock the rental request (remove the lock from the offer)
+      const rentalRequest = await prisma.rentalRequest.findFirst({
+        where: {
+          offers: {
+            some: { id: lease.offerId }
+          }
+        }
+      });
+
+      if (rentalRequest) {
+        await prisma.rentalRequest.update({
+          where: { id: rentalRequest.id },
+          data: {
+            lockedByOfferId: null,
+            updatedAt: now,
+          },
+        });
+        console.log('🔓 Rental request unlocked');
+      }
+
+      // 4. Update property status to available (since lease is terminated)
+      await prisma.property.update({
+        where: { id: lease.propertyId },
+        data: {
+          status: 'AVAILABLE',
+          availability: true,
+          updatedAt: now,
+        },
+      });
+
+      // 5. Mark all related payments as refunded
+      await prisma.payment.updateMany({
+        where: {
+          offerId: lease.offerId,
+          status: { in: ['COMPLETED', 'PENDING'] }
+        },
+        data: {
+          status: 'REFUNDED',
+          updatedAt: now,
+        },
+      });
+
+      // 6. Create refund request record (stub for now)
       // TODO: Implement RefundRequest model when payment system is ready
       const refundAmount = lease.offer.depositAmount || lease.offer.rentAmount;
       const tenantId = lease.offer.tenantGroup.members[0]?.userId;
@@ -111,17 +162,7 @@ export async function applyAdminDecision({ issueId, decision, adminId, notes = '
       // For now, we'll just log the refund action
       // In production, this would create a RefundRequest record and integrate with payment provider
 
-      // Update property status to available (since lease is terminated)
-      await prisma.property.update({
-        where: { id: lease.propertyId },
-        data: {
-          status: 'AVAILABLE',
-          availability: true,
-          updatedAt: now,
-        },
-      });
-
-      console.log('🏠 Property marked as available');
+      console.log('🏠 Property marked as available and tenant data cleaned up');
 
     } else if (decision === 'REJECT') {
       console.log('❌ Processing REJECT decision - no lease changes, issue closed');
@@ -161,12 +202,16 @@ export async function applyAdminDecision({ issueId, decision, adminId, notes = '
       success: true,
       actions: {
         leaseUpdated: decision === 'APPROVE',
-        refundRequestCreated: decision === 'APPROVE',
+        offerCancelled: decision === 'APPROVE',
+        rentalRequestUnlocked: decision === 'APPROVE',
         propertyUpdated: decision === 'APPROVE',
+        paymentsRefunded: decision === 'APPROVE',
+        refundRequestCreated: decision === 'APPROVE',
         auditLogCreated: true,
       },
       refundRequestId: decision === 'APPROVE' ? 'STUB_' + Date.now() : null,
       leaseStatus: decision === 'APPROVE' ? 'TERMINATED' : lease.status,
+      propertyStatus: decision === 'APPROVE' ? 'AVAILABLE' : 'RENTED',
     };
 
   } catch (error) {

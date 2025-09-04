@@ -324,6 +324,11 @@ export const getMoveInUIState = async (req, res) => {
               select: { userId: true }
             }
           }
+        },
+        rentalRequest: {
+          select: {
+            moveInDate: true
+          }
         }
       }
     });
@@ -345,7 +350,8 @@ export const getMoveInUIState = async (req, res) => {
     }
 
     // Get lease start date and payment date
-    const leaseStart = offer.leaseStartDate;
+    // Use offer.leaseStartDate if available, otherwise fallback to rental request move-in date
+    const leaseStart = offer.leaseStartDate || offer.rentalRequest?.moveInDate;
     const paymentDate = offer.paymentDate;
     const windowClose = leaseStart ? computeVerificationDeadline(leaseStart) : null;
     
@@ -356,13 +362,18 @@ export const getMoveInUIState = async (req, res) => {
       console.warn(`Offer ${id} has no payment date`);
     }
 
+    // Normalize all dates to UTC for consistent comparison
+    const nowUTC = new Date(now.toISOString());
+    const paymentDateUTC = paymentDate ? new Date(paymentDate.toISOString()) : null;
+    const windowCloseUTC = windowClose ? new Date(windowClose.toISOString()) : null;
+
     // Determine window phase
     // Window opens from payment date and closes 2 days after expected move-in date
     let phase = 'PRE_MOVE_IN';
-    if (paymentDate && windowClose) {
-      if (now >= paymentDate && now < windowClose) {
+    if (paymentDateUTC && windowCloseUTC) {
+      if (nowUTC >= paymentDateUTC && nowUTC < windowCloseUTC) {
         phase = 'WINDOW_OPEN';
-      } else if (now >= windowClose) {
+      } else if (nowUTC >= windowCloseUTC) {
         phase = 'WINDOW_CLOSED';
       }
     }
@@ -370,9 +381,9 @@ export const getMoveInUIState = async (req, res) => {
     // Determine permissions
     const canConfirmOrDeny = isTenantMember && 
       offer.moveInVerificationStatus === 'PENDING' && 
-      paymentDate && 
+      paymentDateUTC && 
       phase !== 'WINDOW_CLOSED' &&
-      now < windowClose;
+      nowUTC < windowCloseUTC;
 
     const canReportIssue = phase === 'WINDOW_OPEN';
     
@@ -381,13 +392,17 @@ export const getMoveInUIState = async (req, res) => {
       offerId: id,
       userId,
       now: now.toISOString(),
+      nowUTC: nowUTC.toISOString(),
       paymentDate: paymentDate?.toISOString(),
+      paymentDateUTC: paymentDateUTC?.toISOString(),
       leaseStart: leaseStart?.toISOString(),
       windowClose: windowClose?.toISOString(),
+      windowCloseUTC: windowCloseUTC?.toISOString(),
       phase,
       verificationStatus: offer.moveInVerificationStatus,
       canConfirmOrDeny,
-      canReportIssue
+      canReportIssue,
+      timezone: 'UTC normalized for comparison'
     });
 
     return res.json({

@@ -27,7 +27,11 @@ export const AuthProvider = ({ children }) => {
           'Content-Type': 'application/json',
         },
       });
-      if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
+      if (!res.ok) {
+        const error = new Error(`GET ${url} failed: ${res.status}`);
+        error.response = { status: res.status, data: await res.json().catch(() => ({})) };
+        throw error;
+      }
       const data = await res.json();
       return { data, ...data, status: res.status };
     },
@@ -46,7 +50,11 @@ export const AuthProvider = ({ children }) => {
         headers: { ...headers, ...(options.headers || {}) },
         body: isForm ? body : JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`POST ${url} failed: ${res.status}`);
+      if (!res.ok) {
+        const error = new Error(`POST ${url} failed: ${res.status}`);
+        error.response = { status: res.status, data: await res.json().catch(() => ({})) };
+        throw error;
+      }
       const data = await res.json();
       return { data, ...data, status: res.status };
     },
