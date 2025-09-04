@@ -72,12 +72,20 @@ const getLandlordDashboard = async (req, res) => {
       },
     });
 
-    // Calculate portfolio metrics based on offers
+    // Calculate portfolio metrics
     const totalProperties = properties.length;
-    const totalOffers = properties.reduce(
-      (sum, property) => sum + property.offers.length,
-      0
-    );
+    // Use distinct property IDs from Unit records to avoid historical duplicates
+    // Fallback to totalProperties if no units exist
+    const unitPropertyRows = await prisma.unit.findMany({
+      where: {
+        property: {
+          organization: { members: { some: { userId: landlordId } } },
+        },
+      },
+      select: { propertyId: true },
+      distinct: ['propertyId'],
+    });
+    const totalUnits = unitPropertyRows.length > 0 ? unitPropertyRows.length : totalProperties;
     // Only count PAID offers that were not cancelled via move-in review
     const activeOffers = properties.reduce(
       (sum, property) =>
@@ -289,7 +297,7 @@ const getLandlordDashboard = async (req, res) => {
       // Portfolio metrics
       totalProperties,
       activeProperties: totalProperties,
-      totalUnits: totalOffers, // Using offers instead of units
+      totalUnits, // Real unit count across landlord portfolio
       occupiedUnits: activeOffers, // Using active offers instead of occupied units
       vacantUnits: vacantProperties, // Using vacant properties instead of vacant units
       occupancyRate,

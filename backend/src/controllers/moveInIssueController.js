@@ -590,21 +590,28 @@ export const createMoveInIssue = async (req, res) => {
       });
     }
 
-    // Create notifications (with error handling to prevent rollback)
+    // Create notifications (with error handling to prevent rollback) and emit in real-time
     try {
-      const notificationPromises = Array.from(otherParticipants).map((participantId) =>
-        prisma.notification.create({
-          data: {
-            userId: participantId,
-            type: 'MOVE_IN_ISSUE_REPORTED',
-            entityId: moveInIssue.id,
-            title: 'New move-in issue reported',
-            body: `A new move-in issue has been reported: "${title}"`,
-          },
-        })
+      const createdNotifs = await Promise.all(
+        Array.from(otherParticipants).map(async (participantId) => ({
+          participantId,
+          notification: await prisma.notification.create({
+            data: {
+              userId: participantId,
+              type: 'MOVE_IN_ISSUE_REPORTED',
+              entityId: moveInIssue.id,
+              title: 'New move-in issue reported',
+              body: `A new move-in issue has been reported: "${title}"`,
+            },
+          }),
+        }))
       );
 
-      await Promise.all(notificationPromises);
+      if (global.io?.emitNotification) {
+        for (const { participantId, notification } of createdNotifs) {
+          await global.io.emitNotification(participantId, notification);
+        }
+      }
     } catch (notificationError) {
       console.error('Failed to create notifications for move-in issue:', notificationError);
       // Don't fail the entire operation if notifications fail

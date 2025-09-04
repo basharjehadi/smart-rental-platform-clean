@@ -109,39 +109,8 @@ const TenantDashboard = () => {
   };
 
   const renderMoveInVerificationCard = request => {
-    if (request.status !== 'LOCKED' || !Array.isArray(request.offers))
-      return null;
-    const paidOffer = request.offers.find(o => o.status === 'PAID');
-    if (!paidOffer) return null;
-
-    const handleConfirm = async () => {
-      try {
-        await api.post(`/move-in/offers/${paidOffer.id}/verify`);
-        fetchRequests();
-      } catch {}
-    };
-
-    const handleDeny = async () => {
-      try {
-        await api.post(`/move-in/offers/${paidOffer.id}/deny`);
-        fetchRequests();
-      } catch {}
-    };
-
-    const handleReportIssueClick = () => {
-      handleReportIssue(request, paidOffer);
-    };
-
-    return (
-      <div className="mt-3">
-        <MoveInVerificationBanner
-          offerId={paidOffer.id}
-          onConfirm={handleConfirm}
-          onDeny={handleDeny}
-          onReportIssue={handleReportIssueClick}
-        />
-      </div>
-    );
+    // Completely removed - no longer showing move-in verification banner
+    return null;
   };
 
   const handleLogout = () => {

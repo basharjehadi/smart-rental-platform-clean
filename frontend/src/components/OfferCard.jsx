@@ -223,21 +223,21 @@ const OfferCard = ({
           </div>
         )}
 
-        {/* Move-In Button for Paid Offers Only */}
-        {status === 'PAID' && (
+        {/* Move-In Button for Paid Offers Only - Hide when move-in is verified */}
+        {status === 'PAID' && moveInState?.data?.verificationStatus !== 'VERIFIED' && (
           <div className='pt-4 border-t border-gray-200'>
             <button
               onClick={() => navigate(`/move-in?offerId=${offerId}`)}
-              disabled={moveInState?.window?.phase === 'WINDOW_CLOSED'}
+              disabled={moveInState?.data?.window?.phase === 'WINDOW_CLOSED'}
               className={`w-full px-4 py-2 rounded-lg transition-colors ${
-                moveInState?.window?.phase === 'WINDOW_CLOSED'
+                moveInState?.data?.window?.phase === 'WINDOW_CLOSED'
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-purple-600 text-white hover:bg-purple-700'
               }`}
               title={
-                moveInState?.window?.phase === 'PRE_MOVE_IN'
+                moveInState?.data?.window?.phase === 'PRE_MOVE_IN'
                   ? 'Opens at check-in'
-                  : moveInState?.window?.phase === 'WINDOW_CLOSED'
+                  : moveInState?.data?.window?.phase === 'WINDOW_CLOSED'
                   ? 'Window closed'
                   : 'Access move-in center'
               }

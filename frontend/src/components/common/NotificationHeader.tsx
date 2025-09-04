@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import NotificationBadge from './NotificationBadge';
 
 interface NotificationHeaderProps {
@@ -23,9 +24,10 @@ interface NotificationHeaderProps {
 const NotificationHeader: React.FC<NotificationHeaderProps> = ({
   className = '',
 }) => {
-  const { counts, notifications, markAsRead, markAllAsRead } =
+  const { counts, notifications, markAllAsRead } =
     useNotifications();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -45,57 +47,36 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({
   }, []);
 
   const handleNotificationClick = async (notification: any) => {
-    if (!notification.isRead) {
-      await markAsRead(notification.id);
-    }
+    // Define navigation mapping for clickable notifications
+    const getNavigationPath = (type: string, userRole: string) => {
+      switch (type) {
+        case 'NEW_RENTAL_REQUEST':
+          return '/tenant-rental-requests'; // landlord page
+        case 'NEW_OFFER':
+          return '/my-offers'; // tenant page
+        case 'MOVE_IN_ISSUE_REPORTED':
+          return '/landlord-my-property'; // landlord page
+        case 'PAYMENT_CONFIRMED':
+          return userRole === 'LANDLORD' ? '/landlord-dashboard' : '/payment-history';
+        case 'CONTRACT_UPDATED':
+          return userRole === 'LANDLORD' ? '/landlord-my-tenants' : '/tenant-dashboard';
+        case 'KYC_APPROVED':
+        case 'KYC_REJECTED':
+        case 'ACCOUNT_UPDATED':
+          return userRole === 'LANDLORD' ? '/landlord-profile' : '/tenant-profile';
+        case 'PROPERTY_STATUS_CHANGED':
+          return '/landlord-my-property'; // landlord page
+        default:
+          return null; // Not clickable
+      }
+    };
 
-    // Handle navigation based on notification type
-    switch (notification.type) {
-      case 'NEW_RENTAL_REQUEST':
-        // Business notification - handled by sidebar
-        break;
-      case 'NEW_OFFER':
-        // Business notification - handled by sidebar
-        break;
-      case 'PAYMENT_CONFIRMED':
-      case 'PAYMENT_FAILED':
-        // Navigate to payment history
-        window.location.href = '/payment-history';
-        break;
-      case 'CONTRACT_UPDATED':
-      case 'CONTRACT_SIGNED':
-        // Navigate to contract management
-        window.location.href = '/contract-management';
-        break;
-      case 'KYC_APPROVED':
-      case 'KYC_REJECTED':
-        // Navigate to profile page
-        window.location.href =
-          user?.role === 'LANDLORD' ? '/landlord-profile' : '/tenant-profile';
-        break;
-      case 'PROPERTY_STATUS_CHANGED':
-        // Navigate to property details or properties list
-        if (user?.role === 'LANDLORD') {
-          window.location.href = '/landlord-my-property';
-        }
-        break;
-      case 'MOVE_IN_ISSUE_REPORTED':
-      case 'MOVE_IN_ISSUE_UPDATED':
-        // Navigate to move-in issue page
-        if (user?.role === 'LANDLORD') {
-          window.location.href = `/landlord/issue/${notification.entityId}`;
-        } else {
-          window.location.href = `/tenant/issue/${notification.entityId}`;
-        }
-        break;
-      case 'SYSTEM_ANNOUNCEMENT':
-      case 'ACCOUNT_UPDATED':
-        // System notifications - no specific navigation needed
-        break;
-      default:
-        break;
+    const path = getNavigationPath(notification.type, user?.role || '');
+    
+    if (path) {
+      navigate(path);
     }
-
+    
     setIsOpen(false);
   };
 
@@ -267,14 +248,20 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({
 
               return (
                 <div className='divide-y divide-gray-100'>
-                  {filteredNotifications.slice(0, 10).map(notification => (
-                    <div
-                      key={notification.id}
-                      onClick={() => handleNotificationClick(notification)}
-                      className={`px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors duration-200 ${
-                        notification.isRead ? 'opacity-75' : ''
-                      }`}
-                    >
+                  {filteredNotifications.slice(0, 10).map(notification => {
+                    // Check if notification is clickable
+                    const isClickable = ['NEW_RENTAL_REQUEST', 'NEW_OFFER', 'MOVE_IN_ISSUE_REPORTED', 
+                      'PAYMENT_CONFIRMED', 'CONTRACT_UPDATED', 'KYC_APPROVED', 'KYC_REJECTED', 
+                      'PROPERTY_STATUS_CHANGED', 'ACCOUNT_UPDATED'].includes(notification.type);
+                    
+                    return (
+                      <div
+                        key={notification.id}
+                        onClick={isClickable ? () => handleNotificationClick(notification) : undefined}
+                        className={`px-4 py-3 transition-colors duration-200 ${
+                          isClickable ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default'
+                        } ${notification.isRead ? 'opacity-75' : ''}`}
+                      >
                       <div className='flex items-start space-x-3'>
                         <div className='flex-shrink-0 mt-0.5'>
                           {getNotificationIcon(notification.type)}
@@ -309,13 +296,14 @@ const NotificationHeader: React.FC<NotificationHeaderProps> = ({
                             </span>
 
                             <div className='flex items-center space-x-2'>
-                              <ExternalLink className='w-3 h-3 text-gray-400' />
+                              {isClickable && <ExternalLink className='w-3 h-3 text-gray-400' />}
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               );
             })()}

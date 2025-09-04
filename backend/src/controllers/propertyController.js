@@ -105,7 +105,14 @@ export const getLandlordProperties = async (req, res) => {
       
       return {
         ...rest,
-        moveInIssues: moveInIssuesSummary
+        // Surface minimal offers info so UI can show move-in confirmed badge
+        offers: (offers || []).map(o => ({
+          id: o.id,
+          moveInVerificationStatus: o.moveInVerificationStatus,
+          leaseStartDate: o.leaseStartDate,
+          rentalRequest: o.rentalRequest,
+        })),
+        moveInIssues: moveInIssuesSummary,
       };
     });
 

@@ -76,8 +76,11 @@ export default function MoveInCenter() {
 
 
 
-  // Hide confirm when any issue exists for this offer
+  // Hide confirm when any issue exists for this offer OR when move-in is already verified
   const canConfirm = ui?.canConfirmOrDeny && status === 'PENDING' && moveInIssues.length === 0;
+  
+  // Hide report issue button when move-in is verified
+  const canReportIssue = ui?.canReportIssue && moveInIssues.length === 0 && status !== 'VERIFIED';
 
   // Debug logging
   console.log('🔍 MoveInCenter: Phase and permissions:', {
@@ -129,10 +132,18 @@ export default function MoveInCenter() {
                 </div>
               )}
 
-          {phase === 'WINDOW_OPEN' && (
+          {phase === 'WINDOW_OPEN' && status !== 'VERIFIED' && (
             <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-green-800">
                 Issue window is open! You can report issues from payment date until <strong>{windowClose}</strong> (2 days after move-in).
+                  </p>
+                </div>
+              )}
+
+          {phase === 'WINDOW_OPEN' && status === 'VERIFIED' && (
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-green-800">
+                🎉 <strong>Congratulations!</strong> You have successfully confirmed your move-in to your new place. We hope you enjoy your new home!
                   </p>
                 </div>
               )}
@@ -161,105 +172,108 @@ export default function MoveInCenter() {
           )}
         </section>
 
-        <section className="card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold">Move-In Issues</h3>
-            {ui?.canReportIssue && moveInIssues.length === 0 && (
-              <button 
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
-                onClick={() => setShowReportModal(true)}
-              >
-                Report Move-In Issue
-              </button>
-            )}
-          </div>
+        {/* Hide Move-In Issues section when move-in is verified */}
+        {status !== 'VERIFIED' && (
+          <section className="card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">Move-In Issues</h3>
+              {canReportIssue && (
+                <button 
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
+                  onClick={() => setShowReportModal(true)}
+                >
+                  Report Move-In Issue
+                </button>
+              )}
+            </div>
 
-          {issuesLoading ? (
-            <div className="animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
-              <div className="space-y-3">
-                <div className="h-3 bg-gray-200 rounded"></div>
-                <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+            {issuesLoading ? (
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
+                <div className="space-y-3">
+                  <div className="h-3 bg-gray-200 rounded"></div>
+                  <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+                </div>
               </div>
-            </div>
-          ) : moveInIssues.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="text-gray-400 text-4xl mb-4">✅</div>
-              <p className="text-gray-600 text-lg mb-2">No issues reported</p>
-              <p className="text-gray-500">Your move-in is going smoothly!</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {moveInIssues.map(issue => (
-                <div key={issue.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h4 className="text-lg font-semibold text-gray-900">
-                          {issue.title}
-                        </h4>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          issue.status === 'OPEN' ? 'bg-red-100 text-red-800' :
-                          issue.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
-                          issue.status === 'RESOLVED' ? 'bg-green-100 text-green-800' :
-                          issue.status === 'ESCALATED' ? 'bg-purple-100 text-purple-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {issue.status}
-                        </span>
+            ) : moveInIssues.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-gray-400 text-4xl mb-4">✅</div>
+                <p className="text-gray-600 text-lg mb-2">No issues reported</p>
+                <p className="text-gray-500">Your move-in is going smoothly!</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {moveInIssues.map(issue => (
+                  <div key={issue.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="text-lg font-semibold text-gray-900">
+                            {issue.title}
+                          </h4>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            issue.status === 'OPEN' ? 'bg-red-100 text-red-800' :
+                            issue.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
+                            issue.status === 'RESOLVED' ? 'bg-green-100 text-green-800' :
+                            issue.status === 'ESCALATED' ? 'bg-purple-100 text-purple-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {issue.status}
+                          </span>
+                        </div>
+                        <p className="text-gray-600 mb-3">
+                          {issue.description}
+                        </p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-500">Created:</span>
+                            <p className="font-medium">
+                              {new Date(issue.createdAt).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Comments:</span>
+                            <p className="font-medium">
+                              {issue.comments?.length || 0}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Last Updated:</span>
+                            <p className="font-medium">
+                              {new Date(issue.updatedAt).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-gray-600 mb-3">
-                        {issue.description}
-                      </p>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-500">Created:</span>
-                          <p className="font-medium">
-                            {new Date(issue.createdAt).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                            })}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Comments:</span>
-                          <p className="font-medium">
-                            {issue.comments?.length || 0}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Last Updated:</span>
-                          <p className="font-medium">
-                            {new Date(issue.updatedAt).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                            })}
-                          </p>
-                        </div>
+                      <div className="ml-4">
+                        <button
+                          onClick={() => {
+                            if (user?.role === 'LANDLORD') {
+                              navigate(`/landlord/issue/${issue.id}`);
+                            } else {
+                              navigate(`/tenant/issue/${issue.id}`);
+                            }
+                          }}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                        >
+                          View Details
+                        </button>
                       </div>
-                    </div>
-                    <div className="ml-4">
-                      <button
-                        onClick={() => {
-                          if (user?.role === 'LANDLORD') {
-                            navigate(`/landlord/issue/${issue.id}`);
-                          } else {
-                            navigate(`/tenant/issue/${issue.id}`);
-                          }
-                        }}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                      >
-                        View Details
-                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </div>
 
       {/* Report Issue Modal */}

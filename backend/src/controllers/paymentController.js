@@ -3,9 +3,50 @@ import { prisma } from '../utils/prisma.js';
 import { sendPaymentSuccess } from '../utils/emailService.js';
 import { activateConversationAfterPayment } from '../utils/chatGuard.js';
 import propertyAvailabilityService from '../services/propertyAvailabilityService.js';
+import { NotificationService } from '../services/notificationService.js';
 import reviewService from '../services/reviewService.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// Notify landlord organization owners about a tenant payment (initial or monthly)
+async function notifyLandlordOfPayment(offerId, amount, purpose, paymentId) {
+  try {
+    const offer = await prisma.offer.findUnique({
+      where: { id: offerId },
+      select: { organizationId: true, propertyId: true, rentalRequestId: true },
+    });
+    if (!offer?.organizationId) return;
+
+    const owners = await prisma.organizationMember.findMany({
+      where: { organizationId: offer.organizationId, role: 'OWNER' },
+      select: { userId: true },
+    });
+    if (!owners.length) return;
+
+    const title =
+      purpose === 'DEPOSIT_AND_FIRST_MONTH'
+        ? 'Initial payment received'
+        : 'Monthly rent payment received';
+    const body =
+      purpose === 'DEPOSIT_AND_FIRST_MONTH'
+        ? `Tenant completed the initial payment (deposit/first month): ${amount} PLN.`
+        : `Tenant completed a monthly rent payment: ${amount} PLN.`;
+
+    for (const owner of owners) {
+      try {
+        const notif = await NotificationService.createPaymentNotification(
+          owner.userId,
+          String(paymentId || offerId),
+          'SUCCEEDED',
+          amount
+        );
+        // createPaymentNotification already emits via socket
+      } catch {}
+    }
+  } catch (e) {
+    console.error('⚠️ Failed to notify landlord of payment:', e.message || e);
+  }
+}
 
 // Helper function to get rental request ID from offer ID
 const getRentalRequestId = async (offerId) => {
@@ -135,6 +176,11 @@ const completeMockPayment = async (req, res) => {
 
       console.log('✅ Created general payment record:', generalPayment.id);
 
+      // Notify landlord in real-time about monthly rent
+      try {
+        await notifyLandlordOfPayment(offerId, amount, 'MONTHLY_RENT', generalPayment.id);
+      } catch {}
+
       const rentPayments = [];
 
       console.log('🔍 Processing selected payments:', selectedPayments);
@@ -233,6 +279,10 @@ const completeMockPayment = async (req, res) => {
         '✅ Created DEPOSIT_AND_FIRST_MONTH payment record:',
         depositPayment.id
       );
+      // Notify landlord in real-time about initial payment
+      try {
+        await notifyLandlordOfPayment(offerId, amount, 'DEPOSIT_AND_FIRST_MONTH', depositPayment.id);
+      } catch {}
       console.log('✅ Payment linked to offerId:', offerId);
 
       // Update offer status to PAID

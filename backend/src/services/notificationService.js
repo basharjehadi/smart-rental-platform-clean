@@ -314,5 +314,22 @@ export async function createManyRentalRequestNotifications(items) {
       data: notifications,
       skipDuplicates: true,
     });
+    // Emit to each landlord user in real time
+    if (io?.emitNotification) {
+      for (const n of notifications) {
+        try {
+          await io.emitNotification(n.userId, {
+            id: 'bulk',
+            userId: n.userId,
+            type: n.type,
+            entityId: n.entityId,
+            title: n.title,
+            body: n.body,
+            isRead: false,
+            createdAt: n.createdAt,
+          });
+        } catch {}
+      }
+    }
   }
 }

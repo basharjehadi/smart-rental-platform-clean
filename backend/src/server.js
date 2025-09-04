@@ -68,6 +68,10 @@ const startServer = async () => {
     app.set('io', io);
     logger.info('🔌 Socket.io instance made available to Express app');
 
+    // Expose io globally for background services/controllers that lack req context
+    global.io = io;
+    logger.info('🔔 Socket.io instance exposed globally');
+
     // Connect Socket.io to notification service
     const { setSocketIO } = await import('./services/notificationService.js');
     setSocketIO(io);

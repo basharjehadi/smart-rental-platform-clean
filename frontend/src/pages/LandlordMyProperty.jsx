@@ -514,6 +514,11 @@ const LandlordMyProperty = () => {
                           <span>
                             Available: {formatDate(property.availableFrom)}
                           </span>
+                          {property.offers?.some?.(o => o.moveInVerificationStatus === 'VERIFIED' || o.moveInVerificationStatus === 'SUCCESS') && (
+                            <span className='ml-3 inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold bg-green-100 text-green-700'>
+                              Tenant confirmed move-in
+                            </span>
+                          )}
                         </div>
 
 
