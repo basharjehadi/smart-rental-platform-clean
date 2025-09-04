@@ -1,110 +1,50 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { toast } from 'react-hot-toast';
 import MoveInIssueCommentThread from '../components/MoveInIssueCommentThread';
 
-const TenantMoveInIssuePage = () => {
+export default function TenantMoveInIssuePage() {
   const { issueId } = useParams();
   const navigate = useNavigate();
-  const { user, api } = useAuth();
-  
+  const { api } = useAuth();
   const [issue, setIssue] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [err, setErr] = useState(null);
 
-  // Fetch issue details
-  useEffect(() => {
-    const fetchIssue = async () => {
-      try {
-        setLoading(true);
-        console.log('🔍 About to call API with issueId:', issueId);
-        console.log('🔍 API base URL:', api.baseURL);
-        console.log('🔍 Full URL will be:', `${api.baseURL}/move-in-issues/${issueId}`);
-        
-        const response = await api.get(`/move-in-issues/${issueId}`);
-        console.log('✅ API call successful, response:', response);
-
-        if (response.data.success) {
-          setIssue(response.data.data);
-        } else {
-          throw new Error('Failed to fetch issue');
-        }
-      } catch (error) {
-        console.error('❌ Error fetching issue:', error);
-        console.error('❌ Error type:', typeof error);
-        console.error('❌ Error response:', error.response);
-        console.error('❌ Error status:', error.response?.status);
-        console.error('❌ Error message:', error.message);
-        
-        if (error.response?.status === 403) {
-          toast.error('You are not authorized to view this issue');
-          navigate('/tenant-dashboard');
-          return;
-        }
-        if (error.response?.status === 404) {
-          toast.error('Issue not found');
-          navigate('/tenant-dashboard');
-          return;
-        }
-        toast.error('Failed to load issue details');
-        navigate('/tenant-dashboard');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (issueId) {
-      fetchIssue();
-    }
-  }, [issueId, navigate, api]);
-
-  // Submit new comment
-  const handleCommentSubmit = async (content) => {
+  async function load() {
+    if (!issueId) { setErr('Missing issue id'); setLoading(false); return; }
     try {
-      const response = await api.post(`/move-in-issues/${issueId}/comments`, {
-        content
-      });
-
-      if (response.data.success) {
-        // Add new comment to the issue
-        setIssue(prevIssue => ({
-          ...prevIssue,
-          comments: [...prevIssue.comments, response.data.comment],
-        }));
-
-        return response.data.comment;
-      } else {
-        throw new Error('Failed to submit comment');
-      }
-    } catch (error) {
-      console.error('Error submitting comment:', error);
-      throw error;
+      setLoading(true);
+      const { data } = await api.get(`move-in-issues/${issueId}`);
+      setIssue(data);
+      setErr(null);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e?.message || 'Failed to fetch issue';
+      console.error('Tenant issue fetch failed:', e?.response?.status, msg);
+      setErr(msg);
+      if (e?.response?.status === 401) navigate('/tenant-dashboard');
+    } finally {
+      setLoading(false);
     }
-  };
-
-
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading issue details...</p>
-        </div>
-      </div>
-    );
   }
 
-  if (!issue) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600">Issue not found</p>
-        </div>
-      </div>
-    );
+  useEffect(() => { load(); }, [issueId]);
+
+  // posting comments (if present on this page)
+  async function submitComment(formData) {
+    try {
+      await api.post(`move-in-issues/${issueId}/comments`, formData);
+      await load();
+    } catch (e) {
+      alert(e?.response?.data?.error || 'Failed to post comment');
+    }
   }
+
+
+
+  if (loading) return <div className="p-4">Loading...</div>;
+  if (err) return <div className="p-4 text-red-600">Error: {err}</div>;
+  if (!issue) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -139,7 +79,7 @@ const TenantMoveInIssuePage = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <MoveInIssueCommentThread
           issue={issue}
-          onCommentSubmit={handleCommentSubmit}
+          onCommentSubmit={submitComment}
           userRole="TENANT"
           showStatusUpdate={true}
           showCommentForm={true}
@@ -147,6 +87,4 @@ const TenantMoveInIssuePage = () => {
       </div>
     </div>
   );
-};
-
-export default TenantMoveInIssuePage;
+}

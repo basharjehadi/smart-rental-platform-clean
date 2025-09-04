@@ -1,98 +1,44 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { toast } from 'react-hot-toast';
 import MoveInIssueCommentThread from '../components/MoveInIssueCommentThread';
 
-const LandlordMoveInIssuePage = () => {
+export default function LandlordMoveInIssuePage() {
   const { issueId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  
+  const { api } = useAuth();
   const [issue, setIssue] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [commentError, setCommentError] = useState('');
+  const [err, setErr] = useState(null);
 
-  // Fetch issue details
-  useEffect(() => {
-    const fetchIssue = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/move-in-issues/${issueId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          if (response.status === 403) {
-            toast.error('You are not authorized to view this issue');
-            navigate('/landlord-dashboard');
-            return;
-          }
-          if (response.status === 404) {
-            toast.error('Issue not found');
-            navigate('/landlord-dashboard');
-            return;
-          }
-          throw new Error('Failed to fetch issue');
-        }
-
-        const data = await response.json();
-        setIssue(data.issue);
-      } catch (error) {
-        console.error('Error fetching issue:', error);
-        toast.error('Failed to load issue details');
-        navigate('/landlord-dashboard');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (issueId) {
-      fetchIssue();
-    }
-  }, [issueId, navigate]);
-
-  // Submit new comment
-  const handleSubmitComment = async (formData) => {
+  async function load() {
+    if (!issueId) { setErr('Missing issue id'); setLoading(false); return; }
     try {
-      setSubmitting(true);
-      setCommentError('');
-
-      const response = await fetch(`/api/move-in-issues/${issueId}/comments`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          // Don't set Content-Type for FormData, let browser set it with boundary
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to submit comment');
-      }
-
-      const data = await response.json();
-      
-      // Add new comment to the issue
-      setIssue(prevIssue => ({
-        ...prevIssue,
-        comments: [...prevIssue.comments, data.comment],
-      }));
-
-      toast.success('Comment submitted successfully');
-      return data.comment;
-    } catch (error) {
-      console.error('Error submitting comment:', error);
-      toast.error('Failed to submit comment');
-      throw error;
+      setLoading(true);
+      const { data } = await api.get(`move-in-issues/${issueId}`);
+      setIssue(data);
+      setErr(null);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e?.message || 'Failed to fetch issue';
+      console.error('Landlord issue fetch failed:', e?.response?.status, msg);
+      setErr(msg);
+      if (e?.response?.status === 401) navigate('/landlord-dashboard');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
-  };
+  }
+
+  useEffect(() => { load(); }, [issueId]);
+
+  // posting comments (if present on this page)
+  async function submitComment(formData) {
+    try {
+      await api.post(`move-in-issues/${issueId}/comments`, formData);
+      await load();
+    } catch (e) {
+      alert(e?.response?.data?.error || 'Failed to post comment');
+    }
+  }
 
 
 
@@ -129,26 +75,9 @@ const LandlordMoveInIssuePage = () => {
     return colors[priority] || 'bg-gray-100 text-gray-800';
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading issue details...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!issue) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600">Issue not found</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="p-4">Loading...</div>;
+  if (err) return <div className="p-4 text-red-600">Error: {err}</div>;
+  if (!issue) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -233,7 +162,7 @@ const LandlordMoveInIssuePage = () => {
           <div className="lg:col-span-2">
             <MoveInIssueCommentThread
               issue={issue}
-              onCommentSubmit={handleSubmitComment}
+              onCommentSubmit={submitComment}
               userRole="LANDLORD"
               showStatusUpdate={true}
               showCommentForm={true}
@@ -243,6 +172,4 @@ const LandlordMoveInIssuePage = () => {
       </div>
     </div>
   );
-};
-
-export default LandlordMoveInIssuePage;
+}

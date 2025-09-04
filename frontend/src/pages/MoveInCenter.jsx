@@ -282,8 +282,8 @@ export default function MoveInCenter() {
                 offerId={offerId}
                 onSuccess={(issueId) => {
                   setShowReportModal(false);
-                  // Refresh the issues list to show the new issue
-                  fetchMoveInIssues();
+                  // Navigate to the tenant issue page
+                  navigate(`/tenant/issue/${issueId}`);
                 }}
                 onCancel={() => setShowReportModal(false)}
               />
