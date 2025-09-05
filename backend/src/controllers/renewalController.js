@@ -1,4 +1,5 @@
 import { prisma } from '../utils/prisma.js';
+import { NotificationService } from '../services/notificationService.js';
 
 const ensureLandlordCanSetPrice = async (
   userId,
@@ -52,8 +53,57 @@ export const createRenewalRequest = async (req, res) => {
         error: 'An open renewal request already exists for this lease',
       });
 
-    // Enforce landlord-only price change
-    await ensureLandlordCanSetPrice(req.user.id, leaseId, proposedMonthlyRent);
+    // 🛡️ SECURITY: Check if user is tenant or landlord for this lease
+    const lease = await prisma.lease.findUnique({
+      where: { id: leaseId },
+      include: {
+        tenantGroup: {
+          include: {
+            members: {
+              where: { isPrimary: true },
+              select: { userId: true }
+            }
+          }
+        },
+        offer: {
+          include: {
+            organization: {
+              include: {
+                members: {
+                  where: { role: 'OWNER' },
+                  select: { userId: true }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!lease) {
+      return res.status(404).json({ error: 'Lease not found' });
+    }
+
+    const tenantId = lease.tenantGroup?.members?.[0]?.userId;
+    const landlordId = lease.offer?.organization?.members?.[0]?.userId;
+    const isTenant = req.user.id === tenantId;
+    const isLandlord = req.user.id === landlordId;
+
+    if (!isTenant && !isLandlord) {
+      return res.status(403).json({ error: 'Access denied: Not authorized for this lease' });
+    }
+
+    // 🛡️ SECURITY: Tenants can only send simple renewal requests (no terms/rent)
+    if (isTenant && (proposedTermMonths || proposedStartDate || proposedMonthlyRent)) {
+      return res.status(403).json({ 
+        error: 'Tenants cannot propose renewal terms. Only landlords can set terms and rent.' 
+      });
+    }
+
+    // 🛡️ SECURITY: Landlords can set terms and rent
+    if (isLandlord) {
+      await ensureLandlordCanSetPrice(req.user.id, leaseId, proposedMonthlyRent);
+    }
 
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const request = await prisma.renewalRequest.create({
@@ -71,60 +121,28 @@ export const createRenewalRequest = async (req, res) => {
       },
     });
 
-    // Notify counterparty (best-effort)
+    // 🚀 NEW: Send real-time notifications
     try {
-      const lease = await prisma.lease.findUnique({
-        where: { id: leaseId },
-        select: { tenantGroupId: true, offerId: true },
+      const requester = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { name: true, role: true }
       });
-      const offer = lease?.offerId
-        ? await prisma.offer.findUnique({
-            where: { id: lease.offerId },
-            select: { organizationId: true },
-          })
-        : null;
-
-      // Get landlord ID from organization
-      let landlordId = null;
-      if (offer?.organizationId) {
-        const landlordMember = await prisma.organizationMember.findFirst({
-          where: {
-            organizationId: offer.organizationId,
-            role: 'OWNER',
-          },
-          select: { userId: true },
-        });
-        landlordId = landlordMember?.userId;
-      }
-
-      // Get tenant ID from tenant group
-      let tenantId = null;
-      if (lease?.tenantGroupId) {
-        const primaryTenant = await prisma.tenantGroupMember.findFirst({
-          where: {
-            tenantGroupId: lease.tenantGroupId,
-            isPrimary: true,
-          },
-          select: { userId: true },
-        });
-        tenantId = primaryTenant?.userId;
-      }
 
       const targets = [tenantId, landlordId].filter(
         (t) => t && t !== req.user.id
       );
-      for (const t of targets) {
-        await prisma.notification.create({
-          data: {
-            userId: t,
-            type: 'SYSTEM_ANNOUNCEMENT',
-            entityId: request.id,
-            title: 'Renewal request created',
-            body: 'A lease renewal request is awaiting your response.',
-          },
-        });
+
+      for (const targetId of targets) {
+        await NotificationService.createRenewalRequestNotification(
+          targetId,
+          request.id,
+          requester?.name || 'User',
+          isTenant // true if tenant made the request, false if landlord
+        );
       }
-    } catch {}
+    } catch (error) {
+      console.error('Error sending renewal notifications:', error);
+    }
 
     return res.json({ success: true, renewal: request });
   } catch (e) {
@@ -141,10 +159,47 @@ export const counterRenewalRequest = async (req, res) => {
       req.body || {};
     const existing = await prisma.renewalRequest.findUnique({
       where: { id },
-      select: { leaseId: true, status: true },
+      include: {
+        lease: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  select: { userId: true }
+                }
+              }
+            },
+            offer: {
+              include: {
+                organization: {
+                  include: {
+                    members: {
+                      where: { role: 'OWNER' },
+                      select: { userId: true }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     });
+    
     if (!existing || !['PENDING', 'COUNTERED'].includes(existing.status))
       return res.status(400).json({ error: 'Renewal not open for counter' });
+
+    // 🛡️ SECURITY: Only landlords can counter with terms/rent
+    const tenantId = existing.lease.tenantGroup?.members?.[0]?.userId;
+    const landlordId = existing.lease.offer?.organization?.members?.[0]?.userId;
+    const isLandlord = req.user.id === landlordId;
+
+    if (!isLandlord) {
+      return res.status(403).json({ 
+        error: 'Only landlords can counter renewal requests with new terms' 
+      });
+    }
 
     // Enforce landlord-only price change
     await ensureLandlordCanSetPrice(
@@ -183,11 +238,46 @@ export const acceptRenewalRequest = async (req, res) => {
     const { id } = req.params; // renewal id
     const renewal = await prisma.renewalRequest.findUnique({
       where: { id },
-      include: { lease: true },
+      include: { 
+        lease: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  select: { userId: true }
+                }
+              }
+            },
+            offer: {
+              include: {
+                organization: {
+                  include: {
+                    members: {
+                      where: { role: 'OWNER' },
+                      select: { userId: true }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
     });
     if (!renewal) return res.status(404).json({ error: 'Renewal not found' });
     if (!['PENDING', 'COUNTERED'].includes(renewal.status))
       return res.status(400).json({ error: 'Renewal not open' });
+
+    // 🛡️ SECURITY: Only tenants can accept renewal requests
+    const tenantId = renewal.lease.tenantGroup?.members?.[0]?.userId;
+    const isTenant = req.user.id === tenantId;
+
+    if (!isTenant) {
+      return res.status(403).json({ 
+        error: 'Only tenants can accept renewal requests' 
+      });
+    }
 
     // Mark accepted and close siblings
     const accepted = await prisma.$transaction(async (tx) => {
@@ -279,41 +369,29 @@ export const acceptRenewalRequest = async (req, res) => {
       return newLease;
     });
 
-    // Notify both parties
+    // 🚀 NEW: Send real-time notifications
     try {
-      const offer = renewal.lease.offerId
-        ? await prisma.offer.findUnique({
-            where: { id: renewal.lease.offerId },
-            select: { organizationId: true },
-          })
-        : null;
+      const accepter = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { name: true }
+      });
 
-      // Get landlord ID from organization
-      let landlordId = null;
-      if (offer?.organizationId) {
-        const landlordMember = await prisma.organizationMember.findFirst({
-          where: {
-            organizationId: offer.organizationId,
-            role: 'OWNER',
-          },
-          select: { userId: true },
-        });
-        landlordId = landlordMember?.userId;
-      }
+      const landlordId = renewal.lease.offer?.organization?.members?.[0]?.userId;
+      const tenantId = renewal.lease.tenantGroup?.members?.[0]?.userId;
 
-      const targets = [landlordId].filter(Boolean);
-      for (const t of targets) {
-        await prisma.notification.create({
-          data: {
-            userId: t,
-            type: 'SYSTEM_ANNOUNCEMENT',
-            entityId: id,
-            title: 'Renewal accepted',
-            body: 'A new lease has been created from the renewal.',
-          },
-        });
+      // Notify the other party
+      const otherPartyId = req.user.id === tenantId ? landlordId : tenantId;
+      if (otherPartyId) {
+        await NotificationService.createRenewalResponseNotification(
+          otherPartyId,
+          id,
+          accepter?.name || 'User',
+          'ACCEPTED'
+        );
       }
-    } catch {}
+    } catch (error) {
+      console.error('Error sending renewal acceptance notifications:', error);
+    }
 
     return res.json({ success: true });
   } catch (e) {
@@ -326,7 +404,54 @@ export const acceptRenewalRequest = async (req, res) => {
 export const declineRenewalRequest = async (req, res) => {
   try {
     const { id } = req.params;
-    const renewal = await prisma.renewalRequest.update({
+    
+    // 🛡️ SECURITY: Check if user is authorized to decline this renewal
+    const renewal = await prisma.renewalRequest.findUnique({
+      where: { id },
+      include: {
+        lease: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  select: { userId: true }
+                }
+              }
+            },
+            offer: {
+              include: {
+                organization: {
+                  include: {
+                    members: {
+                      where: { role: 'OWNER' },
+                      select: { userId: true }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!renewal) {
+      return res.status(404).json({ error: 'Renewal not found' });
+    }
+
+    const tenantId = renewal.lease.tenantGroup?.members?.[0]?.userId;
+    const landlordId = renewal.lease.offer?.organization?.members?.[0]?.userId;
+    const isTenant = req.user.id === tenantId;
+    const isLandlord = req.user.id === landlordId;
+
+    if (!isTenant && !isLandlord) {
+      return res.status(403).json({ 
+        error: 'Access denied: Not authorized for this lease' 
+      });
+    }
+
+    const updatedRenewal = await prisma.renewalRequest.update({
       where: { id },
       data: {
         status: 'DECLINED',
@@ -334,7 +459,32 @@ export const declineRenewalRequest = async (req, res) => {
         decidedAt: new Date(),
       },
     });
-    return res.json({ success: true, renewal });
+
+    // 🚀 NEW: Send real-time notifications
+    try {
+      const decliner = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { name: true }
+      });
+
+      const landlordId = renewal.lease.offer?.organization?.members?.[0]?.userId;
+      const tenantId = renewal.lease.tenantGroup?.members?.[0]?.userId;
+
+      // Notify the other party
+      const otherPartyId = req.user.id === tenantId ? landlordId : tenantId;
+      if (otherPartyId) {
+        await NotificationService.createRenewalResponseNotification(
+          otherPartyId,
+          id,
+          decliner?.name || 'User',
+          'DECLINED'
+        );
+      }
+    } catch (error) {
+      console.error('Error sending renewal decline notifications:', error);
+    }
+
+    return res.json({ success: true, renewal: updatedRenewal });
   } catch (e) {
     return res
       .status(400)
@@ -352,5 +502,121 @@ export const listRenewalsForLease = async (req, res) => {
     return res.json({ success: true, renewals: items });
   } catch (e) {
     return res.status(400).json({ error: 'Failed to fetch renewals' });
+  }
+};
+
+// 🚀 NEW: Proper state machine for renewal workflow
+export const getRenewalWorkflow = async (req, res) => {
+  try {
+    const { id: leaseId } = req.params;
+    
+    // Get the lease with all related data
+    const lease = await prisma.lease.findUnique({
+      where: { id: leaseId },
+      include: {
+        tenantGroup: {
+          include: {
+            members: {
+              where: { isPrimary: true },
+              select: { userId: true }
+            }
+          }
+        },
+        offer: {
+          include: {
+            organization: {
+              include: {
+                members: {
+                  where: { role: 'OWNER' },
+                  select: { userId: true }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!lease) {
+      return res.status(404).json({ error: 'Lease not found' });
+    }
+
+    // Check if user is authorized for this lease
+    const tenantId = lease.tenantGroup?.members?.[0]?.userId;
+    const landlordId = lease.offer?.organization?.members?.[0]?.userId;
+    const isTenant = req.user.id === tenantId;
+    const isLandlord = req.user.id === landlordId;
+
+    if (!isTenant && !isLandlord) {
+      return res.status(403).json({ error: 'Access denied: Not authorized for this lease' });
+    }
+
+    // Get all renewal requests for this lease
+    const renewals = await prisma.renewalRequest.findMany({
+      where: { leaseId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        initiator: {
+          select: { id: true, name: true, role: true }
+        }
+      }
+    });
+
+    // Determine current workflow state
+    const activeRenewal = renewals.find(r => 
+      ['PENDING', 'COUNTERED'].includes(r.status)
+    );
+
+    const workflowState = {
+      hasActiveRenewal: !!activeRenewal,
+      currentStatus: activeRenewal?.status || null,
+      canRequestRenewal: !activeRenewal && isTenant,
+      canProposeRenewal: !activeRenewal && isLandlord,
+      canCounterRenewal: activeRenewal && 
+        ((isTenant && activeRenewal.initiator.role === 'LANDLORD') ||
+         (isLandlord && activeRenewal.initiator.role === 'TENANT')),
+      canAcceptRenewal: activeRenewal && 
+        activeRenewal.status === 'COUNTERED' && 
+        isTenant && 
+        activeRenewal.initiator.role === 'LANDLORD',
+      canDeclineRenewal: activeRenewal && 
+        ['PENDING', 'COUNTERED'].includes(activeRenewal.status) &&
+        ((isTenant && activeRenewal.initiator.role === 'LANDLORD') ||
+         (isLandlord && activeRenewal.initiator.role === 'TENANT')),
+      latestRenewal: activeRenewal,
+      allRenewals: renewals,
+      leaseEndDate: lease.endDate,
+      daysUntilExpiry: Math.ceil((new Date(lease.endDate) - new Date()) / (1000 * 60 * 60 * 24))
+    };
+
+    return res.json({ success: true, workflow: workflowState });
+  } catch (e) {
+    console.error('Get renewal workflow error:', e);
+    return res.status(400).json({ error: 'Failed to fetch renewal workflow' });
+  }
+};
+
+// 🚀 NEW: Auto-expire old renewal requests (can be called by cron job)
+export const expireOldRenewals = async (req, res) => {
+  try {
+    const expiredRenewals = await prisma.renewalRequest.updateMany({
+      where: {
+        status: { in: ['PENDING', 'COUNTERED'] },
+        expiresAt: { lt: new Date() }
+      },
+      data: {
+        status: 'EXPIRED',
+        decidedAt: new Date()
+      }
+    });
+
+    return res.json({ 
+      success: true, 
+      expiredCount: expiredRenewals.count,
+      message: `Expired ${expiredRenewals.count} renewal requests`
+    });
+  } catch (e) {
+    console.error('Expire renewals error:', e);
+    return res.status(400).json({ error: 'Failed to expire renewals' });
   }
 };

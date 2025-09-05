@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const ProposeRenewalModal = ({
+const LandlordRenewalProposalModal = ({
   open,
   onClose,
   onSubmit,
@@ -246,4 +246,4 @@ const ProposeRenewalModal = ({
   );
 };
 
-export default ProposeRenewalModal;
+export default LandlordRenewalProposalModal;

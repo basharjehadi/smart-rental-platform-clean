@@ -279,6 +279,98 @@ export class NotificationService {
       throw error;
     }
   }
+
+  // 🚀 NEW: Create notification for renewal request
+  static async createRenewalRequestNotification(
+    userId,
+    renewalId,
+    requesterName,
+    isTenantRequest = true
+  ) {
+    try {
+      const notification = await prisma.notification.create({
+        data: {
+          userId: userId,
+          type: 'SYSTEM_ANNOUNCEMENT',
+          entityId: renewalId.toString(),
+          title: isTenantRequest ? 'Renewal Request Received' : 'Renewal Proposal Received',
+          body: isTenantRequest 
+            ? `${requesterName} requested a lease renewal`
+            : `${requesterName} proposed new lease terms`,
+        },
+      });
+
+      // Emit real-time notification if socket.io is available
+      if (io) {
+        await io.emitNotification(userId, notification);
+      }
+
+      return notification;
+    } catch (error) {
+      console.error('Error creating renewal request notification:', error);
+      throw error;
+    }
+  }
+
+  // 🚀 NEW: Create notification for renewal response
+  static async createRenewalResponseNotification(
+    userId,
+    renewalId,
+    responderName,
+    action
+  ) {
+    try {
+      const actionText = action === 'ACCEPTED' ? 'accepted' : 'declined';
+      const notification = await prisma.notification.create({
+        data: {
+          userId: userId,
+          type: 'SYSTEM_ANNOUNCEMENT',
+          entityId: renewalId.toString(),
+          title: `Renewal ${actionText.charAt(0).toUpperCase() + actionText.slice(1)}`,
+          body: `${responderName} ${actionText} your renewal ${action === 'ACCEPTED' ? 'proposal' : 'request'}`,
+        },
+      });
+
+      // Emit real-time notification if socket.io is available
+      if (io) {
+        await io.emitNotification(userId, notification);
+      }
+
+      return notification;
+    } catch (error) {
+      console.error('Error creating renewal response notification:', error);
+      throw error;
+    }
+  }
+
+  // 🚀 NEW: Create notification for renewal expiration
+  static async createRenewalExpirationNotification(
+    userId,
+    renewalId,
+    renewalType
+  ) {
+    try {
+      const notification = await prisma.notification.create({
+        data: {
+          userId: userId,
+          type: 'SYSTEM_ANNOUNCEMENT',
+          entityId: renewalId.toString(),
+          title: 'Renewal Expired',
+          body: `Your ${renewalType} has expired without a response`,
+        },
+      });
+
+      // Emit real-time notification if socket.io is available
+      if (io) {
+        await io.emitNotification(userId, notification);
+      }
+
+      return notification;
+    } catch (error) {
+      console.error('Error creating renewal expiration notification:', error);
+      throw error;
+    }
+  }
 }
 
 // Bulk notification creation for rental requests

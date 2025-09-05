@@ -6,6 +6,8 @@ import {
   acceptRenewalRequest,
   declineRenewalRequest,
   listRenewalsForLease,
+  getRenewalWorkflow,
+  expireOldRenewals,
 } from '../controllers/renewalController.js';
 
 const router = Router();
@@ -22,5 +24,11 @@ router.post('/renewals/:id/decline', verifyToken, declineRenewalRequest);
 
 // List renewals for a lease
 router.get('/leases/:id/renewals', verifyToken, listRenewalsForLease);
+
+// Get renewal workflow state for a lease
+router.get('/leases/:id/renewal-workflow', verifyToken, getRenewalWorkflow);
+
+// Auto-expire old renewal requests (admin/cron endpoint)
+router.post('/renewals/expire-old', verifyToken, expireOldRenewals);
 
 export default router;

@@ -1579,10 +1579,9 @@ const TenantDashboardNew = () => {
               {/* Renewal Request Modal */}
               <RenewalRequestModal
                 open={showRenewalModal}
-                defaultTerm={12}
                 submitting={sendingRenewal}
                 onClose={() => setShowRenewalModal(false)}
-                onSubmit={async ({ termMonths, note }) => {
+                onSubmit={async ({ note }) => {
                   try {
                     if (!currentOfferForMeta) {
                       alert('No active booking found.');
@@ -1599,7 +1598,6 @@ const TenantDashboardNew = () => {
                       return;
                     }
                     await api.post(`/leases/${leaseId}/renewals`, {
-                      proposedTermMonths: termMonths || 12,
                       note: note || '',
                     });
                     const threadResp = await api.get(

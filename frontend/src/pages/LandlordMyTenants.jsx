@@ -715,9 +715,11 @@ const LandlordMyTenants = () => {
       {/* Modals */}
       <ProposeRenewalModal
         open={showRenewalModal}
+        currentRent={renewalTenant?.monthlyRent || 0}
+        currentLeaseEndDate={renewalTenant?.leaseEndDate ? new Date(renewalTenant.leaseEndDate) : null}
         submitting={sendingRenewal}
         onClose={() => setShowRenewalModal(false)}
-        onSubmit={async ({ rent, termMonths, startDate, note }) => {
+        onSubmit={async ({ proposedTermMonths, proposedMonthlyRent, proposedStartDate, note }) => {
           try {
             if (!renewalTenant) return;
             setSendingRenewal(true);
@@ -733,9 +735,9 @@ const LandlordMyTenants = () => {
               return;
             }
             await api.post(`/leases/${leaseId}/renewals`, {
-              proposedMonthlyRent: rent,
-              proposedTermMonths: termMonths,
-              proposedStartDate: startDate,
+              proposedMonthlyRent: proposedMonthlyRent,
+              proposedTermMonths: proposedTermMonths,
+              proposedStartDate: proposedStartDate,
               note: note || '',
             });
             setShowRenewalModal(false);

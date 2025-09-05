@@ -4,10 +4,8 @@ const RenewalRequestModal = ({
   open,
   onClose,
   onSubmit,
-  defaultTerm = 12,
   submitting = false,
 }) => {
-  const [term, setTerm] = useState(String(defaultTerm));
   const [note, setNote] = useState('');
 
   if (!open) return null;
@@ -19,32 +17,36 @@ const RenewalRequestModal = ({
           <h3 className='text-lg font-semibold text-gray-900'>
             Request Renewal
           </h3>
+          <p className='text-sm text-gray-600 mt-1'>
+            Send a renewal request to your landlord. They will propose the terms and rent.
+          </p>
         </div>
         <div className='px-5 py-4 space-y-4'>
           <div>
             <label className='block text-sm font-medium text-gray-700 mb-1'>
-              Term (months)
-            </label>
-            <input
-              type='number'
-              min={1}
-              className='w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none'
-              value={term}
-              onChange={e => setTerm(e.target.value)}
-              placeholder='12'
-            />
-          </div>
-          <div>
-            <label className='block text-sm font-medium text-gray-700 mb-1'>
-              Note (optional)
+              Message (optional)
             </label>
             <textarea
               className='w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none'
               rows={3}
               value={note}
               onChange={e => setNote(e.target.value)}
-              placeholder="Anything you'd like to tell the landlord"
+              placeholder="Let your landlord know you'd like to renew your lease..."
             />
+          </div>
+          <div className='bg-blue-50 border border-blue-200 rounded-md p-3'>
+            <div className='flex'>
+              <div className='flex-shrink-0'>
+                <svg className='h-5 w-5 text-blue-400' viewBox='0 0 20 20' fill='currentColor'>
+                  <path fillRule='evenodd' d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z' clipRule='evenodd' />
+                </svg>
+              </div>
+              <div className='ml-3'>
+                <p className='text-sm text-blue-700'>
+                  <strong>Note:</strong> Your landlord will propose the renewal terms including rent amount and lease duration.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
         <div className='px-5 py-4 border-t flex items-center justify-end space-x-2'>
@@ -56,7 +58,7 @@ const RenewalRequestModal = ({
             Cancel
           </button>
           <button
-            onClick={() => onSubmit({ termMonths: Number(term) || 12, note })}
+            onClick={() => onSubmit({ note })}
             className='px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60'
             disabled={submitting}
           >
