@@ -534,6 +534,7 @@ const LandlordDashboard = () => {
                   value={`${dashboardData?.expiringContracts || 0} upcoming`}
                   icon={Calendar}
                   color='blue'
+                  subtitle='within 60 days'
                 />
                 <MetricCard
                   title='Total Properties'

@@ -360,11 +360,15 @@ model Contract {
   fileSize        Int?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-  rentalRequestId Int            @unique
-  rentalRequest   RentalRequest  @relation("Contract", fields: [rentalRequestId], references: [id], onDelete: Cascade)
+  rentalRequestId Int?           @unique
+  leaseId         String?        @unique
+  contractType    ContractType   @default(ORIGINAL)
+  rentalRequest   RentalRequest? @relation("Contract", fields: [rentalRequestId], references: [id], onDelete: Cascade)
+  lease           Lease?         @relation("LeaseContract", fields: [leaseId], references: [id], onDelete: Cascade)
 
   @@index([status, signedAt])
   @@index([contractNumber])
+  @@index([contractType])
   @@map("contracts")
 }
 
@@ -452,12 +456,20 @@ model Lease {
   terminationReason         String?
   organizationId            String?
   tenantGroupId             String
+  // New fields for proper lease lifecycle management
+  contractId                String?              @unique
+  parentLeaseId             String?              // For renewal leases
+  leaseType                 LeaseType            @default(ORIGINAL)
+  renewalEffectiveDate      DateTime?            // When renewal becomes active
   offer                     Offer?               @relation("OfferLeases", fields: [offerId], references: [id])
   organization              Organization?        @relation("OrganizationLeases", fields: [organizationId], references: [id])
   property                  Property?            @relation("PropertyLeases", fields: [propertyId], references: [id])
   rentalRequest             RentalRequest?       @relation("RentalRequestLeases", fields: [rentalRequestId], references: [id])
   tenantGroup               TenantGroup          @relation("TenantGroupLeases", fields: [tenantGroupId], references: [id], onDelete: Cascade)
   unit                      Unit                 @relation("UnitLease", fields: [unitId], references: [id], onDelete: Cascade)
+  contract                  Contract?            @relation("LeaseContract")
+  parentLease               Lease?               @relation("LeaseRenewals", fields: [parentLeaseId], references: [id])
+  renewalLeases             Lease[]              @relation("LeaseRenewals")
   maintenanceRequests       MaintenanceRequest[] @relation("LeaseMaintenance")
   occupants                 Occupant[]
   payments                  Payment[]            @relation("LeasePayments")
@@ -473,6 +485,8 @@ model Lease {
   @@index([rentalRequestId])
   @@index([propertyId])
   @@index([organizationId])
+  @@index([parentLeaseId])
+  @@index([leaseType])
   @@map("leases")
 }
 
@@ -1070,6 +1084,16 @@ enum LeaseStatus {
 enum LeaseRenewalStatus {
   NONE
   DECLINED
+}
+
+enum LeaseType {
+  ORIGINAL
+  RENEWAL
+}
+
+enum ContractType {
+  ORIGINAL
+  RENEWAL
 }
 
 enum MaintenancePriority {

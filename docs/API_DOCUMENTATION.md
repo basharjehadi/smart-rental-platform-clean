@@ -353,6 +353,140 @@ Deny move-in.
 #### GET /api/move-in/offers/:id/issues
 Get move-in issues for an offer.
 
+### Lease Renewal & Termination (`/api/leases`)
+
+#### POST /api/leases/:id/renewals
+Create a renewal request for a lease.
+
+**Request Body:**
+```json
+{
+  "note": "I would like to renew my lease",
+  "proposedTermMonths": 12,        // Landlord only
+  "proposedMonthlyRent": 1200,     // Landlord only
+  "proposedStartDate": "2025-01-01T00:00:00.000Z"  // Landlord only
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "renewal": {
+    "id": "renewal_id",
+    "leaseId": "lease_id",
+    "status": "PENDING",
+    "proposedTermMonths": 12,
+    "proposedMonthlyRent": 1200,
+    "note": "I would like to renew my lease",
+    "expiresAt": "2025-01-08T00:00:00.000Z",
+    "createdAt": "2025-01-01T00:00:00.000Z"
+  }
+}
+```
+
+**Security Notes:**
+- Tenants can only send `note` field
+- Landlords can set all fields including terms and rent
+- Backend enforces role-based permissions
+
+#### POST /api/renewals/:id/counter
+Counter an existing renewal request (landlord only).
+
+**Request Body:**
+```json
+{
+  "proposedTermMonths": 6,
+  "proposedMonthlyRent": 1100,
+  "note": "How about 6 months with a small discount?"
+}
+```
+
+#### POST /api/renewals/:id/accept
+Accept a renewal request (tenant only).
+
+**Response:**
+```json
+{
+  "success": true
+}
+```
+
+**Side Effects:**
+- Creates new lease with proposed terms
+- Updates payment schedule with new rent
+- Sends notifications to both parties
+
+#### POST /api/renewals/:id/decline
+Decline a renewal request (either party).
+
+**Response:**
+```json
+{
+  "success": true,
+  "renewal": { ... }
+}
+```
+
+#### GET /api/leases/:id/renewals
+Get all renewal requests for a lease.
+
+**Response:**
+```json
+{
+  "success": true,
+  "renewals": [
+    {
+      "id": "renewal_id",
+      "status": "PENDING",
+      "proposedTermMonths": 12,
+      "proposedMonthlyRent": 1200,
+      "note": "Renewal request",
+      "initiator": {
+        "id": "user_id",
+        "name": "John Doe",
+        "role": "TENANT"
+      },
+      "createdAt": "2025-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+#### GET /api/leases/:id/renewal-workflow
+Get current renewal workflow state and permissions.
+
+**Response:**
+```json
+{
+  "success": true,
+  "workflow": {
+    "hasActiveRenewal": true,
+    "currentStatus": "PENDING",
+    "canRequestRenewal": false,
+    "canProposeRenewal": false,
+    "canCounterRenewal": true,
+    "canAcceptRenewal": false,
+    "canDeclineRenewal": true,
+    "latestRenewal": { ... },
+    "leaseEndDate": "2025-12-31T00:00:00.000Z",
+    "daysUntilExpiry": 30
+  }
+}
+```
+
+#### POST /api/renewals/expire-old
+Auto-expire old renewal requests (admin/cron endpoint).
+
+**Response:**
+```json
+{
+  "success": true,
+  "expiredCount": 3,
+  "message": "Expired 3 renewal requests"
+}
+```
+
 ### User Management (`/api/users`)
 
 #### GET /api/users/profile

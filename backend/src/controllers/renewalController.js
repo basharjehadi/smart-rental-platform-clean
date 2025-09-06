@@ -1,5 +1,11 @@
 import { prisma } from '../utils/prisma.js';
 import { NotificationService } from '../services/notificationService.js';
+import { 
+  computeEarliestTerminationEnd, 
+  resolveTerminationPolicy, 
+  formatTerminationDate,
+  getTerminationPolicyExplanation 
+} from '../utils/dateUtils.js';
 
 const ensureLandlordCanSetPrice = async (
   userId,
@@ -225,6 +231,26 @@ export const counterRenewalRequest = async (req, res) => {
       },
     });
 
+    // Send notification to tenant about the counter proposal
+    if (tenantId) {
+      try {
+        const landlord = await prisma.user.findUnique({
+          where: { id: landlordId },
+          select: { name: true }
+        });
+        
+        await NotificationService.createRenewalRequestNotification(
+          tenantId,
+          counter.id,
+          landlord?.name || 'Your landlord',
+          false // isTenantRequest = false (landlord initiated)
+        );
+      } catch (notificationError) {
+        console.error('Failed to send counter notification:', notificationError);
+        // Don't fail the request if notification fails
+      }
+    }
+
     return res.json({ success: true, renewal: counter });
   } catch (e) {
     return res
@@ -364,10 +390,49 @@ export const acceptRenewalRequest = async (req, res) => {
           rentalRequestId: renewal.lease.rentalRequestId,
           offerId: renewal.lease.offerId,
           propertyId: renewal.lease.propertyId,
+          // New fields for proper lease lifecycle management
+          parentLeaseId: renewal.lease.id,
+          leaseType: 'RENEWAL',
+          renewalEffectiveDate: baseStart,
         },
       });
+
+      // Mark the original lease as EXPIRED when renewal is accepted
+      await tx.lease.update({
+        where: { id: renewal.leaseId },
+        data: {
+          status: 'EXPIRED',
+          updatedAt: new Date(),
+        },
+      });
+
       return newLease;
     });
+
+    // 🚀 NEW: Generate contract for the renewal
+    try {
+      const { generateContractForLease } = await import('./contractController.js');
+      
+      // Create a mock request object for contract generation
+      const mockReq = {
+        user: { id: req.user.id },
+        params: { leaseId: newLease.id }
+      };
+      
+      const mockRes = {
+        json: (data) => console.log('Contract generation result:', data),
+        status: (code) => ({
+          json: (data) => console.log('Contract generation error:', code, data)
+        })
+      };
+      
+      // Generate contract for the renewal
+      await generateContractForLease(mockReq, mockRes);
+      console.log('✅ Contract generated for renewal');
+    } catch (contractError) {
+      console.error('❌ Failed to generate contract for renewal:', contractError);
+      // Don't fail the renewal if contract generation fails
+    }
 
     // 🚀 NEW: Send real-time notifications
     try {
@@ -618,5 +683,452 @@ export const expireOldRenewals = async (req, res) => {
   } catch (e) {
     console.error('Expire renewals error:', e);
     return res.status(400).json({ error: 'Failed to expire renewals' });
+  }
+};
+
+// 🚀 NEW: Termination Request Functions (as outlined by ChatGPT)
+
+/**
+ * Create a termination request for a lease
+ * Implements the cutoff + month-end policy
+ */
+export const createTerminationRequest = async (req, res) => {
+  try {
+    const { id: leaseId } = req.params;
+    const { proposedEndDate, effectiveDate, reason } = req.body;
+
+    // Get lease with all related data for policy resolution
+    const lease = await prisma.lease.findUnique({
+      where: { id: leaseId },
+      include: {
+        tenantGroup: {
+          include: {
+            members: {
+              where: { isPrimary: true },
+              select: { userId: true }
+            }
+          }
+        },
+        offer: {
+          include: {
+            organization: {
+              include: {
+                // Authorize any organization member; some datasets may not mark OWNER explicitly
+                members: {
+                  select: { userId: true }
+                }
+              }
+            }
+          }
+        },
+        property: {
+          select: {
+            id: true
+          }
+        }
+      }
+    });
+
+    if (!lease) {
+      return res.status(404).json({ error: 'Lease not found' });
+    }
+
+    // Check authorization
+    const tenantId = lease.tenantGroup?.members?.[0]?.userId;
+    const landlordId = lease.offer?.organization?.members?.[0]?.userId;
+    const isTenant = req.user.id === tenantId;
+    const isLandlord = req.user.id === landlordId;
+
+    if (!isTenant && !isLandlord) {
+      return res.status(403).json({ 
+        error: 'Access denied: Not authorized for this lease' 
+      });
+    }
+
+    // Resolve termination policy
+    const policy = resolveTerminationPolicy(lease);
+    const earliestEnd = computeEarliestTerminationEnd(new Date(), policy);
+
+    // Validate proposed end date if provided (accept both proposedEndDate/effectiveDate)
+    const incomingDateIso = proposedEndDate || effectiveDate;
+    if (incomingDateIso) {
+      const proposedDate = new Date(incomingDateIso);
+      if (proposedDate < earliestEnd) {
+        return res.status(400).json({
+          error: 'Invalid termination date',
+          message: `Earliest possible end date is ${formatTerminationDate(earliestEnd, policy.timezone)}`,
+          earliestEnd: earliestEnd.toISOString(),
+          policy: {
+            cutoffDay: policy.cutoffDay,
+            minNoticeDays: policy.minNoticeDays,
+            timezone: policy.timezone,
+            explanation: getTerminationPolicyExplanation(policy)
+          }
+        });
+      }
+    }
+
+    // Use earliest end date if no proposed date or if proposed date is valid
+    const finalEndDate = incomingDateIso ? new Date(incomingDateIso) : earliestEnd;
+
+    // Persist termination intent on the Lease itself (no separate table in schema)
+    const updatedLease = await prisma.lease.update({
+      where: { id: leaseId },
+      data: {
+        terminationNoticeByUserId: req.user.id,
+        terminationNoticeDate: new Date(),
+        terminationReason: reason || null,
+        terminationEffectiveDate: finalEndDate,
+      }
+    });
+
+    // Send notifications
+    try {
+      const requester = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { name: true, role: true }
+      });
+
+      const targets = [tenantId, landlordId].filter(
+        (t) => t && t !== req.user.id
+      );
+
+      // Notify the other party (tenant or landlord)
+      await NotificationService.createSystemAnnouncementNotification(
+        targets,
+        'Lease Termination Request',
+        `${requester?.name || 'User'} requested lease termination (effective ${formatTerminationDate(
+          finalEndDate,
+          policy.timezone
+        )}).`
+      );
+    } catch (error) {
+      console.error('Error sending termination notifications:', error);
+    }
+
+    return res.json({ 
+      success: true, 
+      termination: {
+        leaseId,
+        initiatorUserId: req.user.id,
+        proposedEndDate: updatedLease.terminationEffectiveDate,
+        reason: updatedLease.terminationReason,
+        noticeDate: updatedLease.terminationNoticeDate,
+      },
+      policy: {
+        cutoffDay: policy.cutoffDay,
+        minNoticeDays: policy.minNoticeDays,
+        timezone: policy.timezone,
+        explanation: getTerminationPolicyExplanation(policy)
+      }
+    });
+  } catch (e) {
+    console.error('Create termination request error:', e);
+    return res.status(400).json({ 
+      error: e.message || 'Failed to create termination request' 
+    });
+  }
+};
+
+/**
+ * Get termination policy preview for a lease
+ */
+export const getTerminationPolicyPreview = async (req, res) => {
+  try {
+    const { id: leaseId } = req.params;
+
+    // Get lease with all related data
+    const lease = await prisma.lease.findUnique({
+      where: { id: leaseId },
+      include: {
+        tenantGroup: {
+          include: {
+            members: {
+              where: { isPrimary: true },
+              select: { userId: true }
+            }
+          }
+        },
+        offer: {
+          include: {
+            organization: {
+              include: {
+                // Authorize any organization member; some datasets may not mark OWNER explicitly
+                members: {
+                  select: { userId: true }
+                }
+              }
+            }
+          }
+        },
+        property: {
+          select: {
+            id: true
+          }
+        }
+      }
+    });
+
+    if (!lease) {
+      return res.status(404).json({ error: 'Lease not found' });
+    }
+
+    // Check authorization
+    const tenantId = lease.tenantGroup?.members?.[0]?.userId;
+    const landlordId = lease.offer?.organization?.members?.[0]?.userId;
+    const isTenant = req.user.id === tenantId;
+    const isLandlord = req.user.id === landlordId;
+
+    if (!isTenant && !isLandlord) {
+      return res.status(403).json({ 
+        error: 'Access denied: Not authorized for this lease' 
+      });
+    }
+
+    // Resolve termination policy
+    const policy = resolveTerminationPolicy(lease);
+    const earliestEnd = computeEarliestTerminationEnd(new Date(), policy);
+
+    return res.json({
+      success: true,
+      terminationPolicyPreview: {
+        cutoffDay: policy.cutoffDay,
+        minNoticeDays: policy.minNoticeDays,
+        timezone: policy.timezone,
+        earliestEnd: earliestEnd.toISOString(),
+        explanation: getTerminationPolicyExplanation(policy)
+      }
+    });
+  } catch (e) {
+    console.error('Get termination policy preview error:', e);
+    return res.status(400).json({ 
+      error: 'Failed to get termination policy preview' 
+    });
+  }
+};
+
+/**
+ * Accept a termination request
+ */
+export const acceptTerminationRequest = async (req, res) => {
+  try {
+    const { id: terminationId } = req.params;
+
+    // Get termination request with lease data
+    const terminationRequest = await prisma.terminationRequest.findUnique({
+      where: { id: terminationId },
+      include: {
+        lease: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  select: { userId: true }
+                }
+              }
+            },
+            offer: {
+              include: {
+                organization: {
+                  include: {
+                    members: {
+                      where: { role: 'OWNER' },
+                      select: { userId: true }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!terminationRequest) {
+      return res.status(404).json({ error: 'Termination request not found' });
+    }
+
+    if (terminationRequest.status !== 'PENDING') {
+      return res.status(400).json({ 
+        error: 'Termination request is not pending' 
+      });
+    }
+
+    // Check authorization - either party can accept
+    const tenantId = terminationRequest.lease.tenantGroup?.members?.[0]?.userId;
+    const landlordId = terminationRequest.lease.offer?.organization?.members?.[0]?.userId;
+    const isTenant = req.user.id === tenantId;
+    const isLandlord = req.user.id === landlordId;
+
+    if (!isTenant && !isLandlord) {
+      return res.status(403).json({ 
+        error: 'Access denied: Not authorized for this lease' 
+      });
+    }
+
+    // Update termination request status
+    const updatedRequest = await prisma.terminationRequest.update({
+      where: { id: terminationId },
+      data: {
+        status: 'ACCEPTED',
+        decidedByUserId: req.user.id,
+        decidedAt: new Date()
+      }
+    });
+
+    // Update lease status
+    await prisma.lease.update({
+      where: { id: terminationRequest.leaseId },
+      data: {
+        status: 'TERMINATED',
+        terminationReason: terminationRequest.reason,
+        terminationEffectiveDate: terminationRequest.proposedEndDate,
+        terminationNoticeByUserId: terminationRequest.initiatorUserId,
+        terminationNoticeDate: terminationRequest.createdAt,
+        updatedAt: new Date()
+      }
+    });
+
+    // Send notifications
+    try {
+      const accepter = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { name: true }
+      });
+
+      const otherPartyId = req.user.id === tenantId ? landlordId : tenantId;
+      if (otherPartyId) {
+        await NotificationService.createNotification({
+          userId: otherPartyId,
+          type: 'SYSTEM_ANNOUNCEMENT',
+          title: 'Lease Termination Accepted',
+          message: `${accepter?.name || 'User'} has accepted the lease termination request`,
+          data: {
+            terminationRequestId: terminationId,
+            leaseId: terminationRequest.leaseId,
+            endDate: terminationRequest.proposedEndDate.toISOString()
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error sending termination acceptance notifications:', error);
+    }
+
+    return res.json({ 
+      success: true, 
+      terminationRequest: updatedRequest 
+    });
+  } catch (e) {
+    console.error('Accept termination request error:', e);
+    return res.status(400).json({ 
+      error: 'Failed to accept termination request' 
+    });
+  }
+};
+
+/**
+ * Decline a termination request
+ */
+export const declineTerminationRequest = async (req, res) => {
+  try {
+    const { id: terminationId } = req.params;
+
+    // Get termination request with lease data
+    const terminationRequest = await prisma.terminationRequest.findUnique({
+      where: { id: terminationId },
+      include: {
+        lease: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  select: { userId: true }
+                }
+              }
+            },
+            offer: {
+              include: {
+                organization: {
+                  include: {
+                    members: {
+                      where: { role: 'OWNER' },
+                      select: { userId: true }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!terminationRequest) {
+      return res.status(404).json({ error: 'Termination request not found' });
+    }
+
+    if (terminationRequest.status !== 'PENDING') {
+      return res.status(400).json({ 
+        error: 'Termination request is not pending' 
+      });
+    }
+
+    // Check authorization - either party can decline
+    const tenantId = terminationRequest.lease.tenantGroup?.members?.[0]?.userId;
+    const landlordId = terminationRequest.lease.offer?.organization?.members?.[0]?.userId;
+    const isTenant = req.user.id === tenantId;
+    const isLandlord = req.user.id === landlordId;
+
+    if (!isTenant && !isLandlord) {
+      return res.status(403).json({ 
+        error: 'Access denied: Not authorized for this lease' 
+      });
+    }
+
+    // Update termination request status
+    const updatedRequest = await prisma.terminationRequest.update({
+      where: { id: terminationId },
+      data: {
+        status: 'DECLINED',
+        decidedByUserId: req.user.id,
+        decidedAt: new Date()
+      }
+    });
+
+    // Send notifications
+    try {
+      const decliner = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { name: true }
+      });
+
+      const otherPartyId = req.user.id === tenantId ? landlordId : tenantId;
+      if (otherPartyId) {
+        await NotificationService.createNotification({
+          userId: otherPartyId,
+          type: 'SYSTEM_ANNOUNCEMENT',
+          title: 'Lease Termination Declined',
+          message: `${decliner?.name || 'User'} has declined the lease termination request`,
+          data: {
+            terminationRequestId: terminationId,
+            leaseId: terminationRequest.leaseId
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error sending termination decline notifications:', error);
+    }
+
+    return res.json({ 
+      success: true, 
+      terminationRequest: updatedRequest 
+    });
+  } catch (e) {
+    console.error('Decline termination request error:', e);
+    return res.status(400).json({ 
+      error: 'Failed to decline termination request' 
+    });
   }
 };

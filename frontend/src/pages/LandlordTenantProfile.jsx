@@ -39,6 +39,27 @@ const LandlordTenantProfile = () => {
     fetchTenantDetails();
   }, [tenantId]);
 
+  // After fetching tenant, resolve active lease for accurate dates/contract
+  useEffect(() => {
+    (async () => {
+      try {
+        const offerId = tenant?.offerId || tenant?.paidOfferId || tenant?.offer?.id;
+        if (offerId) {
+          const res = await api.get(`/leases/active-by-offer/${offerId}`);
+          if (res.data?.activeLease) {
+            setTenant(prev => ({ ...(prev || {}), activeLease: res.data.activeLease }));
+            return;
+          }
+        }
+        // Fallback to tenant-based resolution if offerId not present or no activeLease returned
+        const res2 = await api.get(`/leases/active-by-tenant/${tenantId}`);
+        if (res2.data?.activeLease) {
+          setTenant(prev => ({ ...(prev || {}), activeLease: res2.data.activeLease }));
+        }
+      } catch {}
+    })();
+  }, [tenant?.offerId, tenant?.paidOfferId, tenant?.offer?.id, tenantId]);
+
   const fetchTenantDetails = async () => {
     try {
       setLoading(true);
@@ -86,6 +107,13 @@ const LandlordTenantProfile = () => {
     }
   };
 
+  const daysUntil = (date) => {
+    if (!date) return null;
+    const end = new Date(date);
+    const today = new Date();
+    return Math.ceil((end - today) / (1000 * 60 * 60 * 24));
+  };
+
   const formatCurrency = amount => {
     return new Intl.NumberFormat('pl-PL', {
       style: 'currency',
@@ -111,102 +139,77 @@ const LandlordTenantProfile = () => {
       console.log('🔍 Landlord: Viewing contract for tenant:', tenant.name);
 
       const offerId = tenant.offerId || tenant.paidOfferId || tenant.offer?.id;
-      const requestId = tenant.rentalRequestId || tenant.rentalRequest?.id;
-      if (!offerId && !requestId) {
-        console.log('❌ Landlord: No booking identifiers found');
-        alert('No booking identifiers found to view contract.');
+      let activeLease = null;
+      if (offerId) {
+        const leaseRes = await api.get(`/leases/active-by-offer/${offerId}`);
+        activeLease = leaseRes.data?.activeLease || leaseRes.data?.lease;
+      }
+      if (!activeLease) {
+        const res2 = await api.get(`/leases/active-by-tenant/${tenantId}`);
+        activeLease = res2.data?.activeLease;
+      }
+      if (!activeLease?.id) {
+        alert('No lease found for this tenant.');
         return;
       }
-
-      // First, check if there's an existing contract in the database
-      let existingContract = null;
-      try {
-        console.log('🔍 Landlord: Checking for existing contract...');
-        const contractResponse = await api.get(`/contracts/landlord-contracts`);
-        console.log('🔍 Landlord: Contract response:', contractResponse.data);
-
-        if (contractResponse.data.contracts) {
-          if (offerId) {
-            existingContract = contractResponse.data.contracts.find(c =>
-              c.rentalRequest?.offers?.some(o => o.id === offerId)
-            );
-          }
-          if (!existingContract && requestId) {
-            existingContract = contractResponse.data.contracts.find(
-              c => c.rentalRequest?.id === requestId
-            );
-          }
-
-          if (existingContract) {
-            if (
-              existingContract.pdfUrl &&
-              existingContract.pdfUrl !== 'null' &&
-              existingContract.pdfUrl !== null
-            ) {
-              window.open(
-                `http://localhost:3001${existingContract.pdfUrl}`,
-                '_blank'
-              );
-              return;
-            }
-            // Try details for updated pdfUrl
-            try {
-              const details = await api.get(
-                `/contracts/${existingContract.id}`
-              );
-              if (details.data?.success && details.data.contract?.pdfUrl) {
-                window.open(
-                  `http://localhost:3001${details.data.contract.pdfUrl}`,
-                  '_blank'
-                );
-                return;
-              }
-            } catch {}
-          }
-        }
-      } catch (contractError) {
-        console.error(
-          '❌ Landlord: Error checking for existing contract:',
-          contractError
-        );
+      const contractResp = await api.get(`/contracts/lease/${activeLease.id}`);
+      const contract = contractResp.data?.contract;
+      if (contract?.pdfUrl) {
+        window.open(`http://localhost:3001${contract.pdfUrl}`, '_blank');
+        return;
       }
-
-      // If no existing contract, generate via backend
-      const genEndpoint = offerId
-        ? `/contracts/generate-by-offer/${offerId}`
-        : `/contracts/generate/${requestId}`;
-      try {
-        const generateResponse = await api.post(genEndpoint);
-        if (
-          generateResponse.data?.success &&
-          generateResponse.data.contract?.pdfUrl
-        ) {
-          const contractUrl = `http://localhost:3001${generateResponse.data.contract.pdfUrl}`;
-          window.open(contractUrl, '_blank');
-          return;
-        }
-      } catch (generateError) {
-        console.error(
-          '❌ Landlord: Error generating contract via backend:',
-          generateError
-        );
-      }
-
-      // Fallback to frontend generation
-      const response = offerId
-        ? await api.get(`/tenant/offer/${offerId}`)
-        : await api.get(`/landlord/tenant-offer/${requestId}`);
-      const offerData = response.data;
-      if (existingContract) {
-        offerData.offer.originalContractNumber =
-          existingContract.contractNumber;
-        offerData.offer.originalContractDate = existingContract.createdAt;
-        offerData.offer.originalPaymentDate = existingContract.paymentDate;
-      }
-      await viewContract(offerData.offer, user);
+      alert('Contract is not available yet.');
     } catch (error) {
       console.error('❌ Landlord: Error viewing contract:', error);
       alert('Error viewing contract. Please try again.');
+    }
+  };
+
+  // New: download contract for active lease (renewal-aware)
+  const handleDownloadContractNew = async () => {
+    try {
+      const offerId = tenant.offerId || tenant.paidOfferId || tenant.offer?.id;
+      let activeLease = null;
+      if (offerId) {
+        const leaseRes = await api.get(`/leases/active-by-offer/${offerId}`);
+        activeLease = leaseRes.data?.activeLease || leaseRes.data?.lease;
+      }
+      if (!activeLease) {
+        const res2 = await api.get(`/leases/active-by-tenant/${tenantId}`);
+        activeLease = res2.data?.activeLease;
+      }
+      if (!activeLease?.id) { alert('No lease found for this tenant.'); return; }
+      const contractResp = await api.get(`/contracts/lease/${activeLease.id}`);
+      const contract = contractResp.data?.contract;
+      if (contract?.pdfUrl) {
+        window.open(`http://localhost:3001${contract.pdfUrl}`, '_blank');
+        return;
+      }
+      alert('Contract is not available yet.');
+    } catch (e) {
+      console.error('❌ Landlord: Error downloading contract:', e);
+      alert('Error downloading contract.');
+    }
+  };
+
+  // Kept for reference; remove later when unused in UI
+  const handleDownloadContractLegacy = async () => {
+    try {
+      const offerId = tenant.offerId || tenant.paidOfferId || tenant.offer?.id;
+      if (!offerId) { alert('No booking identifiers found to download contract.'); return; }
+      const leaseRes = await api.get(`/leases/active-by-offer/${offerId}`);
+      const activeLease = leaseRes.data?.activeLease || leaseRes.data?.lease;
+      if (!activeLease?.id) { alert('No lease found for this booking.'); return; }
+      const contractResp = await api.get(`/contracts/lease/${activeLease.id}`);
+      const contract = contractResp.data?.contract;
+      if (contract?.pdfUrl) {
+        window.open(`http://localhost:3001${contract.pdfUrl}`, '_blank');
+        return;
+      }
+      alert('Contract is not available yet.');
+    } catch (e) {
+      console.error('❌ Landlord: Error downloading contract:', e);
+      alert('Error downloading contract.');
     }
   };
 
@@ -570,6 +573,23 @@ const LandlordTenantProfile = () => {
                       {tenant.name || 'Tenant'}
                     </h2>
                     <p className='text-gray-600'>{tenant.email}</p>
+                    {(() => {
+                      const leaseStart = tenant?.activeLease?.startDate || tenant?.lease?.startDate || tenant?.leaseStartDate;
+                      const leaseEnd = tenant?.activeLease?.endDate || tenant?.lease?.endDate || tenant?.leaseEndDate;
+                      if (!leaseStart || !leaseEnd) return null;
+                      return (
+                        <div className='mt-2'>
+                          <div className='text-xs text-gray-600'>
+                            {new Date(leaseStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric'})}
+                            {' – '}
+                            {new Date(leaseEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric'})}
+                          </div>
+                          <div className='text-xs text-gray-500 mt-1'>
+                            {(() => { const d = daysUntil(leaseEnd); return d != null ? `Ends in ${d} days` : null; })()}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                   {getStatusBadge(tenant.paymentStatus)}
                 </div>
@@ -584,14 +604,39 @@ const LandlordTenantProfile = () => {
                   </button>
 
                   <button
-                    onClick={handleDownloadContract}
+                    onClick={handleDownloadContractNew}
                     className='flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200'
                   >
                     <Download className='w-4 h-4' />
                     <span>Download Contract</span>
                   </button>
 
-                  {/* Send Message button removed as requested */}
+                  {/* Propose Renewal button with 60-day rule */}
+                  {(() => {
+                    const endDate = tenant.leaseEndDate;
+                    if (!endDate) return null;
+                    
+                    const end = new Date(endDate);
+                    const today = new Date();
+                    const daysUntilEnd = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
+                    const isWithin60Days = daysUntilEnd <= 60 && daysUntilEnd > 0;
+                    
+                    if (!isWithin60Days) return null;
+                    
+                    return (
+                      <button
+                        onClick={() => {
+                          // Navigate to My Tenants page where renewal modal is available
+                          navigate('/landlord-my-tenants');
+                        }}
+                        className='flex items-center space-x-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors duration-200'
+                        title={`Lease ends in ${daysUntilEnd} days`}
+                      >
+                        <Calendar className='w-4 h-4' />
+                        <span>Propose Renewal</span>
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

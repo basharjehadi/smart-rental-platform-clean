@@ -1807,3 +1807,344 @@ const createLeaseFromContract = async (contract, rentalRequestId) => {
     throw error;
   }
 };
+
+// Generate contract for a specific lease (for renewals)
+// Internal version that doesn't send HTTP response
+export const generateContractForLeaseInternal = async (leaseId) => {
+  try {
+    console.log('🔧 Generating contract for lease:', leaseId);
+
+    // Find the lease with all necessary data
+    const lease = await prisma.lease.findUnique({
+      where: { id: leaseId },
+      include: {
+        offer: {
+          include: {
+            organization: {
+              include: {
+                members: {
+                  where: { role: 'OWNER' },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        firstName: true,
+                        lastName: true,
+                        pesel: true,
+                        dowodOsobistyNumber: true,
+                        phoneNumber: true,
+                        address: true,
+                        street: true,
+                        city: true,
+                        zipCode: true,
+                        country: true,
+                        citizenship: true,
+                        dateOfBirth: true,
+                        profession: true,
+                        signatureBase64: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        rentalRequest: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        firstName: true,
+                        lastName: true,
+                        pesel: true,
+                        passportNumber: true,
+                        kartaPobytuNumber: true,
+                        phoneNumber: true,
+                        signatureBase64: true,
+                        street: true,
+                        city: true,
+                        zipCode: true,
+                        country: true,
+                        citizenship: true,
+                        dateOfBirth: true,
+                        profession: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        contract: true,
+      },
+    });
+
+    if (!lease) {
+      throw new Error('Lease not found');
+    }
+
+    if (!lease.offer) {
+      throw new Error('No offer found for this lease');
+    }
+
+    // Check if contract already exists
+    if (lease.contract) {
+      console.log('Contract already exists for this lease, skipping generation');
+      return lease.contract;
+    }
+
+    // Generate contract number
+    const contractNumber = generateContractNumber();
+    console.log(`📄 Generated contract number: ${contractNumber}`);
+
+    // Prepare contract data using lease data (for renewals)
+    const landlord = lease.offer.organization.members[0]?.user;
+    const tenant = lease.rentalRequest.tenantGroup.members[0]?.user;
+
+    if (!landlord || !tenant) {
+      throw new Error('Missing landlord or tenant data');
+    }
+
+    // Calculate lease dates
+    const leaseStartDate = new Date(lease.startDate);
+    const leaseEndDate = new Date(lease.endDate);
+
+    console.log('📄 Contract data prepared for lease:', {
+      contractNumber,
+      landlordName: `${landlord.firstName} ${landlord.lastName}`,
+      tenantName: `${tenant.firstName} ${tenant.lastName}`,
+      leaseStartDate: leaseStartDate.toISOString(),
+      leaseEndDate: leaseEndDate.toISOString(),
+      rentAmount: lease.rentAmount,
+      leaseDuration: Math.ceil((leaseEndDate - leaseStartDate) / (1000 * 60 * 60 * 24 * 30))
+    });
+
+    // Prepare contract data
+    const contractData = {
+      landlord: {
+        firstName: landlord.firstName || 'N/A',
+        lastName: landlord.lastName || 'N/A',
+        email: landlord.email || 'N/A',
+        pesel: landlord.pesel || 'N/A',
+        dowodOsobistyNumber: landlord.dowodOsobistyNumber || 'N/A',
+        phoneNumber: landlord.phoneNumber || 'N/A',
+        address: landlord.address || 'N/A',
+        street: landlord.street || 'N/A',
+        city: landlord.city || 'N/A',
+        zipCode: landlord.zipCode || 'N/A',
+        country: landlord.country || 'N/A',
+        citizenship: landlord.citizenship || 'N/A',
+        dateOfBirth: landlord.dateOfBirth || 'N/A',
+        profession: landlord.profession || 'N/A',
+        signature: landlord.signatureBase64 || null,
+      },
+      tenant: {
+        firstName: tenant.firstName || 'N/A',
+        lastName: tenant.lastName || 'N/A',
+        email: tenant.email || 'N/A',
+        pesel: tenant.pesel || 'N/A',
+        passportNumber: tenant.passportNumber || 'N/A',
+        kartaPobytuNumber: tenant.kartaPobytuNumber || 'N/A',
+        phoneNumber: tenant.phoneNumber || 'N/A',
+        street: tenant.street || 'N/A',
+        city: tenant.city || 'N/A',
+        zipCode: tenant.zipCode || 'N/A',
+        country: tenant.country || 'N/A',
+        citizenship: tenant.citizenship || 'N/A',
+        dateOfBirth: tenant.dateOfBirth || 'N/A',
+        profession: tenant.profession || 'N/A',
+        signature: tenant.signatureBase64 || null,
+      },
+      propertyAddress: lease.offer.propertyAddress || 'N/A',
+      leaseStartDate,
+      leaseEndDate,
+      rentAmount: lease.rentAmount,
+      depositAmount: lease.depositAmount || 0,
+      leaseDuration: Math.ceil((leaseEndDate - leaseStartDate) / (1000 * 60 * 60 * 24 * 30)),
+      houseRules: {
+        rulesText: lease.offer.rulesText || null,
+        rulesPdf: lease.offer.rulesPdf || null,
+      },
+    };
+
+    // Generate and save PDF
+    const pdfResult = await saveContractPDF(
+      {
+        ...lease.offer,
+        rentalRequest: { tenant: tenant },
+        property: { address: contractData.propertyAddress },
+        leaseStartDate: leaseStartDate,
+        leaseEndDate: leaseEndDate,
+        rentAmount: lease.rentAmount,
+        depositAmount: lease.depositAmount || 0,
+      },
+      tenant,
+      contractNumber
+    );
+
+    console.log('📄 PDF generated and saved for lease:', {
+      filename: pdfResult.filename,
+      originalSize: `${(pdfResult.originalSize / 1024 / 1024).toFixed(2)} MB`,
+      compressedSize: `${(pdfResult.compressedSize / 1024 / 1024).toFixed(2)} MB`,
+      compressionRatio: `${pdfResult.compressionRatio}%`
+    });
+
+    // Create contract record
+    const contract = await prisma.contract.create({
+      data: {
+        contractNumber,
+        status: 'SIGNED',
+        pdfUrl: `/uploads/contracts/${pdfResult.filename}`,
+        signedAt: new Date(),
+        generationTime: pdfResult.generationTime,
+        fileSize: pdfResult.originalSize,
+        leaseId: leaseId,
+        contractType: 'RENEWAL',
+        // Don't set rentalRequestId for renewal contracts to avoid constraint violation
+      },
+    });
+
+    console.log('✅ Contract saved to database for lease:', {
+      contractId: contract.id,
+      contractNumber: contract.contractNumber,
+      pdfUrl: contract.pdfUrl,
+      leaseId: contract.leaseId
+    });
+
+    return contract;
+  } catch (error) {
+    console.error('❌ Error generating contract for lease:', error);
+    throw error;
+  }
+};
+
+export const generateContractForLease = async (req, res) => {
+  const leaseId = req.params.leaseId;
+  try {
+    const contract = await generateContractForLeaseInternal(leaseId);
+    
+    return res.json({
+      success: true,
+      contract: {
+        id: contract.id,
+        contractNumber: contract.contractNumber,
+        status: contract.status,
+        pdfUrl: contract.pdfUrl,
+        contractType: contract.contractType,
+        signedAt: contract.signedAt,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error generating contract for lease:', error);
+    res.status(500).json({ error: 'Failed to generate contract for lease' });
+  }
+};
+
+// Get the appropriate contract for a lease (handles renewal contracts)
+export const getContractForLease = async (req, res) => {
+  try {
+    const { leaseId } = req.params;
+    const userId = req.user.id;
+
+    console.log('🔍 Getting contract for lease:', leaseId);
+
+    // Find the lease with contract data
+    const lease = await prisma.lease.findUnique({
+      where: { id: leaseId },
+      include: {
+        contract: true,
+        offer: {
+          include: {
+            organization: {
+              include: {
+                members: {
+                  where: { role: 'OWNER' },
+                  include: {
+                    user: {
+                      select: { id: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        rentalRequest: {
+          include: {
+            tenantGroup: {
+              include: {
+                members: {
+                  where: { isPrimary: true },
+                  include: {
+                    user: {
+                      select: { id: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!lease) {
+      return res.status(404).json({ error: 'Lease not found' });
+    }
+
+    // Check authorization
+    const isTenant = lease.rentalRequest?.tenantGroup?.members?.some(
+      (m) => m.userId === userId
+    );
+    const isLandlord = lease.offer?.organization?.members?.[0]?.userId === userId;
+
+    if (!isTenant && !isLandlord) {
+      return res.status(403).json({ error: 'Unauthorized to view this contract' });
+    }
+
+    // If lease has a contract, return it
+    if (lease.contract) {
+      return res.json({
+        success: true,
+        contract: {
+          id: lease.contract.id,
+          contractNumber: lease.contract.contractNumber,
+          status: lease.contract.status,
+          pdfUrl: lease.contract.pdfUrl,
+          contractType: lease.contract.contractType,
+          signedAt: lease.contract.signedAt,
+        },
+      });
+    }
+
+    // If no contract exists, generate one
+    console.log('No contract found for lease, generating new one...');
+    const contract = await generateContractForLeaseInternal(leaseId);
+    
+    return res.json({
+      success: true,
+      contract: {
+        id: contract.id,
+        contractNumber: contract.contractNumber,
+        status: contract.status,
+        pdfUrl: contract.pdfUrl,
+        contractType: contract.contractType,
+        signedAt: contract.signedAt,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error getting contract for lease:', error);
+    res.status(500).json({ error: 'Failed to get contract for lease' });
+  }
+};

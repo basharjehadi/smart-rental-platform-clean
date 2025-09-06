@@ -605,10 +605,26 @@ export const generateRentalContract = (offer, user = null) => {
   return contractHTML;
 };
 
-export const viewContract = async (offer, user = null) => {
+export const viewContract = async (offer, user = null, leaseData = null) => {
   try {
+    // If lease data is provided (for renewals), merge it with offer data
+    let contractData = { ...offer };
+    
+    if (leaseData) {
+      console.log('🔄 Using lease data for contract generation:', leaseData);
+      contractData = {
+        ...offer,
+        // Override with lease data for renewals
+        rentAmount: leaseData.rentAmount || offer.rentAmount,
+        leaseDuration: leaseData.leaseDuration || offer.leaseDuration,
+        availableFrom: leaseData.startDate || offer.availableFrom,
+        // Calculate end date from lease data
+        leaseEndDate: leaseData.endDate || offer.leaseEndDate,
+      };
+    }
+    
     // Generate the contract HTML directly
-    const contractHTML = generateRentalContract(offer, user);
+    const contractHTML = generateRentalContract(contractData, user);
 
     // Open the contract in a new window
     const newWindow = window.open('', '_blank');
@@ -623,10 +639,26 @@ export const viewContract = async (offer, user = null) => {
   }
 };
 
-export const downloadContract = async (offer, user = null) => {
+export const downloadContract = async (offer, user = null, leaseData = null) => {
   try {
+    // If lease data is provided (for renewals), merge it with offer data
+    let contractData = { ...offer };
+    
+    if (leaseData) {
+      console.log('🔄 Using lease data for contract download:', leaseData);
+      contractData = {
+        ...offer,
+        // Override with lease data for renewals
+        rentAmount: leaseData.rentAmount || offer.rentAmount,
+        leaseDuration: leaseData.leaseDuration || offer.leaseDuration,
+        availableFrom: leaseData.startDate || offer.availableFrom,
+        // Calculate end date from lease data
+        leaseEndDate: leaseData.endDate || offer.leaseEndDate,
+      };
+    }
+    
     // Generate the contract HTML directly
-    const contractHTML = generateRentalContract(offer, user);
+    const contractHTML = generateRentalContract(contractData, user);
 
     // Convert HTML to PDF using jsPDF and html2canvas
     try {

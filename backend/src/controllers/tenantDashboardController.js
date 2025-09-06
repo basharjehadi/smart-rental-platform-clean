@@ -4,6 +4,12 @@ import {
   getUpcomingPayments,
 } from '../services/paymentService.js';
 import { getUserTrustLevel } from '../services/trustLevels.js';
+import { 
+  resolveTerminationPolicy, 
+  computeEarliestTerminationEnd,
+  formatTerminationDate,
+  getTerminationPolicyExplanation 
+} from '../utils/dateUtils.js';
 
 // Helper function to get tenant payment data - Now using unified service
 const getTenantPaymentsData = async (tenantId) => {
@@ -96,8 +102,9 @@ export const getTenantDashboardData = async (req, res) => {
       include: {
         rentalRequest: {
           include: {
+            // Include all leases (original + renewals) to allow smart selection on the frontend/backend
             leases: {
-              where: { status: 'ACTIVE' },
+              orderBy: { createdAt: 'desc' },
               include: {
                 unit: true,
               },
@@ -213,10 +220,40 @@ export const getTenantDashboardData = async (req, res) => {
           return end;
         })();
 
+      // Choose which lease to display for this offer
+      const displayLease = (() => {
+        const allLeases = offer.rentalRequest.leases || [];
+        if (allLeases.length === 0) return null;
+        const today = new Date();
+
+        // If a renewal has started, show it
+        const activeRenewal = allLeases.find(
+          (l) => l.leaseType === 'RENEWAL' && new Date(l.startDate) <= today
+        );
+        if (activeRenewal) return activeRenewal;
+
+        // If a renewal exists but hasn't started yet, show the original lease
+        const futureRenewal = allLeases.find(
+          (l) => l.leaseType === 'RENEWAL' && new Date(l.startDate) > today
+        );
+        if (futureRenewal) {
+          const original =
+            allLeases.find((l) => l.id === futureRenewal.parentLeaseId) ||
+            allLeases.find((l) => l.leaseType === 'ORIGINAL');
+          if (original) return original;
+          return futureRenewal; // fallback
+        }
+
+        // Fallback to the most recent lease
+        return allLeases[0];
+      })();
+
       return {
         offerId: offer.id,
         rentalRequestId: offer.rentalRequest.id,
-        hasActualLease: !!offer.rentalRequest.leases?.[0],
+        hasActualLease:
+          Array.isArray(offer.rentalRequest.leases) &&
+          offer.rentalRequest.leases.length > 0,
         moveInVerificationStatus: offer.moveInVerificationStatus,
         property: {
           id: offer.property?.id,
@@ -258,17 +295,16 @@ export const getTenantDashboardData = async (req, res) => {
           profileImage: null,
         },
         lease: (() => {
-          // Use actual lease data if available, otherwise fallback to offer data
-          const actualLease = offer.rentalRequest.leases?.[0];
-          if (actualLease) {
+          // Use smartly selected display lease if available, otherwise fallback to offer data
+          if (displayLease) {
             return {
-              id: actualLease.id,
-              startDate: actualLease.startDate,
-              endDate: actualLease.endDate,
-              monthlyRent: actualLease.rentAmount,
-              securityDeposit: actualLease.depositAmount,
-              status: actualLease.status,
-              unitId: actualLease.unitId,
+              id: displayLease.id,
+              startDate: displayLease.startDate,
+              endDate: displayLease.endDate,
+              monthlyRent: displayLease.rentAmount,
+              securityDeposit: displayLease.depositAmount,
+              status: displayLease.status,
+              unitId: displayLease.unitId,
             };
           }
           // Fallback to offer data
@@ -296,6 +332,24 @@ export const getTenantDashboardData = async (req, res) => {
       );
     }
 
+    // Add termination policy preview for the active lease
+    let terminationPolicyPreview = null;
+    if (activeLease) {
+      try {
+        const policy = resolveTerminationPolicy(activeLease);
+        const earliestEnd = computeEarliestTerminationEnd(new Date(), policy);
+        terminationPolicyPreview = {
+          cutoffDay: policy.cutoffDay,
+          minNoticeDays: policy.minNoticeDays,
+          timezone: policy.timezone,
+          earliestEnd: earliestEnd.toISOString(),
+          explanation: getTerminationPolicyExplanation(policy)
+        };
+      } catch (error) {
+        console.error('Error calculating termination policy preview:', error);
+      }
+    }
+
     // Simplified response with primary lease and full leases list
     const responseData = {
       tenant: {
@@ -304,6 +358,7 @@ export const getTenantDashboardData = async (req, res) => {
       },
       hasActiveLease: true,
       offerId: activeLease.id,
+      terminationPolicyPreview,
       property: {
         address: (() => {
           // Use the actual property address if available, otherwise fallback to rental request location
@@ -388,19 +443,44 @@ export const getTenantDashboardData = async (req, res) => {
         profileImage: null,
       },
       lease: (() => {
-        // Use actual lease data if available, otherwise fallback to offer data
-        const actualLease = activeLease.rentalRequest.leases?.[0];
-        if (actualLease) {
+        // Smart selection of lease to display at top-level too
+        const allLeases = activeLease.rentalRequest.leases || [];
+        const today = new Date();
+        let displayLease = null;
+
+        const activeRenewal = allLeases.find(
+          (l) => l.leaseType === 'RENEWAL' && new Date(l.startDate) <= today
+        );
+        if (activeRenewal) displayLease = activeRenewal;
+
+        if (!displayLease) {
+          const futureRenewal = allLeases.find(
+            (l) => l.leaseType === 'RENEWAL' && new Date(l.startDate) > today
+          );
+          if (futureRenewal) {
+            displayLease =
+              allLeases.find((l) => l.id === futureRenewal.parentLeaseId) ||
+              allLeases.find((l) => l.leaseType === 'ORIGINAL') ||
+              futureRenewal;
+          }
+        }
+
+        if (!displayLease && allLeases.length > 0) {
+          displayLease = allLeases[0];
+        }
+
+        if (displayLease) {
           return {
-            id: actualLease.id,
-            startDate: actualLease.startDate,
-            endDate: actualLease.endDate,
-            monthlyRent: actualLease.rentAmount,
-            securityDeposit: actualLease.depositAmount,
-            status: actualLease.status,
-            unitId: actualLease.unitId,
+            id: displayLease.id,
+            startDate: displayLease.startDate,
+            endDate: displayLease.endDate,
+            monthlyRent: displayLease.rentAmount,
+            securityDeposit: displayLease.depositAmount,
+            status: displayLease.status,
+            unitId: displayLease.unitId,
           };
         }
+
         // Fallback to offer data
         return {
           startDate: activeLease.rentalRequest.moveInDate,

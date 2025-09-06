@@ -11,6 +11,7 @@ import {
   downloadGeneratedContract,
   getMyContracts,
   getLandlordContracts,
+  getContractForLease,
 } from '../controllers/contractController.js';
 import verifyToken from '../middlewares/verifyToken.js';
 import { PrismaClient } from '@prisma/client';
@@ -274,6 +275,9 @@ router.post('/signature', verifyToken, saveSignature);
 
 // Get contract status
 router.get('/status/:rentalRequestId', verifyToken, getContractStatus);
+
+// Get contract for a specific lease (handles renewal contracts)
+router.get('/lease/:leaseId', verifyToken, getContractForLease);
 
 // Manual trigger to generate all missing contracts (for immediate fixes)
 router.post('/generate-all-missing', verifyToken, generateAllMissingContracts);

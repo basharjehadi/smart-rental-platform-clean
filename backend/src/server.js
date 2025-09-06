@@ -77,6 +77,11 @@ const startServer = async () => {
     setSocketIO(io);
     logger.info('🔔 Socket.io connected to notification service');
 
+    // Initialize renewal cron jobs
+    const { initializeRenewalCronJobs } = await import('./services/renewalCronService.js');
+    initializeRenewalCronJobs();
+    logger.info('⏰ Renewal cron jobs initialized');
+
     // Start server
     server.listen(PORT, () => {
       logger.info(`🚀 Server running on port ${PORT}`);

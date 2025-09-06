@@ -4,6 +4,12 @@ import {
   getPaymentStatus,
   getUpcomingPayments,
 } from '../services/paymentService.js';
+import { 
+  resolveTerminationPolicy, 
+  computeEarliestTerminationEnd,
+  formatTerminationDate,
+  getTerminationPolicyExplanation 
+} from '../utils/dateUtils.js';
 
 // Get all tenants for a landlord
 export const getLandlordTenants = async (req, res) => {
@@ -412,6 +418,38 @@ export const getLandlordTenantDetails = async (req, res) => {
       });
     }
 
+    // Add termination policy preview for the lease
+    let terminationPolicyPreview = null;
+    try {
+      console.log('🔍 LANDLORD: Calculating termination policy preview for tenant:', tenant.email);
+      
+      const leaseData = {
+        offer: {
+          organization: {
+            terminationPolicy: null // Will use defaults
+          }
+        },
+        property: {
+          timezone: 'Europe/Warsaw' // Property model doesn't have timezone field, use fallback
+        }
+      };
+      
+      const policy = resolveTerminationPolicy(leaseData);
+      const earliestEnd = computeEarliestTerminationEnd(new Date(), policy);
+      
+      terminationPolicyPreview = {
+        cutoffDay: policy.cutoffDay,
+        minNoticeDays: policy.minNoticeDays,
+        timezone: policy.timezone,
+        earliestEnd: earliestEnd.toISOString(),
+        explanation: getTerminationPolicyExplanation(policy)
+      };
+      
+      console.log('🔍 LANDLORD: Termination policy preview created:', JSON.stringify(terminationPolicyPreview, null, 2));
+    } catch (error) {
+      console.error('❌ LANDLORD: Error calculating termination policy preview:', error);
+    }
+
     const tenantData = {
       id: tenant.id,
       name:
@@ -437,6 +475,7 @@ export const getLandlordTenantDetails = async (req, res) => {
       contract: contract,
       paymentHistory: paymentData?.payments || [],
       recentActivity: recentActivity,
+      terminationPolicyPreview,
       property: {
         id: paidOffer.property.id,
         title: paidOffer.property.name,

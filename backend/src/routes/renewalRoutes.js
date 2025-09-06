@@ -8,6 +8,10 @@ import {
   listRenewalsForLease,
   getRenewalWorkflow,
   expireOldRenewals,
+  createTerminationRequest,
+  getTerminationPolicyPreview,
+  acceptTerminationRequest,
+  declineTerminationRequest,
 } from '../controllers/renewalController.js';
 
 const router = Router();
@@ -30,5 +34,19 @@ router.get('/leases/:id/renewal-workflow', verifyToken, getRenewalWorkflow);
 
 // Auto-expire old renewal requests (admin/cron endpoint)
 router.post('/renewals/expire-old', verifyToken, expireOldRenewals);
+
+// 🚀 NEW: Termination Request Routes (as outlined by ChatGPT)
+
+// Create termination request for a lease (either party)
+router.post('/leases/:id/terminations', verifyToken, createTerminationRequest);
+
+// Get termination policy preview for a lease
+router.get('/leases/:id/termination-policy', verifyToken, getTerminationPolicyPreview);
+
+// Accept a termination request
+router.post('/terminations/:id/accept', verifyToken, acceptTerminationRequest);
+
+// Decline a termination request
+router.post('/terminations/:id/decline', verifyToken, declineTerminationRequest);
 
 export default router;

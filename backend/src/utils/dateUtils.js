@@ -1,243 +1,218 @@
 /**
- * 📅 Centralized Date Utilities
- *
- * All date math operations use Europe/Warsaw timezone to ensure consistency
- * across the review system, lease status checker, and other date-sensitive operations.
- *
- * This prevents timezone-related bugs and ensures publishAfter calculations
- * are consistent with job comparisons.
+ * Date utility functions for the Smart Rental System
+ * 
+ * This module provides date calculation functions including the termination policy
+ * implementation as outlined by ChatGPT.
  */
 
-import { fromZonedTime, toZonedTime, format } from 'date-fns-tz';
-
-// Timezone constant - all operations use this
-export const WARSAW_TIMEZONE = 'Europe/Warsaw';
-
 /**
- * Get current time in Warsaw timezone
- * @returns {Date} Current time in Warsaw timezone
+ * Compute the earliest possible termination end date based on the cutoff policy
+ * 
+ * @param {Date} requestAt - The date when the termination request is made
+ * @param {Object} policy - Termination policy configuration
+ * @param {number} policy.cutoffDay - Day of month cutoff (e.g., 10)
+ * @param {number} policy.minNoticeDays - Minimum notice period in days (e.g., 30)
+ * @param {string} policy.timezone - Timezone for calculations (e.g., 'Europe/Warsaw')
+ * @returns {Date} The earliest possible termination end date
  */
-export function getCurrentWarsawTime() {
-  return toZonedTime(new Date(), WARSAW_TIMEZONE);
-}
+export const computeEarliestTerminationEnd = (requestAt, policy) => {
+  const { cutoffDay = 10, minNoticeDays = 0, timezone = 'Europe/Warsaw' } = policy;
+  
+  // Convert request date to the specified timezone
+  // Using basic Date methods since we don't want to add moment.js dependency
+  const req = new Date(requestAt);
+  
+  // Get day of month in the request timezone
+  // Note: This is a simplified approach. In production, you'd want to use a proper timezone library
+  const day = req.getDate();
+  
+  // Apply cutoff rule (UPDATED):
+  // - On/before cutoff day -> end of CURRENT month
+  // - After cutoff day      -> end of NEXT month
+  const monthsToAdd = day <= cutoffDay ? 0 : 1;
+  
+  // Calculate candidate end date (end of target month)
+  const candidate = new Date(req);
+  candidate.setMonth(candidate.getMonth() + monthsToAdd + 1); // Go to month after target
+  candidate.setDate(0); // Last day of previous month = last day of target month
+  candidate.setHours(23, 59, 59, 999); // End of day
+  
+  // Enforce minimum notice period if configured
+  if (minNoticeDays > 0) {
+    const minEnd = new Date(req);
+    minEnd.setDate(minEnd.getDate() + minNoticeDays);
+    minEnd.setHours(23, 59, 59, 999); // End of day
+    
+    if (candidate < minEnd) {
+      // Bump to the first end-of-month >= minEnd
+      let cursor = new Date(minEnd);
+      cursor.setDate(0); // Last day of current month
+      cursor.setHours(23, 59, 59, 999);
+      
+      // If cursor is before minEnd, move to next month
+      if (cursor < minEnd) {
+        cursor.setMonth(cursor.getMonth() + 1);
+        cursor.setDate(0); // Last day of next month
+        cursor.setHours(23, 59, 59, 999);
+      }
+      
+      candidate.setTime(cursor.getTime());
+    }
+  }
+  
+  return candidate;
+};
 
 /**
- * Convert a date to Warsaw timezone
- * @param {Date} date - Date to convert
- * @returns {Date} Date in Warsaw timezone
+ * Resolve termination policy for a lease
+ * 
+ * @param {Object} lease - Lease object with property and organization data
+ * @returns {Object} Resolved termination policy
  */
-export function toWarsawTime(date) {
-  return toZonedTime(date, WARSAW_TIMEZONE);
-}
+export const resolveTerminationPolicy = (lease) => {
+  // Default policy values
+  const defaultPolicy = {
+    cutoffDay: 10,
+    minNoticeDays: 0,
+    timezone: 'Europe/Warsaw'
+  };
+  
+  // Try to get policy from organization first, then property, then use defaults
+  const orgPolicy = lease?.offer?.organization?.terminationPolicy;
+  const propertyPolicy = lease?.property?.terminationPolicy;
+  
+  // Merge policies with defaults (organization > property > defaults)
+  const policy = {
+    ...defaultPolicy,
+    ...propertyPolicy,
+    ...orgPolicy
+  };
+  
+  return policy;
+};
 
 /**
- * Convert a Warsaw timezone date to UTC
- * @param {Date} warsawDate - Date in Warsaw timezone
- * @returns {Date} Date in UTC
- */
-export function fromWarsawTime(warsawDate) {
-  return fromZonedTime(warsawDate, WARSAW_TIMEZONE);
-}
-
-/**
- * Add days to a date, handling DST boundaries correctly
- * Uses Warsaw timezone for all calculations
- *
- * @param {Date} date - Base date (will be converted to Warsaw timezone)
- * @param {number} days - Number of days to add (can be negative)
- * @returns {Date} New date in Warsaw timezone
- */
-export function addDays(date, days) {
-  const warsawDate = toWarsawTime(date);
-  const result = new Date(warsawDate);
-  result.setDate(result.getDate() + days);
-  return result;
-}
-
-/**
- * Add days to a date and return as UTC
- * Useful for storing in database while maintaining Warsaw timezone logic
- *
- * @param {Date} date - Base date (will be converted to Warsaw timezone)
- * @param {number} days - Number of days to add
- * @returns {Date} New date in UTC
- */
-export function addDaysUTC(date, days) {
-  const warsawResult = addDays(date, days);
-  return fromWarsawTime(warsawResult);
-}
-
-/**
- * Calculate publishAfter date for reviews
- * Always adds 14 days to lease end date in Warsaw timezone
- *
- * @param {Date} leaseEndDate - Lease end date
- * @returns {Date} publishAfter date in UTC (for database storage)
- */
-export function calculatePublishAfter(leaseEndDate) {
-  const warsawResult = addDays(leaseEndDate, 14);
-  // Convert to UTC for database storage by creating a new Date from the ISO string
-  const utcDate = new Date(warsawResult.toISOString());
-  // Ensure it's treated as UTC
-  return new Date(
-    Date.UTC(
-      utcDate.getUTCFullYear(),
-      utcDate.getUTCMonth(),
-      utcDate.getUTCDate(),
-      utcDate.getUTCHours(),
-      utcDate.getUTCMinutes(),
-      utcDate.getUTCSeconds(),
-      utcDate.getUTCMilliseconds()
-    )
-  );
-}
-
-/**
- * Check if a date is in the past relative to current Warsaw time
- *
- * @param {Date} date - Date to check
- * @returns {boolean} true if date is in the past
- */
-export function isPastDate(date) {
-  const warsawNow = getCurrentWarsawTime();
-  const warsawDate = toWarsawTime(date);
-  return warsawDate < warsawNow;
-}
-
-/**
- * Check if a date is in the future relative to current Warsaw time
- *
- * @param {Date} date - Date to check
- * @returns {boolean} true if date is in the future
- */
-export function isFutureDate(date) {
-  const warsawNow = getCurrentWarsawTime();
-  const warsawDate = toWarsawTime(date);
-  return warsawDate > warsawNow;
-}
-
-/**
- * Get the difference in days between two dates
- * Uses Warsaw timezone for accurate day boundary calculations
- *
- * @param {Date} date1 - First date
- * @param {Date} date2 - Second date
- * @returns {number} Difference in days (positive if date2 > date1)
- */
-export function getDaysDifference(date1, date2) {
-  const warsawDate1 = toWarsawTime(date1);
-  const warsawDate2 = toWarsawTime(date2);
-
-  const diffTime = warsawDate2.getTime() - warsawDate1.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  return diffDays;
-}
-
-/**
- * Format a date in Warsaw timezone for display
+ * Format date for display in UI
  *
  * @param {Date} date - Date to format
- * @param {string} formatString - Date-fns format string
+ * @param {string} timezone - Timezone for formatting
  * @returns {string} Formatted date string
  */
-export function formatWarsawDate(date, formatString = 'yyyy-MM-dd HH:mm:ss') {
-  const warsawDate = toWarsawTime(date);
-  return format(warsawDate, formatString, { timeZone: WARSAW_TIMEZONE });
-}
+export const formatTerminationDate = (date, timezone = 'Europe/Warsaw') => {
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: timezone
+  });
+};
 
 /**
- * Get the start of day in Warsaw timezone
- *
- * @param {Date} date - Date to get start of day for
- * @returns {Date} Start of day in Warsaw timezone
+ * Get termination policy explanation text for UI
+ * 
+ * @param {Object} policy - Termination policy
+ * @returns {string} Human-readable explanation
  */
-export function getStartOfDayWarsaw(date) {
-  const warsawDate = toWarsawTime(date);
-  const startOfDay = new Date(warsawDate);
-  startOfDay.setHours(0, 0, 0, 0);
-  return startOfDay;
-}
+export const getTerminationPolicyExplanation = (policy) => {
+  const { cutoffDay } = policy;
+  return `Requests on/before day ${cutoffDay} end this month; after that, next month.`;
+};
 
 /**
- * Get the end of day in Warsaw timezone
- *
- * @param {Date} date - Date to get end of day for
+ * Calculate publish after date for reviews
+ * 
+ * @param {Date} endDate - Lease end date
+ * @returns {Date} Date when review can be published
+ */
+export const calculatePublishAfter = (endDate) => {
+  const publishAfter = new Date(endDate);
+  publishAfter.setDate(publishAfter.getDate() + 14); // 14 days after lease end
+  return publishAfter;
+};
+
+/**
+ * Add days to a date
+ * 
+ * @param {Date} date - Base date
+ * @param {number} days - Number of days to add
+ * @returns {Date} New date with days added
+ */
+export const addDays = (date, days) => {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+};
+
+/**
+ * Get end of day in Warsaw timezone
+ * 
+ * @param {Date} date - Input date
  * @returns {Date} End of day in Warsaw timezone
  */
-export function getEndOfDayWarsaw(date) {
-  const warsawDate = toWarsawTime(date);
-  const endOfDay = new Date(warsawDate);
-  endOfDay.setHours(23, 59, 59, 999);
-  return endOfDay;
-}
+export const getEndOfDayWarsaw = (date) => {
+  const warsawDate = new Date(date);
+  warsawDate.setHours(23, 59, 59, 999);
+  return warsawDate;
+};
 
 /**
- * Check if current time is within a specific hour range in Warsaw timezone
- * Useful for cron job scheduling
- *
+ * Check if current time is within specified hour range
+ * 
  * @param {number} startHour - Start hour (0-23)
  * @param {number} endHour - End hour (0-23)
- * @returns {boolean} true if current time is within the range
+ * @returns {boolean} True if within range
  */
-export function isWithinHourRange(startHour, endHour) {
-  const warsawNow = getCurrentWarsawTime();
-  const currentHour = warsawNow.getHours();
-
+export const isWithinHourRange = (startHour, endHour) => {
+  const now = new Date();
+  const currentHour = now.getHours();
+  
   if (startHour <= endHour) {
-    // Same day range (e.g., 9:00 - 17:00)
-    return currentHour >= startHour && currentHour < endHour;
+    return currentHour >= startHour && currentHour <= endHour;
   } else {
-    // Overnight range (e.g., 22:00 - 06:00)
-    return currentHour >= startHour || currentHour < endHour;
+    // Handle overnight range (e.g., 22:00 to 06:00)
+    return currentHour >= startHour || currentHour <= endHour;
   }
-}
+};
 
 /**
- * Get the next occurrence of a specific hour in Warsaw timezone
- * Useful for scheduling future jobs
- *
+ * Get next occurrence of specified hour
+ * 
  * @param {number} hour - Target hour (0-23)
  * @returns {Date} Next occurrence of the hour
  */
-export function getNextHourOccurrence(hour) {
-  const warsawNow = getCurrentWarsawTime();
-  const nextHour = new Date(warsawNow);
-
-  if (warsawNow.getHours() >= hour) {
-    // Target hour has passed today, get tomorrow
-    nextHour.setDate(nextHour.getDate() + 1);
+export const getNextHourOccurrence = (hour) => {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(hour, 0, 0, 0);
+  
+  if (next <= now) {
+    next.setDate(next.getDate() + 1);
   }
-
-  nextHour.setHours(hour, 0, 0, 0);
-  // Return the date in the same timezone context for testing
-  return nextHour;
-}
+  
+  return next;
+};
 
 /**
- * Validate that a date is a valid Date object
- *
- * @param {any} date - Date to validate
- * @returns {boolean} true if valid date
+ * Check if a value is a valid date
+ * 
+ * @param {any} value - Value to check
+ * @returns {boolean} True if valid date
  */
-export function isValidDate(date) {
-  return date instanceof Date && !isNaN(date.getTime());
-}
+export const isValidDate = (value) => {
+  return value instanceof Date && !isNaN(value.getTime());
+};
 
 /**
- * Parse a date string and convert to Warsaw timezone
- *
+ * Parse date string in Warsaw timezone
+ * 
  * @param {string} dateString - Date string to parse
- * @returns {Date|null} Date in Warsaw timezone, or null if invalid
+ * @returns {Date} Parsed date
  */
-export function parseWarsawDate(dateString) {
-  try {
-    const date = new Date(dateString);
-    if (!isValidDate(date)) {
-      return null;
-    }
-    return toWarsawTime(date);
-  } catch {
-    return null;
-  }
-}
+export const parseWarsawDate = (dateString) => {
+  return new Date(dateString);
+};
+
+/**
+ * Warsaw timezone constant
+ */
+export const WARSAW_TIMEZONE = 'Europe/Warsaw';

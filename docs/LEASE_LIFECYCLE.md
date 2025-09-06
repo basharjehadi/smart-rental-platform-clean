@@ -172,29 +172,158 @@ Windows note: Prisma on Windows can occasionally emit EPERM rename warnings for 
 
 ---
 
-## Renewal Workflow (Requests & Counters)
+## Enhanced Renewal Workflow System (2025 Update)
 
-### Model
+### Overview
+The lease renewal system has been completely enhanced with a professional workflow, smart UI, real-time notifications, and comprehensive security. This transforms the basic renewal functionality into an enterprise-grade property management feature.
+
+### Enhanced Data Model
 - `RenewalRequest` with fields: `leaseId`, `initiatorUserId`, `status (PENDING|COUNTERED|ACCEPTED|DECLINED|EXPIRED|CANCELLED)`, `proposedTermMonths`, `proposedStartDate`, `proposedMonthlyRent (landlord-only)`, `note`, `counterOfId`, `expiresAt`, `decidedByUserId`, `decidedAt`.
 
-### Rules
-- Either party can open 1 active renewal request per lease.
-- Only landlord may set or change `proposedMonthlyRent` (enforced server-side).
-- Acceptance creates a new Lease from the proposed start date; contract generation can be plugged in.
-- Requests auto-expire after 7 days (scheduler), or you can extend logic to cut off near lease end.
+### Security & Permission System
+- **Tenant Protection**: Tenants can only send simple renewal requests (no terms/rent manipulation)
+- **Landlord Authorization**: Only landlords can propose terms and rent changes
+- **Access Control**: Users can only access renewals for their own leases
+- **Role Validation**: Comprehensive tenant/landlord role checking for each action
+- **API Security**: Backend guards prevent unauthorized term/rent manipulation
 
-### Endpoints
-- POST `/api/leases/:id/renewals` – create request (landlord price allowed)
-- POST `/api/renewals/:id/counter` – counter; landlord may set price
-- POST `/api/renewals/:id/accept` – accept; creates new Lease
-- POST `/api/renewals/:id/decline` – decline
-- GET  `/api/leases/:id/renewals` – list thread
+### Enhanced API Endpoints
 
-### Scheduler
-- Extends `leaseLifecycleService` to mark overdue requests as `EXPIRED`.
+#### Core Renewal Endpoints
+- `POST /api/leases/:id/renewals` – Create renewal request (tenant: note only, landlord: full terms)
+- `POST /api/renewals/:id/counter` – Counter renewal (landlord only, can set terms)
+- `POST /api/renewals/:id/accept` – Accept renewal (tenant only)
+- `POST /api/renewals/:id/decline` – Decline renewal (either party)
+- `GET /api/leases/:id/renewals` – List renewal thread
 
-### UI (initial)
-- Tenant Dashboard → Lease Progress card: “Decline Renewal” present; “Request Renewal” can be added to call POST `/leases/:id/renewals` without price.
-- Landlord My Tenants → add “Propose Renewal” (with price input) or “Counter” when a pending request exists.
+#### New Workflow Endpoints
+- `GET /api/leases/:id/renewal-workflow` – Get current workflow state and permissions
+- `POST /api/renewals/expire-old` – Auto-expire old renewal requests (admin/cron)
+
+### State Machine Workflow
+```
+REQUESTED (tenant) → PROPOSED (landlord) → ACCEPTED (tenant)
+                                            → REJECTED (tenant)
+REQUESTED (timeout) → EXPIRED
+CANCELLED (by either party if no decision yet)
+```
+
+### Real-Time Notifications
+- **Renewal Request Notifications**: When tenants request renewal or landlords propose terms
+- **Response Notifications**: When renewals are accepted or declined
+- **Expiration Notifications**: When renewals expire without response
+- **Real-Time Delivery**: Instant notifications via Socket.io
+- **Smart Targeting**: Notifications go to the right party based on who initiated the action
+
+### Enhanced UI Components
+
+#### Tenant UI
+- **Simplified Renewal Modal**: Removed term/rent inputs, only message field
+- **Clear Process Explanation**: Users understand landlord will propose terms
+- **Smart Button Logic**: Buttons show/hide based on current workflow state
+- **Real-Time Updates**: Instant UI updates without page refresh
+
+#### Landlord UI
+- **Smart Proposal Modal**: Quick presets (12m same rent, +5% increase, 6m terms)
+- **Custom Terms**: Set any rent increase percentage and lease duration
+- **Live Preview**: See exactly what you're proposing before sending
+- **Revenue Optimization**: Easy rent increase management with visual feedback
+
+### Quick Presets for Landlords
+1. **12 months, same rent** - Maintain current terms
+2. **12 months, +5% increase** - Standard annual rent increase
+3. **6 months, same rent** - Short-term renewal
+4. **Custom terms** - Set any duration and rent increase percentage
+
+### Workflow State API
+The `/api/leases/:id/renewal-workflow` endpoint returns:
+```json
+{
+  "hasActiveRenewal": boolean,
+  "currentStatus": "PENDING|COUNTERED|ACCEPTED|DECLINED|EXPIRED|CANCELLED",
+  "canRequestRenewal": boolean,
+  "canProposeRenewal": boolean,
+  "canCounterRenewal": boolean,
+  "canAcceptRenewal": boolean,
+  "canDeclineRenewal": boolean,
+  "latestRenewal": object,
+  "allRenewals": array,
+  "leaseEndDate": string,
+  "daysUntilExpiry": number
+}
+```
+
+### Auto-Expiration System
+- **7-Day Expiration**: Renewal requests auto-expire after 7 days
+- **Scheduler Integration**: Runs every 5 minutes to check for expired requests
+- **Notification System**: Users are notified when renewals expire
+- **Cleanup**: Expired renewals are marked and cleaned up automatically
+
+### Business Impact
+- **Professional Features**: Enterprise-level lease management capabilities
+- **User Retention**: Landlords will stick with your platform for these features
+- **Revenue Growth**: More successful renewals = more long-term users
+- **Competitive Advantage**: Most rental apps don't have proper renewal workflows
+- **Sticky Platform**: Users become dependent on these professional features
+
+### Testing Guide
+
+#### Prerequisites
+- Active lease with tenant and landlord
+- Valid JWT tokens for both parties
+- Socket.io connection for real-time testing
+
+#### Test Scenarios
+
+1. **Tenant Renewal Request**
+   ```bash
+   # Tenant sends simple renewal request
+   curl -X POST \
+     -H "Authorization: Bearer <tenant-jwt>" \
+     -H "Content-Type: application/json" \
+     -d '{"note":"I would like to renew my lease"}' \
+     http://localhost:3001/api/leases/<leaseId>/renewals
+   ```
+
+2. **Landlord Proposal**
+   ```bash
+   # Landlord proposes renewal terms
+   curl -X POST \
+     -H "Authorization: Bearer <landlord-jwt>" \
+     -H "Content-Type: application/json" \
+     -d '{"proposedTermMonths":12,"proposedMonthlyRent":1200,"note":"Happy to renew with 5% increase"}' \
+     http://localhost:3001/api/leases/<leaseId>/renewals
+   ```
+
+3. **Tenant Acceptance**
+   ```bash
+   # Tenant accepts landlord's proposal
+   curl -X POST \
+     -H "Authorization: Bearer <tenant-jwt>" \
+     http://localhost:3001/api/renewals/<renewalId>/accept
+   ```
+
+4. **Workflow State Check**
+   ```bash
+   # Check current workflow state
+   curl -H "Authorization: Bearer <jwt>" \
+     http://localhost:3001/api/leases/<leaseId>/renewal-workflow
+   ```
+
+#### Verification Points
+- ✅ Tenant cannot set terms/rent (API returns 403)
+- ✅ Landlord can set terms/rent
+- ✅ Real-time notifications appear instantly
+- ✅ UI buttons show/hide based on workflow state
+- ✅ Auto-expiration works after 7 days
+- ✅ New lease is created on acceptance
+- ✅ Payment schedule updates with new rent
+
+### Future Enhancements
+- **Renewal Analytics**: Track renewal rates and rent trends
+- **Automated Rent Increases**: Configurable annual increase percentages
+- **Bulk Renewal Management**: Handle multiple renewals at once
+- **Renewal Templates**: Save common renewal terms as templates
+- **Advanced Notifications**: Email/SMS notifications for critical renewals
 
 

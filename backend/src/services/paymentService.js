@@ -817,15 +817,39 @@ export const getUpcomingPayments = async (userId) => {
     const upcoming = [];
     const startDate = new Date(activeLease.rentalRequest.moveInDate);
 
-    // Calculate lease end date if not available
-    let endDate;
+    // Load actual Lease row to respect termination schedule (if any)
+    let terminationEffectiveDate = null;
+    try {
+      const leaseRow = await prisma.lease.findFirst({
+        where: {
+          rentalRequestId: activeLease.rentalRequestId,
+        },
+        select: {
+          terminationEffectiveDate: true,
+          terminationNoticeDate: true,
+          status: true,
+        },
+      });
+      terminationEffectiveDate = leaseRow?.terminationEffectiveDate
+        ? new Date(leaseRow.terminationEffectiveDate)
+        : null;
+    } catch {}
+
+    // Calculate contractual end date (offer-level) as baseline
+    let endDateBaseline;
     if (activeLease.leaseEndDate) {
-      endDate = new Date(activeLease.leaseEndDate);
+      endDateBaseline = new Date(activeLease.leaseEndDate);
     } else {
-      // Fallback: calculate end date from start date + lease duration
-      endDate = new Date(startDate);
-      endDate.setMonth(endDate.getMonth() + (activeLease.leaseDuration || 12));
+      endDateBaseline = new Date(startDate);
+      endDateBaseline.setMonth(
+        endDateBaseline.getMonth() + (activeLease.leaseDuration || 12)
+      );
     }
+
+    // Final end date honors termination (earliest of termination vs baseline)
+    const endDate = terminationEffectiveDate
+      ? new Date(terminationEffectiveDate)
+      : endDateBaseline;
 
     const monthlyRent = activeLease.rentAmount;
 

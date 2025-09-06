@@ -5,8 +5,10 @@ import {
   handleEarlyMoveOut,
   handle24HourTermination,
   getLeaseStatusHistory,
+  getLeaseByOffer,
 } from '../controllers/leaseController.js';
 import { listLeaseMoveInIssues } from '../controllers/moveInIssueController.js';
+import { getActiveLeaseByOffer, getActiveLeaseByTenant } from '../controllers/leaseController.js';
 
 const router = express.Router();
 
@@ -29,5 +31,10 @@ router.get('/:leaseId/status-history', getLeaseStatusHistory);
 
 // List move-in issues for a specific lease
 router.get('/:leaseId/move-in-issues', listLeaseMoveInIssues);
+
+// Lookup lease by offer (used by landlord UI); safe read-only
+router.get('/by-offer/:offerId', getLeaseByOffer);
+router.get('/active-by-offer/:offerId', getActiveLeaseByOffer);
+router.get('/active-by-tenant/:tenantId', getActiveLeaseByTenant);
 
 export default router;

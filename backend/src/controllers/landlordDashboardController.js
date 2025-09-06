@@ -267,16 +267,17 @@ const getLandlordDashboard = async (req, res) => {
       status: 'In Progress',
     });
 
-    // Get upcoming renewals count - Fixed query to go through offers
-    const upcomingRenewals = await prisma.offer.count({
+    // Get upcoming renewals count for the next 60 days based on active leases
+    const sixtyDaysFromNow = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+    const upcomingRenewals = await prisma.lease.count({
       where: {
-        organization: {
-          members: { some: { userId: landlordId } },
-        },
-        status: 'PAID',
-        leaseEndDate: {
+        status: 'ACTIVE',
+        endDate: {
           gte: new Date(),
-          lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Next 30 days
+          lte: sixtyDaysFromNow,
+        },
+        property: {
+          organization: { members: { some: { userId: landlordId } } },
         },
       },
     });

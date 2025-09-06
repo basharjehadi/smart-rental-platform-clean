@@ -1,5 +1,10 @@
 import { prisma } from '../utils/prisma.js';
 import leaseEventService from '../services/leaseEventService.js';
+import {
+  resolveTerminationPolicy,
+  computeEarliestTerminationEnd,
+  getTerminationPolicyExplanation,
+} from '../utils/dateUtils.js';
 
 /**
  * 🏠 Lease Controller
@@ -466,6 +471,153 @@ export const getLeaseStatusHistory = async (req, res) => {
       error: 'Internal server error',
       message: 'Failed to get lease status history',
     });
+  }
+};
+
+/**
+ * Get lease by offer ID (read-only)
+ * - Returns the lease associated with a given offer, if any
+ * - Adds a terminationPolicyPreview for convenience
+ */
+export const getLeaseByOffer = async (req, res) => {
+  try {
+    const { offerId } = req.params;
+    if (!offerId) {
+      return res.status(400).json({ error: 'Missing offerId' });
+    }
+
+    // Prefer returning the ORIGINAL lease for a given offer
+    let lease = await prisma.lease.findFirst({
+      where: { offerId, leaseType: 'ORIGINAL' },
+      include: {
+        property: true,
+        offer: { include: { organization: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Fallback: if no ORIGINAL lease found (data might be legacy), return the oldest lease
+    if (!lease) {
+      lease = await prisma.lease.findFirst({
+        where: { offerId },
+        include: {
+          property: true,
+          offer: { include: { organization: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+    }
+
+    // Optional convenience: attach termination policy preview if lease exists
+    let terminationPolicyPreview = null;
+    if (lease) {
+      try {
+        const policy = resolveTerminationPolicy(lease);
+        const earliestEnd = computeEarliestTerminationEnd(new Date(), policy);
+        terminationPolicyPreview = {
+          cutoffDay: policy.cutoffDay,
+          minNoticeDays: policy.minNoticeDays,
+          timezone: policy.timezone,
+          earliestEnd: earliestEnd.toISOString(),
+          explanation: getTerminationPolicyExplanation(policy),
+        };
+      } catch (e) {
+        // Do not fail the endpoint if preview fails; just omit it
+      }
+    }
+
+    return res.json({ success: true, lease, terminationPolicyPreview });
+  } catch (error) {
+    console.error('Get lease by offer error:', error);
+    return res.status(500).json({ error: 'Failed to get lease by offer' });
+  }
+};
+
+/**
+ * Get the active lease for a given offer, considering renewal lifecycle
+ * - Returns both originalLease and activeLease
+ * - Active lease is the renewal that has started; otherwise the original
+ */
+export const getActiveLeaseByOffer = async (req, res) => {
+  try {
+    const { offerId } = req.params;
+    if (!offerId) {
+      return res.status(400).json({ error: 'Missing offerId' });
+    }
+
+    // Find the original lease linked to the offer
+    const originalLease = await prisma.lease.findFirst({
+      where: { offerId, leaseType: 'ORIGINAL' },
+      include: {
+        property: true,
+        offer: { include: { organization: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (!originalLease) {
+      return res.status(404).json({ error: 'Original lease not found for offer' });
+    }
+
+    // Fetch all leases for the same rental request to evaluate renewal state
+    const allLeases = await prisma.lease.findMany({
+      where: { rentalRequestId: originalLease.rentalRequestId },
+      orderBy: { startDate: 'asc' },
+    });
+
+    const today = new Date();
+    // Choose the active lease: latest renewal whose startDate has passed; otherwise the original
+    const startedRenewals = allLeases
+      .filter(l => l.leaseType === 'RENEWAL' && new Date(l.startDate) <= today)
+      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+    const activeLease = startedRenewals.length > 0
+      ? startedRenewals[startedRenewals.length - 1]
+      : originalLease;
+
+    return res.json({ success: true, originalLease, activeLease, leases: allLeases });
+  } catch (error) {
+    console.error('Get active lease by offer error:', error);
+    return res.status(500).json({ error: 'Failed to get active lease by offer' });
+  }
+};
+
+/**
+ * Get active lease by tenant userId
+ */
+export const getActiveLeaseByTenant = async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    if (!tenantId) return res.status(400).json({ error: 'Missing tenantId' });
+
+    // All leases belonging to any rentalRequest for this tenant
+    const allLeases = await prisma.lease.findMany({
+      where: {
+        rentalRequest: {
+          tenantGroup: { members: { some: { userId: tenantId } } },
+        },
+      },
+      orderBy: { startDate: 'asc' },
+    });
+
+    if (allLeases.length === 0) {
+      return res.json({ success: true, activeLease: null, leases: [] });
+    }
+
+    const originalLease = allLeases.find(l => l.leaseType === 'ORIGINAL') || allLeases[0];
+    const today = new Date();
+    const startedRenewals = allLeases
+      .filter(l => l.leaseType === 'RENEWAL' && new Date(l.startDate) <= today)
+      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+    const activeLease = startedRenewals.length > 0
+      ? startedRenewals[startedRenewals.length - 1]
+      : originalLease;
+
+    return res.json({ success: true, originalLease, activeLease, leases: allLeases });
+  } catch (error) {
+    console.error('Get active lease by tenant error:', error);
+    return res.status(500).json({ error: 'Failed to get active lease by tenant' });
   }
 };
 

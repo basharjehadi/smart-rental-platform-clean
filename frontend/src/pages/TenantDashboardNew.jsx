@@ -170,7 +170,7 @@ const TenantDashboardNew = () => {
     }
   }, [dashboardData]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (skipRenewals = false) => {
     try {
       console.log('🔍 Frontend: Starting dashboard data fetch...');
       setLoading(true);
@@ -205,28 +205,45 @@ const TenantDashboardNew = () => {
       } else if (dashboardResponse.data?.offerId) {
         setFocusedOfferId(dashboardResponse.data.offerId);
       }
-      // Fetch lease meta for the focused or single offer (temporarily disabled)
-      // TODO: Implement proper lease metadata endpoints
+      // Fetch lease meta for the focused or single offer
       try {
-        // const offerForMeta =
-        //   dashboardResponse.data?.leases?.[0]?.offerId ||
-        //   dashboardResponse.data?.offerId;
-        // if (offerForMeta) {
-        //   const metaResp = await api.get(`/leases/by-offer/${offerForMeta}`);
-        //   setLeaseMeta(metaResp.data?.lease || null);
-        //   const leaseId = metaResp.data?.lease?.id;
-        //   if (leaseId) {
-        //     const threadResp = await api.get(`/leases/${leaseId}/renewals`);
-        //     setRenewals(threadResp.data?.renewals || []);
-        //   } else {
-        //     setRenewals([]);
-        //   }
-        // } else {
-        //   setLeaseMeta(null);
-        //   setRenewals([]);
-        // }
-        setLeaseMeta(null);
-        setRenewals([]);
+        const offerForMeta =
+          dashboardResponse.data?.leases?.[0]?.offerId ||
+          dashboardResponse.data?.offerId;
+        if (offerForMeta) {
+          console.log('🔍 Frontend: Fetching lease meta for offer:', offerForMeta);
+          const metaResp = await api.get(`/leases/by-offer/${offerForMeta}`);
+          console.log('🔍 Frontend: Lease meta response:', metaResp.data);
+          setLeaseMeta(metaResp.data?.lease || null);
+          
+          // Get the original lease ID for renewals (not the renewal lease)
+          const allLeases = dashboardResponse.data?.leases?.map(l => l.lease).filter(Boolean) || [];
+          console.log('🔍 Frontend: Dashboard leases data:', dashboardResponse.data?.leases);
+          console.log('🔍 Frontend: All leases after mapping:', allLeases);
+          console.log('🔍 Frontend: All leases details:', allLeases.map(l => ({ id: l.id, type: l.leaseType, startDate: l.startDate })));
+          
+          const originalLease = allLeases.find(lease => lease.leaseType === 'ORIGINAL');
+          console.log('🔍 Frontend: Original lease found:', originalLease);
+          
+          const leaseIdForRenewals = originalLease?.id || metaResp.data?.lease?.id;
+          console.log('🔍 Frontend: Lease ID for renewals (final):', leaseIdForRenewals);
+          
+          if (leaseIdForRenewals && !skipRenewals) {
+            console.log('🔍 Frontend: Fetching renewals for lease:', leaseIdForRenewals);
+            const threadResp = await api.get(`/leases/${leaseIdForRenewals}/renewals`);
+            console.log('🔍 Frontend: Renewals response:', threadResp.data);
+            setRenewals(threadResp.data?.renewals || []);
+          } else if (skipRenewals) {
+            // Clear renewals since renewal process is complete
+            setRenewals([]);
+          } else {
+            setRenewals([]);
+          }
+        } else {
+          console.log('🔍 Frontend: No offer for meta found');
+          setLeaseMeta(null);
+          setRenewals([]);
+        }
       } catch {
         setLeaseMeta(null);
         setRenewals([]);
@@ -258,7 +275,50 @@ const TenantDashboardNew = () => {
   const currentOfferId = currentLease?.offerId || dashboardData?.offerId;
   const currentProperty = currentLease?.property || dashboardData?.property;
   const currentLandlord = currentLease?.landlord || dashboardData?.landlord;
-  const currentLeaseInfo = currentLease?.lease || dashboardData?.lease;
+  
+  // Smart lease selection logic for renewal lifecycle
+  const getCurrentLeaseInfo = () => {
+    const allLeases = leases.map(l => l.lease).filter(Boolean);
+    if (allLeases.length === 0) return dashboardData?.lease;
+    
+    const today = new Date();
+    
+    // Find renewal lease that has already started
+    const activeRenewalLease = allLeases.find(lease => 
+      lease.leaseType === 'RENEWAL' && 
+      new Date(lease.startDate) <= today
+    );
+    
+    if (activeRenewalLease) {
+      console.log('🔄 Using active renewal lease:', activeRenewalLease.id);
+      return activeRenewalLease;
+    }
+    
+    // Find renewal lease that hasn't started yet
+    const futureRenewalLease = allLeases.find(lease => 
+      lease.leaseType === 'RENEWAL' && 
+      new Date(lease.startDate) > today
+    );
+    
+    if (futureRenewalLease) {
+      // If there's a future renewal, show the original lease until renewal starts
+      const originalLease = allLeases.find(lease => 
+        lease.leaseType === 'ORIGINAL' && 
+        lease.id === futureRenewalLease.parentLeaseId
+      );
+      if (originalLease) {
+        console.log('📅 Using original lease (renewal pending):', originalLease.id);
+        return originalLease;
+      }
+    }
+    
+    // Fallback to the most recent lease or dashboard data
+    const mostRecentLease = allLeases.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+    console.log('📋 Using most recent lease:', mostRecentLease?.id);
+    return mostRecentLease || dashboardData?.lease;
+  };
+  
+  const currentLeaseInfo = getCurrentLeaseInfo();
   const currentOfferForMeta = currentLease?.offerId || dashboardData?.offerId;
   const latestRenewal =
     renewals.length > 0 ? renewals[renewals.length - 1] : null;
@@ -314,115 +374,56 @@ const TenantDashboardNew = () => {
       // Add a small delay to ensure dashboard data is properly loaded
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // First, check if there's an existing contract in the database
-      let existingContract = null;
+      // Get the current lease ID for contract serving
+      const leaseId = currentLeaseInfo?.id;
+      if (!leaseId) {
+        console.log('❌ Dashboard: No lease ID found for contract viewing');
+        alert('No active lease found to view contract.');
+        return;
+      }
+
       try {
-        console.log('🔍 Dashboard: Checking for existing contract...');
-        const contractResponse = await api.get(`/contracts/my-contracts`);
-        console.log('🔍 Dashboard: Contract response:', contractResponse.data);
-
-        if (contractResponse.data.contracts) {
-          console.log(
-            '🔍 Dashboard: Found contracts, searching for offer ID:',
-            currentOfferId
-          );
-          existingContract = contractResponse.data.contracts.find(contract =>
-            contract.rentalRequest.offers.some(
-              offer => offer.id === currentOfferId
-            )
-          );
-
-          if (existingContract) {
+        // Get the appropriate contract for the current lease
+        console.log('🔍 Dashboard: Getting contract for lease:', leaseId);
+        const contractResponse = await api.get(`/contracts/lease/${leaseId}`);
+        
+        if (contractResponse.data.success && contractResponse.data.contract) {
+          const contract = contractResponse.data.contract;
+          console.log('✅ Dashboard: Found contract for lease:', contract);
+          
+          // Check if PDF URL exists and is valid
+          if (
+            contract.pdfUrl &&
+            contract.pdfUrl !== 'null' &&
+            contract.pdfUrl !== null
+          ) {
             console.log(
-              '✅ Dashboard: Found existing contract, checking PDF URL:',
-              existingContract.pdfUrl
+              '✅ Dashboard: Opening contract with URL:',
+              `http://localhost:3001${contract.pdfUrl}`
             );
-
-            // Check if PDF URL exists and is valid
-            if (
-              existingContract.pdfUrl &&
-              existingContract.pdfUrl !== 'null' &&
-              existingContract.pdfUrl !== null
-            ) {
-              console.log(
-                '✅ Dashboard: Opening saved contract with URL:',
-                `http://localhost:3001${existingContract.pdfUrl}`
-              );
-              window.open(
-                `http://localhost:3001${existingContract.pdfUrl}`,
-                '_blank'
-              );
-              return;
-            } else {
-              console.log(
-                '⚠️ Dashboard: Contract found but PDF URL is invalid, will generate on-the-fly'
-              );
-            }
+            window.open(
+              `http://localhost:3001${contract.pdfUrl}`,
+              '_blank'
+            );
+            return;
           } else {
             console.log(
-              'ℹ️ Dashboard: No matching contract found for offer ID:',
-              dashboardData.offerId
+              '⚠️ Dashboard: Contract found but PDF URL is invalid'
             );
+            alert('Contract found but PDF is not available.');
+            return;
           }
         } else {
-          console.log('ℹ️ Dashboard: No contracts in response');
+          console.log('❌ Dashboard: No contract found for lease');
+          alert('No contract found for this lease.');
+          return;
         }
       } catch (contractError) {
         console.error(
-          '❌ Dashboard: Error checking for existing contract:',
+          '❌ Dashboard: Error getting contract for lease:',
           contractError
         );
-        console.log('ℹ️ Dashboard: Will generate on-the-fly due to error');
-      }
-
-      // If no existing contract, generate on-the-fly using backend
-      console.log(
-        '🔍 Dashboard: No existing contract found, generating via backend...'
-      );
-
-      try {
-        // Call backend to generate contract by offer ID
-        const generateResponse = await api.post(
-          `/contracts/generate-by-offer/${currentOfferId}`
-        );
-
-        if (generateResponse.data.success) {
-          // Open the newly generated contract in a new tab
-          const contractUrl = `http://localhost:3001${generateResponse.data.contract.pdfUrl}`;
-          window.open(contractUrl, '_blank');
-          return;
-        }
-      } catch (generateError) {
-        console.error(
-          '❌ Dashboard: Error generating contract via backend:',
-          generateError
-        );
-        console.log('⚠️ Dashboard: Falling back to frontend generation');
-
-        // Fallback to frontend generation
-        const response = await api.get(`/tenant/offer/${currentOfferId}`);
-        const offerData = response.data;
-
-        // If we found an existing contract but with invalid PDF, use its data for consistency
-        if (existingContract) {
-          console.log(
-            '🔍 Dashboard: Using existing contract data for consistency:',
-            {
-              contractNumber: existingContract.contractNumber,
-              createdAt: existingContract.createdAt,
-              paymentDate: existingContract.paymentDate,
-            }
-          );
-
-          // Add the original contract data to the offer
-          offerData.offer.originalContractNumber =
-            existingContract.contractNumber;
-          offerData.offer.originalContractDate = existingContract.createdAt;
-          offerData.offer.originalPaymentDate = existingContract.paymentDate;
-        }
-
-        console.log('🔍 Dashboard: Offer data for contract:', offerData);
-        await viewContract(offerData.offer, user);
+        alert('Error retrieving contract. Please try again.');
       }
     } catch (error) {
       console.error('❌ Dashboard: Error viewing contract:', error);
@@ -460,149 +461,78 @@ const TenantDashboardNew = () => {
         return;
       }
 
-      // First, check if there's an existing contract in the database
-      let existingContract = null;
+      // Get the current lease ID for contract serving
+      const leaseId = currentLeaseInfo?.id;
+      if (!leaseId) {
+        console.log('❌ Dashboard: No lease ID found for contract download');
+        alert('No active lease found to download contract.');
+        return;
+      }
+
       try {
-        console.log('🔍 Dashboard: Checking for existing contract...');
-        const contractResponse = await api.get(`/contracts/my-contracts`);
-        console.log('🔍 Dashboard: Contract response:', contractResponse.data);
-
-        if (contractResponse.data.contracts) {
-          console.log(
-            '🔍 Dashboard: Found contracts, searching for offer ID:',
-            currentOfferId
-          );
-          existingContract = contractResponse.data.contracts.find(contract =>
-            contract.rentalRequest.offers.some(
-              offer => offer.id === currentOfferId
-            )
-          );
-
-          if (existingContract) {
+        // Get the appropriate contract for the current lease
+        console.log('🔍 Dashboard: Getting contract for lease:', leaseId);
+        const contractResponse = await api.get(`/contracts/lease/${leaseId}`);
+        
+        if (contractResponse.data.success && contractResponse.data.contract) {
+          const contract = contractResponse.data.contract;
+          console.log('✅ Dashboard: Found contract for lease:', contract);
+          
+          // Check if PDF URL exists and is valid
+          if (
+            contract.pdfUrl &&
+            contract.pdfUrl !== 'null' &&
+            contract.pdfUrl !== null
+          ) {
             console.log(
-              '✅ Dashboard: Found existing contract, checking PDF URL:',
-              existingContract.pdfUrl
+              '✅ Dashboard: Downloading contract with URL:',
+              `http://localhost:3001${contract.pdfUrl}`
             );
 
-            // Check if PDF URL exists and is valid
-            if (
-              existingContract.pdfUrl &&
-              existingContract.pdfUrl !== 'null' &&
-              existingContract.pdfUrl !== null
-            ) {
-              console.log(
-                '✅ Dashboard: Downloading saved contract with URL:',
-                `http://localhost:3001${existingContract.pdfUrl}`
-              );
-
-              // Download the existing contract
-              const response = await fetch(
-                `http://localhost:3001${existingContract.pdfUrl}`,
-                {
-                  headers: {
-                    Authorization: `Bearer ${localStorage.getItem('token')}`,
-                  },
-                }
-              );
-
-              if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `rental-contract-${existingContract.contractNumber}.pdf`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-                return;
+            // Download the contract
+            const response = await fetch(
+              `http://localhost:3001${contract.pdfUrl}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem('token')}`,
+                },
               }
+            );
+
+            if (response.ok) {
+              const blob = await response.blob();
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `rental-contract-${contract.contractNumber}.pdf`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(url);
+              return;
             } else {
-              console.log(
-                '⚠️ Dashboard: Contract found but PDF URL is invalid, will generate on-the-fly'
-              );
+              console.log('❌ Dashboard: Failed to download contract PDF');
+              alert('Failed to download contract PDF.');
+              return;
             }
           } else {
             console.log(
-              'ℹ️ Dashboard: No matching contract found for offer ID:',
-              dashboardData.offerId
+              '⚠️ Dashboard: Contract found but PDF URL is invalid'
             );
+            alert('Contract found but PDF is not available.');
+            return;
           }
         } else {
-          console.log('ℹ️ Dashboard: No contracts in response');
+          console.log('❌ Dashboard: No contract found for lease');
+          alert('No contract found for this lease.');
+          return;
         }
       } catch (contractError) {
         console.error(
-          '❌ Dashboard: Error checking for existing contract:',
+          '❌ Dashboard: Error getting contract for lease:',
           contractError
         );
-        console.log('ℹ️ Dashboard: Will generate on-the-fly due to error');
-      }
-
-      // If no existing contract, generate on-the-fly using backend
-      console.log(
-        '🔍 Dashboard: No existing contract found, generating via backend...'
-      );
-
-      try {
-        // Call backend to generate contract by offer ID
-        const generateResponse = await api.post(
-          `/contracts/generate-by-offer/${currentOfferId}`
-        );
-
-        if (generateResponse.data.success) {
-          // Download the newly generated contract
-          const contractUrl = `http://localhost:3001${generateResponse.data.contract.pdfUrl}`;
-          const response = await fetch(contractUrl, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('token')}`,
-            },
-          });
-
-          if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `rental-contract-${generateResponse.data.contract.contractNumber}.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-            return;
-          }
-        }
-      } catch (generateError) {
-        console.error(
-          '❌ Dashboard: Error generating contract via backend:',
-          generateError
-        );
-        console.log('⚠️ Dashboard: Falling back to frontend generation');
-
-        // Fallback to frontend generation
-        const response = await api.get(`/tenant/offer/${currentOfferId}`);
-        const offerData = response.data;
-
-        // If we found an existing contract but with invalid PDF, use its data for consistency
-        if (existingContract) {
-          console.log(
-            '🔍 Dashboard: Using existing contract data for consistency:',
-            {
-              contractNumber: existingContract.contractNumber,
-              createdAt: existingContract.createdAt,
-              paymentDate: existingContract.paymentDate,
-            }
-          );
-
-          // Add the original contract data to the offer
-          offerData.offer.originalContractNumber =
-            existingContract.contractNumber;
-          offerData.offer.originalContractDate = existingContract.createdAt;
-          offerData.offer.originalPaymentDate = existingContract.paymentDate;
-        }
-
-        console.log('🔍 Dashboard: Offer data for download:', offerData);
-        await downloadContract(offerData.offer, user);
+        alert('Error retrieving contract. Please try again.');
       }
     } catch (error) {
       console.error('❌ Dashboard: Error downloading contract:', error);
@@ -663,18 +593,20 @@ const TenantDashboardNew = () => {
   };
 
   const calculateDaysToRenewal = () => {
-    const leaseObj = dashboardData.lease;
+    // Get the current active lease using our smart selection logic
+    const currentLease = currentLeaseInfo || dashboardData.lease;
     if (
       !dashboardData.hasActiveLease ||
-      !leaseObj?.startDate ||
-      !leaseObj?.endDate
+      !currentLease?.startDate ||
+      !currentLease?.endDate
     )
       return 'N/A';
-    const startDate = new Date(leaseObj.startDate);
-    const endDate = new Date(leaseObj.endDate);
+    
+    const startDate = new Date(currentLease.startDate);
+    const endDate = new Date(currentLease.endDate);
     const today = new Date();
 
-    // If lease hasn't started yet
+    // If lease hasn't started yet (shouldn't happen with our smart logic, but just in case)
     if (today < startDate) {
       const daysToStart = Math.ceil(
         (startDate - today) / (1000 * 60 * 60 * 24)
@@ -690,19 +622,21 @@ const TenantDashboardNew = () => {
       return 'Lease expired';
     }
 
-    return `${diffDays} days`;
+    return `${diffDays} days until lease renewal`;
   };
 
   const calculateLeaseProgress = () => {
-    const leaseObj = dashboardData.lease;
+    // Get the current active lease (most recent one)
+    const currentLease = currentLeaseInfo || dashboardData.lease;
     if (
       !dashboardData.hasActiveLease ||
-      !leaseObj?.startDate ||
-      !leaseObj?.endDate
+      !currentLease?.startDate ||
+      !currentLease?.endDate
     )
       return 0;
-    const startDate = new Date(leaseObj.startDate);
-    const endDate = new Date(leaseObj.endDate);
+    
+    const startDate = new Date(currentLease.startDate);
+    const endDate = new Date(currentLease.endDate);
     const today = new Date();
 
     const totalDuration = endDate - startDate;
@@ -1393,34 +1327,67 @@ const TenantDashboardNew = () => {
                 <div className='space-y-4'>
                   <div>
                     <p className='text-sm text-gray-600'>
-                      {formatDate(dashboardData.lease?.startDate)} -{' '}
-                      {formatDate(dashboardData.lease?.endDate)}
+                      {formatDate(currentLeaseInfo?.startDate || dashboardData.lease?.startDate)} -{' '}
+                      {formatDate(currentLeaseInfo?.endDate || dashboardData.lease?.endDate)}
                     </p>
                   </div>
-                  <div>
-                    <div className='flex justify-between text-sm mb-1'>
-                      <span className='text-gray-600'>Lease Completion</span>
-                      <span className='font-medium'>
-                        {Math.round(calculateLeaseProgress())}%
-                      </span>
-                    </div>
-                    <div className='w-full bg-gray-200 rounded-full h-2'>
-                      <div
-                        className='bg-blue-600 h-2 rounded-full transition-all duration-300'
-                        style={{ width: `${calculateLeaseProgress()}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                  <div className='bg-gray-100 rounded-lg p-3'>
-                    <p className='text-sm text-orange-600 font-medium'>
-                      {calculateDaysToRenewal()} days until lease renewal
-                    </p>
-                  </div>
+                  {!leaseMeta?.terminationNoticeDate && (
+                    <>
+                      <div>
+                        <div className='flex justify-between text-sm mb-1'>
+                          <span className='text-gray-600'>Lease Completion</span>
+                          <span className='font-medium'>
+                            {Math.round(calculateLeaseProgress())}%
+                          </span>
+                        </div>
+                        <div className='w-full bg-gray-200 rounded-full h-2'>
+                          <div
+                            className='bg-blue-600 h-2 rounded-full transition-all duration-300'
+                            style={{ width: `${calculateLeaseProgress()}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      <div className='bg-gray-100 rounded-lg p-3'>
+                        <p className='text-sm text-orange-600 font-medium'>
+                          {calculateDaysToRenewal()}
+                        </p>
+                      </div>
+                    </>
+                  )}
                   {/* Lease metadata will be loaded separately if needed */}
                   <div className='space-y-2'>
                     {/* Placeholder for future lease metadata */}
                   </div>
                   {/* Two-column layout: left stable actions, right renewal */}
+                  {/* Informational banner when termination exists */}
+                  {leaseMeta?.terminationNoticeDate && (
+                    <div className='mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3 text-amber-900'>
+                      <div className='flex items-center justify-between'>
+                        <div>
+                          <span className='font-semibold'>Termination scheduled</span>
+                          {': '}Effective {new Date(leaseMeta.terminationEffectiveDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          {leaseMeta.terminationReason ? ` — Reason: ${leaseMeta.terminationReason}` : ''}
+                        </div>
+                      </div>
+                      {(() => {
+                        const today = new Date();
+                        const end = new Date(leaseMeta.terminationEffectiveDate);
+                        const start = new Date(leaseMeta.terminationNoticeDate);
+                        const total = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+                        const done = Math.min(total, Math.max(0, Math.ceil((today - start) / (1000 * 60 * 60 * 24))));
+                        const pct = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
+                        return (
+                          <div className='mt-2'>
+                            <div className='w-full h-2 bg-amber-100 rounded'>
+                              <div className='h-2 bg-amber-500 rounded' style={{ width: `${pct}%` }} />
+                            </div>
+                            <div className='mt-1 text-xs text-amber-800'>{pct}% of notice period elapsed</div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
                   <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
                     {/* Left column */}
                     <div className='space-y-2 bg-gray-50 border border-gray-200 rounded-lg p-3'>
@@ -1439,6 +1406,7 @@ const TenantDashboardNew = () => {
                       >
                         Download Contract
                       </button>
+                      {!(leaseMeta?.terminationNoticeDate) && (
                       <button
                         onClick={() => setShowEndModal(true)}
                         className='w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2'
@@ -1447,6 +1415,7 @@ const TenantDashboardNew = () => {
                         <AlertTriangle className='w-4 h-4' />
                         <span>End Lease</span>
                       </button>
+                      )}
                     </div>
 
                     {/* Right column */}
@@ -1454,18 +1423,106 @@ const TenantDashboardNew = () => {
                       <div className='text-sm font-semibold text-indigo-800 mb-1'>
                         Renewal
                       </div>
-                      <button
-                        onClick={() => setShowRenewalModal(true)}
-                        className='w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors'
-                        title='Request lease renewal'
-                      >
-                        Request Renewal
-                      </button>
+                      {leaseMeta?.terminationNoticeDate && (
+                        <div className='text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2'>
+                          Unavailable: termination already scheduled for {new Date(leaseMeta.terminationEffectiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </div>
+                      )}
+                      {!(leaseMeta?.terminationNoticeDate) && (() => {
+                        const activeRenewals = renewals.filter(r => r.status === 'PENDING' || r.status === 'COUNTERED');
+                        const expiredRenewals = renewals.filter(r => r.status === 'EXPIRED');
+                        const acceptedRenewals = renewals.filter(r => r.status === 'ACCEPTED');
+                        
+                        // Check if lease is actually finishing (within 60 days of end date)
+                        const isLeaseFinishing = (() => {
+                          const leaseObj = currentLeaseInfo;
+                          if (!leaseObj?.endDate) return false;
+                          
+                          const endDate = new Date(leaseObj.endDate);
+                          const today = new Date();
+                          const daysUntilEnd = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
+                          
+                          return daysUntilEnd <= 60 && daysUntilEnd > 0; // Within 60 days but not expired
+                        })();
+                        
+                        if (!isLeaseFinishing) {
+                          return (
+                            <div className='text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2'>
+                              Renewal available when lease is within 60 days of ending
+                            </div>
+                          );
+                        }
+                        
+                        // If there's an accepted renewal, check if the new lease has started
+                        if (acceptedRenewals.length > 0) {
+                          // Find the renewal lease from all leases
+                          const allLeases = leases.map(l => l.lease).filter(Boolean);
+                          const acceptedRenewal = acceptedRenewals[0];
+                          const renewalLease = allLeases.find(lease => 
+                            lease.leaseType === 'RENEWAL' && 
+                            lease.parentLeaseId === acceptedRenewal.leaseId
+                          );
+                          
+                          const today = new Date();
+                          const renewalStartDate = renewalLease?.startDate ? new Date(renewalLease.startDate) : null;
+                          
+                          // If renewal lease has started, don't show renewal messages at all
+                          if (renewalStartDate && renewalStartDate <= today) {
+                            return null; // Hide all renewal messages when new lease is active
+                          }
+                          
+                          // If renewal is accepted but hasn't started yet, show accepted message
+                          return (
+                            <div className='text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2'>
+                              Renewal already accepted
+                            </div>
+                          );
+                        }
+                        
+                        if (activeRenewals.length === 0 && expiredRenewals.length === 0) {
+                          return (
+                            <button
+                              onClick={() => setShowRenewalModal(true)}
+                              className='w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors'
+                              title='Request lease renewal'
+                            >
+                              Request Renewal
+                            </button>
+                          );
+                        } else if (activeRenewals.length > 0) {
+                          return (
+                            <div className='text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2'>
+                              Renewal request already pending
+                            </div>
+                          );
+                        } else if (expiredRenewals.length > 0) {
+                          return (
+                            <div className='space-y-2'>
+                              <div className='text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2'>
+                                Previous renewal expired. You can create a new request.
+                              </div>
+                              <button
+                                onClick={() => setShowRenewalModal(true)}
+                                className='w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors'
+                                title='Request lease renewal'
+                              >
+                                Request Renewal
+                              </button>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
 
-                      {renewals.length > 0 && (
+                      {renewals.length > 0 && !renewals.some(r => r.status === 'ACCEPTED') && (
                         <div className='bg-white border border-indigo-200 rounded p-3'>
-                          <div className='text-sm font-semibold text-indigo-800 mb-2'>
-                            Renewal thread
+                          <div className='flex items-center justify-between mb-2'>
+                            <div className='text-sm font-semibold text-indigo-800'>
+                              Renewal thread
+                            </div>
+                            <div className='text-xs text-gray-500 bg-blue-50 px-2 py-1 rounded'>
+                              ⏰ Requests expire after 7 days
+                            </div>
                           </div>
                           <div className='space-y-2 max-h-48 overflow-auto pr-1'>
                             {renewals
@@ -1480,11 +1537,31 @@ const TenantDashboardNew = () => {
                                     <span className='font-medium'>
                                       {r.status}
                                     </span>
-                                    <span className='text-[10px] text-gray-500'>
-                                      {new Date(
-                                        r.createdAt
-                                      ).toLocaleDateString()}
-                                    </span>
+                                    <div className='text-right'>
+                                      <div className='text-[10px] text-gray-500'>
+                                        {new Date(r.createdAt).toLocaleDateString()}
+                                      </div>
+                                      {r.expiresAt && (r.status === 'PENDING' || r.status === 'COUNTERED') && (() => {
+                                        const now = new Date();
+                                        const expires = new Date(r.expiresAt);
+                                        const hoursLeft = Math.max(0, Math.ceil((expires - now) / (1000 * 60 * 60)));
+                                        const daysLeft = Math.max(0, Math.ceil((expires - now) / (1000 * 60 * 60 * 24)));
+                                        
+                                        if (hoursLeft < 24) {
+                                          return (
+                                            <div className='text-[9px] text-red-600'>
+                                              Expires in {hoursLeft}h
+                                            </div>
+                                          );
+                                        } else {
+                                          return (
+                                            <div className='text-[9px] text-orange-600'>
+                                              Expires in {daysLeft}d
+                                            </div>
+                                          );
+                                        }
+                                      })()}
+                                    </div>
                                   </div>
                                   {r.proposedMonthlyRent != null && (
                                     <div className='mt-1'>
@@ -1526,14 +1603,10 @@ const TenantDashboardNew = () => {
                                         `/renewals/${latestOpen.id}/accept`,
                                         {}
                                       );
-                                      if (leaseMeta?.id) {
-                                        const threadResp = await api.get(
-                                          `/leases/${leaseMeta.id}/renewals`
-                                        );
-                                        setRenewals(
-                                          threadResp.data?.renewals || []
-                                        );
-                                      }
+                                      
+                                      // Refresh dashboard data to show new lease (skip renewals since process is complete)
+                                      await fetchDashboardData(true);
+                                      
                                       alert(
                                         'Renewal accepted. New lease created.'
                                       );
@@ -1572,6 +1645,152 @@ const TenantDashboardNew = () => {
                             )}
                         </div>
                       )}
+
+                      {/* Renewal Card Lifecycle States */}
+                      {(() => {
+                        // Check if there's an accepted renewal
+                        console.log('🔍 Frontend: Renewal card - renewals:', renewals);
+                        console.log('🔍 Frontend: Renewal card - leases:', leases);
+                        const acceptedRenewal = renewals.find(r => r.status === 'ACCEPTED');
+                        console.log('🔍 Frontend: Renewal card - accepted renewal:', acceptedRenewal);
+                        const allLeases = leases.map(l => l.lease).filter(Boolean);
+                        const today = new Date();
+
+                        // If current active lease is a started renewal, hide the card entirely
+                        const activeLease = getCurrentLeaseInfo?.() || dashboardData.lease;
+                        if (
+                          activeLease &&
+                          activeLease.leaseType === 'RENEWAL' &&
+                          new Date(activeLease.startDate) <= today
+                        ) {
+                          return null;
+                        }
+                        
+                        if (acceptedRenewal && allLeases.length > 0) {
+                          // Find the renewal lease
+                          const renewalLease = allLeases.find(lease => 
+                            lease.leaseType === 'RENEWAL' && 
+                            lease.parentLeaseId === acceptedRenewal.leaseId
+                          );
+                          
+                          if (renewalLease) {
+                            const renewalStart = new Date(renewalLease.startDate);
+                            const renewalEnd = new Date(renewalLease.endDate);
+                            const originalLease = allLeases.find(lease => 
+                              lease.leaseType === 'ORIGINAL' && 
+                              lease.id === renewalLease.parentLeaseId
+                            );
+                            
+                            // Check if we're in transition period (current lease still active, renewal not yet started)
+                            if (today < renewalStart) {
+                              return (
+                                <div className='bg-green-50 border border-green-200 rounded p-3 mt-2'>
+                                  <div className='text-sm font-semibold text-green-800 mb-1'>
+                                    ✅ Renewal Accepted!
+                                  </div>
+                                  <div className='text-xs text-green-700'>
+                                    New lease will begin on {renewalStart.toLocaleDateString('en-US', {
+                                      month: 'long',
+                                      day: 'numeric',
+                                      year: 'numeric'
+                                    })}
+                                  </div>
+                                  <div className='text-xs text-green-700'>
+                                    Renewal lease ends on {renewalEnd.toLocaleDateString('en-US', {
+                                      month: 'long',
+                                      day: 'numeric',
+                                      year: 'numeric'
+                                    })}
+                                  </div>
+                                  {originalLease && (
+                                    <div className='text-xs text-gray-600 mt-1'>
+                                      Current lease ends on {originalLease.endDate.toLocaleDateString('en-US', {
+                                        month: 'long',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            } else {
+                              // Renewal lease is now active
+                              return (
+                                <div className='bg-blue-50 border border-blue-200 rounded p-3 mt-2'>
+                                  <div className='text-sm font-semibold text-blue-800 mb-1'>
+                                    🔄 Renewal Lease Active
+                                  </div>
+                                  <div className='text-xs text-blue-700'>
+                                    Your renewal lease is now active with updated terms
+                                  </div>
+                                  <div className='text-xs text-gray-600 mt-1'>
+                                    Started on {renewalStart.toLocaleDateString('en-US', {
+                                      month: 'long',
+                                      day: 'numeric',
+                                      year: 'numeric'
+                                    })}
+                                  </div>
+                                  <div className='text-xs text-gray-600'>
+                                    Ends on {renewalEnd.toLocaleDateString('en-US', {
+                                      month: 'long',
+                                      day: 'numeric',
+                                      year: 'numeric'
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            }
+                          } else {
+                            // No renewal lease found, but renewal is accepted - compute dates from proposal
+                            const currentLease = currentLeaseInfo || dashboardData.lease;
+                            const originalEnd = currentLease?.endDate ? new Date(currentLease.endDate) : null;
+                            const computedStart = acceptedRenewal.proposedStartDate
+                              ? new Date(acceptedRenewal.proposedStartDate)
+                              : (originalEnd ? new Date(originalEnd.getTime() + 24 * 60 * 60 * 1000) : null);
+                            const months = acceptedRenewal.proposedTermMonths || 12;
+                            const computedEnd = computedStart ? (() => { const d = new Date(computedStart); d.setMonth(d.getMonth() + months); return d; })() : null;
+
+                            // If the computed renewal start date has passed, hide the card
+                            if (computedStart && today >= computedStart) {
+                              return null;
+                            }
+
+                            return (
+                              <div className='bg-green-50 border border-green-200 rounded p-3 mt-2'>
+                                <div className='text-sm font-semibold text-green-800 mb-1'>
+                                  ✅ Renewal Accepted!
+                                </div>
+                                <div className='text-xs text-green-700'>
+                                  Your renewal has been processed successfully
+                                </div>
+                                {computedStart && (
+                                  <div className='text-xs text-gray-700 mt-1'>
+                                    New lease will begin on {computedStart.toLocaleDateString('en-US', {
+                                      month: 'long', day: 'numeric', year: 'numeric'
+                                    })}
+                                  </div>
+                                )}
+                                {computedEnd && (
+                                  <div className='text-xs text-gray-700'>
+                                    Renewal lease ends on {computedEnd.toLocaleDateString('en-US', {
+                                      month: 'long', day: 'numeric', year: 'numeric'
+                                    })}
+                                  </div>
+                                )}
+                                {originalEnd && (
+                                  <div className='text-xs text-gray-600'>
+                                    Current lease ends on {originalEnd.toLocaleDateString('en-US', {
+                                      month: 'long', day: 'numeric', year: 'numeric'
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+                        }
+                        
+                        return null;
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -1623,6 +1842,7 @@ const TenantDashboardNew = () => {
                   d.setDate(d.getDate() + 30);
                   return d.toISOString();
                 })()}
+                terminationPolicyPreview={dashboardData.terminationPolicyPreview}
                 onClose={() => setShowEndModal(false)}
                 onSubmit={async ({ reason, effectiveDate }) => {
                   try {
@@ -1640,7 +1860,7 @@ const TenantDashboardNew = () => {
                       setSendingEnd(false);
                       return;
                     }
-                    await api.post(`/leases/${leaseId}/termination/notice`, {
+                    await api.post(`/leases/${leaseId}/terminations`, {
                       reason: reason || 'Tenant initiated termination',
                       effectiveDate,
                     });
